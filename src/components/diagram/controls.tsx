@@ -1,6 +1,10 @@
 "use client";
 
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export function Slider(props: {
   label: string;
@@ -14,9 +18,9 @@ export function Slider(props: {
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm text-slate-300">
-      <span className="flex justify-between">
+      <span className="flex justify-between gap-2">
         {props.label}
-        <span className="font-mono text-slate-400">
+        <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
           {props.value.toFixed(props.digits ?? 1)}
           {props.unit && ` ${props.unit}`}
         </span>
@@ -89,19 +93,55 @@ export function Readout(props: { label: string; value: string; color?: string })
   );
 }
 
-/** Standard layout: diagram on the left, controls and readouts on the right. */
+/** Wraps the less-used controls: collapsed on desktop, so the readouts sit higher; shown as-is in the sheet. */
+type More = (children: React.ReactNode) => React.ReactNode;
+
+const collapsed: More = (children) => (
+  <Collapsible className="flex flex-col gap-4">
+    <CollapsibleTrigger asChild>
+      <Button variant="ghost" size="sm" className="group h-auto justify-between px-0 text-sm font-normal text-slate-300 hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-slate-300">
+        More settings
+        <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+      </Button>
+    </CollapsibleTrigger>
+    <CollapsibleContent className="flex flex-col gap-4">{children}</CollapsibleContent>
+  </Collapsible>
+);
+const expanded: More = (children) => children;
+
+/**
+ * Standard layout: diagram on the left, controls and readouts on the right. Below the `lg` breakpoint the
+ * controls move into a sheet, opened by a button in the diagram's corner. `controls` can be a function that
+ * passes its less-used controls through `more`, which collapses them on desktop.
+ */
 export function VisualisationLayout(props: {
   diagram: React.ReactNode;
-  controls: React.ReactNode;
+  controls: React.ReactNode | ((more: More) => React.ReactNode);
   readouts?: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const controls = (more: More) => (typeof props.controls === "function" ? props.controls(more) : props.controls);
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">{props.diagram}</div>
+      <div className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+        {props.diagram}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="absolute top-2 right-2 lg:hidden" aria-label="Settings">
+              <SlidersHorizontal />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Settings</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col gap-4 px-4 pb-4">{controls(expanded)}</div>
+          </SheetContent>
+        </Sheet>
+      </div>
       <div className="flex flex-col gap-4">
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-          {props.controls}
+        <section className="hidden flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 lg:flex">
+          {controls(collapsed)}
         </section>
         {props.readouts && (
           <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">

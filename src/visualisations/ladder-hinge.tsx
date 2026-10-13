@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { AngleArc, Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
+import { Separator } from "@/components/ui/separator";
 import { RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
-import { minWallCable, solve } from "./hinged-beam-solver";
+import { minWallCable, solve } from "./ladder-hinge-solver";
 
 const COLORS = {
   tensionBeam: "#38bdf8",
@@ -44,20 +45,24 @@ const clampLen = (v: Vec) => {
 };
 
 /**
- * Beam hinged at the base of a wall. A second, 2 m beam hangs from two cables: one from the wall to
- * one end, one from the other end to the main beam. Everything settles where the energy is lowest.
- * If the hanging beam would cross the main beam, it rests against it instead, hinged where they touch.
- * The wall cable is anchored above and behind the top of the wall (wrapping over the wall's edge when it has
- * to); the beam and the cable's attachment on it reach past the wall height.
+ * A ladder hinged at the base of a wall, with a 2 m stretcher hanging from it: a rope from the wall holds one
+ * end, and an attachment from the other end runs to the ladder. Everything settles where the energy is lowest.
+ * If the stretcher would cross the ladder, it rests against it instead, hinged where they touch.
+ * The rope is anchored above and behind the top of the wall (wrapping over the wall's edge when it has
+ * to); the ladder and the cable's attachment on it reach past the wall height.
+ *
+ * In the code the ladder is the main beam, the stretcher is the hanging beam (or bar), the rope is the
+ * wall cable and the attachment is the beam cable.
  */
-export default function HingedBeam() {
+export default function LadderHinge() {
   const [wallCable, setWallCable] = useState(3);
-  const [beamCable, setBeamCable] = useState(1);
-  const [beamLength, setBeamLength] = useState(5);
-  const [beamMass, setBeamMass] = useState(20);
-  const [barMass, setBarMass] = useState(40);
+  const [beamCable, setBeamCable] = useState(0.25);
+  const [beamLength, setBeamLength] = useState(6.4);
+  const [beamMass, setBeamMass] = useState(30);
+  const [barMass, setBarMass] = useState(80);
   const [wallHeight, setWallHeight] = useState(4);
-  const [attachDistance, setAttachDistance] = useState(5);
+  /** How far along the ladder past the wall height the attachment is. */
+  const [attachAbove, setAttachAbove] = useState(0.5);
   const [anchorUp, setAnchorUp] = useState(0.5);
   const [anchorBack, setAnchorBack] = useState(2);
   const [showComponents, setShowComponents] = useState(false);
@@ -65,18 +70,20 @@ export default function HingedBeam() {
   const round = (v: number) => Math.round(v * 10) / 10;
   const minBeam = round(wallHeight + MIN_CLEARANCE);
 
-  // Raising the wall pushes the beam length and attachment point up so they stay past the wall height.
+  // The attachment keeps its height above the wall as the wall moves. Raising the wall pushes the ladder
+  // length up so it stays past the wall height, and the attachment comes down if the ladder no longer
+  // reaches it; shortening the ladder does the same.
   const changeWallHeight = (h: number) => {
-    const min = round(h + MIN_CLEARANCE);
+    const l = Math.max(beamLength, round(h + MIN_CLEARANCE));
     setWallHeight(h);
-    setBeamLength((l) => Math.max(l, min));
-    setAttachDistance((a) => Math.max(a, min));
+    setBeamLength(l);
+    setAttachAbove((a) => Math.min(a, round(l - h)));
   };
-  // Shortening the beam pulls the attachment point in with it.
   const changeBeamLength = (l: number) => {
     setBeamLength(l);
-    setAttachDistance((a) => Math.min(a, l));
+    setAttachAbove((a) => Math.min(a, round(l - wallHeight)));
   };
+  const attachDistance = Math.min(beamLength, wallHeight + attachAbove);
 
   const beamWeight = beamMass * G;
   const barWeight = barMass * G;
@@ -230,7 +237,7 @@ export default function HingedBeam() {
   const tensionReadouts = (name: "T₁" | "T₂", cable: string, t: Vec | "slack" | null, color: string) => (
     <>
       <Readout
-        label={`Tension, ${cable} cable ${name}`}
+        label={`Tension, ${cable} ${name}`}
         value={t === "slack" ? "slack" : t ? `${len(t).toFixed(0)} N` : NONE}
         color={color}
       />
@@ -390,7 +397,7 @@ export default function HingedBeam() {
             {inBrowser ? diagram : ground}
           </svg>
           <Slider
-            label="Cable: wall → hanging beam"
+            label="Rope length"
             value={cable}
             min={minCable}
             max={10}
@@ -401,18 +408,8 @@ export default function HingedBeam() {
           />
         </div>
       }
-      controls={
+      controls={(more) => (
         <>
-          <Slider
-            label="Cable: hanging beam → beam"
-            value={beamCable}
-            min={0.1}
-            max={1}
-            step={0.05}
-            unit="m"
-            digits={2}
-            onChange={setBeamCable}
-          />
           <Slider
             label="Wall height"
             value={wallHeight}
@@ -423,55 +420,7 @@ export default function HingedBeam() {
             onChange={changeWallHeight}
           />
           <Slider
-            label="Cable anchor above wall"
-            value={anchorUp}
-            min={0.1}
-            max={MAX_ANCHOR_UP}
-            step={0.05}
-            unit="m"
-            digits={2}
-            onChange={setAnchorUp}
-          />
-          <Slider
-            label="Cable anchor back from wall face"
-            value={anchorBack}
-            min={2}
-            max={MAX_ANCHOR_BACK}
-            step={0.05}
-            unit="m"
-            digits={2}
-            onChange={setAnchorBack}
-          />
-          <Slider
-            label="Beam length"
-            value={beamLength}
-            min={minBeam}
-            max={MAX_BEAM_LENGTH}
-            step={0.1}
-            unit="m"
-            onChange={changeBeamLength}
-          />
-          <Slider
-            label="Cable attachment from hinge"
-            value={attachDistance}
-            min={minBeam}
-            max={beamLength}
-            step={0.1}
-            unit="m"
-            onChange={setAttachDistance}
-          />
-          <Slider
-            label="Beam mass"
-            value={beamMass}
-            min={1}
-            max={100}
-            step={1}
-            unit="kg"
-            digits={0}
-            onChange={setBeamMass}
-          />
-          <Slider
-            label={`Hanging beam mass (${BAR_LENGTH} m)`}
+            label="Stretcher mass"
             value={barMass}
             min={1}
             max={200}
@@ -480,18 +429,81 @@ export default function HingedBeam() {
             digits={0}
             onChange={setBarMass}
           />
+          <Slider
+            label="Attachment height"
+            value={attachAbove}
+            min={MIN_CLEARANCE}
+            max={round(beamLength - wallHeight)}
+            step={0.1}
+            unit="m"
+            onChange={setAttachAbove}
+          />
+          <Separator />
+          {more(
+            <>
+              <Slider
+                label="Attachment length"
+                value={beamCable}
+                min={0.1}
+                max={1}
+                step={0.05}
+                unit="m"
+                digits={2}
+                onChange={setBeamCable}
+              />
+              <Slider
+                label="Anchor height"
+                value={anchorUp}
+                min={0.1}
+                max={MAX_ANCHOR_UP}
+                step={0.05}
+                unit="m"
+                digits={2}
+                onChange={setAnchorUp}
+              />
+              <Slider
+                label="Anchor setback"
+                value={anchorBack}
+                min={2}
+                max={MAX_ANCHOR_BACK}
+                step={0.05}
+                unit="m"
+                digits={2}
+                onChange={setAnchorBack}
+              />
+              <Slider
+                label="Ladder length"
+                value={beamLength}
+                min={minBeam}
+                max={MAX_BEAM_LENGTH}
+                step={0.1}
+                unit="m"
+                onChange={changeBeamLength}
+              />
+              <Slider
+                label="Ladder mass"
+                value={beamMass}
+                min={1}
+                max={100}
+                step={1}
+                unit="kg"
+                digits={0}
+                onChange={setBeamMass}
+              />
+            </>,
+          )}
           <Toggle label="Show x/y components" checked={showComponents} onChange={setShowComponents} />
         </>
-      }
+      )}
       readouts={
         <>
-          <Readout label="Beam angle" value={view ? `${deg(view.phi).toFixed(1)}°` : NONE} />
-          <Readout label="Hanging beam tilt" value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE} />
-          {tensionReadouts("T₁", "wall", view?.t1 ?? null, COLORS.tensionWall)}
-          {tensionReadouts("T₂", "beam", view?.t2 ?? null, COLORS.tensionBeam)}
+          <Readout label="Ladder angle" value={view ? `${deg(view.phi).toFixed(1)}°` : NONE} />
+          <Readout label="Stretcher tilt" value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE} />
+          {tensionReadouts("T₁", "rope", view?.t1 ?? null, COLORS.tensionWall)}
+          {tensionReadouts("T₂", "attachment", view?.t2 ?? null, COLORS.tensionBeam)}
           {hingeReadouts(view?.hinge ?? null)}
           <Readout
-            label="Wall's edge on main beam N"
+            label="Wall's edge on ladder N"
             value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
             color={COLORS.contact}
           />
@@ -500,7 +512,7 @@ export default function HingedBeam() {
             return (
               <Readout
                 key={surface}
-                label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on hanging beam N`}
+                label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on stretcher N`}
                 value={f ? `${len(f).toFixed(0)} N` : NONE}
                 color={COLORS.contact}
               />

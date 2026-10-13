@@ -138,7 +138,7 @@ function wallPush(phi: number, torque: number, s: Setup): { point: Vec; force: V
 }
 
 const ALPHA_MAX = rad(175);
-const WALL_CABLE_SLACK = "The wall cable is too long: it goes slack, and the beam and hanging beam drop to the ground.";
+const WALL_CABLE_SLACK = "The rope is too long: it goes slack, and the ladder and stretcher drop to the ground.";
 
 /** Points within this distance of the ground or wall count as touching it. */
 const CONTACT = 1e-4;
@@ -334,7 +334,7 @@ function solveLinear(A: number[][], b: number[]): number[] | null {
 }
 
 function solveTaut(s: Setup): TautResult {
-  if (s.barWeight <= 0) return fail("Give the hanging beam some mass.");
+  if (s.barWeight <= 0) return fail("Give the stretcher some mass.");
   const toEdge = Math.hypot(s.anchorBack, s.anchorUp);
   const PHI_MAX = phiMax(s);
 
@@ -420,9 +420,9 @@ function solveTaut(s: Setup): TautResult {
     );
     if (tautIfFlipped) return slack(WALL_CABLE_SLACK);
     if (s.wallCable <= toEdge) {
-      return fail("The wall cable is too short for the hanging beam to reach over the wall's edge.");
+      return fail("The rope is too short for the stretcher to reach over the wall's edge.");
     }
-    return fail("The cables can't reach between the wall, the hanging beam and the main beam.");
+    return fail("The rope and attachment can't reach between the wall, the stretcher and the ladder.");
   }
 
   candidates.sort((a, b) => a.e - b.e);
@@ -465,7 +465,7 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
     contacts.push({ surface: "edge", point: vec(0, s.wallHeight), normal: vec(-d.y, d.x) });
   }
   if (contacts.length > 1) {
-    return slack("The hanging beam would rest on the ground or wall at both ends, with its cables slack.");
+    return slack("The stretcher would rest on the ground or wall at both ends, with the rope and attachment slack.");
   }
 
   // Bar equilibrium. Unknowns: T1, T2 and the contact force (if any).
@@ -491,20 +491,20 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
         ],
         [0, s.barWeight],
       );
-  if (!x) return fail("The cables pull in a straight line, so the tension would be unbounded.");
+  if (!x) return fail("The rope and attachment pull in a straight line, so the tension would be unbounded.");
   const [T1, T2, push = 0] = x;
   if (!(T1 > 0) || !(T2 > 0)) {
-    return slack("One cable would go slack, so the hanging beam can't be held by both.");
+    return slack("The rope or attachment would go slack, so the stretcher can't be held by both.");
   }
   if (push < -1e-6) {
-    return fail("The hanging beam would need to be pulled by the ground or wall.");
+    return fail("The stretcher would need to be pulled by the ground or wall.");
   }
   // Without a contact, the torque balance on the bar isn't one of the equations solved above. It holds
   // at a true minimum, but not where the bar and beam cable are pulled into a straight line (the
   // search's boundary) — there the beam cable would really go slack.
   const barTorque = cross(sub(P2, P1), scale(u2, T2)) - s.barWeight * (centre.x - P1.x);
   if (!contact && Math.abs(barTorque) > 1e-3 * s.barWeight * s.barLength) {
-    return slack("The beam cable would go slack and the hanging beam would drop onto the ground, so nothing holds the beam up.");
+    return slack("The attachment would go slack and the stretcher would drop onto the ground, so nothing holds the ladder up.");
   }
 
   const t1 = scale(u1, T1);
@@ -518,7 +518,7 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
   // Leaning on the wall, the wall's top edge takes any torque that would tip the beam further back.
   const onWall = g.phi >= phiMax(s) - 1e-9 && beamTorque > 0;
   if (Math.abs(beamTorque) > tolerance && !onWall) {
-    return slack("The beam cable goes slack: the hanging beam rests on the ground and can't hold the beam up.");
+    return slack("The attachment goes slack: the stretcher rests on the ground and can't hold the ladder up.");
   }
   const wallOnBeam = onWall ? wallPush(g.phi, beamTorque, s) : null;
   const wallForce = wallOnBeam?.force ?? vec(0, 0);
@@ -558,11 +558,11 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
   const W = s.barWeight;
   const T2 = (-s.beamWeight * (s.beamLength / 2) * Math.cos(g.phi)) / cross(B, u2);
   const T1 = (-T2 * u2.x) / u1.x;
-  if (!(T2 > 0) || !(T1 > 0)) return slack("One cable would go slack, so the hanging beam can't be held by both.");
+  if (!(T2 > 0) || !(T1 > 0)) return slack("The rope or attachment would go slack, so the stretcher can't be held by both.");
   const centre = scale(add(P1, P2), 0.5);
   const atEdge = (W * (centre.x - P1.x) - cross(sub(P2, P1), scale(u2, T2))) / (edge.x - P1.x);
   const atEnd1 = W - T1 * u1.y - T2 * u2.y - atEdge;
-  if (atEdge < 0 || atEnd1 < 0) return fail("The hanging beam would tip over the wall's edge.");
+  if (atEdge < 0 || atEnd1 < 0) return fail("The stretcher would tip over the wall's edge.");
   const t2 = scale(u2, T2);
   return {
     kind: "raised",
@@ -586,8 +586,8 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
   };
 }
 
-const BEAM_DOWN = "The cables can't hold the main beam up, so it rests on the ground.";
-const BEAMS_TOUCH = "The hanging beam would cross the main beam, so it rests against it, hinged where they touch.";
+const BEAM_DOWN = "The rope and attachment can't hold the ladder up, so it rests on the ground.";
+const BEAMS_TOUCH = "The stretcher would cross the ladder, so it rests against it, hinged where they touch.";
 
 export function solve(s: Setup): Result {
   const result = solveTaut(s);
@@ -599,8 +599,8 @@ export function solve(s: Setup): Result {
     kind: "none",
     reason:
       s.wallCable <= Math.hypot(s.anchorBack, s.anchorUp)
-        ? "The wall cable is too short: the hanging beam can't reach far enough over the wall's edge for the beam cable to reach the main beam."
-        : "The hanging beam rests on the main beam, but the wall cable is too short to reach it there.",
+        ? "The rope is too short: the stretcher can't reach far enough over the wall's edge for the attachment to reach the ladder."
+        : "The stretcher rests on the ladder, but the rope is too short to reach it there.",
   };
 }
 

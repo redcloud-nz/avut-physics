@@ -21,7 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="h-dvh overflow-hidden font-sans">
         {/* The page scrolls inside this box rather than the window, so its scrollbar can be styled everywhere. */}
