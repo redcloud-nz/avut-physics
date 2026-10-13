@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { AngleArc, Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
-import { Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
-import { solve } from "./hinged-beam-solver";
+import { RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
+import { minWallCable, solve } from "./hinged-beam-solver";
 
 const COLORS = {
   tensionBeam: "#38bdf8",
@@ -15,19 +15,27 @@ const COLORS = {
   contact: "#34d399",
 };
 
-const W = 800;
-const H = 480;
 const G = 9.81;
-const PPM = 50; // pixels per metre (fixed so the drawing doesn't rescale as sliders move)
-const ORIGIN = vec(290, H - 90); // hinge, at the base of the wall's front face
 const MAX_ARROW = 200;
 const BAR_LENGTH = 2;
 /** The beam, and the cable's attachment point on it, must reach at least this far past the wall height. */
 const MIN_CLEARANCE = 0.1;
-const WALL_THICKNESS = 5;
+/** The beams' thicknesses set how close they come when the hanging beam rests on the main beam. */
+const BEAM_THICKNESS = 0.1;
+const BAR_THICKNESS = 0.08;
+const MAX_BEAM_LENGTH = 7;
+const MAX_WALL_HEIGHT = 6;
+const MAX_ANCHOR_UP = 2;
+const MAX_ANCHOR_BACK = 5;
+/** Turn on to show a card of the inputs and solver output, for copying problem cases. */
+const SHOW_RAW_VALUES = false;
+/** Shown in place of a value that doesn't apply. */
+const NONE = "—";
 
-/** World (metres, y up) → SVG (pixels, y down). */
-const toSvg = (p: Vec): Vec => vec(ORIGIN.x + p.x * PPM, ORIGIN.y - p.y * PPM);
+/** The drawing's width in SVG units; its height follows from the setup. */
+const W = 800;
+const BELOW_GROUND = 0.4;
+const ABOVE_TOP = 0.3;
 
 /** Clamp an arrow's drawn length so very large forces stay on screen. */
 const clampLen = (v: Vec) => {
@@ -38,12 +46,12 @@ const clampLen = (v: Vec) => {
 /**
  * Beam hinged at the base of a wall. A second, 2 m beam hangs from two cables: one from the wall to
  * one end, one from the other end to the main beam. Everything settles where the energy is lowest.
- * Once the main beam is down, the hanging beam simply rests on top of it, held up only by the wall cable.
+ * If the hanging beam would cross the main beam, it rests against it instead, hinged where they touch.
  * The wall cable is anchored above and behind the top of the wall (wrapping over the wall's edge when it has
  * to); the beam and the cable's attachment on it reach past the wall height.
  */
 export default function HingedBeam() {
-  const [wallCable, setWallCable] = useState(2);
+  const [wallCable, setWallCable] = useState(3);
   const [beamCable, setBeamCable] = useState(1);
   const [beamLength, setBeamLength] = useState(5);
   const [beamMass, setBeamMass] = useState(20);
@@ -51,7 +59,7 @@ export default function HingedBeam() {
   const [wallHeight, setWallHeight] = useState(4);
   const [attachDistance, setAttachDistance] = useState(5);
   const [anchorUp, setAnchorUp] = useState(0.5);
-  const [anchorBack, setAnchorBack] = useState(1);
+  const [anchorBack, setAnchorBack] = useState(2);
   const [showComponents, setShowComponents] = useState(false);
 
   const round = (v: number) => Math.round(v * 10) / 10;
@@ -72,21 +80,33 @@ export default function HingedBeam() {
 
   const beamWeight = beamMass * G;
   const barWeight = barMass * G;
-  const sol = useMemo(
-    () =>
-            solve({
-        wallHeight,
-        anchorUp,
-        anchorBack,
-        wallCable,
-        beamCable,
-        beamLength,
-        attachDistance,
-        barLength: BAR_LENGTH,
-        beamWeight,
-        barWeight,
-      }),
-    [wallHeight, anchorUp, anchorBack, wallCable, beamCable, beamLength, attachDistance, beamWeight, barWeight],
+  const setup = useMemo(
+    () => ({
+      wallHeight,
+      anchorUp,
+      anchorBack,
+      beamCable,
+      beamLength,
+      attachDistance,
+      barLength: BAR_LENGTH,
+      touchGap: (BEAM_THICKNESS + BAR_THICKNESS) / 2,
+      beamThickness: BEAM_THICKNESS,
+      beamWeight,
+      barWeight,
+    }),
+    [wallHeight, anchorUp, anchorBack, beamCable, beamLength, attachDistance, beamWeight, barWeight],
+  );
+  // The wall cable is never shorter than the length that just brings the hanging beam, lying on the
+  // wall top, to the edge (rounded up to the slider's precision).
+  const minCable = Math.ceil(minWallCable({ ...setup, wallCable: 0 }) * 100) / 100;
+  const cable = Math.max(wallCable, minCable);
+  const sol = useMemo(() => solve({ ...setup, wallCable: cable }), [setup, cable]);
+  // The solver's last few digits differ between the server and the browser, which would make hydration
+  // fail, so results are only shown once running in the browser.
+  const inBrowser = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
   );
 
   // --- Drawing ---
@@ -94,23 +114,41 @@ export default function HingedBeam() {
   const force = (f: Vec) => clampLen(vec(f.x * k, -f.y * k));
   const tag = (name: string, f: Vec) => (len(f) * k > MAX_ARROW ? `${name} ≫` : name);
 
+  // The wall is drawn just thick enough to carry the cable anchor on its back edge (only its face and top
+  // matter to the physics). The drawing spans from the back of the wall to the tip of the beam lying flat,
+  // and from just below the ground to the highest point the beam or the cable anchor can reach. It depends
+  // only on the setup, not the wall cable, so the drawing stays still while that slider moves.
+  const PPM = W / (anchorBack + beamLength + BEAM_THICKNESS / 2); // SVG units per metre
+  const H = Math.round((Math.max(beamLength, wallHeight + anchorUp) + ABOVE_TOP + BELOW_GROUND) * PPM);
+  const origin = vec(anchorBack * PPM, H - BELOW_GROUND * PPM); // hinge, at the base of the wall's front face
+  /** World (metres, y up) → SVG (y down). */
+  const toSvg = (p: Vec): Vec => vec(origin.x + p.x * PPM, origin.y - p.y * PPM);
+
   const O = toSvg(vec(0, 0));
   const wallS = toSvg(vec(0, wallHeight));
   const anchorS = toSvg(vec(-anchorBack, wallHeight + anchorUp));
 
   const ground = (
     <>
-      <line x1={20} y1={O.y} x2={W - 20} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+      <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
       <rect
-        x={O.x - WALL_THICKNESS * PPM}
+        x={O.x - anchorBack * PPM}
         y={wallS.y}
-        width={WALL_THICKNESS * PPM}
+        width={anchorBack * PPM}
         height={wallHeight * PPM}
         fill="#1e293b"
         stroke="#475569"
       />
       {/* post holding the cable anchor */}
-      <line x1={anchorS.x} y1={wallS.y} x2={anchorS.x} y2={anchorS.y} stroke="#475569" strokeWidth={4} strokeLinecap="round" />
+      <line
+        x1={anchorS.x}
+        y1={wallS.y}
+        x2={anchorS.x}
+        y2={anchorS.y}
+        stroke="#475569"
+        strokeWidth={4}
+        strokeLinecap="round"
+      />
       <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="#cbd5e1" />
     </>
   );
@@ -120,19 +158,99 @@ export default function HingedBeam() {
       .map(toSvg)
       .map((p) => `${p.x},${p.y}`)
       .join(" ");
-  const banner = (text: string) => (
-    <Label at={vec(W / 2 + 40, 40)} color="#fbbf24">
-      {text}
-    </Label>
+  const beamLine = (phi: number) => {
+    const tipS = toSvg(scale(vec(Math.cos(phi), Math.sin(phi)), beamLength));
+    const angle = deg(phi);
+    return (
+      <>
+        <line
+          x1={O.x}
+          y1={O.y}
+          x2={tipS.x}
+          y2={tipS.y}
+          stroke="#64748b"
+          strokeWidth={BEAM_THICKNESS * PPM}
+          strokeLinecap="round"
+        />
+        <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
+        {angle > 0.05 && (
+          <AngleArc center={O} radius={46} startDeg={0} sweepDeg={-angle} label={`${angle.toFixed(1)}°`} />
+        )}
+      </>
+    );
+  };
+  const barLine = (a: Vec, b: Vec) => (
+    <line
+      x1={a.x}
+      y1={a.y}
+      x2={b.x}
+      y2={b.y}
+      stroke="#a16207"
+      strokeWidth={BAR_THICKNESS * PPM}
+      strokeLinecap="round"
+    />
   );
+  const hingeArrows = (R: Vec) => (
+    <>
+      <Arrow from={O} v={force(R)} color={COLORS.hinge} label={tag("R", R)} />
+      {showComponents && (
+        <>
+          <Arrow from={O} v={force(vec(R.x, 0))} color={COLORS.component} dashed width={1.5} label="Rx" />
+          <Arrow from={O} v={force(vec(0, R.y))} color={COLORS.component} dashed width={1.5} label="Ry" />
+        </>
+      )}
+    </>
+  );
+  const hingeReadouts = (R: Vec | null) => (
+    <>
+      <Readout label="Hinge force R" value={R ? `${len(R).toFixed(0)} N` : NONE} color={COLORS.hinge} />
+      {showComponents && (
+        <Readout
+          label="  Rx, Ry"
+          value={R ? `${R.x.toFixed(0)}, ${R.y.toFixed(0)} N` : NONE}
+          color={COLORS.component}
+        />
+      )}
+      <Readout label="  R direction" value={R ? `${deg(Math.atan2(R.y, R.x)).toFixed(1)}° above horizontal` : NONE} />
+    </>
+  );
+  /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
+  const tensionArrow = (name: "T₁" | "T₂", at: Vec, t: Vec, color: string) => (
+    <>
+      <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
+      {showComponents && (
+        <>
+          <Arrow from={at} v={force(vec(t.x, 0))} color={COLORS.component} dashed width={1.5} label={`${name}x`} />
+          <Arrow from={at} v={force(vec(0, t.y))} color={COLORS.component} dashed width={1.5} label={`${name}y`} />
+        </>
+      )}
+    </>
+  );
+  /** `t` is null when there's no solution; `slack` when the cable carries nothing. */
+  const tensionReadouts = (name: "T₁" | "T₂", cable: string, t: Vec | "slack" | null, color: string) => (
+    <>
+      <Readout
+        label={`Tension, ${cable} cable ${name}`}
+        value={t === "slack" ? "slack" : t ? `${len(t).toFixed(0)} N` : NONE}
+        color={color}
+      />
+      {showComponents && (
+        <Readout
+          label={`  ${name}x, ${name}y`}
+          value={t && t !== "slack" ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
+          color={COLORS.component}
+        />
+      )}
+    </>
+  );
+  const wallOnBeamArrow = (w: { point: Vec; force: Vec } | null) =>
+    w && (
+      <Arrow from={toSvg(w.point)} v={force(w.force)} color={COLORS.contact} label={tag("N wall", w.force)} width={2} />
+    );
 
   let diagram: React.ReactNode;
   if (sol.kind === "raised") {
     const eq = sol.eq;
-    const angle = deg(eq.phi);
-    const dir = vec(Math.cos(eq.phi), Math.sin(eq.phi));
-    const tipS = toSvg(scale(dir, beamLength));
-    const centreS = toSvg(scale(dir, beamLength / 2));
     const attachS = toSvg(eq.beamAttach);
     const end1S = toSvg(eq.barEnd1);
     const end2S = toSvg(eq.barEnd2);
@@ -151,44 +269,35 @@ export default function HingedBeam() {
         />
         <line x1={end2S.x} y1={end2S.y} x2={attachS.x} y2={attachS.y} stroke="#cbd5e1" strokeWidth={1.5} />
 
-        {/* main beam */}
-        <line x1={O.x} y1={O.y} x2={tipS.x} y2={tipS.y} stroke="#64748b" strokeWidth={12} strokeLinecap="round" />
-        <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
-        <AngleArc center={O} radius={46} startDeg={0} sweepDeg={-angle} label={`${angle.toFixed(1)}°`} />
-
-        {/* hanging beam */}
-        <line x1={end1S.x} y1={end1S.y} x2={end2S.x} y2={end2S.y} stroke="#a16207" strokeWidth={9} strokeLinecap="round" />
+        {beamLine(eq.phi)}
+        {barLine(end1S, end2S)}
 
         {/* forces on the hanging beam */}
-        <Arrow from={barCentreS} v={force(vec(0, -barWeight))} color={COLORS.bar} label="W hanging" />
-        <Arrow from={end1S} v={force(eq.t1)} color={COLORS.tensionWall} label={tag("T₁", eq.t1)} width={2} />
-        <Arrow from={end2S} v={force(eq.t2)} color={COLORS.tensionBeam} label={tag("T₂", eq.t2)} width={2} />
-        {eq.contact && (
-          <Arrow from={toSvg(eq.contact.point)} v={force(eq.contact.force)} color={COLORS.contact} label={tag("N", eq.contact.force)} width={2} />
-        )}
+        <Arrow from={barCentreS} v={force(vec(0, -barWeight))} color={COLORS.bar} label="W" />
+        {tensionArrow("T₁", end1S, eq.t1, COLORS.tensionWall)}
+        {tensionArrow("T₂", end2S, eq.t2, COLORS.tensionBeam)}
+        {eq.contacts.map((c) => (
+          <Arrow
+            key={c.surface}
+            from={toSvg(c.point)}
+            v={force(c.force)}
+            color={COLORS.contact}
+            label={tag("N", c.force)}
+            width={2}
+          />
+        ))}
 
         {/* forces on the main beam */}
-        <Arrow from={centreS} v={force(vec(0, -beamWeight))} color={COLORS.weight} label="W beam" />
-        <Arrow from={attachS} v={force(eq.cableOnBeam)} color={COLORS.tensionBeam} label={tag("T₂", eq.cableOnBeam)} />
-        <Arrow from={O} v={force(eq.hinge)} color={COLORS.hinge} label={tag("R", eq.hinge)} />
-        {showComponents && (
-          <>
-            <Arrow from={attachS} v={force(vec(eq.cableOnBeam.x, 0))} color={COLORS.component} dashed width={1.5} label="Tx" />
-            <Arrow from={attachS} v={force(vec(0, eq.cableOnBeam.y))} color={COLORS.component} dashed width={1.5} label="Ty" />
-            <Arrow from={O} v={force(vec(eq.hinge.x, 0))} color={COLORS.component} dashed width={1.5} label="Rx" />
-            <Arrow from={O} v={force(vec(0, eq.hinge.y))} color={COLORS.component} dashed width={1.5} label="Ry" />
-          </>
-        )}
+        {wallOnBeamArrow(eq.wallOnBeam)}
+        {hingeArrows(eq.hinge)}
       </>
     );
-  } else if (sol.kind === "resting") {
-    // Main beam flat on the ground; the hanging beam rests on top of it (drawn lifted by the beams' thickness).
-    const r = sol.rest;
-    const onTop = (p: Vec) => add(toSvg(p), vec(0, -10));
-    const tipS = toSvg(vec(beamLength, 0));
-    const end1S = onTop(r.barEnd1);
-    const end2S = onTop(r.barEnd2);
-    const wallPath = [...[r.anchor, ...(r.wrapEdge ? [r.wrapEdge] : [])].map(toSvg), end1S];
+  } else if (sol.kind === "hinged") {
+    const h = sol.h;
+    const end1S = toSvg(h.barEnd1);
+    const end2S = toSvg(h.barEnd2);
+    const attachS = toSvg(h.beamAttach);
+    const wallPath = [h.anchor, ...(h.wrapEdge ? [h.wrapEdge] : []), h.barEnd1].map(toSvg);
     const last = wallPath.length - 1;
 
     diagram = (
@@ -197,33 +306,40 @@ export default function HingedBeam() {
         <polyline
           points={wallPath.map((p) => `${p.x},${p.y}`).join(" ")}
           fill="none"
-          stroke={r.cableTaut ? "#cbd5e1" : "#94a3b8"}
+          stroke={h.cableTaut ? "#cbd5e1" : "#94a3b8"}
           strokeWidth={1.5}
-          strokeDasharray={r.cableTaut ? undefined : "5 5"}
+          strokeDasharray={h.cableTaut ? undefined : "5 5"}
           strokeLinejoin="round"
         />
-        {!r.cableTaut && (
+        {!h.cableTaut && (
           <Label at={add(scale(add(wallPath[last - 1], wallPath[last]), 0.5), vec(0, -14))} color="#94a3b8">
             slack
           </Label>
         )}
-        <line x1={O.x} y1={O.y} x2={tipS.x} y2={tipS.y} stroke="#64748b" strokeWidth={12} strokeLinecap="round" />
-        <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
-        <line x1={end1S.x} y1={end1S.y} x2={end2S.x} y2={end2S.y} stroke="#a16207" strokeWidth={9} strokeLinecap="round" />
+        <line x1={end2S.x} y1={end2S.y} x2={attachS.x} y2={attachS.y} stroke="#cbd5e1" strokeWidth={1.5} />
+        {beamLine(h.phi)}
+        {barLine(end1S, end2S)}
 
-        <Arrow from={onTop(scale(add(r.barEnd1, r.barEnd2), 0.5))} v={force(vec(0, -barWeight))} color={COLORS.bar} label="W hanging" />
-        {r.cableTaut && <Arrow from={end1S} v={force(r.t1)} color={COLORS.tensionWall} label={tag("T₁", r.t1)} width={2} />}
-        <Arrow from={onTop(r.supportAt)} v={force(r.support)} color={COLORS.contact} label={tag(r.cableTaut || r.end1Contact ? "F" : "N", r.support)} width={2} />
-        {r.end1Contact && (
+        <Arrow
+          from={toSvg(scale(add(h.barEnd1, h.barEnd2), 0.5))}
+          v={force(vec(0, -barWeight))}
+          color={COLORS.bar}
+          label="W"
+        />
+        {h.cableTaut && tensionArrow("T₁", end1S, h.t1, COLORS.tensionWall)}
+        {/* Drawn like the raised case: the main beam's force on the hanging beam stands in for the beam cable. */}
+        {tensionArrow("T₂", end2S, h.support, COLORS.tensionBeam)}
+        {h.barContact && (
           <Arrow
-            from={end1S}
-            v={force(r.end1Contact.force)}
+            from={toSvg(h.barContact.point)}
+            v={force(h.barContact.force)}
             color={COLORS.contact}
-            label={tag(r.end1Contact.surface === "wall" ? "N wall" : "N ground", r.end1Contact.force)}
+            label={tag("N", h.barContact.force)}
             width={2}
           />
         )}
-        {banner("The main beam rests on the ground")}
+        {wallOnBeamArrow(h.wallOnBeam)}
+        {h.hinge && hingeArrows(h.hinge)}
       </>
     );
   } else {
@@ -231,35 +347,110 @@ export default function HingedBeam() {
       <>
         {ground}
         <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
-        {banner("No balanced position for these settings")}
       </>
     );
   }
 
+  // The readouts always show the same rows, so the panel doesn't jump as the arrangement changes.
+  const view = !inBrowser
+    ? null
+    : sol.kind === "raised"
+      ? {
+          phi: sol.eq.phi,
+          tilt: Math.atan2(sol.eq.barEnd2.y - sol.eq.barEnd1.y, sol.eq.barEnd2.x - sol.eq.barEnd1.x),
+          t1: sol.eq.t1 as Vec | "slack",
+          t2: sol.eq.t2,
+          hinge: sol.eq.hinge as Vec | null,
+          wallOnBeam: sol.eq.wallOnBeam,
+          contacts: sol.eq.contacts,
+        }
+      : sol.kind === "hinged"
+        ? {
+            phi: sol.h.phi,
+            tilt: sol.h.angle,
+            t1: sol.h.cableTaut ? sol.h.t1 : ("slack" as const),
+            t2: sol.h.support,
+            hinge: sol.h.hinge,
+            wallOnBeam: sol.h.wallOnBeam,
+            contacts: sol.h.barContact ? [sol.h.barContact] : [],
+          }
+        : null;
+
   return (
     <VisualisationLayout
       diagram={
-        <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
-          {diagram}
-        </svg>
+        <div className="relative flex flex-col gap-4 p-4">
+          {inBrowser && sol.kind === "none" && (
+            <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+              <p className="font-medium">No balanced position for these settings</p>
+              <p className="mx-auto mt-1 max-w-md text-amber-400/80">{sol.reason}</p>
+            </div>
+          )}
+          <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+            {inBrowser ? diagram : ground}
+          </svg>
+          <Slider
+            label="Cable: wall → hanging beam"
+            value={cable}
+            min={minCable}
+            max={10}
+            step={0.05}
+            unit="m"
+            digits={2}
+            onChange={setWallCable}
+          />
+        </div>
       }
       controls={
         <>
-          <Slider label="Cable: wall → hanging beam" value={wallCable} min={0.2} max={10} step={0.05} unit="m" digits={2} onChange={setWallCable} />
-          <Slider label="Cable: hanging beam → beam" value={beamCable} min={0.1} max={1} step={0.05} unit="m" digits={2} onChange={setBeamCable} />
-          <Slider label="Wall height" value={wallHeight} min={2} max={5} step={0.1} unit="m" onChange={changeWallHeight} />
-          <Slider label="Cable anchor above wall" value={anchorUp} min={0.1} max={2} step={0.05} unit="m" digits={2} onChange={setAnchorUp} />
+          <Slider
+            label="Cable: hanging beam → beam"
+            value={beamCable}
+            min={0.1}
+            max={1}
+            step={0.05}
+            unit="m"
+            digits={2}
+            onChange={setBeamCable}
+          />
+          <Slider
+            label="Wall height"
+            value={wallHeight}
+            min={2}
+            max={MAX_WALL_HEIGHT}
+            step={0.1}
+            unit="m"
+            onChange={changeWallHeight}
+          />
+          <Slider
+            label="Cable anchor above wall"
+            value={anchorUp}
+            min={0.1}
+            max={MAX_ANCHOR_UP}
+            step={0.05}
+            unit="m"
+            digits={2}
+            onChange={setAnchorUp}
+          />
           <Slider
             label="Cable anchor back from wall face"
             value={anchorBack}
-            min={0.5}
-            max={WALL_THICKNESS}
+            min={2}
+            max={MAX_ANCHOR_BACK}
             step={0.05}
             unit="m"
             digits={2}
             onChange={setAnchorBack}
           />
-          <Slider label="Beam length" value={beamLength} min={minBeam} max={7} step={0.1} unit="m" onChange={changeBeamLength} />
+          <Slider
+            label="Beam length"
+            value={beamLength}
+            min={minBeam}
+            max={MAX_BEAM_LENGTH}
+            step={0.1}
+            unit="m"
+            onChange={changeBeamLength}
+          />
           <Slider
             label="Cable attachment from hinge"
             value={attachDistance}
@@ -269,78 +460,75 @@ export default function HingedBeam() {
             unit="m"
             onChange={setAttachDistance}
           />
-          <Slider label="Beam mass" value={beamMass} min={1} max={100} step={1} unit="kg" digits={0} onChange={setBeamMass} />
-          <Slider label={`Hanging beam mass (${BAR_LENGTH} m)`} value={barMass} min={1} max={200} step={1} unit="kg" digits={0} onChange={setBarMass} />
+          <Slider
+            label="Beam mass"
+            value={beamMass}
+            min={1}
+            max={100}
+            step={1}
+            unit="kg"
+            digits={0}
+            onChange={setBeamMass}
+          />
+          <Slider
+            label={`Hanging beam mass (${BAR_LENGTH} m)`}
+            value={barMass}
+            min={1}
+            max={200}
+            step={1}
+            unit="kg"
+            digits={0}
+            onChange={setBarMass}
+          />
           <Toggle label="Show x/y components" checked={showComponents} onChange={setShowComponents} />
         </>
       }
       readouts={
-        sol.kind === "raised" ? (
-          <>
-            <Readout label="Beam angle" value={`${deg(sol.eq.phi).toFixed(1)}°`} />
-            <Readout
-              label="Hanging beam tilt"
-              value={`${Math.abs(deg(Math.atan2(sol.eq.barEnd2.y - sol.eq.barEnd1.y, sol.eq.barEnd2.x - sol.eq.barEnd1.x))).toFixed(1)}°`}
-            />
-            <Readout label="Tension, wall cable T₁" value={`${len(sol.eq.t1).toFixed(0)} N`} color={COLORS.tensionWall} />
-            <Readout label="Tension, beam cable T₂" value={`${len(sol.eq.t2).toFixed(0)} N`} color={COLORS.tensionBeam} />
-            <Readout
-              label="  On beam Tx, Ty"
-              value={`${sol.eq.cableOnBeam.x.toFixed(0)}, ${sol.eq.cableOnBeam.y.toFixed(0)} N`}
-              color={COLORS.component}
-            />
-            <Readout label="Hinge force R" value={`${len(sol.eq.hinge).toFixed(0)} N`} color={COLORS.hinge} />
-            <Readout label="  Rx, Ry" value={`${sol.eq.hinge.x.toFixed(0)}, ${sol.eq.hinge.y.toFixed(0)} N`} color={COLORS.component} />
-            <Readout
-              label="  R direction"
-              value={`${deg(Math.atan2(sol.eq.hinge.y, sol.eq.hinge.x)).toFixed(1)}° above horizontal`}
-            />
-            {sol.eq.contact && (
+        <>
+          <Readout label="Beam angle" value={view ? `${deg(view.phi).toFixed(1)}°` : NONE} />
+          <Readout label="Hanging beam tilt" value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE} />
+          {tensionReadouts("T₁", "wall", view?.t1 ?? null, COLORS.tensionWall)}
+          {tensionReadouts("T₂", "beam", view?.t2 ?? null, COLORS.tensionBeam)}
+          {hingeReadouts(view?.hinge ?? null)}
+          <Readout
+            label="Wall's edge on main beam N"
+            value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
+            color={COLORS.contact}
+          />
+          {(["ground", "wall", "top", "edge"] as const).map((surface) => {
+            const f = view?.contacts.find((c) => c.surface === surface)?.force;
+            return (
               <Readout
-                label={sol.eq.contact.force.y > 0 ? "Ground on hanging beam N" : "Wall on hanging beam N"}
-                value={`${len(sol.eq.contact.force).toFixed(0)} N`}
+                key={surface}
+                label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on hanging beam N`}
+                value={f ? `${len(f).toFixed(0)} N` : NONE}
                 color={COLORS.contact}
               />
-            )}
-            <Readout label="Total weight" value={`${(beamWeight + barWeight).toFixed(0)} N`} />
-          </>
-        ) : sol.kind === "resting" ? (
-          <>
-            <p className="text-sm text-amber-400">{sol.reason}</p>
-            <Readout label="Hanging beam angle" value={`${deg(sol.rest.angle).toFixed(1)}°`} />
-            <Readout
-              label="Tension, wall cable T₁"
-              value={sol.rest.cableTaut ? `${len(sol.rest.t1).toFixed(0)} N` : "slack"}
-              color={COLORS.tensionWall}
-            />
-            <Readout
-              label={sol.rest.cableTaut || sol.rest.end1Contact ? "Force at fixed end F" : "Main beam supports N"}
-              value={`${len(sol.rest.support).toFixed(0)} N`}
-              color={COLORS.contact}
-            />
-            {sol.rest.end1Contact && (
-              <Readout
-                label={sol.rest.end1Contact.surface === "wall" ? "Wall on hanging beam" : "Ground on hanging beam"}
-                value={`${len(sol.rest.end1Contact.force).toFixed(0)} N`}
-                color={COLORS.contact}
-              />
-            )}
-            <Readout label="Hanging beam weight" value={`${barWeight.toFixed(0)} N`} />
-            <p className="text-xs text-slate-400">
-              With the main beam on the ground, the hanging beam&apos;s end is fixed on top of it (or just above, if
-              the wall cable couldn&apos;t reach otherwise); the main beam and the short cable between the beams are
-              left out.
-              {sol.rest.cableTaut
-                ? " The wall cable holds the other end up."
-                : sol.rest.end1Contact?.surface === "wall"
-                  ? " The wall cable goes slack and the hanging beam leans against the wall."
-                  : sol.rest.end1Contact
-                    ? " The wall cable goes slack and the hanging beam's other end rests on the ground."
-                    : " The wall cable is long enough that it goes slack and the hanging beam lies flat."}
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-amber-400">{sol.reason}</p>
+            );
+          })}
+          <Readout label="Total weight" value={`${(beamWeight + barWeight).toFixed(0)} N`} />
+        </>
+      }
+      footer={
+        SHOW_RAW_VALUES && (
+          <RawValues
+            title="Raw values"
+            data={{
+              inputs: {
+                wallCable: cable,
+                beamCable,
+                wallHeight,
+                anchorUp,
+                anchorBack,
+                beamLength,
+                attachDistance,
+                beamMass,
+                barMass,
+              },
+              minWallCable: minCable,
+              result: sol,
+            }}
+          />
         )
       }
     />

@@ -9,3 +9,30 @@ body {
   background: #020617;
   color: #e2e8f0;
 }
+
+/* Dark native controls (range sliders, checkboxes) to match the page. */
+html {
+  color-scheme: dark;
+}
+
+/* The page's scrollbar, in the page's own colours. Firefox uses the standard properties; Chrome and
+   Safari use the -webkit- pseudo-elements, which Chrome ignores if scrollbar-color is also set. */
+@supports (-moz-appearance: none) {
+  .page-scroll {
+    scrollbar-color: #334155 #020617;
+  }
+}
+.page-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+.page-scroll::-webkit-scrollbar-track {
+  background: #020617;
+}
+.page-scroll::-webkit-scrollbar-thumb {
+  background: #334155;
+  border: 3px solid #020617;
+  border-radius: 6px;
+}
+.page-scroll::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

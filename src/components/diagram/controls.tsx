@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export function Slider(props: {
   label: string;
   value: number;
@@ -92,6 +94,7 @@ export function VisualisationLayout(props: {
   diagram: React.ReactNode;
   controls: React.ReactNode;
   readouts?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
@@ -106,6 +109,32 @@ export function VisualisationLayout(props: {
           </section>
         )}
       </div>
+      {props.footer && <div className="lg:col-span-2">{props.footer}</div>}
     </div>
+  );
+}
+
+/** A card showing raw values as JSON, with a button to copy them. */
+export function RawValues(props: { title: string; data: unknown }) {
+  const [copied, setCopied] = useState(false);
+  const text = JSON.stringify(props.data, (_, v) => (typeof v === "number" ? Number(v.toPrecision(6)) : v), 2);
+  const copy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-slate-300">{props.title}</h3>
+        <button
+          onClick={copy}
+          className="rounded-md bg-slate-800 px-3 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre className="max-h-80 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-400">{text}</pre>
+    </section>
   );
 }
