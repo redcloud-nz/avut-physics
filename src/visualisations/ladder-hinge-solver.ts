@@ -46,8 +46,8 @@ export type Equilibrium = {
   cableOnBeam: Vec;
   /** Where the main beam leans on the wall's top edge, and the edge's push on it. */
   wallOnBeam: { point: Vec; force: Vec } | null;
-  /** Force the hinge exerts on the beam. */
-  hinge: Vec;
+  /** Force the hinge exerts on the beam (null when the beam lies on the ground, which shares the load). */
+  hinge: Vec | null;
 };
 
 /**
@@ -79,6 +79,8 @@ export type Hinged = {
   /** The support split into the beam cable's pull (towards beamAttach) and the main beam's push, square to it. */
   t2: Vec;
   beamPush: Vec;
+  /** False when the bar's end has slid along the main beam to where the beam cable hangs slack. */
+  beamCableTaut: boolean;
 };
 
 export type Result =
@@ -232,9 +234,18 @@ function cutsCorner(p: Vec, q: Vec, s: Setup): boolean {
   return a.y + ((b.y - a.y) * -a.x) / (b.x - a.x) < s.wallHeight - 1e-6;
 }
 
-/** How far a point has pushed into the ground and into the wall (both ≥ 0). */
+/**
+ * How far a point has pushed into the ground, the wall's face and the wall's top (all ≥ 0). Inside the wall
+ * it's pushed back out through whichever of the face and the top is nearer.
+ */
 function penetration(p: Vec, s: Setup) {
-  return { ground: Math.max(0, -p.y), wall: p.y < s.wallHeight ? Math.max(0, -p.x) : 0 };
+  const inWall = p.x < 0 && p.y < s.wallHeight;
+  const throughTop = inWall && s.wallHeight - p.y < -p.x;
+  return {
+    ground: Math.max(0, -p.y),
+    wall: inWall && !throughTop ? -p.x : 0,
+    top: throughTop ? s.wallHeight - p.y : 0,
+  };
 }
 
 /**
@@ -269,7 +280,8 @@ function energyOf(g: Geometry, s: Setup): number {
   const stiffness = 1e7 * (s.beamWeight + s.barWeight);
   const pen1 = penetration(g.P1, s);
   const pen2 = penetration(g.P2, s);
-  const below = pen1.ground ** 2 + pen1.wall ** 2 + pen2.ground ** 2 + pen2.wall ** 2;
+  const below =
+    pen1.ground ** 2 + pen1.wall ** 2 + pen1.top ** 2 + pen2.ground ** 2 + pen2.wall ** 2 + pen2.top ** 2;
   return (
     s.beamWeight * (s.beamLength / 2) * Math.sin(phi) +
     (s.barWeight * (g.P1.y + g.P2.y)) / 2 +
@@ -451,16 +463,25 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
   if (rotationMargin(g) < 1e-3) {
     return slack(WALL_CABLE_SLACK);
   }
-  // The main beam is down: the hinged model takes over from here.
-  if (g.phi < rad(0.05)) return { kind: "down" };
+  // The main beam is down. With the bar still hanging from both cables that's an answer too, with the
+  // ground sharing the beam's load; otherwise the hinged model takes over.
+  const result = checkHanging(g, s, g.phi < rad(0.05));
+  return result.kind === "none" && g.phi < rad(0.05) ? { kind: "down" } : result;
+}
 
+function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
   // Snap tiny penalty penetrations back onto the surfaces, and note which surfaces each end touches.
   const contacts: { surface: Surface; point: Vec; normal: Vec }[] = [];
   const settle = (p: Vec) => {
     const pen = penetration(p, s);
-    const q = vec(p.x + pen.wall, p.y + pen.ground);
+    const q = vec(p.x + pen.wall, p.y + pen.ground + pen.top);
     if (q.y < CONTACT) contacts.push({ surface: "ground", point: q, normal: vec(0, 1) });
-    if (q.x < CONTACT && q.y < s.wallHeight) contacts.push({ surface: "wall", point: q, normal: vec(1, 0) });
+    // Over the edge, the bar lying flat on the wall top too belongs to onTopGeometry instead.
+    if (!g.overEdge && q.x < 0 && Math.abs(q.y - s.wallHeight) < CONTACT) {
+      contacts.push({ surface: "top", point: q, normal: vec(0, 1) });
+    } else if (q.x < CONTACT && q.y < s.wallHeight) {
+      contacts.push({ surface: "wall", point: q, normal: vec(1, 0) });
+    }
     return q;
   };
   const P1 = settle(g.P1);
@@ -523,7 +544,9 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
   const tolerance = 1e-3 * (s.beamWeight + s.barWeight) * s.beamLength;
   // Leaning on the wall, the wall's top edge takes any torque that would tip the beam further back.
   const onWall = g.phi >= phiMax(s) - 1e-9 && beamTorque > 0;
-  if (Math.abs(beamTorque) > tolerance && !onWall) {
+  // Lying on the ground, the ground takes any torque that would lower the beam further.
+  const onGround = down && beamTorque < 0;
+  if (Math.abs(beamTorque) > tolerance && !onWall && !onGround) {
     return slack("The attachment goes slack: the stretcher rests on the ground and can't hold the ladder up.");
   }
   const wallOnBeam = onWall ? wallPush(g.phi, beamTorque, s) : null;
@@ -544,7 +567,7 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
         : [],
       cableOnBeam,
       wallOnBeam,
-      hinge: vec(-cableOnBeam.x - wallForce.x, s.beamWeight - cableOnBeam.y - wallForce.y),
+      hinge: down ? null : vec(-cableOnBeam.x - wallForce.x, s.beamWeight - cableOnBeam.y - wallForce.y),
     },
   };
 }
@@ -594,13 +617,24 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
 
 const BEAM_DOWN = "The rope and attachment can't hold the ladder up, so it rests on the ground.";
 const BEAMS_TOUCH = "The stretcher would cross the ladder, so it rests against it, hinged where they touch.";
+const LIFTS_OFF = "The stretcher would lift off the ladder, into a position this model can't find.";
 
 export function solve(s: Setup): Result {
   const result = solveTaut(s);
   if (result.kind === "raised" && !beamsOverlap(result.eq, s)) return result;
   if (result.kind === "none" && !result.slack && !result.mayRest) return { kind: "none", reason: result.reason };
   const h = solveHinged(s);
-  if (h) return { kind: "hinged", h, reason: h.phi > 0 ? BEAMS_TOUCH : BEAM_DOWN };
+  if (h && "fail" in h) return { kind: "none", reason: h.fail };
+  if (h) {
+    // The main beam can only push on the bar, and the beam cable only pull.
+    const tolerance = 1e-3 * (s.beamWeight + s.barWeight);
+    const normal = vec(-Math.sin(h.phi), Math.cos(h.phi));
+    if (h.beamPush.x * normal.x + h.beamPush.y * normal.y < -tolerance) return { kind: "none", reason: LIFTS_OFF };
+    if (h.t2.x * (h.beamAttach.x - h.barEnd2.x) + h.t2.y * (h.beamAttach.y - h.barEnd2.y) < -tolerance) {
+      return { kind: "none", reason: "The attachment would have to push the stretcher, so it can't rest on the ladder here." };
+    }
+    return { kind: "hinged", h, reason: h.phi > 0 ? BEAMS_TOUCH : BEAM_DOWN };
+  }
   if (result.kind === "none" && !result.slack) return { kind: "none", reason: result.reason };
   return {
     kind: "none",
@@ -653,11 +687,10 @@ type Limit = "beam" | "wall" | "ground" | "edge" | "top";
  * touching. For each beam angle the bar drops as low as the wall cable lets it (or onto the main beam, the
  * ground or the wall); the beam then settles at the angle of least total potential energy.
  */
-function solveHinged(s: Setup): Hinged | null {
+function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
   const anchor = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
   const ell = s.barLength;
   const PHI_MAX = phiMax(s);
-  const pinAlong = s.attachDistance - Math.sqrt(Math.max(0, s.beamCable ** 2 - s.touchGap ** 2));
   const pinAt = (phi: number) =>
     add(scale(vec(Math.cos(phi), Math.sin(phi)), pinAlong), scale(vec(-Math.sin(phi), Math.cos(phi)), s.touchGap));
   const end1At = (end2: Vec, angle: number) => add(end2, scale(vec(-Math.cos(angle), Math.sin(angle)), ell));
@@ -747,7 +780,7 @@ function solveHinged(s: Setup): Hinged | null {
   if (PHI_MAX - phi < 1e-6 && energyAt(PHI_MAX) <= energyAt(phi) + 1e-9 * s.barWeight) phi = PHI_MAX;
 
   /** Positions and the forces on the bar, at beam angle phi. */
-  type Arrangement = Omit<Hinged, "hinge" | "wallOnBeam" | "t2" | "beamPush">;
+  type Arrangement = Omit<Hinged, "hinge" | "wallOnBeam" | "t2" | "beamPush" | "beamCableTaut">;
   const arrangement = (phi: number, resting = false): Arrangement | null => {
     const bar = barAt(phi);
     if (!bar) return null;
@@ -891,5 +924,51 @@ function solveHinged(s: Setup): Hinged | null {
     hinge: phi > 0 ? vec(-onBeam.x - wallForce.x, s.beamWeight - onBeam.y - wallForce.y) : null,
     t2: scale(u2, T2),
     beamPush: scale(normal, cross(u2, h.support) / cross(u2, normal)),
+    beamCableTaut: true,
   };
+}
+
+/** The main beam's push on the bar's end along the beam (positive: up it, away from the hinge). */
+const alongBeam = (h: Hinged) => cross(h.support, vec(-Math.sin(h.phi), Math.cos(h.phi)));
+
+/**
+ * The bar resting on the main beam. Nothing but the beam cable holds its end in place along the beam, so it
+ * starts nearest the hinge with the cable taut. If the cable would have to push there, the end slides up the
+ * beam: it stops where the beam's push alone balances it (the cable slack), or where the cable comes taut
+ * again past its attachment. Off the beam's end, nothing holds it.
+ */
+function solveHinged(s: Setup): Hinged | { fail: string } | null {
+  const reach = Math.sqrt(Math.max(0, s.beamCable ** 2 - s.touchGap ** 2));
+  const lo = s.attachDistance - reach;
+  const hi = Math.min(s.beamLength, s.attachDistance + reach);
+  const tolerance = 1e-3 * (s.beamWeight + s.barWeight);
+  const first = restOnBeam(s, lo);
+  if (!first || alongBeam(first) >= -tolerance) return first;
+  const n = 12;
+  let below = lo;
+  for (let i = 1; i <= n; i++) {
+    const at = lo + ((hi - lo) * i) / n;
+    const h = restOnBeam(s, at);
+    if (!h) continue;
+    if (alongBeam(h) < 0) {
+      below = at;
+      continue;
+    }
+    // Pressing back down the beam here: the end settles in between, where the beam cable hangs slack.
+    let [a, b] = [below, at];
+    for (let j = 0; j < 30; j++) {
+      const m = (a + b) / 2;
+      const hm = restOnBeam(s, m);
+      if (hm && alongBeam(hm) < 0) a = m;
+      else b = m;
+    }
+    const settled = restOnBeam(s, b) ?? h;
+    const normal = vec(-Math.sin(settled.phi), Math.cos(settled.phi));
+    const push = settled.support.x * normal.x + settled.support.y * normal.y;
+    return { ...settled, t2: vec(0, 0), beamPush: scale(normal, push), beamCableTaut: false };
+  }
+  // Still sliding at the far end of its range: the beam cable catches it past the attachment, unless the
+  // beam ends first.
+  if (hi < s.attachDistance + reach) return { fail: "The stretcher's foot would slide off the end of the ladder." };
+  return restOnBeam(s, hi);
 }

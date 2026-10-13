@@ -296,7 +296,7 @@ export default function LadderHinge() {
 
         {/* forces on the main beam */}
         {wallOnBeamArrow(eq.wallOnBeam)}
-        {hingeArrows(eq.hinge)}
+        {eq.hinge && hingeArrows(eq.hinge)}
       </>
     );
   } else if (sol.kind === "hinged") {
@@ -323,7 +323,15 @@ export default function LadderHinge() {
             slack
           </Label>
         )}
-        <line x1={end2S.x} y1={end2S.y} x2={attachS.x} y2={attachS.y} stroke="#cbd5e1" strokeWidth={1.5} />
+        <line
+          x1={end2S.x}
+          y1={end2S.y}
+          x2={attachS.x}
+          y2={attachS.y}
+          stroke={h.beamCableTaut ? "#cbd5e1" : "#94a3b8"}
+          strokeWidth={1.5}
+          strokeDasharray={h.beamCableTaut ? undefined : "5 5"}
+        />
         {beamLine(h.phi)}
         {barLine(end1S, end2S)}
 
