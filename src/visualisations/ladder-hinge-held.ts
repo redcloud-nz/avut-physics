@@ -11,7 +11,7 @@ import { nelderMead, phiMax, solveLinear, wallPush, type Setup, type Surface } f
  * measured in metres, so where one is active its Lagrange multiplier is the force it carries, in newtons.
  */
 
-/** The team holds the ladder at about shoulder height (or at its tip, when that's lower). */
+/** The team holds the ladder at about shoulder height (or at its tip, when that's lower), pushing straight up. */
 export const HOLD_HEIGHT = 1.5;
 
 export type HeldContact = { surface: Surface | "ladder"; point: Vec; force: Vec };
@@ -35,7 +35,7 @@ export type Held = {
   contacts: HeldContact[];
   /** Where on the ladder the stretcher's contacts push back on it (the same order as `contacts`). */
   ladderPoints: (Vec | null)[];
-  /** The team's push on the ladder, square to it (null when the wall or ground holds it instead). */
+  /** The team's push on the ladder, straight up or down (null when the wall or ground holds it instead). */
   hold: { point: Vec; force: Vec } | null;
   wallOnBeam: { point: Vec; force: Vec } | null;
   /** Force the hinge exerts on the ladder (null when it lies on the ground, which shares the load). */
@@ -385,7 +385,6 @@ function settleLadder(
   ladderPoints: (Vec | null)[],
 ): Held {
   const along = vec(Math.cos(phi), Math.sin(phi));
-  const normal = vec(-Math.sin(phi), Math.cos(phi));
   const B = scale(along, s.attachDistance);
   // Wrapped round the tip, the attachment's pull on the ladder acts there (its pulls along the ladder cancel).
   const onLadder = [{ at: attachVia ?? B, f: scale(t2, -1) }];
@@ -401,7 +400,8 @@ function settleLadder(
   if (phi >= phiMax(s) - 1e-9 && torque > 0) wallOnBeam = wallPush(phi, torque, s);
   else if (!down) {
     const reach = phi > 0 ? Math.min(s.beamLength, HOLD_HEIGHT / Math.sin(phi)) : s.beamLength;
-    hold = { point: scale(along, reach), force: scale(normal, -torque / reach) };
+    const point = scale(along, reach);
+    hold = { point, force: vec(0, -torque / point.x) };
   }
   const extra = [hold?.force, wallOnBeam?.force].filter((f): f is Vec => !!f);
   const net = [...onLadder.map((l) => l.f), ...extra].reduce(add, vec(0, 0));

@@ -350,7 +350,7 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
   });
   if (h.hold) {
     onLadder.push({ at: h.hold.point, f: h.hold.force });
-    if (Math.abs(dot(h.hold.force, along)) > forceTol) fail("team pushes along the ladder", dot(h.hold.force, along));
+    if (Math.abs(h.hold.force.x) > forceTol) fail("team pushes sideways", h.hold.force.x);
   }
   if (h.wallOnBeam) onLadder.push({ at: h.wallOnBeam.point, f: h.wallOnBeam.force });
   const ladderTurn =

@@ -5,6 +5,7 @@ import { AngleArc, Arrow, Label, add, deg, len, rad, scale, vec, type Vec } from
 import { Separator } from "@/components/ui/separator";
 import { Choice, RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { solveHeld, solveLevel } from "./ladder-hinge-held";
+import { LadderHingeNotes } from "./ladder-hinge-notes";
 import { minWallCable, phiMax, solve } from "./ladder-hinge-solver";
 
 const COLORS = {
@@ -34,6 +35,10 @@ const MAX_ANCHOR_UP = 2;
 const MAX_ANCHOR_BACK = 5;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
+/** The steepest the ground team holds the ladder (degrees). */
+const MAX_TEAM_ANGLE = 60;
+/** How well the ladder's foot grips the ground (rubber feet on a hard surface). */
+const FOOT_FRICTION = 0.5;
 /** Shown in place of a value that doesn't apply. */
 const NONE = "—";
 
@@ -124,7 +129,9 @@ export default function LadderHinge() {
   // wall top, to the edge (rounded up to the slider's precision).
   const minCable = Math.ceil(minWallCable({ ...setup, wallCable: 0 }) * 100) / 100;
   const cable = Math.max(wallCable, minCable);
-  const maxHeldAngle = Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2;
+  // Steeper than this, a team's push at shoulder height is almost along the ladder: it barely turns it, and
+  // it lifts or drags the ladder's foot before it does.
+  const maxHeldAngle = Math.min(MAX_TEAM_ANGLE, Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2);
   const holdAngle = Math.min(heldAngle, maxHeldAngle);
   const held = useMemo(
     () => (ladderMode === "held" ? solveHeld({ ...setup, wallCable: cable }, rad(holdAngle)) : null),
@@ -250,7 +257,7 @@ export default function LadderHinge() {
   );
   const hingeReadouts = (R: Vec | null) => (
     <>
-      <Readout label="Hinge force R" value={R ? `${len(R).toFixed(0)} N` : NONE} color={COLORS.hinge} />
+      <Readout label="Force on ladder's foot R" value={R ? `${len(R).toFixed(0)} N` : NONE} color={COLORS.hinge} />
       {showComponents && (
         <Readout
           label="  Rx, Ry"
@@ -258,7 +265,7 @@ export default function LadderHinge() {
           color={COLORS.component}
         />
       )}
-      <Readout label="  R direction" value={R ? `${deg(Math.atan2(R.y, R.x)).toFixed(1)}° above horizontal` : NONE} />
+      <Readout label="  R direction" value={R ? `${deg(Math.atan2(R.y, R.x)).toFixed(1)}°` : NONE} />
     </>
   );
   /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
@@ -511,25 +518,40 @@ export default function LadderHinge() {
             }
           : null;
   const hold = inBrowser && sol.kind === "held" ? sol.h.hold : null;
-  /** Positive when the team holds the ladder up, negative when it pulls it out, away from the wall. */
-  const holdPush = hold && view ? hold.force.y * Math.cos(view.phi) - hold.force.x * Math.sin(view.phi) : 0;
+  /** Positive when the team holds the ladder up, negative when it pulls it down (shown with its sign). */
+  const holdPush = hold ? hold.force.y : 0;
+  // The ladder's foot only sits in the corner: the ground can push it up and the wall push it out, but
+  // neither can hold it down, and only the ground's grip stops it sliding away from the wall.
+  const footTolerance = 1e-3 * (beamWeight + barWeight);
+  const foot = view?.hinge;
+  const footProblem = !foot
+    ? null
+    : foot.y < -footTolerance
+      ? "Its foot would lift off the ground: it would need pinning down at the base."
+      : foot.x < -FOOT_FRICTION * foot.y - footTolerance
+        ? "Its foot would slide away from the wall: the ground's grip isn't enough to hold it."
+        : null;
+  const notice = !inBrowser
+    ? null
+    : sol.kind === "none"
+      ? { title: "No balanced position for these settings", detail: sol.reason }
+      : teamHolds && level && !level.level && level.result.kind === "held"
+        ? {
+            title: "The team can\u2019t hold the stretcher level here",
+            detail: `${level.reason} Shown with the ladder held at the angle that would level it.`,
+          }
+        : footProblem
+          ? { title: "The ladder wouldn\u2019t stay put", detail: footProblem }
+          : null;
 
   return (
     <VisualisationLayout
       diagram={
         <div className="relative flex flex-col gap-4 p-4">
-          {inBrowser && sol.kind === "none" && (
+          {notice && (
             <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-              <p className="font-medium">No balanced position for these settings</p>
-              <p className="mx-auto mt-1 max-w-md text-amber-400/80">{sol.reason}</p>
-            </div>
-          )}
-          {inBrowser && teamHolds && level && !level.level && level.result.kind === "held" && (
-            <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-              <p className="font-medium">The team can&rsquo;t hold the stretcher level here</p>
-              <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                {level.reason} Shown with the ladder held at the angle that would level it.
-              </p>
+              <p className="font-medium">{notice.title}</p>
+              <p className="mx-auto mt-1 max-w-md text-amber-400/80">{notice.detail}</p>
             </div>
           )}
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
@@ -673,17 +695,7 @@ export default function LadderHinge() {
           {tensionReadouts("T₁", "rope", view?.t1 ?? null, COLORS.tensionWall)}
           {tensionReadouts("T₂", "attachment", view?.t2 ?? null, COLORS.tensionBeam)}
           {hingeReadouts(view?.hinge ?? null)}
-          <Readout
-            label="Ground team's hold F"
-            value={
-              hold
-                ? `${len(hold.force).toFixed(0)} N, ${holdPush >= 0 ? "holding it up" : "pulling it out"}`
-                : inBrowser && ladderMode === "level" && !teamHolds
-                  ? "not holding yet"
-                  : NONE
-            }
-            color={COLORS.hold}
-          />
+          <Readout label="Ground team's hold F" value={hold ? `${holdPush.toFixed(0)} N` : NONE} color={COLORS.hold} />
           <Readout
             label="Wall's edge on ladder N"
             value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
@@ -709,26 +721,29 @@ export default function LadderHinge() {
         </>
       }
       footer={
-        SHOW_RAW_VALUES && (
-          <RawValues
-            title="Raw values"
-            data={{
-              inputs: {
-                wallCable: cable,
-                beamCable,
-                wallHeight,
-                anchorUp,
-                anchorBack,
-                beamLength,
-                attachDistance,
-                beamMass,
-                barMass,
-              },
-              minWallCable: minCable,
-              result: sol,
-            }}
-          />
-        )
+        <div className="flex flex-col gap-4">
+          <LadderHingeNotes />
+          {SHOW_RAW_VALUES && (
+            <RawValues
+              title="Raw values"
+              data={{
+                inputs: {
+                  wallCable: cable,
+                  beamCable,
+                  wallHeight,
+                  anchorUp,
+                  anchorBack,
+                  beamLength,
+                  attachDistance,
+                  beamMass,
+                  barMass,
+                },
+                minWallCable: minCable,
+                result: sol,
+              }}
+            />
+          )}
+        </div>
       }
     />
   );
