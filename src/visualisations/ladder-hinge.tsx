@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { AngleArc, Arrow, Label, add, deg, len, rad, scale, vec, type Vec } from "@/components/diagram/svg";
+import { AngleArc, Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { Choice, RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { solveHeld, solveLevel } from "./ladder-hinge-held";
@@ -19,7 +19,7 @@ const COLORS = {
   hold: "#a3e635",
 };
 
-type LadderMode = "free" | "level" | "held";
+type LadderMode = "free" | "level";
 
 const G = 9.81;
 const MAX_ARROW = 200;
@@ -35,6 +35,8 @@ const MAX_ANCHOR_UP = 2;
 const MAX_ANCHOR_BACK = 5;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
+/** Over how many degrees the team brings the ladder from where it settles by itself to level. */
+const UNDERRUN_OVER = 7.5;
 /** The steepest the ground team holds the ladder (degrees). */
 const MAX_TEAM_ANGLE = 60;
 /** How well the ladder's foot grips the ground (rubber feet on a hard surface). */
@@ -80,12 +82,8 @@ export default function LadderHinge() {
   const [anchorUp, setAnchorUp] = useState(0.5);
   const [anchorBack, setAnchorBack] = useState(2);
   const [showComponents, setShowComponents] = useState(false);
-  /**
-   * Whether the ladder finds its own angle, a ground team holds it at whatever angle keeps the stretcher
-   * level, or the team holds it at `heldAngle` (degrees).
-   */
+  /** Whether the ladder finds its own angle, or a ground team holds it at whatever angle keeps the stretcher level. */
   const [ladderMode, setLadderMode] = useState<LadderMode>("free");
-  const [heldAngle, setHeldAngle] = useState(45);
   /** Keeping it level, the team only takes hold of the ladder once it's below this angle (degrees). */
   const [takeHoldBelow, setTakeHoldBelow] = useState(45);
 
@@ -131,30 +129,30 @@ export default function LadderHinge() {
   const cable = Math.max(wallCable, minCable);
   // Steeper than this, a team's push at shoulder height is almost along the ladder: it barely turns it, and
   // it lifts or drags the ladder's foot before it does.
-  const maxHeldAngle = Math.min(MAX_TEAM_ANGLE, Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2);
-  const holdAngle = Math.min(heldAngle, maxHeldAngle);
-  const held = useMemo(
-    () => (ladderMode === "held" ? solveHeld({ ...setup, wallCable: cable }, rad(holdAngle)) : null),
-    [ladderMode, setup, cable, holdAngle],
-  );
+  const maxTakeHold = Math.min(MAX_TEAM_ANGLE, Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2);
   const level = useMemo(
     () => (ladderMode === "level" ? solveLevel({ ...setup, wallCable: cable }) : null),
     [ladderMode, setup, cable],
   );
-  // Until the angle that would level the stretcher is below the cutoff, the team leaves the ladder alone.
-  const teamHolds =
-    ladderMode === "held" ||
-    (level !== null && level.result.kind === "held" && deg(level.result.h.phi) <= takeHoldBelow);
-  const free = useMemo(() => (teamHolds ? null : solve({ ...setup, wallCable: cable })), [teamHolds, setup, cable]);
-  const sol = free ?? (level ? level.result : held!);
-  // Taking hold of the ladder at a set angle starts from the angle it had until then.
-  const changeLadderMode = (mode: LadderMode) => {
-    if (mode === "held" && sol.kind !== "none") {
-      const phi = sol.kind === "raised" ? sol.eq.phi : sol.h.phi;
-      setHeldAngle(Math.min(maxHeldAngle, Math.round(deg(phi) * 2) / 2));
-    }
-    setLadderMode(mode);
-  };
+  // Until the angle that would level the stretcher is below the cutoff, the team leaves the ladder alone. Then
+  // they take hold where it settles by itself and bring it round to level over the next few degrees.
+  const levelPhi = level?.result.kind === "held" ? level.result.h.phi : null;
+  const underrun =
+    levelPhi === null
+      ? 0
+      : Math.max(0, Math.min(1, (Math.min(takeHoldBelow, maxTakeHold) - deg(levelPhi)) / UNDERRUN_OVER));
+  const needFree = underrun < 1;
+  const free = useMemo(() => (needFree ? solve({ ...setup, wallCable: cable }) : null), [needFree, setup, cable]);
+  const freePhi = free?.kind === "raised" ? free.eq.phi : free?.kind === "hinged" ? free.h.phi : null;
+  const easing = useMemo(
+    () =>
+      underrun > 0 && underrun < 1 && freePhi !== null && levelPhi !== null
+        ? solveHeld({ ...setup, wallCable: cable }, freePhi + underrun * (levelPhi - freePhi))
+        : null,
+    [underrun, freePhi, levelPhi, setup, cable],
+  );
+  const sol = underrun >= 1 || (underrun > 0 && !easing) ? level!.result : (easing ?? free!);
+  const levelled = underrun >= 1 ? level : null;
   // The solver's last few digits differ between the server and the browser, which would make hydration
   // fail, so results are only shown once running in the browser.
   const inBrowser = useSyncExternalStore(
@@ -535,10 +533,10 @@ export default function LadderHinge() {
     ? null
     : sol.kind === "none"
       ? { title: "No balanced position for these settings", detail: sol.reason }
-      : teamHolds && level && !level.level && level.result.kind === "held"
+      : levelled && !levelled.level && levelled.result.kind === "held"
         ? {
             title: "The team can\u2019t hold the stretcher level here",
-            detail: `${level.reason} Shown with the ladder held at the angle that would level it.`,
+            detail: `${levelled.reason} Shown with the ladder held at the angle that would level it.`,
           }
         : footProblem
           ? { title: "The ladder wouldn\u2019t stay put", detail: footProblem }
@@ -567,41 +565,18 @@ export default function LadderHinge() {
             digits={2}
             onChange={setWallCable}
           />
-          {ladderMode === "level" && (
-            <Slider
-              label="Team takes hold below"
-              value={takeHoldBelow}
-              min={0}
-              max={maxHeldAngle}
-              step={0.5}
-              unit="°"
-              onChange={setTakeHoldBelow}
-            />
-          )}
-          {ladderMode === "held" && (
-            <Slider
-              label="Ladder angle (held)"
-              value={holdAngle}
-              min={0}
-              max={maxHeldAngle}
-              step={0.5}
-              unit="°"
-              onChange={setHeldAngle}
-            />
-          )}
         </div>
       }
       controls={(more) => (
         <>
           <Choice
-            label="Ladder"
+            label="Ladder Angle"
             value={ladderMode}
             options={[
-              { value: "free", label: "Finds own angle" },
-              { value: "level", label: "Team levels" },
-              { value: "held", label: "Team holds" },
+              { value: "free", label: "Auto" },
+              { value: "level", label: "Underrun" },
             ]}
-            onChange={changeLadderMode}
+            onChange={setLadderMode}
           />
           <Slider
             label="Wall height"
@@ -682,6 +657,16 @@ export default function LadderHinge() {
                 unit="kg"
                 digits={0}
                 onChange={setBeamMass}
+              />
+              <Slider
+                label="Team Underruns below"
+                value={Math.min(takeHoldBelow, maxTakeHold)}
+                min={0}
+                max={maxTakeHold}
+                step={0.5}
+                unit="°"
+                disabled={ladderMode !== "level"}
+                onChange={setTakeHoldBelow}
               />
             </>,
           )}

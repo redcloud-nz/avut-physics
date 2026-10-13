@@ -44,21 +44,21 @@ export function LadderHingeNotes() {
 
       <Part title="The ground team">
         <p>
-          <span className="text-slate-300">Team holds:</span> the ladder’s angle is set by the slider instead. The
-          stretcher settles at its lowest energy for that angle, and the team supplies whatever torque the ladder needs
-          to stay there. The team is assumed to push straight up (or pull straight down) at shoulder height,
-          {HOLD_HEIGHT} m up, or at the ladder’s tip if that’s lower. Where and how they hold it changes only how hard
-          they push and the force on the foot, not the stretcher’s position. The team only holds the ladder at 60° or
-          lower: steeper, their grip is almost directly above the foot, so a vertical push barely turns the ladder and
-          would lift its foot or drag it out first.
+          With the ladder angle set to “Underrun”, a ground team holds the ladder at whichever angle keeps the stretcher
+          level. Level, resting on the ladder with the attachment taut, the stretcher’s position follows from the
+          ladder’s angle alone, so the rope’s length fixes the angle. The team takes hold once that angle is below “Team
+          Underruns below” in More settings (at most 60°); until then the ladder finds its own angle, as with “Auto”.
+          They take hold where the ladder has settled by itself, then bring it round to level over the next 7.5°,
+          holding it part of the way between the two angles. Where the stretcher can’t be held level (still up by the
+          wall top), the page says why and shows it settled at the angle that would have levelled it. Once the ladder is
+          down and the rope slack, the stretcher stays where it landed.
         </p>
         <p>
-          <span className="text-slate-300">Team levels:</span> the team holds the ladder at whichever angle keeps the
-          stretcher level. Level, resting on the ladder with the attachment taut, the stretcher’s position follows from
-          the ladder’s angle alone, so the rope’s length fixes the angle. Above the take-hold angle (at most 60°) the
-          ladder is left to find its own angle. Where the stretcher can’t be held level (still up by the wall top), the
-          page says why and shows it settled at the angle that would have levelled it. Once the ladder is down and the
-          rope slack, the stretcher stays where it landed.
+          The team is assumed to push straight up (or pull straight down) at shoulder height, {HOLD_HEIGHT} m up, or at
+          the ladder’s tip if that’s lower, supplying whatever torque the ladder needs to stay at its angle. Where and
+          how they hold it changes only how hard they push and the force on the foot, not the stretcher’s position.
+          Steeper than 60° their grip is almost directly above the foot, so a vertical push barely turns the ladder and
+          would lift its foot or drag it out first.
         </p>
       </Part>
 

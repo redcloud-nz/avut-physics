@@ -14,10 +14,11 @@ export function Slider(props: {
   step: number;
   unit?: string;
   digits?: number;
+  disabled?: boolean;
   onChange: (v: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm text-slate-300">
+    <label className={`flex flex-col gap-1 text-sm text-slate-300 ${props.disabled ? "opacity-40" : ""}`}>
       <span className="flex justify-between gap-2">
         {props.label}
         <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
@@ -31,6 +32,7 @@ export function Slider(props: {
         max={props.max}
         step={props.step}
         value={props.value}
+        disabled={props.disabled}
         onChange={(e) => props.onChange(Number(e.target.value))}
         className="accent-sky-500"
       />

@@ -429,33 +429,34 @@ function settleLadder(
 export type LevelResult = { result: HeldResult; level: boolean; reason?: string };
 
 /**
- * The ladder held at whichever angle keeps the stretcher level, as a ground team watching it would hold it.
  * Level and resting on the ladder, with the attachment taut, the stretcher's position follows from the
  * ladder's angle alone: its ladder end where the attachment holds it against the ladder, its rope end the
- * stretcher's length towards the wall at the same height. So the rope's length fixes the angle, found by
- * bisection, and the stretcher's balance then gives the rope's and attachment's pulls and the ladder's push.
- * Where that arrangement can't hold, the ladder is held at that angle and the stretcher left to settle.
+ * stretcher's length towards the wall at the same height.
+ */
+function levelEnds(s: Setup, phi: number): [Vec, Vec] {
+  const reach = Math.sqrt(Math.max(0, s.beamCable ** 2 - s.touchGap ** 2));
+  const P2 = add(
+    scale(vec(Math.cos(phi), Math.sin(phi)), s.attachDistance - reach),
+    scale(vec(-Math.sin(phi), Math.cos(phi)), s.touchGap),
+  );
+  return [sub(P2, vec(s.barLength, 0)), P2];
+}
+
+/** The rope that holds the stretcher level with the ladder at angle phi. */
+const levelRope = (s: Setup, phi: number) => ropePathFor(s, levelEnds(s, phi)[0]).length;
+
+/**
+ * The ladder held at whichever angle keeps the stretcher level, as a ground team watching it would hold it.
+ * Lowering the ladder takes the stretcher further out and down, so the rope's length fixes the angle, found
+ * by bisection.
  */
 export function solveLevel(s: Setup): LevelResult {
   const top = phiMax(s);
-  const W = s.barWeight;
-  const reach = Math.sqrt(Math.max(0, s.beamCable ** 2 - s.touchGap ** 2));
-  const footAlong = s.attachDistance - reach;
-  const ends = (phi: number): [Vec, Vec] => {
-    const P2 = add(
-      scale(vec(Math.cos(phi), Math.sin(phi)), footAlong),
-      scale(vec(-Math.sin(phi), Math.cos(phi)), s.touchGap),
-    );
-    return [sub(P2, vec(s.barLength, 0)), P2];
-  };
-  const ropeNeeded = (phi: number) => ropePathFor(s, ends(phi)[0]).length;
-  const notLevel = (phi: number, reason: string): LevelResult => ({ result: solveHeld(s, phi), level: false, reason });
-
-  // Lowering the ladder takes the stretcher further out and down, so it needs more rope. With more than
-  // enough, the ladder lies on the ground and the stretcher flat on it, where it landed: on a flat ladder
-  // nothing moves it along, so the rope and attachment hang slack and the ladder carries all its weight.
-  if (s.wallCable >= ropeNeeded(0)) {
-    let [P1, P2] = ends(0);
+  // With more than enough rope, the ladder lies on the ground and the stretcher flat on it, where it landed:
+  // on a flat ladder nothing moves it along, so the rope and attachment hang slack and the ladder carries
+  // all its weight.
+  if (s.wallCable >= levelRope(s, 0)) {
+    let [P1, P2] = levelEnds(s, 0);
     // Too near the wall for the stretcher's length, it rests against the wall's face instead.
     if (P1.x < 0) [P1, P2] = [vec(0, P1.y), vec(s.barLength, P2.y)];
     if (len(sub(P2, vec(s.attachDistance, 0))) > s.beamCable + 1e-9) {
@@ -463,30 +464,43 @@ export function solveLevel(s: Setup): LevelResult {
       return { result, level: result.kind === "held" && Math.abs(result.h.tilt) < rad(0.5) };
     }
     const centre = scale(add(P1, P2), 0.5);
-    const contact: HeldContact = { surface: "ladder", point: centre, force: vec(0, W) };
+    const contact: HeldContact = { surface: "ladder", point: centre, force: vec(0, s.barWeight) };
     const none = vec(0, 0);
     const h = settleLadder(s, 0, P1, P2, none, none, null, [contact], [vec(centre.x, 0)]);
     return { result: { kind: "held", h }, level: true };
   }
-  if (s.wallCable < ropeNeeded(top)) {
-    return notLevel(top, "The rope is too short to hold the stretcher level, even with the ladder upright.");
+  if (s.wallCable < levelRope(s, top)) {
+    return {
+      result: solveHeld(s, top),
+      level: false,
+      reason: "The rope is too short to hold the stretcher level, even with the ladder upright.",
+    };
   }
   let [lo, hi] = [0, top];
   for (let i = 0; i < 60; i++) {
     const mid = (lo + hi) / 2;
-    if (ropeNeeded(mid) > s.wallCable) lo = mid;
+    if (levelRope(s, mid) > s.wallCable) lo = mid;
     else hi = mid;
   }
-  const phi = (lo + hi) / 2;
-  const [P1, P2] = ends(phi);
+  return levelAt(s, (lo + hi) / 2);
+}
 
-  if (P1.y < 0) return notLevel(phi, "Level, the stretcher's rope end would be below the ground.");
-  if (P1.x < 0 && P1.y < s.wallHeight) return notLevel(phi, "Level, the stretcher would pass through the wall.");
+/**
+ * The stretcher level with the ladder at angle phi and the rope just long enough: the stretcher's balance
+ * gives the rope's and attachment's pulls and the ladder's push. Where that arrangement can't hold, the
+ * ladder is held at that angle and the stretcher left to settle.
+ */
+function levelAt(s: Setup, phi: number): LevelResult {
+  const W = s.barWeight;
+  const notLevel = (reason: string): LevelResult => ({ result: solveHeld(s, phi), level: false, reason });
+  const [P1, P2] = levelEnds(s, phi);
+  if (P1.y < 0) return notLevel("Level, the stretcher's rope end would be below the ground.");
+  if (P1.x < 0 && P1.y < s.wallHeight) return notLevel("Level, the stretcher would pass through the wall.");
 
   // The stretcher's balance: the rope's pull at end 1, the attachment's and the ladder's push at end 2.
   const u1 = unit(sub(ropePathFor(s, P1).wrapEdge ?? vec(-s.anchorBack, s.wallHeight + s.anchorUp), P1));
-  const B = scale(vec(Math.cos(phi), Math.sin(phi)), s.attachDistance);
-  const u2 = unit(sub(B, P2));
+  const along = vec(Math.cos(phi), Math.sin(phi));
+  const u2 = unit(sub(scale(along, s.attachDistance), P2));
   const n = vec(-Math.sin(phi), Math.cos(phi));
   const centre = scale(add(P1, P2), 0.5);
   const x = solveLinear(
@@ -497,15 +511,14 @@ export function solveLevel(s: Setup): LevelResult {
     ],
     [0, W, cross(sub(centre, P2), vec(0, -W)) * -1],
   );
-  if (!x) return notLevel(phi, "The rope, attachment and ladder can't balance the stretcher level here.");
+  if (!x) return notLevel("The rope, attachment and ladder can't balance the stretcher level here.");
   const [T1, T2, N] = x;
   const tol = -1e-6 * W;
-  if (T1 < tol) return notLevel(phi, "The rope would have to push to keep the stretcher level.");
-  if (N < tol) return notLevel(phi, "The stretcher would lift off the ladder.");
-  if (T2 < tol) return notLevel(phi, "The stretcher's end would slide up the ladder, with the attachment slack.");
+  if (T1 < tol) return notLevel("The rope would have to push to keep the stretcher level.");
+  if (N < tol) return notLevel("The stretcher would lift off the ladder.");
+  if (T2 < tol) return notLevel("The stretcher's end would slide up the ladder, with the attachment slack.");
 
-  const onLadder = scale(n, Math.max(0, N));
-  const ladderAt = scale(vec(Math.cos(phi), Math.sin(phi)), footAlong);
+  const ladderAt = sub(P2, scale(n, s.touchGap));
   const h = settleLadder(
     s,
     phi,
@@ -514,7 +527,7 @@ export function solveLevel(s: Setup): LevelResult {
     scale(u1, Math.max(0, T1)),
     scale(u2, Math.max(0, T2)),
     null,
-    [{ surface: "ladder", point: P2, force: onLadder }],
+    [{ surface: "ladder", point: P2, force: scale(n, Math.max(0, N)) }],
     [ladderAt],
   );
   return { result: { kind: "held", h }, level: true };
