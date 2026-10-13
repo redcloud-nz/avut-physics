@@ -131,13 +131,13 @@ function wallCableEnd(alpha: number, s: Setup): { P1: Vec; wrapEdge: Vec | null 
 }
 
 /** The steepest the main beam can stand: leaning back with its face against the wall's top edge. */
-const phiMax = (s: Setup) => Math.acos(Math.min(1, s.beamThickness / 2 / s.wallHeight));
+export const phiMax = (s: Setup) => Math.acos(Math.min(1, s.beamThickness / 2 / s.wallHeight));
 
 /**
  * The wall's top edge pushing on the main beam leaning against it: square to the beam, enough to balance
  * the leftover torque (positive = trying to lean further back).
  */
-function wallPush(phi: number, torque: number, s: Setup): { point: Vec; force: Vec } {
+export function wallPush(phi: number, torque: number, s: Setup): { point: Vec; force: Vec } {
   const n = vec(Math.sin(phi), -Math.cos(phi));
   return { point: vec(0, s.wallHeight), force: scale(n, torque / (s.wallHeight * Math.sin(phi))) };
 }
@@ -290,7 +290,7 @@ function energyOf(g: Geometry, s: Setup): number {
 }
 
 /** Nelder–Mead minimisation, restarted a few times from the best point to avoid early stalls. */
-function nelderMead(f: (x: number[]) => number, start: number[], step: number): number[] {
+export function nelderMead(f: (x: number[]) => number, start: number[], step: number): number[] {
   const n = start.length;
   const lerp = (a: number[], b: number[], t: number) => a.map((ai, i) => ai + t * (b[i] - ai));
   let best = start;
@@ -331,7 +331,7 @@ function nelderMead(f: (x: number[]) => number, start: number[], step: number): 
 }
 
 /** Solve a small linear system by Gaussian elimination with partial pivoting. */
-function solveLinear(A: number[][], b: number[]): number[] | null {
+export function solveLinear(A: number[][], b: number[]): number[] | null {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
   for (let col = 0; col < n; col++) {
@@ -671,7 +671,7 @@ function beamsOverlap(eq: Equilibrium, s: Setup): boolean {
 }
 
 /** Length of the wall cable's path from its anchor to p, wrapping over the wall's top edge if it has to. */
-function wallCablePath(p: Vec, s: Setup): { length: number; wrapEdge: Vec | null } {
+export function wallCablePath(p: Vec, s: Setup): { length: number; wrapEdge: Vec | null } {
   const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
   const edge = vec(0, s.wallHeight);
   if (p.x > -1e-9) {

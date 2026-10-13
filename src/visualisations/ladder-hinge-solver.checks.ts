@@ -1,4 +1,5 @@
 import { add, cross, len, scale, sub, unit, vec, type Vec } from "@/lib/vec";
+import type { HeldResult } from "./ladder-hinge-held";
 import { minWallCable, type Result, type Setup } from "./ladder-hinge-solver";
 
 /**
@@ -253,5 +254,111 @@ export function violations(s: Setup, r: Result): string[] {
     if (phi > (0.05 * Math.PI) / 180) fail("raised ladder without a hinge force", phi);
     if (ladderTurn > torqueTol) fail("ground would have to hold the ladder down", ladderTurn);
   }
+  return out;
+}
+
+/** A short name for a held-ladder arrangement, e.g. "held: rope+attachment+ladder" or "none: <reason>". */
+export function heldArrangement(r: HeldResult): string {
+  if (r.kind === "none") return `none: ${r.reason}`;
+  const h = r.h;
+  const held = [h.ropeTaut && "rope", h.attachmentTaut && "attachment", ...h.contacts.map((c) => c.surface)];
+  const by = h.hold ? "team" : h.wallOnBeam ? "leaning" : "ladder down";
+  return `held: ${[...new Set(held.filter(Boolean))].sort().join("+")}, ${by}`;
+}
+
+/** Everything wrong with a held-ladder result, checked from the physics alone, like `violations`. */
+export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
+  if (r.kind === "none") return [];
+  const out: string[] = [];
+  const fail = (what: string, amount: number) => out.push(`${what} (${amount.toPrecision(3)})`);
+  const h = r.h;
+  const W = s.barWeight;
+  const forceTol = 1e-3 * (s.beamWeight + W);
+  const torqueTol = forceTol * s.beamLength;
+  const gapTol = 1e-4;
+  const { barEnd1: P1, barEnd2: P2, beamAttach: B } = h;
+  const along = vec(Math.cos(phi), Math.sin(phi));
+  const normal = vec(-Math.sin(phi), Math.cos(phi));
+
+  if (Math.abs(h.phi - phi) > 1e-9) fail("ladder not at the held angle", h.phi);
+  if (Math.abs(len(sub(P1, P2)) - s.barLength) > gapTol) fail("stretcher length", len(sub(P1, P2)));
+  if (len(sub(B, scale(along, s.attachDistance))) > gapTol) fail("attachment point off the ladder", len(B));
+  const attachment = h.attachVia ? len(sub(h.attachVia, B)) + len(sub(P2, h.attachVia)) : len(sub(B, P2));
+  if (h.attachVia && len(sub(h.attachVia, scale(along, s.beamLength))) > 1e-9) fail("attachment wraps off the tip", 1);
+  if (h.attachmentTaut ? Math.abs(attachment - s.beamCable) > gapTol : attachment > s.beamCable + gapTol)
+    fail("attachment length", attachment);
+  const rope = ropePath(P1, s);
+  if (h.ropeTaut ? Math.abs(rope.length - s.wallCable) > 1e-3 : rope.length > s.wallCable + 1e-3)
+    fail("rope length", rope.length);
+
+  const tip = scale(along, s.beamLength);
+  const gap = segmentGap(P1, P2, vec(0, 0), tip);
+  if (gap < s.touchGap - 1e-3) fail("stretcher into the ladder", gap);
+  if (dot(P2, normal) < 0 && !h.attachVia) fail("attachment through the ladder", dot(P2, normal));
+  let depth = 0;
+  for (let i = 0; i <= 100; i++) {
+    const p = add(P1, scale(sub(P2, P1), i / 100));
+    if (p.x < 0 && p.y < s.wallHeight) depth = Math.max(depth, Math.min(-p.x, s.wallHeight - p.y));
+    depth = Math.max(depth, -p.y);
+  }
+  if (depth > 1e-3) fail("stretcher into the wall or ground", depth);
+
+  const pulls = (t: Vec, towards: Vec) =>
+    len(t) < 1e-9 || (dot(t, towards) > 0 && Math.abs(cross(unit(t), unit(towards))) < 1e-6);
+  if (!pulls(h.t1, sub(rope.towards, P1))) fail("rope doesn't pull towards its anchor", len(h.t1));
+  if (!pulls(h.t2, sub(h.attachVia ?? B, P2))) fail("attachment doesn't pull towards the ladder", len(h.t2));
+  const barDir = unit(sub(P2, P1));
+  h.contacts.forEach((c, i) => {
+    const lp = h.ladderPoints[i];
+    // Square to the surface: the ground, wall and wall top have fixed normals; at the wall's edge or the
+    // ladder's tip the push is square to the stretcher; on the ladder's face, square to the ladder.
+    const surfaceDir =
+      c.surface === "ground" || c.surface === "top"
+        ? vec(1, 0)
+        : c.surface === "wall"
+          ? vec(0, 1)
+          : c.surface === "edge" || (lp && len(sub(lp, tip)) < 1e-9)
+            ? barDir
+            : along;
+    if (Math.abs(dot(c.force, surfaceDir)) > forceTol) fail(`${c.surface} pushes sideways`, dot(c.force, surfaceDir));
+    const touchingAt = c.surface === "ladder" ? len(sub(c.point, lp ?? c.point)) - s.touchGap : 0;
+    const off =
+      c.surface === "ground"
+        ? c.point.y
+        : c.surface === "wall"
+          ? c.point.x
+          : c.surface === "top"
+            ? c.point.y - s.wallHeight
+            : c.surface === "edge"
+              ? segmentDistance(vec(0, s.wallHeight), P1, P2)
+              : touchingAt;
+    if (Math.abs(off) > 1e-3) fail(`${c.surface} contact off its surface`, off);
+    if (c.surface === "ladder" && !lp) fail("ladder contact without a point on the ladder", 0);
+  });
+
+  const onBar = [{ at: P1, f: h.t1 }, { at: P2, f: h.t2 }, ...h.contacts.map((c) => ({ at: c.point, f: c.force }))];
+  const centre = scale(add(P1, P2), 0.5);
+  const net = onBar.reduce((sum, l) => add(sum, l.f), vec(0, -W));
+  const turn = onBar.reduce((sum, l) => sum + cross(sub(l.at, centre), l.f), 0);
+  if (len(net) > forceTol) fail("stretcher's forces don't balance", len(net));
+  if (Math.abs(turn) > forceTol * s.barLength) fail("stretcher's torques don't balance", turn);
+
+  const onLadder = [{ at: h.attachVia ?? B, f: scale(h.t2, -1) }];
+  h.contacts.forEach((c, i) => {
+    const lp = h.ladderPoints[i];
+    if (lp) onLadder.push({ at: lp, f: scale(c.force, -1) });
+  });
+  if (h.hold) {
+    onLadder.push({ at: h.hold.point, f: h.hold.force });
+    if (Math.abs(dot(h.hold.force, along)) > forceTol) fail("team pushes along the ladder", dot(h.hold.force, along));
+  }
+  if (h.wallOnBeam) onLadder.push({ at: h.wallOnBeam.point, f: h.wallOnBeam.force });
+  const ladderTurn =
+    onLadder.reduce((sum, l) => sum + cross(l.at, l.f), 0) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
+  if (h.hinge) {
+    const ladderNet = onLadder.reduce((sum, l) => add(sum, l.f), add(h.hinge, vec(0, -s.beamWeight)));
+    if (len(ladderNet) > forceTol) fail("ladder's forces don't balance", len(ladderNet));
+    if (Math.abs(ladderTurn) > torqueTol) fail("ladder's torques don't balance", ladderTurn);
+  } else if (ladderTurn > torqueTol) fail("ground would have to hold the ladder down", ladderTurn);
   return out;
 }

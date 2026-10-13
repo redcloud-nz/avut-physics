@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { AngleArc, Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
+import { AngleArc, Arrow, Label, add, deg, len, rad, scale, vec, type Vec } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
-import { RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
-import { minWallCable, solve } from "./ladder-hinge-solver";
+import { Choice, RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
+import { solveHeld, solveLevel } from "./ladder-hinge-held";
+import { minWallCable, phiMax, solve } from "./ladder-hinge-solver";
 
 const COLORS = {
   tensionBeam: "#38bdf8",
@@ -14,7 +15,10 @@ const COLORS = {
   hinge: "#f472b6",
   component: "#94a3b8",
   contact: "#34d399",
+  hold: "#a3e635",
 };
+
+type LadderMode = "free" | "level" | "held";
 
 const G = 9.81;
 const MAX_ARROW = 200;
@@ -38,6 +42,10 @@ const W = 800;
 const BELOW_GROUND = 0.4;
 const ABOVE_TOP = 0.3;
 
+/** The total of some contact forces, or null if there are none. */
+const sumForces = (contacts: { force: Vec }[]) =>
+  contacts.length ? contacts.reduce((sum, c) => add(sum, c.force), vec(0, 0)) : null;
+
 /** Clamp an arrow's drawn length so very large forces stay on screen. */
 const clampLen = (v: Vec) => {
   const l = len(v);
@@ -48,6 +56,7 @@ const clampLen = (v: Vec) => {
  * A ladder hinged at the base of a wall, with a 2 m stretcher hanging from it: a rope from the wall holds one
  * end, and an attachment from the other end runs to the ladder. Everything settles where the energy is lowest.
  * If the stretcher would cross the ladder, it rests against it instead, hinged where they touch.
+ * Alternatively a ground team holds the ladder at a set angle, and the stretcher settles for that angle.
  * The rope is anchored above and behind the top of the wall (wrapping over the wall's edge when it has
  * to); the ladder and the cable's attachment on it reach past the wall height.
  *
@@ -66,6 +75,12 @@ export default function LadderHinge() {
   const [anchorUp, setAnchorUp] = useState(0.5);
   const [anchorBack, setAnchorBack] = useState(2);
   const [showComponents, setShowComponents] = useState(false);
+  /**
+   * Whether the ladder finds its own angle, a ground team holds it at whatever angle keeps the stretcher
+   * level, or the team holds it at `heldAngle` (degrees).
+   */
+  const [ladderMode, setLadderMode] = useState<LadderMode>("free");
+  const [heldAngle, setHeldAngle] = useState(45);
 
   const round = (v: number) => Math.round(v * 10) / 10;
   const minBeam = round(wallHeight + MIN_CLEARANCE);
@@ -107,7 +122,29 @@ export default function LadderHinge() {
   // wall top, to the edge (rounded up to the slider's precision).
   const minCable = Math.ceil(minWallCable({ ...setup, wallCable: 0 }) * 100) / 100;
   const cable = Math.max(wallCable, minCable);
-  const sol = useMemo(() => solve({ ...setup, wallCable: cable }), [setup, cable]);
+  const free = useMemo(
+    () => (ladderMode === "free" ? solve({ ...setup, wallCable: cable }) : null),
+    [ladderMode, setup, cable],
+  );
+  const maxHeldAngle = Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2;
+  const holdAngle = Math.min(heldAngle, maxHeldAngle);
+  const held = useMemo(
+    () => (ladderMode === "held" ? solveHeld({ ...setup, wallCable: cable }, rad(holdAngle)) : null),
+    [ladderMode, setup, cable, holdAngle],
+  );
+  const level = useMemo(
+    () => (ladderMode === "level" ? solveLevel({ ...setup, wallCable: cable }) : null),
+    [ladderMode, setup, cable],
+  );
+  const sol = level?.result ?? held ?? free!;
+  // Taking hold of the ladder at a set angle starts from the angle it had until then.
+  const changeLadderMode = (mode: LadderMode) => {
+    if (mode === "held" && sol.kind !== "none") {
+      const phi = sol.kind === "raised" ? sol.eq.phi : sol.h.phi;
+      setHeldAngle(Math.min(maxHeldAngle, Math.round(deg(phi) * 2) / 2));
+    }
+    setLadderMode(mode);
+  };
   // The solver's last few digits differ between the server and the browser, which would make hydration
   // fail, so results are only shown once running in the browser.
   const inBrowser = useSyncExternalStore(
@@ -365,6 +402,65 @@ export default function LadderHinge() {
         {h.hinge && hingeArrows(h.hinge)}
       </>
     );
+  } else if (sol.kind === "held") {
+    const h = sol.h;
+    const end1S = toSvg(h.barEnd1);
+    const end2S = toSvg(h.barEnd2);
+    const cableLine = (pts: Vec[], taut: boolean) => (
+      <polyline
+        points={cablePath(pts)}
+        fill="none"
+        stroke={taut ? "#cbd5e1" : "#94a3b8"}
+        strokeWidth={1.5}
+        strokeDasharray={taut ? undefined : "5 5"}
+        strokeLinejoin="round"
+      />
+    );
+
+    diagram = (
+      <>
+        {ground}
+        {cableLine([h.anchor, ...(h.wrapEdge ? [h.wrapEdge] : []), h.barEnd1], h.ropeTaut)}
+        {cableLine([h.beamAttach, ...(h.attachVia ? [h.attachVia] : []), h.barEnd2], h.attachmentTaut)}
+        {beamLine(h.phi)}
+        {barLine(end1S, end2S)}
+
+        <Arrow
+          from={toSvg(scale(add(h.barEnd1, h.barEnd2), 0.5))}
+          v={force(vec(0, -barWeight))}
+          color={COLORS.bar}
+          label="W"
+        />
+        {h.ropeTaut && tensionArrow("T₁", end1S, h.t1, COLORS.tensionWall)}
+        {h.attachmentTaut && tensionArrow("T₂", end2S, h.t2, COLORS.tensionBeam)}
+        {h.contacts.map((c, i) => (
+          <Arrow
+            key={i}
+            from={toSvg(c.point)}
+            v={force(c.force)}
+            color={COLORS.contact}
+            label={tag("N", c.force)}
+            width={2}
+          />
+        ))}
+
+        {/* forces on the ladder */}
+        {h.hold && (
+          <>
+            <circle cx={toSvg(h.hold.point).x} cy={toSvg(h.hold.point).y} r={4} fill={COLORS.hold} />
+            <Arrow
+              from={toSvg(h.hold.point)}
+              v={force(h.hold.force)}
+              color={COLORS.hold}
+              label={tag("F team", h.hold.force)}
+              width={2}
+            />
+          </>
+        )}
+        {wallOnBeamArrow(h.wallOnBeam)}
+        {h.hinge && hingeArrows(h.hinge)}
+      </>
+    );
   } else {
     diagram = (
       <>
@@ -399,7 +495,21 @@ export default function LadderHinge() {
             beamPush: sol.h.beamPush,
             contacts: sol.h.barContact ? [sol.h.barContact] : [],
           }
-        : null;
+        : sol.kind === "held"
+          ? {
+              phi: sol.h.phi,
+              tilt: sol.h.tilt,
+              t1: sol.h.ropeTaut ? sol.h.t1 : ("slack" as const),
+              t2: sol.h.attachmentTaut ? sol.h.t2 : ("slack" as const),
+              hinge: sol.h.hinge,
+              wallOnBeam: sol.h.wallOnBeam,
+              beamPush: sumForces(sol.h.contacts.filter((c) => c.surface === "ladder")),
+              contacts: sol.h.contacts,
+            }
+          : null;
+  const hold = inBrowser && sol.kind === "held" ? sol.h.hold : null;
+  /** Positive when the team holds the ladder up, negative when it pulls it out, away from the wall. */
+  const holdPush = hold && view ? hold.force.y * Math.cos(view.phi) - hold.force.x * Math.sin(view.phi) : 0;
 
   return (
     <VisualisationLayout
@@ -409,6 +519,14 @@ export default function LadderHinge() {
             <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
               <p className="font-medium">No balanced position for these settings</p>
               <p className="mx-auto mt-1 max-w-md text-amber-400/80">{sol.reason}</p>
+            </div>
+          )}
+          {inBrowser && level && !level.level && level.result.kind === "held" && (
+            <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+              <p className="font-medium">No ladder angle brings the stretcher level here</p>
+              <p className="mx-auto mt-1 max-w-md text-amber-400/80">
+                Showing the closest: {Math.abs(deg(level.result.h.tilt)).toFixed(1)}° of tilt.
+              </p>
             </div>
           )}
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
@@ -424,10 +542,31 @@ export default function LadderHinge() {
             digits={2}
             onChange={setWallCable}
           />
+          {ladderMode === "held" && (
+            <Slider
+              label="Ladder angle (held)"
+              value={holdAngle}
+              min={0}
+              max={maxHeldAngle}
+              step={0.5}
+              unit="°"
+              onChange={setHeldAngle}
+            />
+          )}
         </div>
       }
       controls={(more) => (
         <>
+          <Choice
+            label="Ladder"
+            value={ladderMode}
+            options={[
+              { value: "free", label: "Finds own angle" },
+              { value: "level", label: "Team levels" },
+              { value: "held", label: "Team holds" },
+            ]}
+            onChange={changeLadderMode}
+          />
           <Slider
             label="Wall height"
             value={wallHeight}
@@ -521,6 +660,13 @@ export default function LadderHinge() {
           {tensionReadouts("T₂", "attachment", view?.t2 ?? null, COLORS.tensionBeam)}
           {hingeReadouts(view?.hinge ?? null)}
           <Readout
+            label="Ground team's hold F"
+            value={
+              hold ? `${len(hold.force).toFixed(0)} N, ${holdPush >= 0 ? "holding it up" : "pulling it out"}` : NONE
+            }
+            color={COLORS.hold}
+          />
+          <Readout
             label="Wall's edge on ladder N"
             value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
             color={COLORS.contact}
@@ -531,7 +677,7 @@ export default function LadderHinge() {
             color={COLORS.contact}
           />
           {(["ground", "wall", "top", "edge"] as const).map((surface) => {
-            const f = view?.contacts.find((c) => c.surface === surface)?.force;
+            const f = sumForces(view?.contacts.filter((c) => c.surface === surface) ?? []);
             return (
               <Readout
                 key={surface}
