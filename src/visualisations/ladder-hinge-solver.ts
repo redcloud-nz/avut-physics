@@ -76,6 +76,9 @@ export type Hinged = {
   wallOnBeam: { point: Vec; force: Vec } | null;
   /** Force the hinge exerts on the main beam (null when the beam lies on the ground, which shares the load). */
   hinge: Vec | null;
+  /** The support split into the beam cable's pull (towards beamAttach) and the main beam's push, square to it. */
+  t2: Vec;
+  beamPush: Vec;
 };
 
 export type Result =
@@ -87,7 +90,7 @@ export type Result =
 type TautResult =
   | { kind: "raised"; eq: Equilibrium }
   | { kind: "down" }
-  | { kind: "none"; reason: string; slack: boolean };
+  | { kind: "none"; reason: string; slack: boolean; mayRest?: boolean };
 
 const fail = (reason: string): TautResult => ({ kind: "none", reason, slack: false });
 
@@ -422,7 +425,10 @@ function solveTaut(s: Setup): TautResult {
     if (s.wallCable <= toEdge) {
       return fail("The rope is too short for the stretcher to reach over the wall's edge.");
     }
-    return fail("The rope and attachment can't reach between the wall, the stretcher and the ladder.");
+    // Nothing taut fits (say the rope is too long to hold anything), but everything may still come to rest
+    // on the ladder and the ground.
+    const reason = "The rope and attachment can't reach between the wall, the stretcher and the ladder.";
+    return { kind: "none", reason, slack: false, mayRest: true };
   }
 
   candidates.sort((a, b) => a.e - b.e);
@@ -592,9 +598,10 @@ const BEAMS_TOUCH = "The stretcher would cross the ladder, so it rests against i
 export function solve(s: Setup): Result {
   const result = solveTaut(s);
   if (result.kind === "raised" && !beamsOverlap(result.eq, s)) return result;
-  if (result.kind === "none" && !result.slack) return { kind: "none", reason: result.reason };
+  if (result.kind === "none" && !result.slack && !result.mayRest) return { kind: "none", reason: result.reason };
   const h = solveHinged(s);
   if (h) return { kind: "hinged", h, reason: h.phi > 0 ? BEAMS_TOUCH : BEAM_DOWN };
+  if (result.kind === "none" && !result.slack) return { kind: "none", reason: result.reason };
   return {
     kind: "none",
     reason:
@@ -740,7 +747,8 @@ function solveHinged(s: Setup): Hinged | null {
   if (PHI_MAX - phi < 1e-6 && energyAt(PHI_MAX) <= energyAt(phi) + 1e-9 * s.barWeight) phi = PHI_MAX;
 
   /** Positions and the forces on the bar, at beam angle phi. */
-  const arrangement = (phi: number, resting = false): Omit<Hinged, "hinge" | "wallOnBeam"> | null => {
+  type Arrangement = Omit<Hinged, "hinge" | "wallOnBeam" | "t2" | "beamPush">;
+  const arrangement = (phi: number, resting = false): Arrangement | null => {
     const bar = barAt(phi);
     if (!bar) return null;
     const end2 = pinAt(phi);
@@ -764,7 +772,7 @@ function solveHinged(s: Setup): Hinged | null {
 
     // Forces on the bar: torques about the pin give the cable's pull or end 1's contact force; the pin
     // takes the rest. Lying flat on the main beam, the beam carries its whole weight.
-    let h: Omit<Hinged, "hinge" | "wallOnBeam">;
+    let h: Arrangement;
     const u1 = unit(sub(path.wrapEdge ?? anchor, end1));
     const T1 = (W * (centre.x - end2.x)) / cross(sub(end1, end2), u1);
     // Held by the cable just above a limit, but the cable would have to push: the bar rests on that limit
@@ -873,9 +881,15 @@ function solveHinged(s: Setup): Hinged | null {
   const leftover = cross(h.supportAt, onBeam) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
   const wallOnBeam = phi >= PHI_MAX && leftover > 0 ? wallPush(phi, leftover, s) : null;
   const wallForce = wallOnBeam?.force ?? vec(0, 0);
+  // The main beam's surface can only push square to itself, so the beam cable takes the rest of the support.
+  const u2 = unit(sub(h.beamAttach, h.barEnd2));
+  const normal = vec(-Math.sin(phi), Math.cos(phi));
+  const T2 = cross(h.support, normal) / cross(u2, normal);
   return {
     ...h,
     wallOnBeam,
     hinge: phi > 0 ? vec(-onBeam.x - wallForce.x, s.beamWeight - onBeam.y - wallForce.y) : null,
+    t2: scale(u2, T2),
+    beamPush: scale(normal, cross(u2, h.support) / cross(u2, normal)),
   };
 }

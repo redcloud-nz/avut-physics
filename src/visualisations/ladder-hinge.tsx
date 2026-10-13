@@ -334,8 +334,16 @@ export default function LadderHinge() {
           label="W"
         />
         {h.cableTaut && tensionArrow("T₁", end1S, h.t1, COLORS.tensionWall)}
-        {/* Drawn like the raised case: the main beam's force on the hanging beam stands in for the beam cable. */}
-        {tensionArrow("T₂", end2S, h.support, COLORS.tensionBeam)}
+        {len(h.t2) > 1e-6 && tensionArrow("T₂", end2S, h.t2, COLORS.tensionBeam)}
+        {len(h.beamPush) > 1e-6 && (
+          <Arrow
+            from={toSvg(h.supportAt)}
+            v={force(h.beamPush)}
+            color={COLORS.contact}
+            label={tag("N", h.beamPush)}
+            width={2}
+          />
+        )}
         {h.barContact && (
           <Arrow
             from={toSvg(h.barContact.point)}
@@ -366,9 +374,10 @@ export default function LadderHinge() {
           phi: sol.eq.phi,
           tilt: Math.atan2(sol.eq.barEnd2.y - sol.eq.barEnd1.y, sol.eq.barEnd2.x - sol.eq.barEnd1.x),
           t1: sol.eq.t1 as Vec | "slack",
-          t2: sol.eq.t2,
+          t2: sol.eq.t2 as Vec | "slack",
           hinge: sol.eq.hinge as Vec | null,
           wallOnBeam: sol.eq.wallOnBeam,
+          beamPush: null as Vec | null,
           contacts: sol.eq.contacts,
         }
       : sol.kind === "hinged"
@@ -376,9 +385,10 @@ export default function LadderHinge() {
             phi: sol.h.phi,
             tilt: sol.h.angle,
             t1: sol.h.cableTaut ? sol.h.t1 : ("slack" as const),
-            t2: sol.h.support,
+            t2: len(sol.h.t2) > 1e-6 ? sol.h.t2 : ("slack" as const),
             hinge: sol.h.hinge,
             wallOnBeam: sol.h.wallOnBeam,
+            beamPush: sol.h.beamPush,
             contacts: sol.h.barContact ? [sol.h.barContact] : [],
           }
         : null;
@@ -505,6 +515,11 @@ export default function LadderHinge() {
           <Readout
             label="Wall's edge on ladder N"
             value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
+            color={COLORS.contact}
+          />
+          <Readout
+            label="Ladder on stretcher N"
+            value={view?.beamPush ? `${len(view.beamPush).toFixed(0)} N` : NONE}
             color={COLORS.contact}
           />
           {(["ground", "wall", "top", "edge"] as const).map((surface) => {
