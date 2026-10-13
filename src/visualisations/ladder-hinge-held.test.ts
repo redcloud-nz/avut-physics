@@ -59,7 +59,7 @@ describe("held ladder", () => {
 describe("team keeps the stretcher level", () => {
   // Paying out the rope, the team lowers the ladder to keep the stretcher level, all the way to the ground.
   it.each([
-    [2, 68.4],
+    [2.5, 57.1],
     [3, 50.2],
     [4, 36.7],
     [5, 23.0],
@@ -74,10 +74,32 @@ describe("team keeps the stretcher level", () => {
     expect(heldViolations(s, r.h.phi, r)).toEqual([]);
   });
 
-  it("where no angle levels it, shows the closest", () => {
-    const { result: r, level } = solveLevel(setupFor({ rope: 1 }));
+  it("with the stretcher still near the wall top, it can't be held level and says why", () => {
+    const { result: r, level, reason } = solveLevel(setupFor({ rope: 1 }));
     if (r.kind !== "held") throw new Error(heldArrangement(r));
     expect(level).toBe(false);
-    expect(Math.abs(r.h.tilt)).toBeLessThan(rad(5));
+    expect(reason).toBe("The stretcher would lift off the ladder.");
+    expect(Math.abs(r.h.tilt)).toBeLessThan(rad(6));
+  });
+
+  it("once the ladder is down and the rope slack, more rope leaves the stretcher where it landed", () => {
+    const ends = [6.6, 7, 8, 10].map((rope) => {
+      const r = solveLevel(setupFor({ rope })).result;
+      if (r.kind !== "held") throw new Error(heldArrangement(r));
+      expect(r.h.ropeTaut).toBe(false);
+      return r.h.barEnd1;
+    });
+    for (const e of ends) expect(len(sub(e, ends[0]))).toBeLessThan(1e-9);
+  });
+
+  it("holds for random setups", { timeout: 60_000 }, () => {
+    const failures = randomInputs(300, 5)
+      .map((i) => {
+        const s = setupFor(i);
+        const r = solveLevel(s).result;
+        return { inputs: i, problems: r.kind === "held" ? heldViolations(s, r.h.phi, r) : [] };
+      })
+      .filter((f) => f.problems.length > 0);
+    expect(failures).toEqual([]);
   });
 });

@@ -81,6 +81,8 @@ export default function LadderHinge() {
    */
   const [ladderMode, setLadderMode] = useState<LadderMode>("free");
   const [heldAngle, setHeldAngle] = useState(45);
+  /** Keeping it level, the team only takes hold of the ladder once it's below this angle (degrees). */
+  const [takeHoldBelow, setTakeHoldBelow] = useState(45);
 
   const round = (v: number) => Math.round(v * 10) / 10;
   const minBeam = round(wallHeight + MIN_CLEARANCE);
@@ -122,10 +124,6 @@ export default function LadderHinge() {
   // wall top, to the edge (rounded up to the slider's precision).
   const minCable = Math.ceil(minWallCable({ ...setup, wallCable: 0 }) * 100) / 100;
   const cable = Math.max(wallCable, minCable);
-  const free = useMemo(
-    () => (ladderMode === "free" ? solve({ ...setup, wallCable: cable }) : null),
-    [ladderMode, setup, cable],
-  );
   const maxHeldAngle = Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2;
   const holdAngle = Math.min(heldAngle, maxHeldAngle);
   const held = useMemo(
@@ -136,7 +134,12 @@ export default function LadderHinge() {
     () => (ladderMode === "level" ? solveLevel({ ...setup, wallCable: cable }) : null),
     [ladderMode, setup, cable],
   );
-  const sol = level?.result ?? held ?? free!;
+  // Until the angle that would level the stretcher is below the cutoff, the team leaves the ladder alone.
+  const teamHolds =
+    ladderMode === "held" ||
+    (level !== null && level.result.kind === "held" && deg(level.result.h.phi) <= takeHoldBelow);
+  const free = useMemo(() => (teamHolds ? null : solve({ ...setup, wallCable: cable })), [teamHolds, setup, cable]);
+  const sol = free ?? (level ? level.result : held!);
   // Taking hold of the ladder at a set angle starts from the angle it had until then.
   const changeLadderMode = (mode: LadderMode) => {
     if (mode === "held" && sol.kind !== "none") {
@@ -521,11 +524,11 @@ export default function LadderHinge() {
               <p className="mx-auto mt-1 max-w-md text-amber-400/80">{sol.reason}</p>
             </div>
           )}
-          {inBrowser && level && !level.level && level.result.kind === "held" && (
+          {inBrowser && teamHolds && level && !level.level && level.result.kind === "held" && (
             <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-              <p className="font-medium">No ladder angle brings the stretcher level here</p>
+              <p className="font-medium">The team can&rsquo;t hold the stretcher level here</p>
               <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                Showing the closest: {Math.abs(deg(level.result.h.tilt)).toFixed(1)}° of tilt.
+                {level.reason} Shown with the ladder held at the angle that would level it.
               </p>
             </div>
           )}
@@ -542,6 +545,17 @@ export default function LadderHinge() {
             digits={2}
             onChange={setWallCable}
           />
+          {ladderMode === "level" && (
+            <Slider
+              label="Team takes hold below"
+              value={takeHoldBelow}
+              min={0}
+              max={maxHeldAngle}
+              step={0.5}
+              unit="°"
+              onChange={setTakeHoldBelow}
+            />
+          )}
           {ladderMode === "held" && (
             <Slider
               label="Ladder angle (held)"
@@ -662,7 +676,11 @@ export default function LadderHinge() {
           <Readout
             label="Ground team's hold F"
             value={
-              hold ? `${len(hold.force).toFixed(0)} N, ${holdPush >= 0 ? "holding it up" : "pulling it out"}` : NONE
+              hold
+                ? `${len(hold.force).toFixed(0)} N, ${holdPush >= 0 ? "holding it up" : "pulling it out"}`
+                : inBrowser && ladderMode === "level" && !teamHolds
+                  ? "not holding yet"
+                  : NONE
             }
             color={COLORS.hold}
           />

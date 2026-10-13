@@ -51,12 +51,25 @@ type Piece = { key: string; kind: Kind; g: number; at: Vec; m: Vec; ladderAt?: V
 
 const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
 
-/** A held answer's stretcher position: centre and angle, from end 1 to end 2. */
-const poseOf = (h: Held) => {
-  const c = scale(add(h.barEnd1, h.barEnd2), 0.5);
-  return [c.x, c.y, Math.atan2(h.barEnd2.y - h.barEnd1.y, h.barEnd2.x - h.barEnd1.x)];
-};
 const safeUnit = (v: Vec, fallback: Vec) => (len(v) > 1e-12 ? unit(v) : fallback);
+
+/** Behind the wall's face: on the wall top, or inside the wall nearer the top than the face. */
+function behindFaceFor(s: Setup, p: Vec) {
+  return p.x < 0 && (p.y >= s.wallHeight || s.wallHeight - p.y < -p.x);
+}
+
+/**
+ * The rope's path to p, over the wall's edge when the straight line would cut through the wall. Unlike the
+ * free solver's, it carries on smoothly into the wall, where the minimiser may briefly push an end: as if
+ * from the face or the top, whichever is nearer.
+ */
+function ropePathFor(s: Setup, p: Vec): { length: number; wrapEdge: Vec | null } {
+  const anchor = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec(0, s.wallHeight);
+  return !behindFaceFor(s, p) && cross(sub(edge, anchor), sub(p, anchor)) < 0
+    ? { length: len(sub(edge, anchor)) + len(sub(p, edge)), wrapEdge: edge }
+    : { length: len(sub(p, anchor)), wrapEdge: null };
+}
 
 /** The point of segment ab nearest p, and how far along it is (0 to 1). */
 function nearest(p: Vec, a: Vec, b: Vec) {
@@ -65,11 +78,8 @@ function nearest(p: Vec, a: Vec, b: Vec) {
   return { point: add(a, scale(ab, t)), t };
 }
 
-/**
- * The stretcher with the ladder held at angle phi. Given `from` (the answer at a nearby angle), it settles
- * from there instead of searching every position: the one the stretcher actually reaches as the ladder moves.
- */
-export function solveHeld(s: Setup, phi: number, from?: Held): HeldResult {
+/** The stretcher with the ladder held at angle phi. */
+export function solveHeld(s: Setup, phi: number): HeldResult {
   if (s.barWeight <= 0) return { kind: "none", reason: "Give the stretcher some mass." };
   phi = Math.max(0, Math.min(phiMax(s), phi));
   const W = s.barWeight;
@@ -81,26 +91,14 @@ export function solveHeld(s: Setup, phi: number, from?: Held): HeldResult {
   const B = scale(along, s.attachDistance);
   const tip = scale(along, s.beamLength);
 
-  /**
-   * The rope's path to p, over the wall's edge when the straight line would cut through the wall. Unlike the
-   * free solver's, it carries on smoothly into the wall, where the minimiser may briefly push an end: as
-   * if from the face or the top, whichever is nearer.
-   */
-  const ropePath = (p: Vec) =>
-    !behindFace(p) && cross(sub(edge, anchor), sub(p, anchor)) < 0
-      ? { length: len(sub(edge, anchor)) + len(sub(p, edge)), wrapEdge: edge as Vec | null }
-      : { length: len(sub(p, anchor)), wrapEdge: null };
+  const ropePath = (p: Vec) => ropePathFor(s, p);
+  const behindFace = (p: Vec) => behindFaceFor(s, p);
 
   /** The attachment's path to p: straight from its fixing, or over the ladder's tip to the ladder's far side. */
   function attachmentPath(p: Vec): { length: number; via: Vec | null } {
     return dot(p, normal) < 0
       ? { length: len(sub(tip, B)) + len(sub(p, tip)), via: tip }
       : { length: len(sub(p, B)), via: null };
-  }
-
-  /** Behind the wall's face: on the wall top, or inside the wall nearer the top than the face. */
-  function behindFace(p: Vec) {
-    return p.x < 0 && (p.y >= s.wallHeight || s.wallHeight - p.y < -p.x);
   }
 
   const ends = (q: number[]): [Vec, Vec] => {
@@ -203,7 +201,7 @@ export function solveHeld(s: Setup, phi: number, from?: Held): HeldResult {
     return [c.x, c.y, theta];
   };
   const soft = penalised(1e4 * W);
-  const starts: { q: number[]; e: number }[] = from ? [{ q: poseOf(from), e: 0 }] : searchStarts();
+  const starts = searchStarts();
   const stiff = penalised(1e7 * W);
   function searchStarts() {
     const grid = Array.from({ length: nTheta }, (_, i) => Array.from({ length: nA }, (_, j) => soft(startAt(i, j))));
@@ -303,50 +301,8 @@ export function solveHeld(s: Setup, phi: number, from?: Held): HeldResult {
   const contacts = touching.map((p) => ({ surface: p.kind as Surface | "ladder", point: p.at, force: forceOf(p) }));
   const ladderPoints = touching.map((p) => p.ladderAt ?? null);
 
-  // The ladder: the attachment's pull, the stretcher pushing back where it rests on it, its weight, and
-  // the team's hold. Leaning on the wall or lying on the ground, those take the torque instead.
-  // Wrapped round the tip, the attachment's pull on the ladder acts there (its pulls along the ladder cancel).
   const attachVia = attachmentPath(P2).via;
-  const onLadder = [{ at: attachVia ?? B, f: scale(t2, -1) }];
-  touching.forEach((p, i) => {
-    if (p.ladderAt) onLadder.push({ at: p.ladderAt, f: scale(contacts[i].force, -1) });
-  });
-  const torque =
-    onLadder.reduce((sum, l) => sum + cross(l.at, l.f), 0) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
-  let hold: Held["hold"] = null;
-  let wallOnBeam: Held["wallOnBeam"] = null;
-  const down = phi < rad(0.05) && torque <= 0;
-  if (phi >= phiMax(s) - 1e-9 && torque > 0) wallOnBeam = wallPush(phi, torque, s);
-  else if (!down) {
-    const reach = phi > 0 ? Math.min(s.beamLength, HOLD_HEIGHT / Math.sin(phi)) : s.beamLength;
-    hold = { point: scale(along, reach), force: scale(normal, -torque / reach) };
-  }
-  const extra = [hold?.force, wallOnBeam?.force].filter((f): f is Vec => !!f);
-  const net = [...onLadder.map((l) => l.f), ...extra].reduce(add, vec(0, 0));
-  const path = ropePath(P1);
-
-  return {
-    kind: "held",
-    h: {
-      phi,
-      anchor,
-      wrapEdge: path.wrapEdge,
-      beamAttach: B,
-      attachVia,
-      barEnd1: P1,
-      barEnd2: P2,
-      tilt: Math.atan2(P2.y - P1.y, Math.abs(P2.x - P1.x)),
-      ropeTaut: len(t1) > 1e-9,
-      t1,
-      attachmentTaut: len(t2) > 1e-9,
-      t2,
-      contacts,
-      ladderPoints,
-      hold,
-      wallOnBeam,
-      hinge: down ? null : vec(-net.x, s.beamWeight - net.y),
-    },
-  };
+  return { kind: "held", h: settleLadder(s, phi, P1, P2, t1, t2, attachVia, contacts, ladderPoints) };
 
   /**
    * Newton's method on the balance of the stretcher with the given constraints held exactly at zero:
@@ -413,76 +369,153 @@ export function solveHeld(s: Setup, phi: number, from?: Held): HeldResult {
   }
 }
 
-export type LevelResult = { result: HeldResult; level: boolean };
+/**
+ * The whole held answer, given where the stretcher is and the forces on it: the ladder's balance gives the
+ * team's hold and the hinge force. Leaning on the wall or lying on the ground, those take the torque instead.
+ */
+function settleLadder(
+  s: Setup,
+  phi: number,
+  P1: Vec,
+  P2: Vec,
+  t1: Vec,
+  t2: Vec,
+  attachVia: Vec | null,
+  contacts: HeldContact[],
+  ladderPoints: (Vec | null)[],
+): Held {
+  const along = vec(Math.cos(phi), Math.sin(phi));
+  const normal = vec(-Math.sin(phi), Math.cos(phi));
+  const B = scale(along, s.attachDistance);
+  // Wrapped round the tip, the attachment's pull on the ladder acts there (its pulls along the ladder cancel).
+  const onLadder = [{ at: attachVia ?? B, f: scale(t2, -1) }];
+  contacts.forEach((c, i) => {
+    const at = ladderPoints[i];
+    if (at) onLadder.push({ at, f: scale(c.force, -1) });
+  });
+  const torque =
+    onLadder.reduce((sum, l) => sum + cross(l.at, l.f), 0) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
+  let hold: Held["hold"] = null;
+  let wallOnBeam: Held["wallOnBeam"] = null;
+  const down = phi < rad(0.05) && torque <= 0;
+  if (phi >= phiMax(s) - 1e-9 && torque > 0) wallOnBeam = wallPush(phi, torque, s);
+  else if (!down) {
+    const reach = phi > 0 ? Math.min(s.beamLength, HOLD_HEIGHT / Math.sin(phi)) : s.beamLength;
+    hold = { point: scale(along, reach), force: scale(normal, -torque / reach) };
+  }
+  const extra = [hold?.force, wallOnBeam?.force].filter((f): f is Vec => !!f);
+  const net = [...onLadder.map((l) => l.f), ...extra].reduce(add, vec(0, 0));
+  return {
+    phi,
+    anchor: vec(-s.anchorBack, s.wallHeight + s.anchorUp),
+    wrapEdge: ropePathFor(s, P1).wrapEdge,
+    beamAttach: B,
+    attachVia,
+    barEnd1: P1,
+    barEnd2: P2,
+    tilt: Math.atan2(P2.y - P1.y, Math.abs(P2.x - P1.x)),
+    ropeTaut: len(t1) > 1e-9,
+    t1,
+    attachmentTaut: len(t2) > 1e-9,
+    t2,
+    contacts,
+    ladderPoints,
+    hold,
+    wallOnBeam,
+    hinge: down ? null : vec(-net.x, s.beamWeight - net.y),
+  };
+}
+
+export type LevelResult = { result: HeldResult; level: boolean; reason?: string };
 
 /**
- * The ladder held at whatever angle brings the stretcher level, as a ground team watching it would hold it.
- * From a first guess the angle steps down (or up) until the tilt changes sign, each step settling from the
- * last, then closes in on the level angle by bisection. Where no angle levels it, the closest one.
+ * The ladder held at whichever angle keeps the stretcher level, as a ground team watching it would hold it.
+ * Level and resting on the ladder, with the attachment taut, the stretcher's position follows from the
+ * ladder's angle alone: its ladder end where the attachment holds it against the ladder, its rope end the
+ * stretcher's length towards the wall at the same height. So the rope's length fixes the angle, found by
+ * bisection, and the stretcher's balance then gives the rope's and attachment's pulls and the ladder's push.
+ * Where that arrangement can't hold, the ladder is held at that angle and the stretcher left to settle.
  */
-export function solveLevel(s: Setup, guess = rad(45)): LevelResult {
+export function solveLevel(s: Setup): LevelResult {
   const top = phiMax(s);
-  const clamp = (phi: number) => Math.max(0, Math.min(top, phi));
-  type Try = { phi: number; h: Held };
-  const attempt = (phi: number, from?: Held): Try | null => {
-    let r = solveHeld(s, phi, from);
-    // Settling from a nearby angle can fail where the stretcher's arrangement changes: search afresh.
-    if (r.kind === "none" && from) r = solveHeld(s, phi);
-    return r.kind === "held" ? { phi, h: r.h } : null;
+  const W = s.barWeight;
+  const reach = Math.sqrt(Math.max(0, s.beamCable ** 2 - s.touchGap ** 2));
+  const footAlong = s.attachDistance - reach;
+  const ends = (phi: number): [Vec, Vec] => {
+    const P2 = add(
+      scale(vec(Math.cos(phi), Math.sin(phi)), footAlong),
+      scale(vec(-Math.sin(phi), Math.cos(phi)), s.touchGap),
+    );
+    return [sub(P2, vec(s.barLength, 0)), P2];
   };
+  const ropeNeeded = (phi: number) => ropePathFor(s, ends(phi)[0]).length;
+  const notLevel = (phi: number, reason: string): LevelResult => ({ result: solveHeld(s, phi), level: false, reason });
 
-  // A first angle with an answer: the guess, or the nearest of a spread around it.
-  let first: Try | null = null;
-  let firstFailure: HeldResult | null = null;
-  const spread = [5, 10, 20, 30, 45, 60, 80].flatMap((d) => [guess - rad(d), guess + rad(d)]);
-  for (const phi of [guess, ...spread.filter((p) => p > 0 && p < top), top, 0]) {
-    const r = solveHeld(s, clamp(phi));
-    if (r.kind === "held") {
-      first = { phi: clamp(phi), h: r.h };
-      break;
+  // Lowering the ladder takes the stretcher further out and down, so it needs more rope. With more than
+  // enough, the ladder lies on the ground and the stretcher flat on it, where it landed: on a flat ladder
+  // nothing moves it along, so the rope and attachment hang slack and the ladder carries all its weight.
+  if (s.wallCable >= ropeNeeded(0)) {
+    let [P1, P2] = ends(0);
+    // Too near the wall for the stretcher's length, it rests against the wall's face instead.
+    if (P1.x < 0) [P1, P2] = [vec(0, P1.y), vec(s.barLength, P2.y)];
+    if (len(sub(P2, vec(s.attachDistance, 0))) > s.beamCable + 1e-9) {
+      const result = solveHeld(s, 0);
+      return { result, level: result.kind === "held" && Math.abs(result.h.tilt) < rad(0.5) };
     }
-    firstFailure ??= r;
+    const centre = scale(add(P1, P2), 0.5);
+    const contact: HeldContact = { surface: "ladder", point: centre, force: vec(0, W) };
+    const none = vec(0, 0);
+    const h = settleLadder(s, 0, P1, P2, none, none, null, [contact], [vec(centre.x, 0)]);
+    return { result: { kind: "held", h }, level: true };
   }
-  if (!first) return { result: firstFailure ?? solveHeld(s, clamp(guess)), level: false };
+  if (s.wallCable < ropeNeeded(top)) {
+    return notLevel(top, "The rope is too short to hold the stretcher level, even with the ladder upright.");
+  }
+  let [lo, hi] = [0, top];
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (ropeNeeded(mid) > s.wallCable) lo = mid;
+    else hi = mid;
+  }
+  const phi = (lo + hi) / 2;
+  const [P1, P2] = ends(phi);
 
-  let best = first;
-  const keep = (t: Try) => {
-    if (Math.abs(t.h.tilt) < Math.abs(best.h.tilt)) best = t;
-  };
-  // The ladder end high: lower the ladder; low: raise it.
-  const dir = first.h.tilt > 0 ? -1 : 1;
-  // Steps sized to overshoot the level angle a little, judging by how the tilt has been changing.
-  let step = rad(2);
-  let a = first;
-  let b: Try | null = null;
-  while (!b) {
-    if ((dir < 0 && a.phi <= 0) || (dir > 0 && a.phi >= top)) break;
-    const next = attempt(clamp(a.phi + dir * step), a.h);
-    if (!next) break;
-    keep(next);
-    if (Math.sign(next.h.tilt) !== Math.sign(a.h.tilt)) b = next;
-    else {
-      const slope = (a.h.tilt - next.h.tilt) / (a.phi - next.phi);
-      const ahead = slope * dir < 0 ? Math.abs(next.h.tilt / slope) * 1.5 : 2 * step;
-      step = Math.max(rad(0.5), Math.min(rad(15), ahead));
-      a = next;
-    }
-  }
-  if (b) {
-    // Regula falsi, halving the weight of an end that keeps being kept (the Illinois method).
-    let [fa, fb] = [a.h.tilt, b.h.tilt];
-    for (let i = 0; i < 20 && Math.abs(best.h.tilt) > rad(0.05) && Math.abs(b.phi - a.phi) > 1e-6; i++) {
-      const at = attempt((a.phi * fb - b.phi * fa) / (fb - fa), a.h);
-      if (!at) break;
-      keep(at);
-      if (Math.sign(at.h.tilt) === Math.sign(fa)) {
-        [a, fa] = [at, at.h.tilt];
-        fb /= 2;
-      } else {
-        [b, fb] = [at, at.h.tilt];
-        fa /= 2;
-      }
-    }
-  }
-  return { result: { kind: "held", h: best.h }, level: Math.abs(best.h.tilt) < rad(0.5) };
+  if (P1.y < 0) return notLevel(phi, "Level, the stretcher's rope end would be below the ground.");
+  if (P1.x < 0 && P1.y < s.wallHeight) return notLevel(phi, "Level, the stretcher would pass through the wall.");
+
+  // The stretcher's balance: the rope's pull at end 1, the attachment's and the ladder's push at end 2.
+  const u1 = unit(sub(ropePathFor(s, P1).wrapEdge ?? vec(-s.anchorBack, s.wallHeight + s.anchorUp), P1));
+  const B = scale(vec(Math.cos(phi), Math.sin(phi)), s.attachDistance);
+  const u2 = unit(sub(B, P2));
+  const n = vec(-Math.sin(phi), Math.cos(phi));
+  const centre = scale(add(P1, P2), 0.5);
+  const x = solveLinear(
+    [
+      [u1.x, u2.x, n.x],
+      [u1.y, u2.y, n.y],
+      [cross(sub(P1, P2), u1), 0, 0],
+    ],
+    [0, W, cross(sub(centre, P2), vec(0, -W)) * -1],
+  );
+  if (!x) return notLevel(phi, "The rope, attachment and ladder can't balance the stretcher level here.");
+  const [T1, T2, N] = x;
+  const tol = -1e-6 * W;
+  if (T1 < tol) return notLevel(phi, "The rope would have to push to keep the stretcher level.");
+  if (N < tol) return notLevel(phi, "The stretcher would lift off the ladder.");
+  if (T2 < tol) return notLevel(phi, "The stretcher's end would slide up the ladder, with the attachment slack.");
+
+  const onLadder = scale(n, Math.max(0, N));
+  const ladderAt = scale(vec(Math.cos(phi), Math.sin(phi)), footAlong);
+  const h = settleLadder(
+    s,
+    phi,
+    P1,
+    P2,
+    scale(u1, Math.max(0, T1)),
+    scale(u2, Math.max(0, T2)),
+    null,
+    [{ surface: "ladder", point: P2, force: onLadder }],
+    [ladderAt],
+  );
+  return { result: { kind: "held", h }, level: true };
 }
