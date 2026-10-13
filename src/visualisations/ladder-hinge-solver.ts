@@ -486,6 +486,8 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
   };
   const P1 = settle(g.P1);
   const P2 = settle(g.P2);
+  // An end sunk into the wall's face by the penalty springs can slip the bar past the corner check: check again.
+  if (cutsCorner(P1, P2, s)) return slack("The stretcher would pass through the wall's top corner.");
   if (g.overEdge) {
     // The edge pushes square to the bar (which runs outwards over it), so upwards.
     const d = unit(sub(P2, P1));
