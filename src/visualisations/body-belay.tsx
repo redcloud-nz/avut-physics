@@ -61,13 +61,13 @@ const mirror = (p: V3): V3 => ({ ...p, z: -p.z });
  */
 export default function BodyBelay(props: { maths?: React.ReactNode }) {
   const [barMass, setBarMass] = useState(90);
-  const [wallHeight, setWallHeight] = useState(4);
+  const [wallHeight, setWallHeight] = useState(2.89);
   const [belayerMass, setBelayerMass] = useState(80);
   const [footing, setFooting] = useState<Footing>("painted-steel-dry");
   const [edge, setEdge] = useState<Edge>("steel");
   const [belayerBack, setBelayerBack] = useState(3);
   const [gap, setGap] = useState(2);
-  const [teamDistance, setTeamDistance] = useState(6);
+  const [teamDistance, setTeamDistance] = useState(4);
   const [teamPull, setTeamPull] = useState(200);
   const [showComponents, setShowComponents] = useState(false);
 
@@ -417,7 +417,16 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
       }
       controls={(more) => (
         <>
-          <Slider label="Wall height" value={wallHeight} min={2} max={6} step={0.1} unit="m" onChange={setWallHeight} />
+          <Slider
+            label="Wall height"
+            value={wallHeight}
+            min={2}
+            max={6}
+            step={0.01}
+            unit="m"
+            digits={2}
+            onChange={setWallHeight}
+          />
           <Slider
             label="Stretcher mass"
             value={barMass}
