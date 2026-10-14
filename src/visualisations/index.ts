@@ -1,5 +1,5 @@
 export type Visualisation = {
-  href: "/block-on-an-incline" | "/ladder-hinge-lower" | "/two-point-lower";
+  href: "/block-on-an-incline" | "/ladder-hinge-lower" | "/two-point-lower" | "/body-belay";
   title: string;
   description: string;
 };
@@ -25,5 +25,12 @@ export const twoPointLower: Visualisation = {
     "A 2 m stretcher lowered over a wall on a rope from an anchor behind its top, with a line from its other end to a ground team out in front, who pull it steadily to keep it off the wall. The stretcher settles where the forces and torques on it balance.",
 };
 
+export const bodyBelay: Visualisation = {
+  href: "/body-belay",
+  title: "Body-Belayed Two-Point Lower",
+  description:
+    "The two-point lower with no anchor: two belayers standing side by side on the wall top each hold a rope round their waist and lean back against its pull. Shows how the angle between their ropes loads them, and whether their feet grip well enough to stop them sliding towards the edge.",
+};
+
 /** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
-export const visualisations: Visualisation[] = [ladderHinge, twoPointLower];
+export const visualisations: Visualisation[] = [ladderHinge, twoPointLower, bodyBelay];
