@@ -21,8 +21,10 @@ import { solveLower, type Lowered, type Setup as LowerSetup } from "./two-point-
  * back part of its tension: by the capstan rule, the belayers hold e^(−μθ) of the tension on the stretcher's side,
  * where θ is how far the rope turns over the edge.
  *
- * The belayers' lean moves their waists, which moves the stretcher a little, which changes the ropes' pull; the
- * two are solved together by settling the lean a few times.
+ * The belayers' lean moves their waists, which turns their ropes: how wide the V opens, how far each turns over the
+ * edge, and which way it pulls them, which changes the lean they need; the two are solved together by settling the
+ * lean a few times. While the ropes wrap the edge, the stretcher itself stays put: each rope is a fixed length past
+ * the edge, whatever the lean.
  */
 
 export type Setup = Omit<LowerSetup, "anchorUp" | "anchorBack" | "rope"> & {

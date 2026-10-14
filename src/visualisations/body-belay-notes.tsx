@@ -19,9 +19,9 @@ export function BodyBelayNotes() {
         </p>
         <p>
           The ropes’ length is fixed at the moment the stretcher has just gone over the edge. Seen side on, each rope is{" "}
-          {PAST_EDGE} m longer than the straight run from the belayers’ waists to the edge. That’s when the ropes take
-          most of the stretcher’s weight while the belayers are still close to the edge. The run to the edge depends on
-          how far they lean, so the length is worked out together with their lean.
+          {PAST_EDGE} m longer than the straight run from the belayers’ waists to the edge. That’s when the ropes are
+          under the most tension: the further the stretcher is lowered, the less they carry. The run to the edge depends
+          on how far they lean, so the length is worked out together with their lean.
         </p>
       </Part>
 
@@ -31,9 +31,10 @@ export function BodyBelayNotes() {
           form a V from the stretcher’s end, and the wider apart they stand, the wider the V opens. Each rope takes the
           shortest path over the edge, which is a straight line if you unfold the rope flat about the edge. Their
           sideways pulls on the stretcher cancel, so only their pulls side on hold it up. A rope at an angle to the
-          side-on view pulls partly sideways, so each must pull harder to give its share: each rope’s tension (T₁) is
-          half the ropes’ pull on the stretcher, divided by the cosine of half the angle between them. That’s the same
-          rule as for the two legs of an anchor: at 120° apart, each rope carries the whole load.
+          side-on view pulls partly sideways, so each must pull harder to give its share: each rope’s tension at the
+          stretcher (T<sub>s</sub>) is half the ropes’ pull on the stretcher, divided by the cosine of half the angle
+          between them. That’s the same rule as for the two legs of an anchor: at 120° apart, each rope carries the
+          whole load.
         </p>
         <p>
           As the stretcher is lowered, each rope slides slowly over the wall’s edge, and the edge’s friction holds back
@@ -64,8 +65,10 @@ export function BodyBelayNotes() {
           quickly.
         </p>
         <p>
-          Leaning back moves their waists, which moves the stretcher a little and changes the ropes’ pull. So the page
-          settles the stretcher, works out the lean, and repeats until the two agree.
+          Leaning back moves their waists, which changes the ropes’ directions: how wide the V opens, how far each turns
+          over the edge, and which way it pulls them. That changes the lean they need, so the page works out the lean
+          and repeats until the two agree. The stretcher itself stays put: each rope runs {PAST_EDGE} m past the edge
+          however they lean.
         </p>
       </Part>
 
@@ -85,8 +88,8 @@ export function BodyBelayNotes() {
             jerk if the stretcher drops, and no history.
           </li>
           <li>
-            The belayers stand upright and straight. A real belayer sits, crouches or braces a foot against something,
-            and can bend at the hips and knees. Any of these changes how much grip they need.
+            The belayers keep their bodies straight from feet to head. A real belayer sits, crouches or braces a foot
+            against something, and can bend at the hips and knees. Any of these changes how much grip they need.
           </li>
           <li>
             Each footing’s friction coefficient is a rough, middle-of-the-range figure for rubber-soled boots. The real
@@ -98,9 +101,10 @@ export function BodyBelayNotes() {
           </li>
           <li>
             The edge’s friction only helps while the rope is sliding towards the stretcher. Once the belayers stop
-            lowering, it can hold anything from that much down to nothing, depending on how the rope settled. If they
-            pull the stretcher back up, it works against them instead: they’d need e<sup>μθ</sup> times the stretcher’s
-            side, not e<sup>−μθ</sup>. A frictionless edge is the safe case to plan for.
+            lowering, it can act either way, depending on how the rope settled: their side can be anything from e
+            <sup>−μθ</sup> to e<sup>μθ</sup> times the stretcher’s side. If they pull the stretcher back up, it works
+            against them instead: they’d need e<sup>μθ</sup> times the stretcher’s side, not e<sup>−μθ</sup>. A
+            frictionless edge is the safe case to plan for.
           </li>
           <li>
             The edge is treated as a sharp corner the rope bends round, with one friction coefficient. Rope on a real

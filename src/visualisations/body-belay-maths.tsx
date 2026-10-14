@@ -86,8 +86,10 @@ export function BodyBelayMaths() {
         </p>
         <Eq tex={r`\tan\lambda = \frac{F}{N} \qquad \hat{\mathbf f} = -\frac{(R_x,\, R_z)}{F}`} />
         <p>
-          But <M tex={r`\mathbf R`} /> depends on where the waist is, through the stretcher and the rope. So the page
-          solves for the lean where the two agree,
+          But <M tex={r`\mathbf R`} /> depends on where the waist is, through the rope’s direction{" "}
+          <M tex={r`\hat{\mathbf u}_1`} /> and the wrap <M tex={r`\theta`} />. (While the rope wraps the edge, the
+          stretcher doesn’t move: its end stays {PAST_EDGE} m past the edge.) So the page solves for the lean where the
+          two agree,
         </p>
         <Eq tex={r`g(\lambda) = \arctan\frac{F(\lambda)}{N(\lambda)} - \lambda = 0`} />
         <p>
