@@ -93,7 +93,8 @@ export function LadderHingeNotes() {
   );
 }
 
-function Part(props: { title: string; children: React.ReactNode }) {
+/** One titled part of a notes card. */
+export function Part(props: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <h3 className="font-medium text-slate-300">{props.title}</h3>

@@ -44,6 +44,9 @@ export type Held = {
 
 export type HeldResult = { kind: "held"; h: Held } | { kind: "none"; reason: string };
 
+/** The parts of the setup the wall and the rope's anchor need. */
+type WallSetup = Pick<Setup, "wallHeight" | "anchorUp" | "anchorBack">;
+
 type Kind = "rope" | "attachment" | Surface | "ladder";
 
 /** One constraint, g ≤ 0, whose force on the stretcher pushes along m at the stretcher's point `at`. */
@@ -54,7 +57,7 @@ const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
 const safeUnit = (v: Vec, fallback: Vec) => (len(v) > 1e-12 ? unit(v) : fallback);
 
 /** Behind the wall's face: on the wall top, or inside the wall nearer the top than the face. */
-function behindFaceFor(s: Setup, p: Vec) {
+export function behindFaceFor(s: WallSetup, p: Vec) {
   return p.x < 0 && (p.y >= s.wallHeight || s.wallHeight - p.y < -p.x);
 }
 
@@ -63,7 +66,7 @@ function behindFaceFor(s: Setup, p: Vec) {
  * free solver's, it carries on smoothly into the wall, where the minimiser may briefly push an end: as if
  * from the face or the top, whichever is nearer.
  */
-function ropePathFor(s: Setup, p: Vec): { length: number; wrapEdge: Vec | null } {
+export function ropePathFor(s: WallSetup, p: Vec): { length: number; wrapEdge: Vec | null } {
   const anchor = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
   const edge = vec(0, s.wallHeight);
   return !behindFaceFor(s, p) && cross(sub(edge, anchor), sub(p, anchor)) < 0
