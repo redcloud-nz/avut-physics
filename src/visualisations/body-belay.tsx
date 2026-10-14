@@ -59,7 +59,7 @@ const mirror = (p: V3): V3 => ({ ...p, z: -p.z });
  * page shows whether their feet grip well enough to hold them there. A second drawing shows the ropes from above,
  * opening into a V as the belayers stand further apart.
  */
-export default function BodyBelay() {
+export default function BodyBelay(props: { maths?: React.ReactNode }) {
   const [barMass, setBarMass] = useState(90);
   const [wallHeight, setWallHeight] = useState(4);
   const [belayerMass, setBelayerMass] = useState(80);
@@ -578,6 +578,7 @@ export default function BodyBelay() {
       footer={
         <div className="flex flex-col gap-4">
           <BodyBelayNotes />
+          {props.maths}
           {SHOW_RAW_VALUES && <RawValues title="Raw values" data={{ inputs: input, result: sol }} />}
         </div>
       }
