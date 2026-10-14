@@ -157,3 +157,11 @@ html {
     @apply font-sans;
   }
 }
+/* Printed (or saved as a PDF), the page flows onto as many sheets as it needs, rather than scrolling in its box. */
+@media print {
+  body,
+  .page-scroll {
+    height: auto;
+    overflow: visible;
+  }
+}
