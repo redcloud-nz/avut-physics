@@ -35,6 +35,14 @@ export function BodyBelayNotes() {
           half the ropes’ pull on the stretcher, divided by the cosine of half the angle between them. That’s the same
           rule as for the two legs of an anchor: at 120° apart, each rope carries the whole load.
         </p>
+        <p>
+          As the stretcher is lowered, each rope slides slowly over the wall’s edge, and the edge’s friction holds back
+          part of its tension. By the capstan rule, the tension on the belayer’s side is the tension on the stretcher’s
+          side times e<sup>−μθ</sup>, where μ is the friction coefficient between the rope and the edge and θ is how far
+          the rope turns as it goes over it (in radians). The edge takes the difference. A painted steel container rail
+          (μ about 0.2) turning the rope 60° takes about a fifth of the load; a concrete edge takes nearly half. The
+          friction doesn’t move the stretcher: only how much of its pull reaches the belayers.
+        </p>
       </Part>
 
       <Part title="The belayers">
@@ -48,8 +56,12 @@ export function BodyBelayNotes() {
         <p>
           The ground pushes back on their feet (R). Its upward part (N) is their weight plus the rope’s downward pull.
           Its sideways part (F) is friction, and it has to match the rope’s pull across the ground. The grip needed is F
-          divided by N, which is also the tangent of their lean. If that is more than the “Footing grip”, a friction
-          coefficient, their feet slide towards the edge. The page still shows them at the lean they’d need.
+          divided by N, which is also the tangent of their lean. If that is more than the footing’s friction
+          coefficient, their feet slide towards the edge. The page still shows them at the lean they’d need. The
+          footing’s safety factor is the footing’s friction coefficient divided by the grip needed: the friction their
+          feet could take over the friction they need. Below 1, they slide. It only covers their footing, with steady
+          loads; a jerk on the rope, one belayer taking more than their share, or a patch of wet or dust eats into it
+          quickly.
         </p>
         <p>
           Leaning back moves their waists, which moves the stretcher a little and changes the ropes’ pull. So the page
@@ -77,13 +89,32 @@ export function BodyBelayNotes() {
             and can bend at the hips and knees. Any of these changes how much grip they need.
           </li>
           <li>
-            Their feet grip with a single friction coefficient. Real footing varies with the surface, the shoes, and
-            whether it’s wet, loose or sloping.
+            Each footing’s friction coefficient is a rough, middle-of-the-range figure for rubber-soled boots. The real
+            value varies a lot with the boots’ tread and wear, the surface’s finish, and dust, frost, oil or mud on it,
+            and the ground is taken as level.
           </li>
           <li>
             Each rope holds fast round its belayer’s waist. How hard their brake hands have to grip isn’t modelled.
           </li>
-          <li>There’s no friction over the wall’s edge or where the stretcher touches the ground or the wall.</li>
+          <li>
+            The edge’s friction only helps while the rope is sliding towards the stretcher. Once the belayers stop
+            lowering, it can hold anything from that much down to nothing, depending on how the rope settled. If they
+            pull the stretcher back up, it works against them instead: they’d need e<sup>μθ</sup> times the stretcher’s
+            side, not e<sup>−μθ</sup>. A frictionless edge is the safe case to plan for.
+          </li>
+          <li>
+            The edge is treated as a sharp corner the rope bends round, with one friction coefficient. Rope on a real
+            edge varies with the rope’s sheath, its speed, dirt and wear, and the figures for each edge are rough.
+            Bending round a tight edge also stiffens the rope’s run over it, adding some drag the capstan rule leaves
+            out.
+          </li>
+          <li>
+            The rope’s strength isn’t modelled. A shipping container’s roof edge is a square steel tube with only a few
+            millimetres’ radius, much tighter than the rope’s diameter. A rope bent that sharply loses much of its
+            strength, and sliding over paint, rust or burrs wears its sheath. Use edge protection or an edge roller
+            whatever the belay.
+          </li>
+          <li>There’s no friction where the stretcher touches the ground or the wall.</li>
           <li>The rope and line are weightless and don’t stretch, and the stretcher is rigid and uniform.</li>
           <li>
             The belayers are exactly mirror images, sharing the load evenly. In practice one usually takes more than the

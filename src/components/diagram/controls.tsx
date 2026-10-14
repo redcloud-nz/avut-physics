@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -83,6 +83,41 @@ export function Choice<T extends string>(props: {
   );
 }
 
+/** A dropdown for picking one of many options, optionally in groups. */
+export function Select<T extends string>(props: {
+  label: string;
+  value: T;
+  groups: { label?: string; options: { value: T; label: string }[] }[];
+  onChange: (v: T) => void;
+}) {
+  const options = (g: (typeof props.groups)[number]) =>
+    g.options.map((o) => (
+      <option key={o.value} value={o.value}>
+        {o.label}
+      </option>
+    ));
+  return (
+    <label className="flex flex-col gap-1 text-sm text-slate-300">
+      {props.label}
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value as T)}
+        className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+      >
+        {props.groups.map((g, i) =>
+          g.label ? (
+            <optgroup key={g.label} label={g.label}>
+              {options(g)}
+            </optgroup>
+          ) : (
+            <Fragment key={i}>{options(g)}</Fragment>
+          ),
+        )}
+      </select>
+    </label>
+  );
+}
+
 /** A labelled read-only value, e.g. a computed force. */
 export function Readout(props: { label: string; value: string; color?: string }) {
   return (
@@ -101,7 +136,11 @@ type More = (children: React.ReactNode) => React.ReactNode;
 const collapsed: More = (children) => (
   <Collapsible className="flex flex-col gap-4">
     <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="sm" className="group h-auto justify-between px-0 text-sm font-normal text-slate-300 hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-slate-300">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="group h-auto justify-between px-0 text-sm font-normal text-slate-300 hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-slate-300"
+      >
         More settings
         <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
       </Button>

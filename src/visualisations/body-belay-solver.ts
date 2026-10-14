@@ -17,6 +17,10 @@ import { solveLower, type Lowered, type Setup as LowerSetup } from "./two-point-
  * the two-point lower's solver can place the stretcher. Each rope's tension is then the side-on pull shared
  * between the two, made larger by how far the V opens.
  *
+ * The rope is taken to be sliding slowly over the edge, as the stretcher is lowered, so the edge's friction holds
+ * back part of its tension: by the capstan rule, the belayers hold e^(−μθ) of the tension on the stretcher's side,
+ * where θ is how far the rope turns over the edge.
+ *
  * The belayers' lean moves their waists, which moves the stretcher a little, which changes the ropes' pull; the
  * two are solved together by settling the lean a few times.
  */
@@ -30,6 +34,8 @@ export type Setup = Omit<LowerSetup, "anchorUp" | "anchorBack" | "rope"> & {
   belayerWeight: number;
   /** The friction coefficient between the belayers' feet and the wall top. */
   grip: number;
+  /** The friction coefficient between the rope and the wall's edge. */
+  edgeFriction: number;
 };
 
 /** The rope runs round each belayer's waist, this far up their body from their feet. */
@@ -46,6 +52,7 @@ export type V3 = { x: number; y: number; z: number };
 const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
 const sub3 = (a: V3, b: V3) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
 const len3 = (a: V3) => Math.hypot(a.x, a.y, a.z);
+const dot3 = (a: V3, b: V3) => a.x * b.x + a.y * b.y + a.z * b.z;
 const scale3 = (a: V3, k: number) => v3(a.x * k, a.y * k, a.z * k);
 
 /** The belayer on the z > 0 side (the other is their mirror image). */
@@ -62,6 +69,9 @@ export type Belayer = {
   ground: V3;
   /** The friction coefficient their feet need to hold: the ground's sideways push over its upward push. */
   gripNeeded: number;
+  /** The footing's safety factor: the friction their feet can take over the friction they need (the footing's grip
+   * over `gripNeeded`). Below 1, they slide. */
+  safety: number;
   /** Their feet hold without sliding. */
   holds: boolean;
 };
@@ -72,8 +82,13 @@ export type Belayed = {
   b: Belayer;
   /** Each rope's length, from waist to stretcher. */
   rope: number;
-  /** Each rope's tension. */
+  /** Each rope's tension on the stretcher's side of the edge. */
+  loadTension: number;
+  /** Each rope's tension on the belayer's side of the edge: what they hold, less than `loadTension` by the edge's
+   * friction. */
   tension: number;
+  /** How far each rope turns as it wraps over the edge (radians), or 0 when it doesn't touch it. */
+  wrap: number;
   /** The angle between the two ropes where they meet at the stretcher (radians). */
   ropeAngle: number;
   /** Where the belayer's rope crosses the wall's edge (z > 0 side), when it wraps over it. */
@@ -108,14 +123,18 @@ function belayedFor(s: Setup, ls: LowerSetup, l: Lowered, lean: number, facing: 
   // amount, unfolded about the edge. Only the part along the side-on view pulls the stretcher in its plane.
   const side = ropePathFor(ls, l.barEnd1).length;
   const rope = Math.hypot(side, waist.z);
-  const tension = l.ropeTaut ? len(l.t1) / 2 / (side / rope) : 0;
+  const loadTension = l.ropeTaut ? len(l.t1) / 2 / (side / rope) : 0;
   let edgeCrossing: V3 | null = null;
   let next = end;
+  let wrap = 0;
   if (l.wrapEdge) {
     const toEdge = len(sub(l.wrapEdge, vec(waist.x, waist.y)));
     edgeCrossing = v3(0, s.wallHeight, (waist.z * (side - toEdge)) / side);
     next = edgeCrossing;
+    const [a, b] = [sub3(edgeCrossing, waist), sub3(end, edgeCrossing)];
+    wrap = Math.acos(Math.max(-1, Math.min(1, dot3(a, b) / len3(a) / len3(b))));
   }
+  const tension = loadTension * Math.exp(-s.edgeFriction * wrap);
   const along = sub3(next, waist);
   const pull = scale3(along, tension / len3(along));
   // Their feet balance the pull and their weight (taken at their waist, where the strut meets the rope).
@@ -124,9 +143,21 @@ function belayedFor(s: Setup, ls: LowerSetup, l: Lowered, lean: number, facing: 
   const gripNeeded = ground.y > 0 ? sideways / ground.y : Infinity;
   return {
     l,
-    b: { feet, waist, lean, facing, pull, ground, gripNeeded, holds: gripNeeded <= s.grip },
+    b: {
+      feet,
+      waist,
+      lean,
+      facing,
+      pull,
+      ground,
+      gripNeeded,
+      safety: s.grip / gripNeeded,
+      holds: gripNeeded <= s.grip,
+    },
     rope,
+    loadTension,
     tension,
+    wrap,
     ropeAngle: 2 * Math.asin(Math.min(1, Math.abs(waist.z) / rope)),
     edgeCrossing,
   };

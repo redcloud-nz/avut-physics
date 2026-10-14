@@ -3,7 +3,8 @@
 import { useDeferredValue, useMemo, useState, useSyncExternalStore } from "react";
 import { Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
-import { RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
+import { RawValues, Readout, Select, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
+import { EDGES, SURFACES, edgeFor, footingFor, type Edge, type Footing } from "./body-belay-surfaces";
 import { BodyBelayNotes } from "./body-belay-notes";
 import { WAIST_HEIGHT, solveBelay, type Belayed, type Belayer, type V3 } from "./body-belay-solver";
 import { TEAM_HEIGHT } from "./two-point-lower-solver";
@@ -59,18 +60,21 @@ const mirror = (p: V3): V3 => ({ ...p, z: -p.z });
  * opening into a V as the belayers stand further apart.
  */
 export default function BodyBelay() {
-  const [barMass, setBarMass] = useState(80);
+  const [barMass, setBarMass] = useState(90);
   const [wallHeight, setWallHeight] = useState(4);
   const [belayerMass, setBelayerMass] = useState(80);
-  const [grip, setGrip] = useState(0.6);
-  const [belayerBack, setBelayerBack] = useState(2);
-  const [gap, setGap] = useState(1);
+  const [footing, setFooting] = useState<Footing>("painted-steel-dry");
+  const [edge, setEdge] = useState<Edge>("steel");
+  const [belayerBack, setBelayerBack] = useState(3);
+  const [gap, setGap] = useState(2);
   const [teamDistance, setTeamDistance] = useState(6);
   const [teamPull, setTeamPull] = useState(200);
   const [showComponents, setShowComponents] = useState(false);
 
   const barWeight = barMass * G;
   const belayerWeight = belayerMass * G;
+  const { grip, label: footingLabel } = footingFor(footing);
+  const edgeFriction = edgeFor(edge).friction;
   const setup = useMemo(
     () => ({
       wallHeight,
@@ -78,12 +82,13 @@ export default function BodyBelay() {
       gap,
       belayerWeight,
       grip,
+      edgeFriction,
       teamDistance,
       teamPull,
       barLength: BAR_LENGTH,
       barWeight,
     }),
-    [wallHeight, belayerBack, gap, belayerWeight, grip, teamDistance, teamPull, barWeight],
+    [wallHeight, belayerBack, gap, belayerWeight, grip, edgeFriction, teamDistance, teamPull, barWeight],
   );
   // Working out the belayers' lean takes a handful of solves, so the sliders move first and the drawing follows.
   const input = useDeferredValue(setup);
@@ -339,7 +344,7 @@ export default function BodyBelay() {
   const view = inBrowser && sol.kind === "belayed" ? sol.l : null;
   const belayed = inBrowser && sol.kind === "belayed" ? sol : null;
   const belayer = belayed?.b ?? null;
-  /** Each rope's push on the wall's edge as it wraps over it: its tension, pulling both ways round the edge. */
+  /** Each rope's push on the wall's edge as it wraps over it: its tension either side, pulling both ways round it. */
   const ropeOnEdge = (() => {
     const c = belayed?.edgeCrossing;
     if (!belayed || !c || belayed.tension <= 0) return null;
@@ -349,7 +354,8 @@ export default function BodyBelay() {
       return { x: d.x / l, y: d.y / l, z: d.z / l };
     };
     const [a, b] = [out(belayed.b.waist), out({ x: belayed.l.barEnd1.x, y: belayed.l.barEnd1.y, z: 0 })];
-    return belayed.tension * Math.hypot(a.x + b.x, a.y + b.y, a.z + b.z);
+    const [t, u] = [belayed.tension, belayed.loadTension];
+    return Math.hypot(t * a.x + u * b.x, t * a.y + u * b.y, t * a.z + u * b.z);
   })();
   // How far the stretcher hangs out from the wall's face, once it's over the edge and below the wall top.
   const nearest = view ? Math.min(view.barEnd1.x, view.barEnd2.x) : -1;
@@ -362,7 +368,7 @@ export default function BodyBelay() {
       : !sol.b.holds
         ? {
             title: "The belayers would slide towards the edge",
-            detail: `Their feet need a grip of ${sol.b.gripNeeded.toFixed(2)} to hold, more than the footing's ${grip.toFixed(2)}.`,
+            detail: `Their feet need a grip of ${sol.b.gripNeeded.toFixed(2)} to hold, more than the ${grip.toFixed(2)} of ${footingLabel}.`,
           }
         : null;
 
@@ -433,7 +439,24 @@ export default function BodyBelay() {
             onChange={setBelayerMass}
           />
           <Slider label="Gap between belayers" value={gap} min={0} max={6} step={0.1} unit="m" onChange={setGap} />
-          <Slider label="Footing grip" value={grip} min={0.1} max={1.2} step={0.05} digits={2} onChange={setGrip} />
+          <Select
+            label="Footing"
+            value={footing}
+            groups={(["dry", "wet"] as const).map((w) => ({
+              label: w === "dry" ? "Dry" : "Wet",
+              options: SURFACES.map((s) => ({
+                value: `${s.key}-${w}` as Footing,
+                label: `${w === "dry" ? "Dry" : "Wet"} ${s.label.toLowerCase()} (${s[w].toFixed(2)})`,
+              })),
+            }))}
+            onChange={setFooting}
+          />
+          <Select
+            label="Wall's edge"
+            value={edge}
+            groups={[{ options: EDGES.map((e) => ({ value: e.key, label: `${e.label} (${e.friction.toFixed(2)})` })) }]}
+            onChange={setEdge}
+          />
           <Slider
             label="Ground team's pull"
             value={teamPull}
@@ -484,7 +507,17 @@ export default function BodyBelay() {
             color={COLORS.rope}
           />
           <Readout
-            label="Tension, each rope T₁"
+            label="Each rope's turn over edge"
+            value={belayed ? `${deg(belayed.wrap).toFixed(0)}°` : NONE}
+            color={COLORS.rope}
+          />
+          <Readout
+            label="Rope tension at stretcher"
+            value={belayed ? (belayed.loadTension > 1e-6 ? `${belayed.loadTension.toFixed(0)} N` : "slack") : NONE}
+            color={COLORS.rope}
+          />
+          <Readout
+            label="Rope tension at belayer T₁"
             value={belayed ? (belayed.tension > 1e-6 ? `${belayed.tension.toFixed(0)} N` : "slack") : NONE}
             color={COLORS.rope}
           />
@@ -501,6 +534,11 @@ export default function BodyBelay() {
           <Readout
             label="Grip needed"
             value={belayer ? belayer.gripNeeded.toFixed(2) : NONE}
+            color={belayer && !belayer.holds ? COLORS.slipping : COLORS.belayer}
+          />
+          <Readout
+            label="Footing safety factor"
+            value={belayer ? `${Number.isFinite(belayer.safety) ? belayer.safety.toFixed(2) : "∞"} : 1` : NONE}
             color={belayer && !belayer.holds ? COLORS.slipping : COLORS.belayer}
           />
           <Readout

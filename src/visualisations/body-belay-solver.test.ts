@@ -11,6 +11,7 @@ type Inputs = {
   gap: number;
   belayerMass: number;
   grip: number;
+  edgeFriction: number;
   stretcherMass: number;
   teamDistance: number;
   teamPull: number;
@@ -18,11 +19,12 @@ type Inputs = {
 
 const DEFAULTS: Inputs = {
   wallHeight: 4,
-  belayerBack: 2,
-  gap: 1,
+  belayerBack: 3,
+  gap: 2,
   belayerMass: 80,
-  grip: 0.6,
-  stretcherMass: 80,
+  grip: 0.5,
+  edgeFriction: 0.2,
+  stretcherMass: 90,
   teamDistance: 6,
   teamPull: 200,
 };
@@ -35,6 +37,7 @@ function setupFor(inputs: Partial<Inputs>): Setup {
     gap: i.gap,
     belayerWeight: i.belayerMass * G,
     grip: i.grip,
+    edgeFriction: i.edgeFriction,
     teamDistance: i.teamDistance,
     teamPull: i.teamPull,
     barLength: 2,
@@ -55,6 +58,7 @@ function randomInputs(count: number, seed = 7): Inputs[] {
     gap: pick(0, 6, 0.1),
     belayerMass: pick(40, 150, 1),
     grip: pick(0.1, 1.2, 0.05),
+    edgeFriction: pick(0, 0.6, 0.05),
     stretcherMass: pick(1, 200, 1),
     teamDistance: pick(4, 10, 0.1),
     teamPull: pick(10, 1000, 10),
@@ -110,8 +114,18 @@ function violations(s: Setup, r: BelayResult): string[] {
   if (r.tension > fTol && len3(sub3(unit3(b.pull), unit3(sub3(next, b.waist)))) > 1e-3)
     out.push("rope pulls the belayer the wrong way");
   const last = unit3(sub3(crossing ?? b.waist, end));
-  if (len(sub(l.t1, vec(2 * r.tension * last.x, 2 * r.tension * last.y))) > fTol)
+  if (len(sub(l.t1, vec(2 * r.loadTension * last.x, 2 * r.loadTension * last.y))) > fTol)
     out.push("ropes' pull on the stretcher isn't both tensions");
+
+  // Sliding over the edge towards the stretcher, each rope loses tension to the edge's friction by the capstan rule,
+  // over the angle it turns through there.
+  const first = unit3(sub3(next, b.waist));
+  const wrap = crossing
+    ? Math.acos(Math.min(1, Math.max(-1, -(first.x * last.x + first.y * last.y + first.z * last.z))))
+    : 0;
+  if (Math.abs(wrap - r.wrap) > 1e-6) out.push("rope's wrap over the edge is wrong");
+  if (Math.abs(r.tension - r.loadTension * Math.exp(-s.edgeFriction * wrap)) > fTol)
+    out.push("edge friction doesn't take the capstan rule's share");
   const angle = Math.acos(Math.min(1, last.x * last.x + last.y * last.y - last.z * last.z));
   if (r.tension > fTol && Math.abs(angle - r.ropeAngle) > 1e-3) out.push("angle between ropes is wrong");
 
@@ -122,6 +136,10 @@ function violations(s: Setup, r: BelayResult): string[] {
   if (b.ground.y <= 0) out.push("feet lift");
   if (Math.abs(b.gripNeeded - Math.hypot(b.ground.x, b.ground.z) / b.ground.y) > 1e-9) out.push("grip needed is wrong");
   if (b.holds !== b.gripNeeded <= s.grip) out.push("holds doesn't match the grip");
+  const capacity = s.grip * b.ground.y;
+  const needed = Math.hypot(b.ground.x, b.ground.z);
+  if (Math.abs(b.safety - capacity / needed) > 1e-9 * b.safety)
+    out.push("safety factor isn't friction available over needed");
 
   // The stretcher balances too.
   const forces: { at: Vec; f: Vec }[] = [
@@ -159,13 +177,23 @@ describe("body belay", () => {
   };
 
   it("shares the load evenly between ropes side by side", () => {
-    const r = solved({ gap: 0 });
+    const r = solved({ gap: 0, edgeFriction: 0 });
     expect(r.ropeAngle).toBe(0);
     expect(r.tension).toBeCloseTo(len(r.l.t1) / 2, 6);
   });
 
-  it("two belayers of the stretcher's weight hold it just over the edge on ordinary footing", () => {
+  it("eases the belayers' load the more the edge grips the rope, without moving the stretcher", () => {
+    const [none, steel, concrete] = [0, 0.2, 0.55].map((edgeFriction) => solved({ edgeFriction }));
+    expect(steel.loadTension).toBeCloseTo(none.loadTension, 0);
+    expect(steel.tension).toBeLessThan(none.tension);
+    expect(concrete.tension).toBeLessThan(steel.tension);
+    expect(concrete.b.gripNeeded).toBeLessThan(none.b.gripNeeded);
+  });
+
+  it("two belayers on dry painted steel hold a patient on a stretcher just over the edge only with its friction", () => {
     expect(solved({}).b.holds).toBe(true);
+    expect(solved({ edgeFriction: 0 }).b.holds).toBe(false);
+    expect(solved({ grip: 0.25, edgeFriction: 0.55 }).b.holds).toBe(false);
   });
 
   it("loads each rope and belayer more the wider the ropes open", () => {
