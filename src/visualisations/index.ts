@@ -1,5 +1,5 @@
 export type Visualisation = {
-  href: "/block-on-an-incline" | "/ladder-hinge" | "/two-point-lower";
+  href: "/block-on-an-incline" | "/ladder-hinge-lower" | "/two-point-lower";
   title: string;
   description: string;
 };
@@ -12,8 +12,8 @@ export const incline: Visualisation = {
 };
 
 export const ladderHinge: Visualisation = {
-  href: "/ladder-hinge",
-  title: "Ladder Hinge",
+  href: "/ladder-hinge-lower",
+  title: "Ladder Hinge Lower",
   description:
     "A ladder hinged at the base of a wall, with a 2 m stretcher hanging from it. A rope from an anchor behind the top of the wall holds one end of the stretcher, and an attachment from the other end runs to the ladder. Everything settles where the torques and forces on the ladder and stretcher balance.",
 };
@@ -25,5 +25,5 @@ export const twoPointLower: Visualisation = {
     "A 2 m stretcher lowered over a wall on a rope from an anchor behind its top, with a line from its other end to a ground team out in front, who pull it steadily to keep it off the wall. The stretcher settles where the forces and torques on it balance.",
 };
 
-/** Listed on the home page. Each one also needs its own page under `src/app`. */
-export const visualisations: Visualisation[] = [incline, ladderHinge, twoPointLower];
+/** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
+export const visualisations: Visualisation[] = [ladderHinge, twoPointLower];
