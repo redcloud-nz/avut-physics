@@ -1,0 +1,4 @@
+package-lock.json
+
+# Solver snapshots: compared byte for byte by the sweep test.
+src/visualisations/__snapshots__
