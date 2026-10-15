@@ -1,6 +1,6 @@
 import { nearestOnSegment, segmentsCross } from "@/lib/geometry";
 import { clamp, rad } from "@/lib/math";
-import { centralDifferences, gridMinima, leastSquares, nelderMead, solveLinear } from "@/lib/numeric";
+import { centralDifferences, gridMinima, leastSquares, nelderMead, solveLinear, transpose, withColumns } from "@/lib/numeric";
 import { Vector2, vec2 } from "@/lib/vector2";
 import { phiMax, wallPush, type Setup, type Surface } from "./ladder-hinge-solver";
 
@@ -305,11 +305,7 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
     let l =
       m === 0
         ? []
-        : (leastSquares(
-            [0, 1, 2].map((j) => cols.map((c) => c[j])),
-            [0, W, 0],
-            1e-9,
-          ) ?? keys.map(() => 0));
+        : (leastSquares(transpose(cols), [0, W, 0], 1e-9) ?? keys.map(() => 0));
     let q = [...q0];
     for (let iter = 0; iter < 40; iter++) {
       const r = residual(q, l);
@@ -320,13 +316,9 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
       const dq = centralDifferences((q) => residual(q, l), q, [1e-7, 1e-7, 1e-7 / half]);
       if (!dq) return null;
       const forces = at(q).map((p) => generalised(p!, q));
-      const J = dq.map((row, j) => [...row, ...forces.map((f) => f[j] ?? 0)]);
+      const J = withColumns(dq, forces);
       // Least squares (square and well-posed in the usual case; more contacts than freedoms otherwise).
-      const dx = leastSquares(
-        J,
-        r.map((v) => -v),
-        1e-12 * W * W,
-      );
+      const dx = leastSquares(J, r.map((v) => -v), 1e-12 * W * W);
       if (!dx) return null;
       q = q.map((v, j) => v + dx[j]);
       l = l.map((v, i) => v + dx[3 + i]);

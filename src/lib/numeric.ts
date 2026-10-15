@@ -1,5 +1,15 @@
 /** Small numerical methods for the solvers. */
 
+/** A matrix, as its rows. */
+export type Matrix = number[][];
+
+/** The transpose of A: its columns as rows. */
+export const transpose = (A: Matrix): Matrix => (A[0] ?? []).map((_, j) => A.map((row) => row[j]));
+
+/** A with `columns` appended on its right. A column shorter than A is padded with zeros. */
+export const withColumns = (A: Matrix, columns: number[][]): Matrix =>
+  A.map((row, i) => [...row, ...columns.map((c) => c[i] ?? 0)]);
+
 /** Nelder–Mead minimisation, restarted a few times from the best point to avoid early stalls. */
 export function nelderMead(f: (x: number[]) => number, start: number[], step: number): number[] {
   const n = start.length;
@@ -42,7 +52,7 @@ export function nelderMead(f: (x: number[]) => number, start: number[], step: nu
 }
 
 /** Solve a small linear system by Gaussian elimination with partial pivoting. */
-export function solveLinear(A: number[][], b: number[]): number[] | null {
+export function solveLinear(A: Matrix, b: number[]): number[] | null {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
   for (let col = 0; col < n; col++) {
@@ -63,7 +73,7 @@ export function solveLinear(A: number[][], b: number[]): number[] | null {
  * The x minimising |Ax − b|² + damping·|x|², from the normal equations (AᵀA + damping·I) x = Aᵀb. A is given by
  * its rows. Null if the system is singular.
  */
-export function leastSquares(A: number[][], b: number[], damping: number): number[] | null {
+export function leastSquares(A: Matrix, b: number[], damping: number): number[] | null {
   const n = A[0]?.length ?? 0;
   const AtA = Array.from({ length: n }, (_, i) =>
     Array.from({ length: n }, (_, k) => A.reduce((sum, row) => sum + row[i] * row[k], 0) + (i === k ? damping : 0)),
@@ -80,7 +90,7 @@ export function centralDifferences(
   f: (x: number[]) => number[] | null,
   x: number[],
   steps: number[],
-): number[][] | null {
+): Matrix | null {
   const columns: number[][] = [];
   for (let j = 0; j < x.length; j++) {
     const step = steps[j];
@@ -89,7 +99,7 @@ export function centralDifferences(
     if (!fp || !fm) return null;
     columns.push(fp.map((v, i) => (v - fm[i]) / (2 * step)));
   }
-  return (columns[0] ?? []).map((_, i) => columns.map((c) => c[i]));
+  return transpose(columns);
 }
 
 /**

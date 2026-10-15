@@ -1,4 +1,4 @@
-import { centralDifferences, gridMinima, leastSquares, nelderMead } from "@/lib/numeric";
+import { centralDifferences, gridMinima, leastSquares, nelderMead, transpose, withColumns } from "@/lib/numeric";
 import { Vector2, vec2 } from "@/lib/vector2";
 import { behindFaceFor, ropePathFor } from "./ladder-hinge-held";
 import type { Surface } from "./ladder-hinge-solver";
@@ -315,7 +315,7 @@ export function solveLower(s: Setup): LowerResult {
     let l =
       m === 0
         ? []
-        : (leastSquares([0, 1, 2].map((j) => cols.map((c) => c[j])), rhs, 1e-9) ?? keys.map(() => 0));
+        : (leastSquares(transpose(cols), rhs, 1e-9) ?? keys.map(() => 0));
     let q = [...q0];
     for (let iter = 0; iter < 40; iter++) {
       const r = residual(q, l);
@@ -326,7 +326,7 @@ export function solveLower(s: Setup): LowerResult {
       const dq = centralDifferences((q) => residual(q, l), q, [1e-7, 1e-7, 1e-7 / half]);
       if (!dq) return null;
       const forces = at(q).map((p) => generalised(p!.at, p!.m, q));
-      const J = dq.map((row, j) => [...row, ...forces.map((f) => (j < 3 ? f[j] : 0))]);
+      const J = withColumns(dq, forces);
       // Least squares (square and well-posed in the usual case; more contacts than freedoms otherwise).
       const dx = leastSquares(J, r.map((v) => -v), 1e-12 * W * W);
       if (!dx) return null;

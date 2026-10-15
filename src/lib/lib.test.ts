@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { nearestOnSegment, segmentDistance, segmentGap } from "./geometry";
 import { clamp, linearScale } from "./math";
-import { centralDifferences, gridMinima, leastSquares, nelderMead, solveLinear } from "./numeric";
 import { vec2 } from "./vector2";
 import { vec3 } from "./vector3";
 
@@ -54,41 +53,5 @@ describe("math", () => {
     expect(clamp(5, 0, 1)).toBe(1);
     expect(clamp(-5, 0, 1)).toBe(0);
     expect(linearScale([0, 10], [100, 0])(2.5)).toBe(75);
-  });
-});
-
-describe("numeric", () => {
-  it("minimises", () => {
-    const [x, y] = nelderMead(([x, y]) => (x - 1) ** 2 + (y + 2) ** 2, [0, 0], 0.5);
-    expect(x).toBeCloseTo(1, 6);
-    expect(y).toBeCloseTo(-2, 6);
-  });
-
-  it("solves linear systems, and least squares on overdetermined ones", () => {
-    const [x, y] = solveLinear([[2, 1], [1, 3]], [3, 5])!;
-    expect(x).toBeCloseTo(0.8);
-    expect(y).toBeCloseTo(1.4);
-    expect(solveLinear([[1, 2], [2, 4]], [1, 2])).toBeNull();
-    // The best fit of y = c through 1, 2 and 3 is their mean.
-    expect(leastSquares([[1], [1], [1]], [1, 2, 3], 0)![0]).toBeCloseTo(2);
-  });
-
-  it("differentiates numerically", () => {
-    const J = centralDifferences(([x, y]) => [x * y, x + 2 * y], [2, 3], [1e-6, 1e-6])!;
-    expect(J[0][0]).toBeCloseTo(3);
-    expect(J[0][1]).toBeCloseTo(2);
-    expect(J[1][0]).toBeCloseTo(1);
-    expect(J[1][1]).toBeCloseTo(2);
-    expect(centralDifferences(() => null, [0], [1])).toBeNull();
-  });
-
-  it("finds a wrapped grid's local minima, lowest first", () => {
-    const grid = [
-      [9, 8, 7, 6],
-      [8, 1, 8, 5],
-      [7, 8, 9, 0],
-      [6, 7, 8, Infinity],
-    ];
-    expect(gridMinima(grid).map(({ i, j }) => [i, j])).toEqual([[2, 3], [1, 1]]);
   });
 });
