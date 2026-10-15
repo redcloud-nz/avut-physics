@@ -2,7 +2,7 @@ import { solveBelay, type Belayed } from "@/visualisations/body-belay-solver";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
 /*
- * The write-up's figures, worked out by the body belay page's own solver, so they always match what the page
+ * The article's figures, worked out by the body belay page's own solver, so they always match what the page
  * shows for the same settings.
  */
 
@@ -15,7 +15,8 @@ export const DEFAULTS = {
   belayerBack: 3,
   gap: 2,
   belayerMass: 80,
-  stretcherMass: 90,
+  /** An 80 kg casualty in a Ferno Model 71 (13.5 kg with straps and footplate), with a blanket and lashings. */
+  stretcherMass: 95,
   /** Dry painted steel, a shipping container's roof. */
   grip: SURFACES.find((s) => s.key === "painted-steel")!.dry,
   /** A painted steel container rail. */
@@ -58,6 +59,8 @@ export function belay(c: Case = {}) {
     /** The friction each belayer's feet must supply (N). */
     sideways: Math.hypot(b.b.ground.x, b.b.ground.z),
     gripNeeded: b.b.gripNeeded,
+    /** How far each belayer leans back from upright (radians). */
+    lean: b.b.lean,
     /** The footing's safety factor with this grip (the page's default unless given). */
     safety: b.b.safety,
     ropeAngle: b.ropeAngle,
@@ -65,7 +68,5 @@ export function belay(c: Case = {}) {
   };
 }
 
-/** The three ways the edge can act: helping while the rope runs out, not at all, and against them hauling up. */
-export const lowering = (c: Case = {}) => belay(c);
+/** One belayer's load holding the stretcher still, with the edge's friction not counted, since it can act either way. */
 export const holding = (c: Case = {}) => belay({ ...c, edgeFriction: 0 });
-export const hauling = (c: Case = {}) => belay({ ...c, edgeFriction: -(c.edgeFriction ?? DEFAULTS.edgeFriction) });

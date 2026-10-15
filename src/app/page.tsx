@@ -21,7 +21,7 @@ export default function Home() {
           </li>
         ))}
       </ul>
-      <h2 className="mt-10 mb-4 text-xl font-semibold tracking-tight text-slate-50">Write-ups</h2>
+      <h2 className="mt-10 mb-4 text-xl font-semibold tracking-tight text-slate-50">Articles</h2>
       <ul className="grid gap-4 sm:grid-cols-2">
         <li>
           <Link
@@ -30,7 +30,7 @@ export default function Home() {
           >
             <h3 className="text-lg font-semibold text-slate-100">Standing Body Belays</h3>
             <p className="text-sm text-slate-400">
-              Why a standing body belay can’t safely hold a stretcher’s weight, and what to use instead.
+              The best a standing body belay can do holding a stretcher still, and why even that isn’t enough.
             </p>
           </Link>
         </li>

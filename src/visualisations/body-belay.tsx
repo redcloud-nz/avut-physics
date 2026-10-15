@@ -60,7 +60,7 @@ const mirror = (p: V3): V3 => ({ ...p, z: -p.z });
  * opening into a V as the belayers stand further apart.
  */
 export default function BodyBelay(props: { maths?: React.ReactNode }) {
-  const [barMass, setBarMass] = useState(90);
+  const [barMass, setBarMass] = useState(95);
   const [wallHeight, setWallHeight] = useState(2.89);
   const [belayerMass, setBelayerMass] = useState(80);
   const [footing, setFooting] = useState<Footing>("painted-steel-dry");

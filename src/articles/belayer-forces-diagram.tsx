@@ -1,5 +1,5 @@
 import { Arrow, vec } from "@/components/diagram/svg";
-import { DEFAULTS, arrangement } from "@/writeups/standing-body-belays-figures";
+import { DEFAULTS, arrangement } from "@/articles/standing-body-belays-figures";
 
 /*
  * The forces on one belayer in the common case, holding still, to scale in the plane of their rope: their weight,

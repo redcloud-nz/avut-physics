@@ -1,9 +1,9 @@
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
-import { DEFAULTS, holding } from "@/writeups/standing-body-belays-figures";
+import { DEFAULTS, holding } from "@/articles/standing-body-belays-figures";
 
 /*
  * The safety factor holding still against the stretcher's weight, on dry and wet painted steel, for one belayer of
- * the write-up's default weight. Drawn in `currentColor` and its tints, so it prints in black on white.
+ * the article's default weight. Drawn in `currentColor` and its tints, so it prints in black on white.
  */
 
 const STEEL = SURFACES.find((s) => s.key === "painted-steel")!;

@@ -1,4 +1,4 @@
-import { DEFAULTS, arrangement } from "@/writeups/standing-body-belays-figures";
+import { DEFAULTS, arrangement } from "@/articles/standing-body-belays-figures";
 
 /*
  * The lower, seen side on and drawn to scale from the solver's arrangement for the common case, holding still.
@@ -178,10 +178,10 @@ export function SetupDiagram() {
         </g>
       </svg>
       <figcaption id="setup-caption" className="text-sm text-slate-400">
-        <strong className="font-medium text-slate-300">Figure 1.</strong> The lower, side on and to scale, just after
-        the stretcher has gone over the edge, when the ropes carry the most. The second belayer stands beside the first,
-        hidden behind them. Each rope runs from a belayer’s waist, over the roof’s edge, to the stretcher’s head; the
-        dashed line runs from its foot to the ground team.
+        <strong className="font-medium text-slate-300">Figure 1.</strong> The lower, held still just after the stretcher
+        has gone over the edge, when the ropes carry the most, side on and to scale. The second belayer stands beside
+        the first, hidden behind them. Each rope runs from a belayer’s waist, over the roof’s edge, to the stretcher’s
+        head; the dashed line runs from its foot to the ground team.
       </figcaption>
     </figure>
   );
