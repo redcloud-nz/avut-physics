@@ -1,8 +1,7 @@
 /** Small SVG primitives for physics diagrams. Coordinates are SVG user units (y points down). */
 
-import { add, len, rad, scale, vec, type Vec } from "@/lib/vec";
-
-export * from "@/lib/vec";
+import { rad } from "@/lib/math";
+import { Vector2 } from "@/lib/vector2";
 
 /** An arrow from `from` along vector `v`, with an optional label just past the tip. */
 export function Arrow({
@@ -13,23 +12,23 @@ export function Arrow({
   dashed = false,
   width = 2.5,
 }: {
-  from: Vec;
-  v: Vec;
+  from: Vector2;
+  v: Vector2;
   color: string;
   label?: string;
   dashed?: boolean;
   width?: number;
 }) {
-  const l = len(v);
+  const l = v.len();
   if (l < 1) return null;
-  const u = scale(v, 1 / l);
+  const u = v.scale(1 / l);
   const head = Math.min(12, l * 0.4);
-  const tip = add(from, v);
-  const base = add(tip, scale(u, -head));
-  const perp = vec(-u.y, u.x);
-  const p1 = add(base, scale(perp, head * 0.45));
-  const p2 = add(base, scale(perp, -head * 0.45));
-  const labelPos = add(tip, scale(u, 14));
+  const tip = from.add(v);
+  const base = tip.add(u.scale(-head));
+  const perp = u.perp();
+  const p1 = base.add(perp.scale(head * 0.45));
+  const p2 = base.add(perp.scale(-head * 0.45));
+  const labelPos = tip.add(u.scale(14));
 
   return (
     <g color={color}>
@@ -57,7 +56,7 @@ export function AngleArc({
   label,
   color = "#94a3b8",
 }: {
-  center: Vec;
+  center: Vector2;
   radius: number;
   startDeg: number;
   sweepDeg: number;
@@ -66,10 +65,10 @@ export function AngleArc({
 }) {
   const a0 = rad(startDeg);
   const a1 = rad(startDeg + sweepDeg);
-  const p0 = add(center, vec(Math.cos(a0) * radius, Math.sin(a0) * radius));
-  const p1 = add(center, vec(Math.cos(a1) * radius, Math.sin(a1) * radius));
+  const p0 = center.add(Vector2.fromAngle(a0, radius));
+  const p1 = center.add(Vector2.fromAngle(a1, radius));
   const mid = rad(startDeg + sweepDeg / 2);
-  const labelPos = add(center, vec(Math.cos(mid) * (radius + 16), Math.sin(mid) * (radius + 16)));
+  const labelPos = center.add(Vector2.fromAngle(mid, radius + 16));
   const largeArc = Math.abs(sweepDeg) > 180 ? 1 : 0;
   const sweep = sweepDeg > 0 ? 1 : 0;
 
@@ -86,7 +85,7 @@ export function AngleArc({
   );
 }
 
-export function Label({ at, color = "#e2e8f0", children }: { at: Vec; color?: string; children: React.ReactNode }) {
+export function Label({ at, color = "#e2e8f0", children }: { at: Vector2; color?: string; children: React.ReactNode }) {
   return (
     <text
       x={at.x}

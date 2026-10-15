@@ -1,5 +1,6 @@
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 import { DEFAULTS, holding } from "@/articles/standing-body-belays-figures";
+import { linearScale } from "@/lib/math";
 
 /*
  * The safety factor holding still against the stretcher's weight, on dry and wet painted steel, for one belayer of
@@ -18,8 +19,8 @@ const W = 480;
 const H = 300;
 const PLOT = { left: 44, right: W - 48, top: 28, bottom: H - 44 };
 
-const x = (kg: number) => PLOT.left + ((kg - MASS.from) / (MASS.to - MASS.from)) * (PLOT.right - PLOT.left);
-const y = (sf: number) => PLOT.bottom - ((sf - SAFETY.from) / (SAFETY.to - SAFETY.from)) * (PLOT.bottom - PLOT.top);
+const x = linearScale([MASS.from, MASS.to], [PLOT.left, PLOT.right]);
+const y = linearScale([SAFETY.from, SAFETY.to], [PLOT.bottom, PLOT.top]);
 
 const path = (points: [number, number][]) =>
   points.map(([kg, sf], i) => `${i ? "L" : "M"}${x(kg).toFixed(1)},${y(sf).toFixed(1)}`).join(" ");

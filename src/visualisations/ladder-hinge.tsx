@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { AngleArc, Arrow, Label, add, deg, len, scale, vec, type Vec } from "@/components/diagram/svg";
+import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
+import { G } from "@/lib/constants";
+import { clamp, deg } from "@/lib/math";
+import { Vector2, vec2 } from "@/lib/vector2";
 import { Separator } from "@/components/ui/separator";
 import { Choice, RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { solveHeld, solveLevel } from "./ladder-hinge-held";
@@ -21,7 +24,6 @@ const COLORS = {
 
 type LadderMode = "free" | "level";
 
-const G = 9.81;
 const MAX_ARROW = 200;
 const BAR_LENGTH = 2;
 /** The beam, and the cable's attachment point on it, must reach at least this far past the wall height. */
@@ -50,14 +52,8 @@ const BELOW_GROUND = 0.4;
 const ABOVE_TOP = 0.3;
 
 /** The total of some contact forces, or null if there are none. */
-const sumForces = (contacts: { force: Vec }[]) =>
-  contacts.length ? contacts.reduce((sum, c) => add(sum, c.force), vec(0, 0)) : null;
-
-/** Clamp an arrow's drawn length so very large forces stay on screen. */
-const clampLen = (v: Vec) => {
-  const l = len(v);
-  return l > MAX_ARROW ? scale(v, MAX_ARROW / l) : v;
-};
+const sumForces = (contacts: { force: Vector2 }[]) =>
+  contacts.length ? contacts.reduce((sum, c) => sum.add(c.force), Vector2.ZERO) : null;
 
 /**
  * A ladder hinged at the base of a wall, with a 2 m stretcher hanging from it: a rope from the wall holds one
@@ -140,7 +136,7 @@ export default function LadderHinge() {
   const underrun =
     levelPhi === null
       ? 0
-      : Math.max(0, Math.min(1, (Math.min(takeHoldBelow, maxTakeHold) - deg(levelPhi)) / UNDERRUN_OVER));
+      : clamp((Math.min(takeHoldBelow, maxTakeHold) - deg(levelPhi)) / UNDERRUN_OVER, 0, 1);
   const needFree = underrun < 1;
   const free = useMemo(() => (needFree ? solve({ ...setup, wallCable: cable }) : null), [needFree, setup, cable]);
   const freePhi = free?.kind === "raised" ? free.eq.phi : free?.kind === "hinged" ? free.h.phi : null;
@@ -163,8 +159,8 @@ export default function LadderHinge() {
 
   // --- Drawing ---
   const k = 110 / Math.max(beamWeight + barWeight, 1); // px per newton
-  const force = (f: Vec) => clampLen(vec(f.x * k, -f.y * k));
-  const tag = (name: string, f: Vec) => (len(f) * k > MAX_ARROW ? `${name} ≫` : name);
+  const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
+  const tag = (name: string, f: Vector2) => (f.len() * k > MAX_ARROW ? `${name} ≫` : name);
 
   // The wall is drawn just thick enough to carry the cable anchor on its back edge (only its face and top
   // matter to the physics). The drawing spans from the back of the wall to the tip of the beam lying flat,
@@ -172,13 +168,13 @@ export default function LadderHinge() {
   // only on the setup, not the wall cable, so the drawing stays still while that slider moves.
   const PPM = W / (anchorBack + beamLength + BEAM_THICKNESS / 2); // SVG units per metre
   const H = Math.round((Math.max(beamLength, wallHeight + anchorUp) + ABOVE_TOP + BELOW_GROUND) * PPM);
-  const origin = vec(anchorBack * PPM, H - BELOW_GROUND * PPM); // hinge, at the base of the wall's front face
+  const origin = vec2(anchorBack * PPM, H - BELOW_GROUND * PPM); // hinge, at the base of the wall's front face
   /** World (metres, y up) → SVG (y down). */
-  const toSvg = (p: Vec): Vec => vec(origin.x + p.x * PPM, origin.y - p.y * PPM);
+  const toSvg = (p: Vector2): Vector2 => vec2(origin.x + p.x * PPM, origin.y - p.y * PPM);
 
-  const O = toSvg(vec(0, 0));
-  const wallS = toSvg(vec(0, wallHeight));
-  const anchorS = toSvg(vec(-anchorBack, wallHeight + anchorUp));
+  const O = toSvg(Vector2.ZERO);
+  const wallS = toSvg(vec2(0, wallHeight));
+  const anchorS = toSvg(vec2(-anchorBack, wallHeight + anchorUp));
 
   const ground = (
     <>
@@ -205,13 +201,13 @@ export default function LadderHinge() {
     </>
   );
 
-  const cablePath = (pts: Vec[]) =>
+  const cablePath = (pts: Vector2[]) =>
     pts
       .map(toSvg)
       .map((p) => `${p.x},${p.y}`)
       .join(" ");
   const beamLine = (phi: number) => {
-    const tipS = toSvg(scale(vec(Math.cos(phi), Math.sin(phi)), beamLength));
+    const tipS = toSvg(Vector2.fromAngle(phi, beamLength));
     const angle = deg(phi);
     return (
       <>
@@ -231,7 +227,7 @@ export default function LadderHinge() {
       </>
     );
   };
-  const barLine = (a: Vec, b: Vec) => (
+  const barLine = (a: Vector2, b: Vector2) => (
     <line
       x1={a.x}
       y1={a.y}
@@ -242,20 +238,20 @@ export default function LadderHinge() {
       strokeLinecap="round"
     />
   );
-  const hingeArrows = (R: Vec) => (
+  const hingeArrows = (R: Vector2) => (
     <>
       <Arrow from={O} v={force(R)} color={COLORS.hinge} label={tag("R", R)} />
       {showComponents && (
         <>
-          <Arrow from={O} v={force(vec(R.x, 0))} color={COLORS.component} dashed width={1.5} label="Rx" />
-          <Arrow from={O} v={force(vec(0, R.y))} color={COLORS.component} dashed width={1.5} label="Ry" />
+          <Arrow from={O} v={force(vec2(R.x, 0))} color={COLORS.component} dashed width={1.5} label="Rx" />
+          <Arrow from={O} v={force(vec2(0, R.y))} color={COLORS.component} dashed width={1.5} label="Ry" />
         </>
       )}
     </>
   );
-  const hingeReadouts = (R: Vec | null) => (
+  const hingeReadouts = (R: Vector2 | null) => (
     <>
-      <Readout label="Force on ladder's foot R" value={R ? `${len(R).toFixed(0)} N` : NONE} color={COLORS.hinge} />
+      <Readout label="Force on ladder's foot R" value={R ? `${R.len().toFixed(0)} N` : NONE} color={COLORS.hinge} />
       {showComponents && (
         <Readout
           label="  Rx, Ry"
@@ -267,23 +263,23 @@ export default function LadderHinge() {
     </>
   );
   /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
-  const tensionArrow = (name: "T₁" | "T₂", at: Vec, t: Vec, color: string) => (
+  const tensionArrow = (name: "T₁" | "T₂", at: Vector2, t: Vector2, color: string) => (
     <>
       <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
       {showComponents && (
         <>
-          <Arrow from={at} v={force(vec(t.x, 0))} color={COLORS.component} dashed width={1.5} label={`${name}x`} />
-          <Arrow from={at} v={force(vec(0, t.y))} color={COLORS.component} dashed width={1.5} label={`${name}y`} />
+          <Arrow from={at} v={force(vec2(t.x, 0))} color={COLORS.component} dashed width={1.5} label={`${name}x`} />
+          <Arrow from={at} v={force(vec2(0, t.y))} color={COLORS.component} dashed width={1.5} label={`${name}y`} />
         </>
       )}
     </>
   );
   /** `t` is null when there's no solution; `slack` when the cable carries nothing. */
-  const tensionReadouts = (name: "T₁" | "T₂", cable: string, t: Vec | "slack" | null, color: string) => (
+  const tensionReadouts = (name: "T₁" | "T₂", cable: string, t: Vector2 | "slack" | null, color: string) => (
     <>
       <Readout
         label={`Tension, ${cable} ${name}`}
-        value={t === "slack" ? "slack" : t ? `${len(t).toFixed(0)} N` : NONE}
+        value={t === "slack" ? "slack" : t ? `${t.len().toFixed(0)} N` : NONE}
         color={color}
       />
       {showComponents && (
@@ -295,7 +291,7 @@ export default function LadderHinge() {
       )}
     </>
   );
-  const wallOnBeamArrow = (w: { point: Vec; force: Vec } | null) =>
+  const wallOnBeamArrow = (w: { point: Vector2; force: Vector2 } | null) =>
     w && (
       <Arrow from={toSvg(w.point)} v={force(w.force)} color={COLORS.contact} label={tag("N wall", w.force)} width={2} />
     );
@@ -306,7 +302,7 @@ export default function LadderHinge() {
     const attachS = toSvg(eq.beamAttach);
     const end1S = toSvg(eq.barEnd1);
     const end2S = toSvg(eq.barEnd2);
-    const barCentreS = toSvg(scale(add(eq.barEnd1, eq.barEnd2), 0.5));
+    const barCentreS = toSvg(eq.barEnd1.add(eq.barEnd2).scale(0.5));
 
     diagram = (
       <>
@@ -325,7 +321,7 @@ export default function LadderHinge() {
         {barLine(end1S, end2S)}
 
         {/* forces on the hanging beam */}
-        <Arrow from={barCentreS} v={force(vec(0, -barWeight))} color={COLORS.bar} label="W" />
+        <Arrow from={barCentreS} v={force(vec2(0, -barWeight))} color={COLORS.bar} label="W" />
         {tensionArrow("T₁", end1S, eq.t1, COLORS.tensionWall)}
         {tensionArrow("T₂", end2S, eq.t2, COLORS.tensionBeam)}
         {eq.contacts.map((c) => (
@@ -364,7 +360,7 @@ export default function LadderHinge() {
           strokeLinejoin="round"
         />
         {!h.cableTaut && (
-          <Label at={add(scale(add(wallPath[last - 1], wallPath[last]), 0.5), vec(0, -14))} color="#94a3b8">
+          <Label at={wallPath[last - 1].add(wallPath[last]).scale(0.5).add(vec2(0, -14))} color="#94a3b8">
             slack
           </Label>
         )}
@@ -381,14 +377,14 @@ export default function LadderHinge() {
         {barLine(end1S, end2S)}
 
         <Arrow
-          from={toSvg(scale(add(h.barEnd1, h.barEnd2), 0.5))}
-          v={force(vec(0, -barWeight))}
+          from={toSvg(h.barEnd1.add(h.barEnd2).scale(0.5))}
+          v={force(vec2(0, -barWeight))}
           color={COLORS.bar}
           label="W"
         />
         {h.cableTaut && tensionArrow("T₁", end1S, h.t1, COLORS.tensionWall)}
-        {len(h.t2) > 1e-6 && tensionArrow("T₂", end2S, h.t2, COLORS.tensionBeam)}
-        {len(h.beamPush) > 1e-6 && (
+        {h.t2.len() > 1e-6 && tensionArrow("T₂", end2S, h.t2, COLORS.tensionBeam)}
+        {h.beamPush.len() > 1e-6 && (
           <Arrow
             from={toSvg(h.supportAt)}
             v={force(h.beamPush)}
@@ -414,7 +410,7 @@ export default function LadderHinge() {
     const h = sol.h;
     const end1S = toSvg(h.barEnd1);
     const end2S = toSvg(h.barEnd2);
-    const cableLine = (pts: Vec[], taut: boolean) => (
+    const cableLine = (pts: Vector2[], taut: boolean) => (
       <polyline
         points={cablePath(pts)}
         fill="none"
@@ -434,8 +430,8 @@ export default function LadderHinge() {
         {barLine(end1S, end2S)}
 
         <Arrow
-          from={toSvg(scale(add(h.barEnd1, h.barEnd2), 0.5))}
-          v={force(vec(0, -barWeight))}
+          from={toSvg(h.barEnd1.add(h.barEnd2).scale(0.5))}
+          v={force(vec2(0, -barWeight))}
           color={COLORS.bar}
           label="W"
         />
@@ -485,11 +481,11 @@ export default function LadderHinge() {
       ? {
           phi: sol.eq.phi,
           tilt: Math.atan2(sol.eq.barEnd2.y - sol.eq.barEnd1.y, sol.eq.barEnd2.x - sol.eq.barEnd1.x),
-          t1: sol.eq.t1 as Vec | "slack",
-          t2: sol.eq.t2 as Vec | "slack",
-          hinge: sol.eq.hinge as Vec | null,
+          t1: sol.eq.t1 as Vector2 | "slack",
+          t2: sol.eq.t2 as Vector2 | "slack",
+          hinge: sol.eq.hinge as Vector2 | null,
           wallOnBeam: sol.eq.wallOnBeam,
-          beamPush: null as Vec | null,
+          beamPush: null as Vector2 | null,
           contacts: sol.eq.contacts,
         }
       : sol.kind === "hinged"
@@ -497,7 +493,7 @@ export default function LadderHinge() {
             phi: sol.h.phi,
             tilt: sol.h.angle,
             t1: sol.h.cableTaut ? sol.h.t1 : ("slack" as const),
-            t2: len(sol.h.t2) > 1e-6 ? sol.h.t2 : ("slack" as const),
+            t2: sol.h.t2.len() > 1e-6 ? sol.h.t2 : ("slack" as const),
             hinge: sol.h.hinge,
             wallOnBeam: sol.h.wallOnBeam,
             beamPush: sol.h.beamPush,
@@ -683,12 +679,12 @@ export default function LadderHinge() {
           <Readout label="Ground team's hold F" value={hold ? `${holdPush.toFixed(0)} N` : NONE} color={COLORS.hold} />
           <Readout
             label="Wall's edge on ladder N"
-            value={view?.wallOnBeam ? `${len(view.wallOnBeam.force).toFixed(0)} N` : NONE}
+            value={view?.wallOnBeam ? `${view.wallOnBeam.force.len().toFixed(0)} N` : NONE}
             color={COLORS.contact}
           />
           <Readout
             label="Ladder on stretcher N"
-            value={view?.beamPush ? `${len(view.beamPush).toFixed(0)} N` : NONE}
+            value={view?.beamPush ? `${view.beamPush.len().toFixed(0)} N` : NONE}
             color={COLORS.contact}
           />
           {(["ground", "wall", "top", "edge"] as const).map((surface) => {
@@ -697,7 +693,7 @@ export default function LadderHinge() {
               <Readout
                 key={surface}
                 label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on stretcher N`}
-                value={f ? `${len(f).toFixed(0)} N` : NONE}
+                value={f ? `${f.len().toFixed(0)} N` : NONE}
                 color={COLORS.contact}
               />
             );

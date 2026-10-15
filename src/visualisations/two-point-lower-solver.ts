@@ -1,6 +1,7 @@
-import { add, cross, len, scale, sub, unit, vec, type Vec } from "@/lib/vec";
+import { centralDifferences, gridMinima, leastSquares, nelderMead } from "@/lib/numeric";
+import { Vector2, vec2 } from "@/lib/vector2";
 import { behindFaceFor, ropePathFor } from "./ladder-hinge-held";
-import { nelderMead, solveLinear, type Surface } from "./ladder-hinge-solver";
+import type { Surface } from "./ladder-hinge-solver";
 
 /**
  * A two-point lower: a stretcher lowered over a wall on a rope from an anchor behind the wall's top (wrapping
@@ -38,23 +39,23 @@ export const TEAM_HEIGHT = 1;
  */
 export const TEAM_REACH = 1;
 
-export type Contact = { surface: Surface; point: Vec; force: Vec };
+export type Contact = { surface: Surface; point: Vector2; force: Vector2 };
 
 export type Lowered = {
-  anchor: Vec;
+  anchor: Vector2;
   /** The wall's top edge, when the rope wraps over it. */
-  wrapEdge: Vec | null;
-  team: Vec;
+  wrapEdge: Vector2 | null;
+  team: Vector2;
   /** The wall's top edge, when the line wraps over it to a stretcher end on the wall top. */
-  lineEdge: Vec | null;
-  barEnd1: Vec; // on the rope
-  barEnd2: Vec; // on the line
+  lineEdge: Vector2 | null;
+  barEnd1: Vector2; // on the rope
+  barEnd2: Vector2; // on the line
   /** The stretcher's slope, from −90° to 90°: positive when its line end is the higher. */
   tilt: number;
   ropeTaut: boolean;
-  t1: Vec;
+  t1: Vector2;
   /** The line's pull on the stretcher: the team's steady pull along its last run, or less once they hold its end. */
-  t2: Vec;
+  t2: Vector2;
   /** The stretcher's end has reached the team, who hold it rather than haul it in (the line may hang slack). */
   teamHolding: boolean;
   contacts: Contact[];
@@ -65,11 +66,7 @@ export type LowerResult = { kind: "lowered"; l: Lowered } | { kind: "none"; reas
 type Kind = "rope" | "team" | Surface;
 
 /** One constraint, g ≤ 0, whose force on the stretcher pushes along m at the stretcher's point `at`. */
-type Piece = { key: string; kind: Kind; g: number; at: Vec; m: Vec };
-
-const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
-
-const safeUnit = (v: Vec, fallback: Vec) => (len(v) > 1e-12 ? unit(v) : fallback);
+type Piece = { key: string; kind: Kind; g: number; at: Vector2; m: Vector2 };
 
 /** The shortest rope that just lets the stretcher, lying on the wall top, reach its edge. */
 export const minRope = (s: Pick<Setup, "anchorUp" | "anchorBack" | "barLength">) =>
@@ -77,15 +74,15 @@ export const minRope = (s: Pick<Setup, "anchorUp" | "anchorBack" | "barLength">)
 
 /** The longest rope: the stretcher lying on the ground, its line end TEAM_REACH short of the team (along the ground). */
 export const maxRope = (s: Setup) =>
-  ropePathFor(s, vec(Math.max(0, s.teamDistance - TEAM_REACH - s.barLength), 0)).length;
+  ropePathFor(s, vec2(Math.max(0, s.teamDistance - TEAM_REACH - s.barLength), 0)).length;
 
 /** The line's path from the team to p: straight, or over the wall's edge to a stretcher end on the wall top. */
-export function linePathFor(s: Setup, p: Vec): { length: number; via: Vec | null } {
-  const team = vec(s.teamDistance, TEAM_HEIGHT);
-  const edge = vec(0, s.wallHeight);
-  return behindFaceFor(s, p) && cross(sub(edge, team), sub(p, team)) > 0
-    ? { length: len(sub(edge, team)) + len(sub(p, edge)), via: edge }
-    : { length: len(sub(p, team)), via: null };
+export function linePathFor(s: Setup, p: Vector2): { length: number; via: Vector2 | null } {
+  const team = vec2(s.teamDistance, TEAM_HEIGHT);
+  const edge = vec2(0, s.wallHeight);
+  return behindFaceFor(s, p) && edge.sub(team).cross(p.sub(team)) > 0
+    ? { length: edge.distanceTo(team) + p.distanceTo(edge), via: edge }
+    : { length: p.distanceTo(team), via: null };
 }
 
 export function solveLower(s: Setup): LowerResult {
@@ -93,18 +90,18 @@ export function solveLower(s: Setup): LowerResult {
   const W = s.barWeight;
   const T = Math.max(0, s.teamPull);
   const half = s.barLength / 2;
-  const anchor = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const edge = vec(0, s.wallHeight);
-  const team = vec(s.teamDistance, TEAM_HEIGHT);
+  const anchor = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec2(0, s.wallHeight);
+  const team = vec2(s.teamDistance, TEAM_HEIGHT);
 
-  const ends = (q: number[]): [Vec, Vec] => {
-    const d = vec(Math.cos(q[2]), Math.sin(q[2]));
-    const c = vec(q[0], q[1]);
-    return [sub(c, scale(d, half)), add(c, scale(d, half))];
+  const ends = (q: number[]): [Vector2, Vector2] => {
+    const d = Vector2.fromAngle(q[2]);
+    const c = vec2(q[0], q[1]);
+    return [c.sub(d.scale(half)), c.add(d.scale(half))];
   };
 
   /** The team's pull on the stretcher's end, per newton: along the line's last run. */
-  const lineDir = (P2: Vec) => safeUnit(sub(linePathFor(s, P2).via ?? team, P2), vec(1, 0));
+  const lineDir = (P2: Vector2) => (linePathFor(s, P2).via ?? team).sub(P2).safeUnit(vec2(1, 0));
 
   const pieces = (q: number[]): Piece[] => {
     const [P1, P2] = ends(q);
@@ -115,33 +112,33 @@ export function solveLower(s: Setup): LowerResult {
       kind: "rope",
       g: path.length - s.rope,
       at: P1,
-      m: safeUnit(sub(path.wrapEdge ?? anchor, P1), unit(sub(anchor, P1))),
+      m: (path.wrapEdge ?? anchor).sub(P1).safeUnit(anchor.sub(P1).unit()),
     });
     // At the team's reach they hold the end where it is, easing their pull: a push back along the line, up to
     // their whole pull. Nearer, the line hangs slack (see `pull`), so this is never pushed against like a contact.
-    out.push({ key: "team", kind: "team", g: TEAM_REACH - len(sub(P2, team)), at: P2, m: scale(lineDir(P2), -1) });
+    out.push({ key: "team", kind: "team", g: TEAM_REACH - P2.distanceTo(team), at: P2, m: lineDir(P2).neg() });
     for (const [i, P] of [P1, P2].entries()) {
-      out.push({ key: `ground${i}`, kind: "ground", g: -P.y, at: P, m: vec(0, 1) });
+      out.push({ key: `ground${i}`, kind: "ground", g: -P.y, at: P, m: vec2(0, 1) });
       // The wall's signed distance: inside, out through the nearer of the face and the top.
       const h = s.wallHeight;
       const wall: Omit<Piece, "key" | "at"> =
         P.x < 0 && P.y < h
           ? h - P.y < -P.x
-            ? { kind: "top", g: h - P.y, m: vec(0, 1) }
-            : { kind: "wall", g: -P.x, m: vec(1, 0) }
+            ? { kind: "top", g: h - P.y, m: vec2(0, 1) }
+            : { kind: "wall", g: -P.x, m: vec2(1, 0) }
           : P.x >= 0 && P.y >= h
-            ? { kind: "edge", g: -len(sub(P, edge)), m: safeUnit(sub(P, edge), vec(0, 1)) }
+            ? { kind: "edge", g: -P.distanceTo(edge), m: P.sub(edge).safeUnit(vec2(0, 1)) }
             : P.x >= 0
-              ? { kind: "wall", g: -P.x, m: vec(1, 0) }
-              : { kind: "top", g: h - P.y, m: vec(0, 1) };
+              ? { kind: "wall", g: -P.x, m: vec2(1, 0) }
+              : { kind: "top", g: h - P.y, m: vec2(0, 1) };
       out.push({ key: `wall${i}`, at: P, ...wall });
     }
     // Spanning the wall's face, the stretcher must pass above its top edge.
     if (behindFaceFor(s, P1) !== behindFaceFor(s, P2)) {
-      const d = unit(sub(P2, P1));
-      const up = d.x > 0 ? vec(-d.y, d.x) : vec(d.y, -d.x);
-      const at = add(P1, scale(d, dot(sub(edge, P1), d)));
-      out.push({ key: "corner", kind: "edge", g: dot(sub(edge, P1), up), at, m: up });
+      const d = P2.sub(P1).unit();
+      const up = d.x > 0 ? d.perp() : d.perp().neg();
+      const at = P1.add(d.scale(edge.sub(P1).dot(d)));
+      out.push({ key: "corner", kind: "edge", g: edge.sub(P1).dot(up), at, m: up });
     }
     return out;
   };
@@ -149,11 +146,11 @@ export function solveLower(s: Setup): LowerResult {
   /** The team's pull on the stretcher: steady while the end is out of reach, nothing once it's within it. */
   const pull = (q: number[], holding: boolean) => {
     const P2 = ends(q)[1];
-    return holding || linePathFor(s, P2).length > TEAM_REACH ? scale(lineDir(P2), T) : vec(0, 0);
+    return holding || linePathFor(s, P2).length > TEAM_REACH ? lineDir(P2).scale(T) : Vector2.ZERO;
   };
 
   /** A force's push on the stretcher per newton: its x and y, and its torque about the centre. */
-  const generalised = (at: Vec, m: Vec, q: number[]) => [m.x, m.y, cross(sub(at, vec(q[0], q[1])), m)];
+  const generalised = (at: Vector2, m: Vector2, q: number[]) => [m.x, m.y, at.sub(vec2(q[0], q[1])).cross(m)];
 
   const penalised = (k: number) => (q: number[]) => {
     const P2 = ends(q)[1];
@@ -168,13 +165,13 @@ export function solveLower(s: Setup): LowerResult {
   // from the wall's edge), with the stretcher at a spread of angles.
   const nTheta = 24;
   const nA = 24;
-  const toEdge = len(sub(edge, anchor));
+  const toEdge = edge.distanceTo(anchor);
   const startAt = (from: number, i: number, j: number) => {
     const theta = -Math.PI + (2 * Math.PI * (i + 0.5)) / nTheta;
     const a = (2 * Math.PI * j) / nA;
-    const dir = vec(Math.cos(a), Math.sin(a));
-    const P1 = from === 0 ? add(anchor, scale(dir, s.rope * 0.999)) : add(edge, scale(dir, (s.rope - toEdge) * 0.999));
-    const c = add(P1, scale(vec(Math.cos(theta), Math.sin(theta)), half));
+    const dir = Vector2.fromAngle(a);
+    const P1 = from === 0 ? anchor.add(dir.scale(s.rope * 0.999)) : edge.add(dir.scale((s.rope - toEdge) * 0.999));
+    const c = P1.add(Vector2.fromAngle(theta, half));
     return [c.x, c.y, theta];
   };
   const soft = penalised(1e4 * W);
@@ -184,21 +181,7 @@ export function solveLower(s: Setup): LowerResult {
     const grid = Array.from({ length: nTheta }, (_, i) =>
       Array.from({ length: nA }, (_, j) => soft(startAt(from, i, j))),
     );
-    for (let i = 0; i < nTheta; i++) {
-      for (let j = 0; j < nA; j++) {
-        const e = grid[i][j];
-        let isMin = true;
-        for (let di = -1; di <= 1 && isMin; di++) {
-          for (let dj = -1; dj <= 1; dj++) {
-            if ((di || dj) && grid[(i + di + nTheta) % nTheta][(j + dj + nA) % nA] < e) {
-              isMin = false;
-              break;
-            }
-          }
-        }
-        if (isMin) starts.push({ q: startAt(from, i, j), e });
-      }
-    }
+    for (const { i, j, e } of gridMinima(grid)) starts.push({ q: startAt(from, i, j), e });
   }
   starts.sort((a, b) => a.e - b.e);
   // An end caught on the wall's corner is a resting place of its own that the grid can miss: start from each
@@ -207,7 +190,7 @@ export function solveLower(s: Setup): LowerResult {
     .flatMap((end) =>
       Array.from({ length: nTheta }, (_, i) => {
         const theta = -Math.PI + (2 * Math.PI * (i + 0.5)) / nTheta;
-        const c = add(edge, scale(vec(Math.cos(theta), Math.sin(theta)), end === 0 ? half : -half));
+        const c = edge.add(Vector2.fromAngle(theta, end === 0 ? half : -half));
         const q = [c.x, c.y + 1e-3, theta];
         return { q, e: soft(q) };
       })
@@ -249,13 +232,13 @@ export function solveLower(s: Setup): LowerResult {
   const final = pieces(q);
 
   const [P1, P2] = ends(q);
-  const forceOf = (p: Piece) => scale(p.m, Math.max(0, lambda.get(p.key) ?? 0));
+  const forceOf = (p: Piece) => p.m.scale(Math.max(0, lambda.get(p.key) ?? 0));
   const byKey = new Map(final.map((p) => [p.key, p]));
   const t1 = forceOf(byKey.get("rope")!);
   const holding = lambda.has("team");
-  const t2 = add(pull(q, holding), forceOf(byKey.get("team")!));
+  const t2 = pull(q, holding).add(forceOf(byKey.get("team")!));
   const contacts = final
-    .filter((p) => p.kind !== "rope" && p.kind !== "team" && len(forceOf(p)) > 1e-9)
+    .filter((p) => p.kind !== "rope" && p.kind !== "team" && forceOf(p).len() > 1e-9)
     .map((p) => ({ surface: p.kind as Surface, point: p.at, force: forceOf(p) }));
 
   return {
@@ -268,7 +251,7 @@ export function solveLower(s: Setup): LowerResult {
       barEnd1: P1,
       barEnd2: P2,
       tilt: Math.atan2(P2.y - P1.y, Math.abs(P2.x - P1.x)),
-      ropeTaut: len(t1) > 1e-9,
+      ropeTaut: t1.len() > 1e-9,
       t1,
       t2,
       teamHolding: holding || linePathFor(s, P2).length < TEAM_REACH,
@@ -332,10 +315,7 @@ export function solveLower(s: Setup): LowerResult {
     let l =
       m === 0
         ? []
-        : (solveLinear(
-            cols.map((a, i) => cols.map((b, k) => a.reduce((sum, v, j) => sum + v * b[j], 0) + (i === k ? 1e-9 : 0))),
-            cols.map((a) => a.reduce((sum, v, j) => sum + v * rhs[j], 0)),
-          ) ?? keys.map(() => 0));
+        : (leastSquares([0, 1, 2].map((j) => cols.map((c) => c[j])), rhs, 1e-9) ?? keys.map(() => 0));
     let q = [...q0];
     for (let iter = 0; iter < 40; iter++) {
       const r = residual(q, l);
@@ -343,27 +323,12 @@ export function solveLower(s: Setup): LowerResult {
       const size = Math.max(...r.map(Math.abs));
       if (size < 1e-9 * W) return { q, lambda: new Map(keys.map((k, i) => [k, l[i]])) };
       // Jacobian: numerically in the position, exactly in the forces (the balance is linear in them).
-      const n = 3 + m;
-      const J = Array.from({ length: r.length }, () => new Array(n).fill(0));
-      for (let j = 0; j < 3; j++) {
-        const step = j < 2 ? 1e-7 : 1e-7 / half;
-        const qp = q.map((v, k) => (k === j ? v + step : v));
-        const qm = q.map((v, k) => (k === j ? v - step : v));
-        const rp = residual(qp, l);
-        const rm = residual(qm, l);
-        if (!rp || !rm) return null;
-        for (let i = 0; i < r.length; i++) J[i][j] = (rp[i] - rm[i]) / (2 * step);
-      }
-      at(q).forEach((p, i) => generalised(p!.at, p!.m, q).forEach((v, j) => (J[j][3 + i] = v)));
+      const dq = centralDifferences((q) => residual(q, l), q, [1e-7, 1e-7, 1e-7 / half]);
+      if (!dq) return null;
+      const forces = at(q).map((p) => generalised(p!.at, p!.m, q));
+      const J = dq.map((row, j) => [...row, ...forces.map((f) => (j < 3 ? f[j] : 0))]);
       // Least squares (square and well-posed in the usual case; more contacts than freedoms otherwise).
-      const JtJ = Array.from({ length: n }, (_, a) =>
-        Array.from(
-          { length: n },
-          (_, b) => J.reduce((sum, row) => sum + row[a] * row[b], 0) + (a === b ? 1e-12 * W * W : 0),
-        ),
-      );
-      const Jtr = Array.from({ length: n }, (_, a) => -J.reduce((sum, row, i) => sum + row[a] * r[i], 0));
-      const dx = solveLinear(JtJ, Jtr);
+      const dx = leastSquares(J, r.map((v) => -v), 1e-12 * W * W);
       if (!dx) return null;
       q = q.map((v, j) => v + dx[j]);
       l = l.map((v, i) => v + dx[3 + i]);

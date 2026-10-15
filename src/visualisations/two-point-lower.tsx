@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { Arrow, Label, add, deg, len, scale, sub, unit, vec, type Vec } from "@/components/diagram/svg";
+import { Arrow, Label } from "@/components/diagram/svg";
+import { G } from "@/lib/constants";
+import { deg } from "@/lib/math";
+import { Vector2, vec2 } from "@/lib/vector2";
 import { Separator } from "@/components/ui/separator";
 import { RawValues, Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { TwoPointLowerNotes } from "./two-point-lower-notes";
@@ -16,7 +19,6 @@ const COLORS = {
   team: "#a3e635",
 };
 
-const G = 9.81;
 const MAX_ARROW = 200;
 const BAR_LENGTH = 2;
 const BAR_THICKNESS = 0.08;
@@ -33,11 +35,6 @@ const ABOVE_TOP = 0.3;
 /** Room past the team, so their marker and label fit. */
 const PAST_TEAM = 0.4;
 
-/** Clamp an arrow's drawn length so very large forces stay on screen. */
-const clampLen = (v: Vec) => {
-  const l = len(v);
-  return l > MAX_ARROW ? scale(v, MAX_ARROW / l) : v;
-};
 
 /**
  * A two-point lower: a 2 m stretcher lowered over a wall on a rope from an anchor behind its top, with a line
@@ -76,8 +73,8 @@ export default function TwoPointLower() {
 
   // --- Drawing ---
   const k = 110 / Math.max(barWeight, 1); // px per newton
-  const force = (f: Vec) => clampLen(vec(f.x * k, -f.y * k));
-  const tag = (name: string, f: Vec) => (len(f) * k > MAX_ARROW ? `${name} ≫` : name);
+  const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
+  const tag = (name: string, f: Vector2) => (f.len() * k > MAX_ARROW ? `${name} ≫` : name);
 
   // The wall is drawn just thick enough to carry the rope's anchor on its back edge (only its face and top
   // matter to the physics). The drawing spans from the back of the wall to just past the team, and from just
@@ -85,15 +82,15 @@ export default function TwoPointLower() {
   // that slider moves.
   const PPM = W / (anchorBack + teamDistance + PAST_TEAM); // SVG units per metre
   const H = Math.round((wallHeight + anchorUp + ABOVE_TOP + BELOW_GROUND) * PPM);
-  const origin = vec(anchorBack * PPM, H - BELOW_GROUND * PPM); // the base of the wall's face
+  const origin = vec2(anchorBack * PPM, H - BELOW_GROUND * PPM); // the base of the wall's face
   /** World (metres, y up) → SVG (y down). */
-  const toSvg = (p: Vec): Vec => vec(origin.x + p.x * PPM, origin.y - p.y * PPM);
+  const toSvg = (p: Vector2): Vector2 => vec2(origin.x + p.x * PPM, origin.y - p.y * PPM);
 
-  const O = toSvg(vec(0, 0));
-  const wallS = toSvg(vec(0, wallHeight));
-  const anchorS = toSvg(vec(-anchorBack, wallHeight + anchorUp));
-  const teamFootS = toSvg(vec(teamDistance, 0));
-  const teamS = toSvg(vec(teamDistance, TEAM_HEIGHT));
+  const O = toSvg(Vector2.ZERO);
+  const wallS = toSvg(vec2(0, wallHeight));
+  const anchorS = toSvg(vec2(-anchorBack, wallHeight + anchorUp));
+  const teamFootS = toSvg(vec2(teamDistance, 0));
+  const teamS = toSvg(vec2(teamDistance, TEAM_HEIGHT));
 
   const scene = (
     <>
@@ -128,13 +125,13 @@ export default function TwoPointLower() {
         strokeLinecap="round"
       />
       <circle cx={teamS.x} cy={teamS.y} r={5} fill={COLORS.team} />
-      <Label at={add(teamFootS, vec(0, 20))} color={COLORS.team}>
+      <Label at={teamFootS.add(vec2(0, 20))} color={COLORS.team}>
         team
       </Label>
     </>
   );
 
-  const cableLine = (pts: Vec[], taut: boolean) => (
+  const cableLine = (pts: Vector2[], taut: boolean) => (
     <polyline
       points={pts
         .map(toSvg)
@@ -148,13 +145,13 @@ export default function TwoPointLower() {
     />
   );
   /** A pull on the stretcher, with its x/y components when they're shown. */
-  const tensionArrow = (name: "T₁" | "T₂", at: Vec, t: Vec, color: string) => (
+  const tensionArrow = (name: "T₁" | "T₂", at: Vector2, t: Vector2, color: string) => (
     <>
       <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
       {showComponents && (
         <>
-          <Arrow from={at} v={force(vec(t.x, 0))} color={COLORS.component} dashed width={1.5} label={`${name}x`} />
-          <Arrow from={at} v={force(vec(0, t.y))} color={COLORS.component} dashed width={1.5} label={`${name}y`} />
+          <Arrow from={at} v={force(vec2(t.x, 0))} color={COLORS.component} dashed width={1.5} label={`${name}x`} />
+          <Arrow from={at} v={force(vec2(0, t.y))} color={COLORS.component} dashed width={1.5} label={`${name}y`} />
         </>
       )}
     </>
@@ -167,14 +164,14 @@ export default function TwoPointLower() {
     const end2S = toSvg(l.barEnd2);
     const ropePath = [l.anchor, ...(l.wrapEdge ? [l.wrapEdge] : []), l.barEnd1];
     const linePath = [l.team, ...(l.lineEdge ? [l.lineEdge] : []), l.barEnd2];
-    const lineTaut = len(l.t2) > 1e-6;
+    const lineTaut = l.t2.len() > 1e-6;
     diagram = (
       <>
         {scene}
         {cableLine(ropePath, l.ropeTaut)}
         {cableLine(linePath, lineTaut)}
         {!l.ropeTaut && (
-          <Label at={add(scale(add(toSvg(ropePath.at(-2)!), end1S), 0.5), vec(0, -14))} color="#94a3b8">
+          <Label at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))} color="#94a3b8">
             slack
           </Label>
         )}
@@ -188,8 +185,8 @@ export default function TwoPointLower() {
           strokeLinecap="round"
         />
         <Arrow
-          from={toSvg(scale(add(l.barEnd1, l.barEnd2), 0.5))}
-          v={force(vec(0, -barWeight))}
+          from={toSvg(l.barEnd1.add(l.barEnd2).scale(0.5))}
+          v={force(vec2(0, -barWeight))}
           color={COLORS.bar}
           label="W"
         />
@@ -214,7 +211,7 @@ export default function TwoPointLower() {
   /** The rope's push on the wall's edge as it wraps over it: its tension, pulling both ways round the edge. */
   const ropeOnEdge =
     view?.wrapEdge && view.ropeTaut
-      ? scale(add(unit(sub(view.anchor, view.wrapEdge)), unit(sub(view.barEnd1, view.wrapEdge))), len(view.t1))
+      ? view.anchor.sub(view.wrapEdge).unit().add(view.barEnd1.sub(view.wrapEdge).unit()).scale(view.t1.len())
       : null;
   // How far the stretcher hangs out from the wall's face, once it's over the edge and below the wall top.
   const nearest = view ? Math.min(view.barEnd1.x, view.barEnd2.x) : -1;
@@ -225,19 +222,19 @@ export default function TwoPointLower() {
 
   const sumForces = (surface: string) => {
     const cs = view?.contacts.filter((c) => c.surface === surface) ?? [];
-    return cs.length ? cs.reduce((sum, c) => add(sum, c.force), vec(0, 0)) : null;
+    return cs.length ? cs.reduce((sum, c) => sum.add(c.force), Vector2.ZERO) : null;
   };
-  const tensionReadouts = (name: "T₁" | "T₂", what: string, t: Vec | null, color: string) => (
+  const tensionReadouts = (name: "T₁" | "T₂", what: string, t: Vector2 | null, color: string) => (
     <>
       <Readout
         label={`Tension, ${what} ${name}`}
-        value={!view ? NONE : t && len(t) > 1e-6 ? `${len(t).toFixed(0)} N` : "slack"}
+        value={!view ? NONE : t && t.len() > 1e-6 ? `${t.len().toFixed(0)} N` : "slack"}
         color={color}
       />
       {showComponents && (
         <Readout
           label={`  ${name}x, ${name}y`}
-          value={t && len(t) > 1e-6 ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
+          value={t && t.len() > 1e-6 ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
           color={COLORS.component}
         />
       )}
@@ -342,7 +339,7 @@ export default function TwoPointLower() {
           />
           <Readout
             label="Rope on wall's edge"
-            value={ropeOnEdge ? `${len(ropeOnEdge).toFixed(0)} N` : NONE}
+            value={ropeOnEdge ? `${ropeOnEdge.len().toFixed(0)} N` : NONE}
             color={COLORS.rope}
           />
           {(["ground", "wall", "top", "edge"] as const).map((surface) => {
@@ -351,7 +348,7 @@ export default function TwoPointLower() {
               <Readout
                 key={surface}
                 label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on stretcher N`}
-                value={f ? `${len(f).toFixed(0)} N` : NONE}
+                value={f ? `${f.len().toFixed(0)} N` : NONE}
                 color={COLORS.contact}
               />
             );

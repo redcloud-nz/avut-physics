@@ -1,5 +1,8 @@
-import { Arrow, vec } from "@/components/diagram/svg";
+import { Arrow } from "@/components/diagram/svg";
 import { DEFAULTS, arrangement } from "@/articles/standing-body-belays-figures";
+import { G } from "@/lib/constants";
+import { newtons } from "@/lib/format";
+import { vec2 } from "@/lib/vector2";
 
 /*
  * The forces on one belayer in the common case, holding still, to scale in the plane of their rope: their weight,
@@ -7,19 +10,14 @@ import { DEFAULTS, arrangement } from "@/articles/standing-body-belays-figures";
  * prints in black on white.
  */
 
-const G = 9.81;
-
 /** SVG user units per metre of the belayer, and per newton of force. */
 const PER_METRE = 100;
 const PER_NEWTON = 0.1;
 /** Where their feet are. */
-const FEET = vec(230, 250);
+const FEET = vec2(230, 250);
 const BODY = 1.75;
 const WAIST = 1;
 const SHOULDER = 1.45;
-
-/** A force in newtons, to the nearest 10. */
-const newtons = (x: number) => `${Math.round(x / 10) * 10} N`;
 
 export function BelayerForcesDiagram() {
   const b = arrangement({ edgeFriction: 0 }).b;
@@ -28,18 +26,18 @@ export function BelayerForcesDiagram() {
   const grip = Math.hypot(b.ground.x, b.ground.z);
   const most = DEFAULTS.grip * up;
   // The rope's pull, seen in its own plane: towards the edge as hard as the boots grip, and a little down.
-  const pull = vec(grip, -b.pull.y);
-  const tension = Math.hypot(pull.x, pull.y);
+  const pull = vec2(grip, -b.pull.y);
+  const tension = pull.len();
 
   // Their body leans back, away from the edge (to the right), in line with the ground's push.
   const along = (d: number) =>
-    vec(FEET.x - d * PER_METRE * Math.sin(b.lean), FEET.y - d * PER_METRE * Math.cos(b.lean));
+    vec2(FEET.x - d * PER_METRE * Math.sin(b.lean), FEET.y - d * PER_METRE * Math.cos(b.lean));
   const waist = along(WAIST);
   const shoulder = along(SHOULDER);
   const head = along(BODY - 0.12);
-  const ropeEnd = vec(waist.x + pull.x * PER_NEWTON, waist.y + pull.y * PER_NEWTON);
+  const ropeEnd = waist.add(pull.scale(PER_NEWTON));
 
-  const heel = vec(FEET.x - 8, FEET.y);
+  const heel = vec2(FEET.x - 8, FEET.y);
   const gripY = FEET.y + 8;
   const mostY = FEET.y + 26;
 
@@ -68,13 +66,13 @@ export function BelayerForcesDiagram() {
 
         {/* The forces. */}
         <g className="text-sky-400 print:text-black">
-          <Arrow from={waist} v={vec(pull.x * PER_NEWTON, pull.y * PER_NEWTON)} color="currentColor" />
-          <Arrow from={waist} v={vec(0, weight * PER_NEWTON)} color="currentColor" />
-          <Arrow from={vec(heel.x, heel.y + up * PER_NEWTON)} v={vec(0, -up * PER_NEWTON)} color="currentColor" />
-          <Arrow from={vec(FEET.x + grip * PER_NEWTON, gripY)} v={vec(-grip * PER_NEWTON, 0)} color="currentColor" />
+          <Arrow from={waist} v={pull.scale(PER_NEWTON)} color="currentColor" />
+          <Arrow from={waist} v={vec2(0, weight * PER_NEWTON)} color="currentColor" />
+          <Arrow from={vec2(heel.x, heel.y + up * PER_NEWTON)} v={vec2(0, -up * PER_NEWTON)} color="currentColor" />
+          <Arrow from={vec2(FEET.x + grip * PER_NEWTON, gripY)} v={vec2(-grip * PER_NEWTON, 0)} color="currentColor" />
           <Arrow
-            from={vec(FEET.x + most * PER_NEWTON, mostY)}
-            v={vec(-most * PER_NEWTON, 0)}
+            from={vec2(FEET.x + most * PER_NEWTON, mostY)}
+            v={vec2(-most * PER_NEWTON, 0)}
             color="currentColor"
             dashed
             width={1.5}

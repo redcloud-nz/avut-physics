@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AngleArc, Arrow, add, deg, rad, scale, vec } from "@/components/diagram/svg";
+import { AngleArc, Arrow } from "@/components/diagram/svg";
+import { G } from "@/lib/constants";
+import { deg, rad } from "@/lib/math";
+import { Vector2, vec2 } from "@/lib/vector2";
 import { Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 
 const COLORS = {
@@ -21,7 +24,7 @@ export default function Incline() {
   const [mass, setMass] = useState(5);
   const [muS, setMuS] = useState(0.5);
   const [muK, setMuK] = useState(0.3);
-  const [g, setG] = useState(9.81);
+  const [g, setG] = useState(G);
   const [showComponents, setShowComponents] = useState(true);
 
   // --- Physics (SI units) ---
@@ -38,16 +41,16 @@ export default function Incline() {
 
   // --- Geometry (SVG units, y down). Slope descends to the right. ---
   const L = 460;
-  const corner = vec(W - 70, H - 50); // bottom-right, where the angle is
-  const top = add(corner, vec(-L * Math.cos(th), -L * Math.sin(th)));
-  const bottomLeft = vec(top.x, corner.y);
-  const down = vec(Math.cos(th), Math.sin(th)); // unit vector down the slope
-  const outward = vec(Math.sin(th), -Math.cos(th)); // unit normal out of the surface
+  const corner = vec2(W - 70, H - 50); // bottom-right, where the angle is
+  const top = corner.add(vec2(-L * Math.cos(th), -L * Math.sin(th)));
+  const bottomLeft = vec2(top.x, corner.y);
+  const down = Vector2.fromAngle(th); // unit vector down the slope
+  const outward = vec2(Math.sin(th), -Math.cos(th)); // unit normal out of the surface
 
   const blockW = 70;
   const blockH = 44;
-  const contact = add(top, scale(down, L * 0.5));
-  const centre = add(contact, scale(outward, blockH / 2));
+  const contact = top.add(down.scale(L * 0.5));
+  const centre = contact.add(outward.scale(blockH / 2));
 
   const k = 130 / weight; // px per newton: weight is always drawn 130px long
 
@@ -77,15 +80,15 @@ export default function Incline() {
 
           {showComponents && (
             <>
-              <Arrow from={centre} v={scale(down, along * k)} color={COLORS.component} dashed width={1.5} label="mg sinθ" />
-              <Arrow from={centre} v={scale(outward, -normal * k)} color={COLORS.component} dashed width={1.5} label="mg cosθ" />
+              <Arrow from={centre} v={down.scale(along * k)} color={COLORS.component} dashed width={1.5} label="mg sinθ" />
+              <Arrow from={centre} v={outward.scale(-normal * k)} color={COLORS.component} dashed width={1.5} label="mg cosθ" />
             </>
           )}
-          <Arrow from={centre} v={vec(0, weight * k)} color={COLORS.weight} label="W" />
-          <Arrow from={centre} v={scale(outward, normal * k)} color={COLORS.normal} label="N" />
-          <Arrow from={contact} v={scale(down, -friction * k)} color={COLORS.friction} label="f" />
+          <Arrow from={centre} v={vec2(0, weight * k)} color={COLORS.weight} label="W" />
+          <Arrow from={centre} v={outward.scale(normal * k)} color={COLORS.normal} label="N" />
+          <Arrow from={contact} v={down.scale(-friction * k)} color={COLORS.friction} label="f" />
           {sliding && (
-            <Arrow from={add(centre, scale(outward, blockH))} v={scale(down, net * k)} color={COLORS.net} label="F net" />
+            <Arrow from={centre.add(outward.scale(blockH))} v={down.scale(net * k)} color={COLORS.net} label="F net" />
           )}
         </svg>
       }

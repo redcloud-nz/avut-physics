@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { len } from "@/lib/vec";
 import { solve } from "./ladder-hinge-solver";
 import { arrangement, randomInputs, setupFor, violations, type Inputs } from "./ladder-hinge-solver.checks";
 
@@ -219,9 +218,9 @@ describe("forces", () => {
     const r = solve(setupFor({}));
     if (r.kind !== "hinged") throw new Error(arrangement(r));
     expect((r.h.phi * 180) / Math.PI).toBeCloseTo(49.33, 1);
-    expect(len(r.h.t1)).toBeCloseTo(642.7, 0);
-    expect(len(r.h.t2)).toBeCloseTo(641.7, 0);
-    expect(len(r.h.beamPush)).toBeCloseTo(99.8, 0);
+    expect(r.h.t1.len()).toBeCloseTo(642.7, 0);
+    expect(r.h.t2.len()).toBeCloseTo(641.7, 0);
+    expect(r.h.beamPush.len()).toBeCloseTo(99.8, 0);
   });
 
   it("a slid foot: the rope and the ladder's push each carry half the stretcher, the attachment nothing", () => {
@@ -229,8 +228,8 @@ describe("forces", () => {
     const r = solve(s);
     if (r.kind !== "hinged") throw new Error(arrangement(r));
     expect(r.h.beamCableTaut).toBe(false);
-    expect(len(r.h.t2)).toBe(0);
-    expect(len(r.h.t1)).toBeCloseTo(s.barWeight / 2, 0);
-    expect(len(r.h.beamPush)).toBeCloseTo(s.barWeight / 2, 0);
+    expect(r.h.t2.len()).toBe(0);
+    expect(r.h.t1.len()).toBeCloseTo(s.barWeight / 2, 0);
+    expect(r.h.beamPush.len()).toBeCloseTo(s.barWeight / 2, 0);
   });
 });

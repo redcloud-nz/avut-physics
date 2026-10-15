@@ -1,4 +1,7 @@
-import { add, cross, len, rad, scale, sub, unit, vec, type Vec } from "@/lib/vec";
+import { segmentGap, segmentsCross } from "@/lib/geometry";
+import { rad } from "@/lib/math";
+import { nelderMead, solveLinear } from "@/lib/numeric";
+import { Vector2, vec2 } from "@/lib/vector2";
 
 /**
  * Statics of a beam hinged at the base of a wall (origin, y up), with a second, hanging bar suspended
@@ -32,22 +35,22 @@ export type Setup = {
 export type Equilibrium = {
   phi: number; // beam angle above horizontal
   /** Cable 1's anchor, and the wall's top edge if the cable wraps over it on its way to the bar. */
-  anchor: Vec;
-  wrapEdge: Vec | null;
-  beamAttach: Vec;
-  barEnd1: Vec; // attached to the wall cable
-  barEnd2: Vec; // attached to the beam cable
+  anchor: Vector2;
+  wrapEdge: Vector2 | null;
+  beamAttach: Vector2;
+  barEnd1: Vector2; // attached to the wall cable
+  barEnd2: Vector2; // attached to the beam cable
   /** Forces the cables exert on the bar (at barEnd1 and barEnd2). */
-  t1: Vec;
-  t2: Vec;
+  t1: Vector2;
+  t2: Vector2;
   /** Where the bar rests on the ground, the wall, its top or its top edge, and the force pushing back. */
-  contacts: { surface: Surface; point: Vec; force: Vec }[];
+  contacts: { surface: Surface; point: Vector2; force: Vector2 }[];
   /** Force the beam cable exerts on the beam, at beamAttach. */
-  cableOnBeam: Vec;
+  cableOnBeam: Vector2;
   /** Where the main beam leans on the wall's top edge, and the edge's push on it. */
-  wallOnBeam: { point: Vec; force: Vec } | null;
+  wallOnBeam: { point: Vector2; force: Vector2 } | null;
   /** Force the hinge exerts on the beam (null when the beam lies on the ground, which shares the load). */
-  hinge: Vec | null;
+  hinge: Vector2 | null;
 };
 
 /**
@@ -58,27 +61,27 @@ export type Equilibrium = {
  */
 export type Hinged = {
   phi: number; // main beam angle above horizontal (0 when it lies on the ground)
-  anchor: Vec;
-  wrapEdge: Vec | null;
-  beamAttach: Vec;
-  barEnd1: Vec; // held by the wall cable
-  barEnd2: Vec; // pinned to the main beam
+  anchor: Vector2;
+  wrapEdge: Vector2 | null;
+  beamAttach: Vector2;
+  barEnd1: Vector2; // held by the wall cable
+  barEnd2: Vector2; // pinned to the main beam
   angle: number; // bar's angle above horizontal, end 1 towards the wall
   cableTaut: boolean;
-  t1: Vec; // wall cable's pull on the bar (zero when slack)
+  t1: Vector2; // wall cable's pull on the bar (zero when slack)
   /** Force the main beam exerts on the bar: at the pin, or spread along it when the bar lies flat on it. */
-  support: Vec;
-  supportAt: Vec;
+  support: Vector2;
+  supportAt: Vector2;
   lyingFlat: boolean;
   /** What the bar rests on besides the main beam: end 1 on the wall, the ground or the wall top, or the wall's top edge. */
-  barContact: { surface: "wall" | "ground" | "edge" | "top"; point: Vec; force: Vec } | null;
+  barContact: { surface: "wall" | "ground" | "edge" | "top"; point: Vector2; force: Vector2 } | null;
   /** Where the main beam leans on the wall's top edge, and the edge's push on it. */
-  wallOnBeam: { point: Vec; force: Vec } | null;
+  wallOnBeam: { point: Vector2; force: Vector2 } | null;
   /** Force the hinge exerts on the main beam (null when the beam lies on the ground, which shares the load). */
-  hinge: Vec | null;
+  hinge: Vector2 | null;
   /** The support split into the beam cable's pull (towards beamAttach) and the main beam's push, square to it. */
-  t2: Vec;
-  beamPush: Vec;
+  t2: Vector2;
+  beamPush: Vector2;
   /** False when the bar's end has slid along the main beam to where the beam cable hangs slack. */
   beamCableTaut: boolean;
 };
@@ -107,17 +110,17 @@ export type Surface = "ground" | "wall" | "top" | "edge";
  * overEdge: the bar rests on the wall's top edge, its wall-cable end behind it.
  * onTop: it lies flat on the wall top as well, overhanging the edge.
  */
-type Geometry = { phi: number; B: Vec; P1: Vec; P2: Vec; wrapEdge: Vec | null; overEdge?: boolean; onTop?: boolean };
+type Geometry = { phi: number; B: Vector2; P1: Vector2; P2: Vector2; wrapEdge: Vector2 | null; overEdge?: boolean; onTop?: boolean };
 
 /**
  * Where the wall cable ends, given the direction alpha of its last straight run (measured from straight
  * down, positive away from the wall). Directions that would cut through the wall's top edge instead
  * wrap over that edge, which then acts like a frictionless pulley.
  */
-function wallCableEnd(alpha: number, s: Setup): { P1: Vec; wrapEdge: Vec | null } | null {
-  const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const edge = vec(0, s.wallHeight);
-  const dir = vec(Math.sin(alpha), -Math.cos(alpha));
+function wallCableEnd(alpha: number, s: Setup): { P1: Vector2; wrapEdge: Vector2 | null } | null {
+  const C = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec2(0, s.wallHeight);
+  const dir = vec2(Math.sin(alpha), -Math.cos(alpha));
   const toEdge = Math.hypot(s.anchorBack, s.anchorUp);
   const edgeAlpha = Math.atan2(s.anchorBack, s.anchorUp);
   // A straight run steeper than the line to the edge drops to the wall's top level behind the edge.
@@ -125,9 +128,9 @@ function wallCableEnd(alpha: number, s: Setup): { P1: Vec; wrapEdge: Vec | null 
   if (toEdge > 1e-9 && alpha < edgeAlpha && reachesWallTop) {
     // Too short to get past the edge: the cable would end inside the wall.
     if (s.wallCable <= toEdge) return null;
-    return { P1: add(edge, scale(dir, s.wallCable - toEdge)), wrapEdge: edge };
+    return { P1: edge.add(dir.scale(s.wallCable - toEdge)), wrapEdge: edge };
   }
-  return { P1: add(C, scale(dir, s.wallCable)), wrapEdge: null };
+  return { P1: C.add(dir.scale(s.wallCable)), wrapEdge: null };
 }
 
 /** The steepest the main beam can stand: leaning back with its face against the wall's top edge. */
@@ -137,9 +140,9 @@ export const phiMax = (s: Setup) => Math.acos(Math.min(1, s.beamThickness / 2 / 
  * The wall's top edge pushing on the main beam leaning against it: square to the beam, enough to balance
  * the leftover torque (positive = trying to lean further back).
  */
-export function wallPush(phi: number, torque: number, s: Setup): { point: Vec; force: Vec } {
-  const n = vec(Math.sin(phi), -Math.cos(phi));
-  return { point: vec(0, s.wallHeight), force: scale(n, torque / (s.wallHeight * Math.sin(phi))) };
+export function wallPush(phi: number, torque: number, s: Setup): { point: Vector2; force: Vector2 } {
+  const n = vec2(Math.sin(phi), -Math.cos(phi));
+  return { point: vec2(0, s.wallHeight), force: n.scale(torque / (s.wallHeight * Math.sin(phi))) };
 }
 
 const ALPHA_MAX = rad(175);
@@ -150,36 +153,35 @@ const CONTACT = 1e-4;
 
 /** Positions for a trial configuration, or null if the cables can't both be taut there. */
 function geometry(phi: number, alpha: number, branch: Branch, s: Setup): Geometry | null {
-  const B = scale(vec(Math.cos(phi), Math.sin(phi)), s.attachDistance);
+  const B = Vector2.fromAngle(phi, s.attachDistance);
   const end = wallCableEnd(alpha, s);
   if (!end) return null;
   const { P1, wrapEdge } = end;
 
   // Bar end 2 is barLength from P1 and beamCable from B: a circle–circle intersection.
-  const d = sub(B, P1);
-  const dist = Math.hypot(d.x, d.y);
+  const d = B.sub(P1);
+  const dist = d.len();
   const r1 = s.barLength;
   const r2 = s.beamCable;
   if (dist < 1e-9 || dist > r1 + r2 || dist < Math.abs(r1 - r2)) return null;
   const along = (dist * dist + r1 * r1 - r2 * r2) / (2 * dist);
   const h = Math.sqrt(Math.max(0, r1 * r1 - along * along));
-  const ud = scale(d, 1 / dist);
-  const perp = vec(-ud.y, ud.x);
-  const P2 = add(add(P1, scale(ud, along)), scale(perp, branch * h));
+  const ud = d.scale(1 / dist);
+  const P2 = P1.add(ud.scale(along)).add(ud.perp().scale(branch * h));
   return { phi, B, P1, P2, wrapEdge };
 }
 
 /** Where the main beam meets the beam cable from P2, or null if it can't. */
-function beamFrom(P2: Vec, branch: Branch, s: Setup): { phi: number; B: Vec } | null {
+function beamFrom(P2: Vector2, branch: Branch, s: Setup): { phi: number; B: Vector2 } | null {
   // B is attachDistance from the hinge and beamCable from P2: another circle–circle intersection.
-  const dist = Math.hypot(P2.x, P2.y);
+  const dist = P2.len();
   const r1 = s.attachDistance;
   const r2 = s.beamCable;
   if (dist < 1e-9 || dist > r1 + r2 || dist < Math.abs(r1 - r2)) return null;
   const along = (dist * dist + r1 * r1 - r2 * r2) / (2 * dist);
   const h = Math.sqrt(Math.max(0, r1 * r1 - along * along));
-  const u = scale(P2, 1 / dist);
-  const B = add(scale(u, along), scale(vec(-u.y, u.x), branch * h));
+  const u = P2.scale(1 / dist);
+  const B = u.scale(along).add(u.perp().scale(branch * h));
   const phi = Math.atan2(B.y, B.x);
   return phi >= 0 && phi <= phiMax(s) ? { phi, B } : null;
 }
@@ -190,15 +192,15 @@ function beamFrom(P2: Vec, branch: Branch, s: Setup): { phi: number; B: Vec } | 
  * there over the edge, and the beam cable sets the main beam's angle.
  */
 function edgeGeometry(alpha: number, branch: Branch, s: Setup): Geometry | null {
-  const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const edge = vec(0, s.wallHeight);
-  const P1 = add(C, scale(vec(Math.sin(alpha), -Math.cos(alpha)), s.wallCable));
+  const C = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec2(0, s.wallHeight);
+  const P1 = C.add(vec2(Math.sin(alpha), -Math.cos(alpha)).scale(s.wallCable));
   // End 1 must be behind the edge and not inside the wall.
   if (P1.x > -1e-9 || P1.y < s.wallHeight) return null;
-  const toEdge = sub(edge, P1);
-  const dist = len(toEdge);
+  const toEdge = edge.sub(P1);
+  const dist = toEdge.len();
   if (dist > s.barLength) return null;
-  const P2 = add(P1, scale(toEdge, s.barLength / dist));
+  const P2 = P1.add(toEdge.scale(s.barLength / dist));
   const beam = beamFrom(P2, branch, s);
   if (!beam) return null;
   return { phi: beam.phi, B: beam.B, P1, P2, wrapEdge: null, overEdge: true };
@@ -210,8 +212,8 @@ function edgeGeometry(alpha: number, branch: Branch, s: Setup): Geometry | null 
  */
 function onTopGeometry(branch: Branch, s: Setup): Geometry | null {
   if (s.wallCable <= s.anchorUp) return null;
-  const P1 = vec(-s.anchorBack + Math.sqrt(s.wallCable ** 2 - s.anchorUp ** 2), s.wallHeight);
-  const P2 = add(P1, vec(s.barLength, 0));
+  const P1 = vec2(-s.anchorBack + Math.sqrt(s.wallCable ** 2 - s.anchorUp ** 2), s.wallHeight);
+  const P2 = P1.add(vec2(s.barLength, 0));
   if (P1.x >= 0 || P2.x <= 0) return null;
   const beam = beamFrom(P2, branch, s);
   if (!beam) return null;
@@ -227,7 +229,7 @@ export function minWallCable(s: Setup): number {
 }
 
 /** Whether the segment pq passes through the wall's top corner (one end behind the face, below the edge line). */
-function cutsCorner(p: Vec, q: Vec, s: Setup): boolean {
+function cutsCorner(p: Vector2, q: Vector2, s: Setup): boolean {
   const [a, b] = p.x < q.x ? [p, q] : [q, p];
   // An end resting on the wall face (x = 0) counts too.
   if (!(a.x < -1e-9 && b.x > -CONTACT)) return false;
@@ -238,7 +240,7 @@ function cutsCorner(p: Vec, q: Vec, s: Setup): boolean {
  * How far a point has pushed into the ground, the wall's face and the wall's top (all ≥ 0). Inside the wall
  * it's pushed back out through whichever of the face and the top is nearer.
  */
-function penetration(p: Vec, s: Setup) {
+function penetration(p: Vector2, s: Setup) {
   const inWall = p.x < 0 && p.y < s.wallHeight;
   const throughTop = inWall && s.wallHeight - p.y < -p.x;
   return {
@@ -287,65 +289,6 @@ function energyOf(g: Geometry, s: Setup): number {
     (s.barWeight * (g.P1.y + g.P2.y)) / 2 +
     (stiffness * below) / 2
   );
-}
-
-/** Nelder–Mead minimisation, restarted a few times from the best point to avoid early stalls. */
-export function nelderMead(f: (x: number[]) => number, start: number[], step: number): number[] {
-  const n = start.length;
-  const lerp = (a: number[], b: number[], t: number) => a.map((ai, i) => ai + t * (b[i] - ai));
-  let best = start;
-  for (let restart = 0; restart < 4; restart++) {
-    let simplex = [best, ...best.map((_, i) => best.map((v, j) => (i === j ? v + step : v)))].map((x) => ({ x, v: f(x) }));
-    for (let iter = 0; iter < 400 * n; iter++) {
-      simplex.sort((a, b) => a.v - b.v);
-      const lo = simplex[0];
-      const hi = simplex[n];
-      const size = Math.max(...simplex.slice(1).map((p) => Math.max(...p.x.map((v, i) => Math.abs(v - lo.x[i])))));
-      if (size < 1e-12) break;
-      const centroid = lo.x.map((_, i) => simplex.slice(0, n).reduce((sum, p) => sum + p.x[i], 0) / n);
-      const at = (t: number) => lerp(centroid, hi.x, t);
-      const r = { x: at(-1), v: f(at(-1)) };
-      if (r.v < lo.v) {
-        const e = { x: at(-2), v: f(at(-2)) };
-        simplex[n] = e.v < r.v ? e : r;
-      } else if (r.v < simplex[n - 1].v) {
-        simplex[n] = r;
-      } else {
-        const k = { x: at(0.5), v: f(at(0.5)) };
-        if (k.v < hi.v) {
-          simplex[n] = k;
-        } else {
-          simplex = simplex.map((p, i) => {
-            if (i === 0) return p;
-            const x = lerp(lo.x, p.x, 0.5);
-            return { x, v: f(x) };
-          });
-        }
-      }
-    }
-    simplex.sort((a, b) => a.v - b.v);
-    best = simplex[0].x;
-    step /= 10;
-  }
-  return best;
-}
-
-/** Solve a small linear system by Gaussian elimination with partial pivoting. */
-export function solveLinear(A: number[][], b: number[]): number[] | null {
-  const n = b.length;
-  const M = A.map((row, i) => [...row, b[i]]);
-  for (let col = 0; col < n; col++) {
-    let pivot = col;
-    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
-    if (Math.abs(M[pivot][col]) < 1e-12) return null;
-    [M[col], M[pivot]] = [M[pivot], M[col]];
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-      const k = M[r][col] / M[col][col];
-      for (let c = col; c <= n; c++) M[r][c] -= k * M[col][c];
-    }
-  }
-  return M.map((row, i) => row[n] / row[i]);
 }
 
 function solveTaut(s: Setup): TautResult {
@@ -471,16 +414,16 @@ function checkEquilibrium(g: Geometry, s: Setup): TautResult {
 
 function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
   // Snap tiny penalty penetrations back onto the surfaces, and note which surfaces each end touches.
-  const contacts: { surface: Surface; point: Vec; normal: Vec }[] = [];
-  const settle = (p: Vec) => {
+  const contacts: { surface: Surface; point: Vector2; normal: Vector2 }[] = [];
+  const settle = (p: Vector2) => {
     const pen = penetration(p, s);
-    const q = vec(p.x + pen.wall, p.y + pen.ground + pen.top);
-    if (q.y < CONTACT) contacts.push({ surface: "ground", point: q, normal: vec(0, 1) });
+    const q = vec2(p.x + pen.wall, p.y + pen.ground + pen.top);
+    if (q.y < CONTACT) contacts.push({ surface: "ground", point: q, normal: vec2(0, 1) });
     // Over the edge, the bar lying flat on the wall top too belongs to onTopGeometry instead.
     if (!g.overEdge && q.x < 0 && Math.abs(q.y - s.wallHeight) < CONTACT) {
-      contacts.push({ surface: "top", point: q, normal: vec(0, 1) });
+      contacts.push({ surface: "top", point: q, normal: vec2(0, 1) });
     } else if (q.x < CONTACT && q.y < s.wallHeight) {
-      contacts.push({ surface: "wall", point: q, normal: vec(1, 0) });
+      contacts.push({ surface: "wall", point: q, normal: vec2(1, 0) });
     }
     return q;
   };
@@ -490,8 +433,8 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
   if (cutsCorner(P1, P2, s)) return slack("The stretcher would pass through the wall's top corner.");
   if (g.overEdge) {
     // The edge pushes square to the bar (which runs outwards over it), so upwards.
-    const d = unit(sub(P2, P1));
-    contacts.push({ surface: "edge", point: vec(0, s.wallHeight), normal: vec(-d.y, d.x) });
+    const d = P2.sub(P1).unit();
+    contacts.push({ surface: "edge", point: vec2(0, s.wallHeight), normal: d.perp() });
   }
   if (contacts.length > 1) {
     return slack("The stretcher would rest on the ground or wall at both ends, with the rope and attachment slack.");
@@ -499,17 +442,17 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
 
   // Bar equilibrium. Unknowns: T1, T2 and the contact force (if any).
   // Equations: ΣFx = 0, ΣFy = W and, with a contact, Σ torque about end 1 = 0.
-  const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const u1 = unit(sub(g.wrapEdge ?? C, P1)); // the wall cable pulls towards the anchor, or the edge it wraps over
-  const u2 = unit(sub(g.B, P2));
-  const centre = scale(add(P1, P2), 0.5);
+  const C = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const u1 = (g.wrapEdge ?? C).sub(P1).unit(); // the wall cable pulls towards the anchor, or the edge it wraps over
+  const u2 = g.B.sub(P2).unit();
+  const centre = P1.add(P2).scale(0.5);
   const contact = contacts[0];
   const x = contact
     ? solveLinear(
         [
           [u1.x, u2.x, contact.normal.x],
           [u1.y, u2.y, contact.normal.y],
-          [0, cross(sub(P2, P1), u2), cross(sub(contact.point, P1), contact.normal)],
+          [0, P2.sub(P1).cross(u2), contact.point.sub(P1).cross(contact.normal)],
         ],
         [0, s.barWeight, s.barWeight * (centre.x - P1.x)],
       )
@@ -531,18 +474,18 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
   // Without a contact, the torque balance on the bar isn't one of the equations solved above. It holds
   // at a true minimum, but not where the bar and beam cable are pulled into a straight line (the
   // search's boundary) — there the beam cable would really go slack.
-  const barTorque = cross(sub(P2, P1), scale(u2, T2)) - s.barWeight * (centre.x - P1.x);
+  const barTorque = P2.sub(P1).cross(u2.scale(T2)) - s.barWeight * (centre.x - P1.x);
   if (!contact && Math.abs(barTorque) > 1e-3 * s.barWeight * s.barLength) {
     return slack("The attachment would go slack and the stretcher would drop onto the ground, so nothing holds the ladder up.");
   }
 
-  const t1 = scale(u1, T1);
-  const t2 = scale(u2, T2);
-  const cableOnBeam = scale(t2, -1);
+  const t1 = u1.scale(T1);
+  const t2 = u2.scale(T2);
+  const cableOnBeam = t2.neg();
 
   // The cables can only pull. If the beam's torques don't balance, the cable would be acting as a
   // strut; in reality it goes slack and everything settles onto the ground instead.
-  const beamTorque = cross(g.B, cableOnBeam) - s.beamWeight * (s.beamLength / 2) * Math.cos(g.phi);
+  const beamTorque = g.B.cross(cableOnBeam) - s.beamWeight * (s.beamLength / 2) * Math.cos(g.phi);
   const tolerance = 1e-3 * (s.beamWeight + s.barWeight) * s.beamLength;
   // Leaning on the wall, the wall's top edge takes any torque that would tip the beam further back.
   const onWall = g.phi >= phiMax(s) - 1e-9 && beamTorque > 0;
@@ -552,7 +495,7 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
     return slack("The attachment goes slack: the stretcher rests on the ground and can't hold the ladder up.");
   }
   const wallOnBeam = onWall ? wallPush(g.phi, beamTorque, s) : null;
-  const wallForce = wallOnBeam?.force ?? vec(0, 0);
+  const wallForce = wallOnBeam?.force ?? Vector2.ZERO;
   return {
     kind: "raised",
     eq: {
@@ -565,11 +508,11 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
       t1,
       t2,
       contacts: contact
-        ? [{ surface: contact.surface, point: contact.point, force: scale(contact.normal, Math.max(0, push)) }]
+        ? [{ surface: contact.surface, point: contact.point, force: contact.normal.scale(Math.max(0, push)) }]
         : [],
       cableOnBeam,
       wallOnBeam,
-      hinge: down ? null : vec(-cableOnBeam.x - wallForce.x, s.beamWeight - cableOnBeam.y - wallForce.y),
+      hinge: down ? null : vec2(-cableOnBeam.x - wallForce.x, s.beamWeight - cableOnBeam.y - wallForce.y),
     },
   };
 }
@@ -581,20 +524,20 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
  */
 function checkOnTop(g: Geometry, s: Setup): TautResult {
   if (g.phi < rad(0.05)) return { kind: "down" };
-  const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const edge = vec(0, s.wallHeight);
+  const C = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec2(0, s.wallHeight);
   const { P1, P2, B } = g;
-  const u1 = unit(sub(C, P1));
-  const u2 = unit(sub(B, P2));
+  const u1 = C.sub(P1).unit();
+  const u2 = B.sub(P2).unit();
   const W = s.barWeight;
-  const T2 = (-s.beamWeight * (s.beamLength / 2) * Math.cos(g.phi)) / cross(B, u2);
+  const T2 = (-s.beamWeight * (s.beamLength / 2) * Math.cos(g.phi)) / B.cross(u2);
   const T1 = (-T2 * u2.x) / u1.x;
   if (!(T2 > 0) || !(T1 > 0)) return slack("The rope or attachment would go slack, so the stretcher can't be held by both.");
-  const centre = scale(add(P1, P2), 0.5);
-  const atEdge = (W * (centre.x - P1.x) - cross(sub(P2, P1), scale(u2, T2))) / (edge.x - P1.x);
+  const centre = P1.add(P2).scale(0.5);
+  const atEdge = (W * (centre.x - P1.x) - P2.sub(P1).cross(u2.scale(T2))) / (edge.x - P1.x);
   const atEnd1 = W - T1 * u1.y - T2 * u2.y - atEdge;
   if (atEdge < 0 || atEnd1 < 0) return fail("The stretcher would tip over the wall's edge.");
-  const t2 = scale(u2, T2);
+  const t2 = u2.scale(T2);
   return {
     kind: "raised",
     eq: {
@@ -604,15 +547,15 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
       beamAttach: B,
       barEnd1: P1,
       barEnd2: P2,
-      t1: scale(u1, T1),
+      t1: u1.scale(T1),
       t2,
       contacts: [
-        { surface: "top", point: P1, force: vec(0, atEnd1) },
-        { surface: "edge", point: edge, force: vec(0, atEdge) },
+        { surface: "top", point: P1, force: vec2(0, atEnd1) },
+        { surface: "edge", point: edge, force: vec2(0, atEdge) },
       ],
-      cableOnBeam: scale(t2, -1),
+      cableOnBeam: t2.neg(),
       wallOnBeam: null,
-      hinge: vec(t2.x, s.beamWeight + t2.y),
+      hinge: vec2(t2.x, s.beamWeight + t2.y),
     },
   };
 }
@@ -630,9 +573,9 @@ export function solve(s: Setup): Result {
   if (h) {
     // The main beam can only push on the bar, and the beam cable only pull.
     const tolerance = 1e-3 * (s.beamWeight + s.barWeight);
-    const normal = vec(-Math.sin(h.phi), Math.cos(h.phi));
-    if (h.beamPush.x * normal.x + h.beamPush.y * normal.y < -tolerance) return { kind: "none", reason: LIFTS_OFF };
-    if (h.t2.x * (h.beamAttach.x - h.barEnd2.x) + h.t2.y * (h.beamAttach.y - h.barEnd2.y) < -tolerance) {
+    const normal = Vector2.fromAngle(h.phi).perp();
+    if (h.beamPush.dot(normal) < -tolerance) return { kind: "none", reason: LIFTS_OFF };
+    if (h.t2.dot(h.beamAttach.sub(h.barEnd2)) < -tolerance) {
       return { kind: "none", reason: "The attachment would have to push the stretcher, so it can't rest on the ladder here." };
     }
     return { kind: "hinged", h, reason: h.phi > 0 ? BEAMS_TOUCH : BEAM_DOWN };
@@ -647,39 +590,24 @@ export function solve(s: Setup): Result {
   };
 }
 
-/** Distance from p to the segment ab. */
-function segmentDistance(p: Vec, a: Vec, b: Vec) {
-  const ab = sub(b, a);
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / (ab.x * ab.x + ab.y * ab.y)));
-  return len(sub(p, add(a, scale(ab, t))));
-}
-
 /** Whether the bar crosses the main beam or comes closer to it than their thicknesses allow. */
 function beamsOverlap(eq: Equilibrium, s: Setup): boolean {
-  const O = vec(0, 0);
-  const tip = scale(vec(Math.cos(eq.phi), Math.sin(eq.phi)), s.beamLength);
+  const O = Vector2.ZERO;
+  const tip = Vector2.fromAngle(eq.phi, s.beamLength);
   const [p, q] = [eq.barEnd1, eq.barEnd2];
-  const side = (a: Vec, b: Vec, c: Vec) => cross(sub(b, a), sub(c, a));
-  const crosses = side(O, tip, p) * side(O, tip, q) < 0 && side(p, q, O) * side(p, q, tip) < 0;
-  const gap = Math.min(
-    segmentDistance(p, O, tip),
-    segmentDistance(q, O, tip),
-    segmentDistance(O, p, q),
-    segmentDistance(tip, p, q),
-  );
-  return crosses || gap < s.touchGap * (1 - 1e-6);
+  return segmentsCross(O, tip, p, q) || segmentGap(O, tip, p, q) < s.touchGap * (1 - 1e-6);
 }
 
 /** Length of the wall cable's path from its anchor to p, wrapping over the wall's top edge if it has to. */
-export function wallCablePath(p: Vec, s: Setup): { length: number; wrapEdge: Vec | null } {
-  const C = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
-  const edge = vec(0, s.wallHeight);
+export function wallCablePath(p: Vector2, s: Setup): { length: number; wrapEdge: Vector2 | null } {
+  const C = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const edge = vec2(0, s.wallHeight);
   if (p.x > -1e-9) {
     // Height at which the straight line from the anchor crosses the wall's front face.
     const yAtFace = C.y + ((p.y - C.y) * (0 - C.x)) / (p.x - C.x);
-    if (yAtFace < s.wallHeight) return { length: len(sub(edge, C)) + len(sub(p, edge)), wrapEdge: edge };
+    if (yAtFace < s.wallHeight) return { length: edge.distanceTo(C) + p.distanceTo(edge), wrapEdge: edge };
   }
-  return { length: len(sub(p, C)), wrapEdge: null };
+  return { length: p.distanceTo(C), wrapEdge: null };
 }
 
 type Limit = "beam" | "wall" | "ground" | "edge" | "top";
@@ -690,14 +618,14 @@ type Limit = "beam" | "wall" | "ground" | "edge" | "top";
  * ground or the wall); the beam then settles at the angle of least total potential energy.
  */
 function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
-  const anchor = vec(-s.anchorBack, s.wallHeight + s.anchorUp);
+  const anchor = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
   const ell = s.barLength;
   const PHI_MAX = phiMax(s);
   const pinAt = (phi: number) =>
-    add(scale(vec(Math.cos(phi), Math.sin(phi)), pinAlong), scale(vec(-Math.sin(phi), Math.cos(phi)), s.touchGap));
-  const end1At = (end2: Vec, angle: number) => add(end2, scale(vec(-Math.cos(angle), Math.sin(angle)), ell));
+    Vector2.fromAngle(phi, pinAlong).add(Vector2.fromAngle(phi).perp().scale(s.touchGap));
+  const end1At = (end2: Vector2, angle: number) => end2.add(vec2(-Math.cos(angle), Math.sin(angle)).scale(ell));
   // A hair of tolerance, for arrangements where the cable is exactly taut.
-  const reaches = (p: Vec) => wallCablePath(p, s).length <= s.wallCable * (1 + 1e-9);
+  const reaches = (p: Vector2) => wallCablePath(p, s).length <= s.wallCable * (1 + 1e-9);
 
   /** The bar's lowest angle at beam angle phi, and whether the cable or a surface stops it there. */
   const barAt = (phi: number): { angle: number; taut: boolean; limit: Limit; lowest: number } | null => {
@@ -788,19 +716,19 @@ function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
     if (!bar) return null;
     const end2 = pinAt(phi);
     const end1 = end1At(end2, bar.angle);
-    const centre = scale(add(end1, end2), 0.5);
+    const centre = end1.add(end2).scale(0.5);
     const path = wallCablePath(end1, s);
     const W = s.barWeight;
     const base = {
       phi,
       anchor,
       wrapEdge: path.wrapEdge,
-      beamAttach: scale(vec(Math.cos(phi), Math.sin(phi)), s.attachDistance),
+      beamAttach: Vector2.fromAngle(phi, s.attachDistance),
       barEnd1: end1,
       barEnd2: end2,
       angle: bar.angle,
       cableTaut: bar.taut,
-      t1: vec(0, 0),
+      t1: Vector2.ZERO,
       lyingFlat: false,
       barContact: null,
     };
@@ -808,29 +736,29 @@ function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
     // Forces on the bar: torques about the pin give the cable's pull or end 1's contact force; the pin
     // takes the rest. Lying flat on the main beam, the beam carries its whole weight.
     let h: Arrangement;
-    const u1 = unit(sub(path.wrapEdge ?? anchor, end1));
-    const T1 = (W * (centre.x - end2.x)) / cross(sub(end1, end2), u1);
+    const u1 = (path.wrapEdge ?? anchor).sub(end1).unit();
+    const T1 = (W * (centre.x - end2.x)) / end1.sub(end2).cross(u1);
     // Held by the cable just above a limit, but the cable would have to push: the bar rests on that limit
     // too, with the cable at full length (the tension and contact are split at the end).
     const onLimit = bar.taut && (T1 < 0 || resting) && bar.angle - bar.lowest < 1e-3;
     if (bar.taut && !onLimit) {
-      const t1 = scale(u1, T1);
-      h = { ...base, t1, support: vec(-t1.x, W - t1.y), supportAt: end2 };
+      const t1 = u1.scale(T1);
+      h = { ...base, t1, support: vec2(-t1.x, W - t1.y), supportAt: end2 };
     } else if (bar.limit === "wall") {
       const push = (W * (end2.x - centre.x)) / (end1.y - end2.y);
-      h = { ...base, support: vec(-push, W), supportAt: end2, barContact: { surface: "wall", point: end1, force: vec(push, 0) } };
+      h = { ...base, support: vec2(-push, W), supportAt: end2, barContact: { surface: "wall", point: end1, force: vec2(push, 0) } };
     } else if (bar.limit === "edge") {
       // Resting on the wall's top edge, which pushes square to the bar.
-      const edge = vec(0, s.wallHeight);
-      const n = vec(Math.sin(bar.angle), Math.cos(bar.angle));
-      const push = (W * (centre.x - end2.x)) / cross(sub(edge, end2), n);
-      const f = scale(n, push);
-      h = { ...base, support: vec(-f.x, W - f.y), supportAt: end2, barContact: { surface: "edge", point: edge, force: f } };
+      const edge = vec2(0, s.wallHeight);
+      const n = vec2(Math.sin(bar.angle), Math.cos(bar.angle));
+      const push = (W * (centre.x - end2.x)) / edge.sub(end2).cross(n);
+      const f = n.scale(push);
+      h = { ...base, support: vec2(-f.x, W - f.y), supportAt: end2, barContact: { surface: "edge", point: edge, force: f } };
     } else if (bar.limit === "ground" || bar.limit === "top") {
       const up = (W * (centre.x - end2.x)) / (end1.x - end2.x);
-      h = { ...base, support: vec(0, W - up), supportAt: end2, barContact: { surface: bar.limit, point: end1, force: vec(0, up) } };
+      h = { ...base, support: vec2(0, W - up), supportAt: end2, barContact: { surface: bar.limit, point: end1, force: vec2(0, up) } };
     } else {
-      h = { ...base, support: vec(0, W), supportAt: centre, lyingFlat: true };
+      h = { ...base, support: vec2(0, W), supportAt: centre, lyingFlat: true };
     }
     return h;
   };
@@ -840,7 +768,7 @@ function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
   const lift = (phi: number) => {
     const h = arrangement(phi);
     if (!h) return Infinity;
-    return cross(h.supportAt, scale(h.support, -1)) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
+    return h.supportAt.cross(h.support.neg()) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
   };
 
   // The energy minimum can sit where it changes steeply (the beam hanging from an almost straight
@@ -886,52 +814,52 @@ function restOnBeam(s: Setup, pinAlong: number): Hinged | null {
   if (phi > 0 && h.barContact && atFullLength && Math.abs(lift(phi)) > 1e-6 * (s.beamWeight + s.barWeight)) {
     const W = s.barWeight;
     const end2 = h.barEnd2;
-    const centre = scale(add(end1, end2), 0.5);
-    const u1 = unit(sub(h.wrapEdge ?? anchor, end1));
-    const n = unit(h.barContact.force);
+    const centre = end1.add(end2).scale(0.5);
+    const u1 = (h.wrapEdge ?? anchor).sub(end1).unit();
+    const n = h.barContact.force.unit();
     const at = h.barContact.point;
     const x = solveLinear(
       [
-        [cross(sub(end1, end2), u1), cross(sub(at, end2), n)],
-        [cross(end2, u1), cross(end2, n)],
+        [end1.sub(end2).cross(u1), at.sub(end2).cross(n)],
+        [end2.cross(u1), end2.cross(n)],
       ],
       [W * (centre.x - end2.x), s.beamWeight * (s.beamLength / 2) * Math.cos(phi) + W * end2.x],
     );
     if (x && x[0] >= 0 && x[1] >= 0) {
       const [T1, N] = x;
-      const t1 = scale(u1, T1);
-      const f = scale(n, N);
+      const t1 = u1.scale(T1);
+      const f = n.scale(N);
       h = {
         ...h,
         cableTaut: true,
         t1,
-        support: vec(-t1.x - f.x, W - t1.y - f.y),
+        support: vec2(-t1.x - f.x, W - t1.y - f.y),
         barContact: { ...h.barContact, force: f },
       };
     }
   }
   // The main beam: the bar pushes back on it, the wall's top edge when it leans there, and the hinge (or,
   // lying down, the ground too) holds it.
-  const onBeam = scale(h.support, -1);
-  const leftover = cross(h.supportAt, onBeam) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
+  const onBeam = h.support.neg();
+  const leftover = h.supportAt.cross(onBeam) - s.beamWeight * (s.beamLength / 2) * Math.cos(phi);
   const wallOnBeam = phi >= PHI_MAX && leftover > 0 ? wallPush(phi, leftover, s) : null;
-  const wallForce = wallOnBeam?.force ?? vec(0, 0);
+  const wallForce = wallOnBeam?.force ?? Vector2.ZERO;
   // The main beam's surface can only push square to itself, so the beam cable takes the rest of the support.
-  const u2 = unit(sub(h.beamAttach, h.barEnd2));
-  const normal = vec(-Math.sin(phi), Math.cos(phi));
-  const T2 = cross(h.support, normal) / cross(u2, normal);
+  const u2 = h.beamAttach.sub(h.barEnd2).unit();
+  const normal = Vector2.fromAngle(phi).perp();
+  const T2 = h.support.cross(normal) / u2.cross(normal);
   return {
     ...h,
     wallOnBeam,
-    hinge: phi > 0 ? vec(-onBeam.x - wallForce.x, s.beamWeight - onBeam.y - wallForce.y) : null,
-    t2: scale(u2, T2),
-    beamPush: scale(normal, cross(u2, h.support) / cross(u2, normal)),
+    hinge: phi > 0 ? vec2(-onBeam.x - wallForce.x, s.beamWeight - onBeam.y - wallForce.y) : null,
+    t2: u2.scale(T2),
+    beamPush: normal.scale(u2.cross(h.support) / u2.cross(normal)),
     beamCableTaut: true,
   };
 }
 
 /** The main beam's push on the bar's end along the beam (positive: up it, away from the hinge). */
-const alongBeam = (h: Hinged) => cross(h.support, vec(-Math.sin(h.phi), Math.cos(h.phi)));
+const alongBeam = (h: Hinged) => h.support.cross(Vector2.fromAngle(h.phi).perp());
 
 /**
  * The bar resting on the main beam. Nothing but the beam cable holds its end in place along the beam, so it
@@ -965,9 +893,9 @@ function solveHinged(s: Setup): Hinged | { fail: string } | null {
       else b = m;
     }
     const settled = restOnBeam(s, b) ?? h;
-    const normal = vec(-Math.sin(settled.phi), Math.cos(settled.phi));
-    const push = settled.support.x * normal.x + settled.support.y * normal.y;
-    return { ...settled, t2: vec(0, 0), beamPush: scale(normal, push), beamCableTaut: false };
+    const normal = Vector2.fromAngle(settled.phi).perp();
+    const push = settled.support.dot(normal);
+    return { ...settled, t2: Vector2.ZERO, beamPush: normal.scale(push), beamCableTaut: false };
   }
   // Still sliding at the far end of its range: the beam cable catches it past the attachment, unless the
   // beam ends first.

@@ -6,6 +6,7 @@ import { DEFAULTS, holding } from "@/articles/standing-body-belays-figures";
 import { BelayerForcesDiagram } from "@/articles/belayer-forces-diagram";
 import { SetupDiagram } from "@/articles/setup-diagram";
 import { StretcherWeightGraph, TRAINING } from "@/articles/stretcher-weight-graph";
+import { degrees, kg, newtons } from "@/lib/format";
 
 const TITLE = "Standing Body Belays";
 const DESCRIPTION =
@@ -17,10 +18,6 @@ const r = String.raw;
 
 /** A safety factor, to two places. */
 const sf = (x: number) => x.toFixed(2);
-/** A force in newtons, to the nearest 10. */
-const newtons = (x: number) => `${Math.round(x / 10) * 10} N`;
-const kg = (newtons: number) => `${Math.round(newtons / 9.81)} kg`;
-const degrees = (radians: number) => `${Math.round((radians * 180) / Math.PI)}°`;
 
 /** A training pair (a heavy belayer, a light mock casualty) and a real one (a heavy casualty and their gear). */
 const TRAINING_PAIR = { belayer: 90, stretcher: 70 };

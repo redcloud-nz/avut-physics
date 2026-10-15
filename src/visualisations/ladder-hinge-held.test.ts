@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { len, rad, sub } from "@/lib/vec";
+import { rad } from "@/lib/math";
 import { solveHeld, solveLevel } from "./ladder-hinge-held";
 import { solve } from "./ladder-hinge-solver";
 import { heldArrangement, heldViolations, randomInputs, setupFor } from "./ladder-hinge-solver.checks";
@@ -25,9 +25,9 @@ describe("held ladder", () => {
     if (free.kind !== "hinged") throw new Error(free.kind);
     const r = solveHeld(s, free.h.phi);
     if (r.kind !== "held") throw new Error(heldArrangement(r));
-    expect(len(r.h.hold!.force)).toBeLessThan(1);
-    expect(len(sub(r.h.barEnd1, free.h.barEnd1))).toBeLessThan(1e-3);
-    expect(len(sub(r.h.barEnd2, free.h.barEnd2))).toBeLessThan(1e-3);
+    expect(r.h.hold!.force.len()).toBeLessThan(1);
+    expect(r.h.barEnd1.distanceTo(free.h.barEnd1)).toBeLessThan(1e-3);
+    expect(r.h.barEnd2.distanceTo(free.h.barEnd2)).toBeLessThan(1e-3);
   });
 
   // With the ladder's angle and the rope set separately, the rope can level the stretcher all the way down.
@@ -89,7 +89,7 @@ describe("team keeps the stretcher level", () => {
       expect(r.h.ropeTaut).toBe(false);
       return r.h.barEnd1;
     });
-    for (const e of ends) expect(len(sub(e, ends[0]))).toBeLessThan(1e-9);
+    for (const e of ends) expect(e.distanceTo(ends[0])).toBeLessThan(1e-9);
   });
 
   it("holds for random setups", { timeout: 60_000 }, () => {

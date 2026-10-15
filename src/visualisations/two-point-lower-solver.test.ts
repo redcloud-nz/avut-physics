@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { add, cross, len, scale, sub, unit, vec, type Vec } from "@/lib/vec";
+import { G } from "@/lib/constants";
+import { seededPicker } from "@/lib/random";
+import { Vector2, vec2 } from "@/lib/vector2";
 import { ropePathFor } from "./ladder-hinge-held";
 import {
   TEAM_HEIGHT,
@@ -11,8 +13,6 @@ import {
   type LowerResult,
   type Setup,
 } from "./two-point-lower-solver";
-
-const G = 9.81;
 
 /** The page's inputs, in its units (masses in kg). */
 type Inputs = {
@@ -54,10 +54,7 @@ function setupFor(inputs: Partial<Inputs>): Setup {
 
 /** A seeded stream of random inputs across the page's slider ranges, the rope anywhere in its range. */
 function randomInputs(count: number, seed = 1): Inputs[] {
-  let state = seed;
-  const rand = () => (state = (state * 1103515245 + 12345) % 2147483648) / 2147483648;
-  const pick = (lo: number, hi: number, step: number) =>
-    Math.round((lo + Math.round((rand() * (hi - lo)) / step) * step) * 100) / 100;
+  const pick = seededPicker(seed);
   return Array.from({ length: count }, () => ({
     wallHeight: pick(2, 6, 0.1),
     anchorUp: pick(0.1, 2, 0.05),
@@ -94,29 +91,29 @@ function violations(s: Setup, r: LowerResult): string[] {
   const P1 = l.barEnd1;
   const P2 = l.barEnd2;
   const h = s.wallHeight;
-  const edge = vec(0, h);
-  const anchor = vec(-s.anchorBack, h + s.anchorUp);
-  const team = vec(s.teamDistance, TEAM_HEIGHT);
+  const edge = vec2(0, h);
+  const anchor = vec2(-s.anchorBack, h + s.anchorUp);
+  const team = vec2(s.teamDistance, TEAM_HEIGHT);
 
-  if (Math.abs(len(sub(P2, P1)) - s.barLength) > tol) out.push("stretcher isn't 2 m long");
+  if (Math.abs(P2.distanceTo(P1) - s.barLength) > tol) out.push("stretcher isn't 2 m long");
 
   // The rope can't stretch, and pulls only along its last run when taut.
   const rope = ropePathFor(s, P1);
   if (rope.length > s.rope + tol) out.push(`rope stretched by ${(rope.length - s.rope).toFixed(4)} m`);
   if (l.ropeTaut && rope.length < s.rope - tol) out.push("rope pulls while slack");
-  if (len(l.t1) > fTol && len(sub(unit(l.t1), unit(sub(rope.wrapEdge ?? anchor, P1)))) > tol)
+  if (l.t1.len() > fTol && l.t1.unit().distanceTo((rope.wrapEdge ?? anchor).sub(P1).unit()) > tol)
     out.push("rope pulls the wrong way");
 
   // The team pulls steadily along the line, unless they're holding its end within reach.
   const line = linePathFor(s, P2);
-  const lineDir = unit(sub(line.via ?? team, P2));
-  if (len(l.t2) > fTol && len(sub(unit(l.t2), lineDir)) > tol) out.push("line pulls the wrong way");
-  if (len(l.t2) > s.teamPull + fTol) out.push("line pulls harder than the team");
+  const lineDir = (line.via ?? team).sub(P2).unit();
+  if (l.t2.len() > fTol && l.t2.unit().distanceTo(lineDir) > tol) out.push("line pulls the wrong way");
+  if (l.t2.len() > s.teamPull + fTol) out.push("line pulls harder than the team");
   // Within the team's reach the line can only hang slack: nearer still, it carries nothing.
-  const reach = len(sub(P2, team));
-  if (!l.teamHolding && Math.abs(len(l.t2) - s.teamPull) > fTol) out.push("line isn't at the team's pull");
+  const reach = P2.distanceTo(team);
+  if (!l.teamHolding && Math.abs(l.t2.len() - s.teamPull) > fTol) out.push("line isn't at the team's pull");
   if (l.teamHolding && reach > TEAM_REACH + tol) out.push("team holds an end out of reach");
-  if (reach < TEAM_REACH - tol && len(l.t2) > fTol) out.push("line pulls within the team's reach");
+  if (reach < TEAM_REACH - tol && l.t2.len() > fTol) out.push("line pulls within the team's reach");
 
   // Nothing passes through the ground or the wall.
   for (const P of [P1, P2]) {
@@ -130,34 +127,34 @@ function violations(s: Setup, r: LowerResult): string[] {
   // Each contact touches its surface and only pushes, square to it.
   for (const c of l.contacts) {
     const f = c.force;
-    const along = (n: Vec) => Math.abs(cross(n, f)) < fTol && f.x * n.x + f.y * n.y > 0;
+    const along = (n: Vector2) => Math.abs(n.cross(f)) < fTol && f.dot(n) > 0;
     const ok =
       c.surface === "ground"
-        ? Math.abs(c.point.y) < tol && along(vec(0, 1))
+        ? Math.abs(c.point.y) < tol && along(vec2(0, 1))
         : c.surface === "wall"
-          ? Math.abs(c.point.x) < tol && c.point.y <= h + tol && along(vec(1, 0))
+          ? Math.abs(c.point.x) < tol && c.point.y <= h + tol && along(vec2(1, 0))
           : c.surface === "top"
-            ? Math.abs(c.point.y - h) < tol && c.point.x <= tol && along(vec(0, 1))
-            : len(sub(c.point, edge)) < tol;
+            ? Math.abs(c.point.y - h) < tol && c.point.x <= tol && along(vec2(0, 1))
+            : c.point.distanceTo(edge) < tol;
     if (!ok) out.push(`${c.surface} contact is wrong`);
   }
   // The stretcher's edge contact pushes square to the stretcher (or out from the edge at an end).
   for (const c of l.contacts.filter((c) => c.surface === "edge")) {
-    const d = unit(sub(P2, P1));
-    const atEnd = Math.min(len(sub(c.point, P1)), len(sub(c.point, P2))) < tol;
-    if (!atEnd && Math.abs(c.force.x * d.x + c.force.y * d.y) > fTol) out.push("edge pushes along the stretcher");
+    const d = P2.sub(P1).unit();
+    const atEnd = Math.min(c.point.distanceTo(P1), c.point.distanceTo(P2)) < tol;
+    if (!atEnd && Math.abs(c.force.dot(d)) > fTol) out.push("edge pushes along the stretcher");
   }
 
   // The stretcher balances.
-  const forces: { at: Vec; f: Vec }[] = [
-    { at: scale(add(P1, P2), 0.5), f: vec(0, -W) },
+  const forces: { at: Vector2; f: Vector2 }[] = [
+    { at: P1.add(P2).scale(0.5), f: vec2(0, -W) },
     { at: P1, f: l.t1 },
     { at: P2, f: l.t2 },
     ...l.contacts.map((c) => ({ at: c.point, f: c.force })),
   ];
-  const net = forces.reduce((sum, x) => add(sum, x.f), vec(0, 0));
-  if (len(net) > fTol) out.push(`forces don't balance by ${len(net).toFixed(2)} N`);
-  const torque = forces.reduce((sum, x) => sum + cross(sub(x.at, P1), x.f), 0);
+  const net = forces.reduce((sum, x) => sum.add(x.f), Vector2.ZERO);
+  if (net.len() > fTol) out.push(`forces don't balance by ${net.len().toFixed(2)} N`);
+  const torque = forces.reduce((sum, x) => sum + x.at.sub(P1).cross(x.f), 0);
   if (Math.abs(torque) > fTol) out.push(`torques don't balance by ${torque.toFixed(2)} N·m`);
   return out;
 }

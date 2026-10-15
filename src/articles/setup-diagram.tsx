@@ -1,11 +1,11 @@
 import { DEFAULTS, arrangement } from "@/articles/standing-body-belays-figures";
+import { linearScale } from "@/lib/math";
+import { vec2, type Vector2 } from "@/lib/vector2";
 
 /*
  * The lower, seen side on and drawn to scale from the solver's arrangement for the common case, holding still.
  * Drawn in `currentColor` and its tints, so it prints in black on white.
  */
-
-type P = { x: number; y: number };
 
 /** How tall the people are drawn (m), as on the body belay page. */
 const PERSON_HEIGHT = 1.75;
@@ -20,16 +20,14 @@ const S = 50;
 const W = (RIGHT - LEFT) * S;
 const H = (TOP - BOTTOM) * S;
 
-const X = (x: number) => (x - LEFT) * S;
-const Y = (y: number) => (TOP - y) * S;
-const pt = (p: P) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
-const along = (from: P, to: P, d: number): P => {
-  const l = Math.hypot(to.x - from.x, to.y - from.y);
-  return { x: from.x + ((to.x - from.x) * d) / l, y: from.y + ((to.y - from.y) * d) / l };
-};
+const X = linearScale([LEFT, RIGHT], [0, W]);
+const Y = linearScale([TOP, BOTTOM], [0, H]);
+const pt = (p: Vector2) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
+/** The point `d` from `from` towards `to`. */
+const along = (from: Vector2, to: Vector2, d: number) => from.add(to.sub(from).unit().scale(d));
 
 /** A straight-bodied person from `feet` towards `toward`, with their hands at `hands`. */
-function Person(props: { feet: P; toward: P; hands: P }) {
+function Person(props: { feet: Vector2; toward: Vector2; hands: Vector2 }) {
   const head = along(props.feet, props.toward, PERSON_HEIGHT - 0.12);
   const shoulder = along(props.feet, props.toward, 1.45);
   return (
@@ -42,8 +40,8 @@ function Person(props: { feet: P; toward: P; hands: P }) {
 }
 
 /** A labelled distance from `a` to `b`, with its label `dy` units below (or above, if negative) its middle. */
-function Dimension(props: { a: P; b: P; label: string; dy?: number; anchor?: "start" | "middle" }) {
-  const mid = { x: (props.a.x + props.b.x) / 2, y: (props.a.y + props.b.y) / 2 };
+function Dimension(props: { a: Vector2; b: Vector2; label: string; dy?: number; anchor?: "start" | "middle" }) {
+  const mid = props.a.add(props.b).scale(0.5);
   return (
     <g>
       <line
@@ -72,12 +70,12 @@ export function SetupDiagram() {
   const a = arrangement({ edgeFriction: 0 });
   const { l, b } = a;
   const wall = DEFAULTS.wallHeight;
-  const feet = { x: b.feet.x, y: b.feet.y };
+  const feet = b.feet.xy();
   const waist = l.anchor;
   const rope = [waist, ...(l.wrapEdge ? [l.wrapEdge] : []), l.barEnd1];
   const line = [l.barEnd2, ...(l.lineEdge ? [l.lineEdge] : []), l.team];
-  const teamFeet = { x: l.team.x + 0.35, y: 0 };
-  const stretcherMid = { x: (l.barEnd1.x + l.barEnd2.x) / 2, y: (l.barEnd1.y + l.barEnd2.y) / 2 };
+  const teamFeet = vec2(l.team.x + 0.35, 0);
+  const stretcherMid = l.barEnd1.add(l.barEnd2).scale(0.5);
 
   return (
     <figure className="flex flex-col gap-2 print:break-inside-avoid">
@@ -112,7 +110,7 @@ export function SetupDiagram() {
           opacity={0.08}
         />
         <path
-          d={`M${pt({ x: LEFT, y: wall })} L${pt({ x: 0, y: wall })} L${pt({ x: 0, y: 0 })}`}
+          d={`M${pt(vec2(LEFT, wall))} L${pt(vec2(0, wall))} L${pt(vec2(0, 0))}`}
           stroke="currentColor"
           strokeWidth={2}
           fill="none"
@@ -141,19 +139,19 @@ export function SetupDiagram() {
         {/* The people: one belayer (the other is beside them, hidden behind), and the ground team. */}
         <g className="text-slate-200 print:text-black">
           <Person feet={feet} toward={waist} hands={along(waist, rope[1], 0.35)} />
-          <Person feet={teamFeet} toward={{ x: teamFeet.x + 0.25, y: 1 }} hands={l.team} />
+          <Person feet={teamFeet} toward={vec2(teamFeet.x + 0.25, 1)} hands={l.team} />
         </g>
 
         {/* Dimensions. */}
         <Dimension
-          a={{ x: LEFT + 0.4, y: 0 }}
-          b={{ x: LEFT + 0.4, y: wall }}
+          a={vec2(LEFT + 0.4, 0)}
+          b={vec2(LEFT + 0.4, wall)}
           label={`${wall} m`}
           dy={5}
           anchor="start"
         />
-        <Dimension a={{ x: feet.x, y: wall - 0.35 }} b={{ x: 0, y: wall - 0.35 }} label={`${DEFAULTS.belayerBack} m`} />
-        <Dimension a={{ x: 0, y: -0.3 }} b={{ x: l.team.x, y: -0.3 }} label={`${DEFAULTS.teamDistance} m`} />
+        <Dimension a={vec2(feet.x, wall - 0.35)} b={vec2(0, wall - 0.35)} label={`${DEFAULTS.belayerBack} m`} />
+        <Dimension a={vec2(0, -0.3)} b={vec2(l.team.x, -0.3)} label={`${DEFAULTS.teamDistance} m`} />
 
         {/* Labels. */}
         <g fill="currentColor" className="text-slate-300 print:text-black">

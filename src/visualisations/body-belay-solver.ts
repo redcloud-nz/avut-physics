@@ -1,4 +1,4 @@
-import { len, sub, vec } from "@/lib/vec";
+import { vec3, type Vector3 } from "@/lib/vector3";
 import { ropePathFor } from "./ladder-hinge-held";
 import { solveLower, type Lowered, type Setup as LowerSetup } from "./two-point-lower-solver";
 
@@ -49,26 +49,18 @@ export const WAIST_HEIGHT = 1;
  */
 export const PAST_EDGE = 0.5;
 
-export type V3 = { x: number; y: number; z: number };
-
-const v3 = (x: number, y: number, z: number): V3 => ({ x, y, z });
-const sub3 = (a: V3, b: V3) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
-const len3 = (a: V3) => Math.hypot(a.x, a.y, a.z);
-const dot3 = (a: V3, b: V3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const scale3 = (a: V3, k: number) => v3(a.x * k, a.y * k, a.z * k);
-
 /** The belayer on the z > 0 side (the other is their mirror image). */
 export type Belayer = {
-  feet: V3;
-  waist: V3;
+  feet: Vector3;
+  waist: Vector3;
   /** How far they lean back from upright (radians), away from their rope. */
   lean: number;
   /** The direction they lean away from, seen from above: their rope's pull, x towards the wall's face. */
   facing: { x: number; z: number };
   /** Their rope's pull on them, at their waist. */
-  pull: V3;
+  pull: Vector3;
   /** The ground's push on their feet: up, and back against the rope (friction). */
-  ground: V3;
+  ground: Vector3;
   /** The friction coefficient their feet need to hold: the ground's sideways push over its upward push. */
   gripNeeded: number;
   /** The footing's safety factor: the friction their feet can take over the friction they need (the footing's grip
@@ -94,15 +86,15 @@ export type Belayed = {
   /** The angle between the two ropes where they meet at the stretcher (radians). */
   ropeAngle: number;
   /** Where the belayer's rope crosses the wall's edge (z > 0 side), when it wraps over it. */
-  edgeCrossing: V3 | null;
+  edgeCrossing: Vector3 | null;
 };
 
 export type BelayResult = ({ kind: "belayed" } & Belayed) | { kind: "none"; reason: string };
 
 /** A belayer's waist, leaning back by `lean` away from `facing`. */
-function waistFor(s: Setup, lean: number, facing: { x: number; z: number }): V3 {
+function waistFor(s: Setup, lean: number, facing: { x: number; z: number }): Vector3 {
   const back = WAIST_HEIGHT * Math.sin(lean);
-  return v3(
+  return vec3(
     -s.belayerBack - back * facing.x,
     s.wallHeight + WAIST_HEIGHT * Math.cos(lean),
     s.gap / 2 - back * facing.z,
@@ -110,7 +102,7 @@ function waistFor(s: Setup, lean: number, facing: { x: number; z: number }): V3 
 }
 
 /** The two-point lower's setup seen side on, with the rope's anchor at the belayers' waists. */
-export function lowerSetupFor(s: Setup, waist: V3): LowerSetup {
+export function lowerSetupFor(s: Setup, waist: Vector3): LowerSetup {
   const anchorUp = waist.y - s.wallHeight;
   const anchorBack = -waist.x;
   return { ...s, anchorUp, anchorBack, rope: Math.hypot(anchorUp, anchorBack) + PAST_EDGE };
@@ -118,29 +110,28 @@ export function lowerSetupFor(s: Setup, waist: V3): LowerSetup {
 
 /** The ropes and the belayer, for the stretcher placed side on and the belayer at this lean. */
 function belayedFor(s: Setup, ls: LowerSetup, l: Lowered, lean: number, facing: { x: number; z: number }): Belayed {
-  const feet = v3(-s.belayerBack, s.wallHeight, s.gap / 2);
+  const feet = vec3(-s.belayerBack, s.wallHeight, s.gap / 2);
   const waist = waistFor(s, lean, facing);
-  const end = v3(l.barEnd1.x, l.barEnd1.y, 0);
+  const end = vec3(l.barEnd1.x, l.barEnd1.y, 0);
   // Side on, the rope is `side` long; its sideways run makes it longer, and tilts its every part by the same
   // amount, unfolded about the edge. Only the part along the side-on view pulls the stretcher in its plane.
   const side = ropePathFor(ls, l.barEnd1).length;
   const rope = Math.hypot(side, waist.z);
-  const loadTension = l.ropeTaut ? len(l.t1) / 2 / (side / rope) : 0;
-  let edgeCrossing: V3 | null = null;
+  const loadTension = l.ropeTaut ? l.t1.len() / 2 / (side / rope) : 0;
+  let edgeCrossing: Vector3 | null = null;
   let next = end;
   let wrap = 0;
   if (l.wrapEdge) {
-    const toEdge = len(sub(l.wrapEdge, vec(waist.x, waist.y)));
-    edgeCrossing = v3(0, s.wallHeight, (waist.z * (side - toEdge)) / side);
+    const toEdge = l.wrapEdge.distanceTo(waist.xy());
+    edgeCrossing = vec3(0, s.wallHeight, (waist.z * (side - toEdge)) / side);
     next = edgeCrossing;
-    const [a, b] = [sub3(edgeCrossing, waist), sub3(end, edgeCrossing)];
-    wrap = Math.acos(Math.max(-1, Math.min(1, dot3(a, b) / len3(a) / len3(b))));
+    wrap = edgeCrossing.sub(waist).angleTo(end.sub(edgeCrossing));
   }
   const tension = loadTension * Math.exp(-s.edgeFriction * wrap);
-  const along = sub3(next, waist);
-  const pull = scale3(along, tension / len3(along));
+  const along = next.sub(waist);
+  const pull = along.scale(tension / along.len());
   // Their feet balance the pull and their weight (taken at their waist, where the strut meets the rope).
-  const ground = v3(-pull.x, s.belayerWeight - pull.y, -pull.z);
+  const ground = vec3(-pull.x, s.belayerWeight - pull.y, -pull.z);
   const sideways = Math.hypot(ground.x, ground.z);
   const gripNeeded = ground.y > 0 ? sideways / ground.y : Infinity;
   return {

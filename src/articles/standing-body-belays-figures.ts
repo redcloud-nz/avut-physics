@@ -1,3 +1,4 @@
+import { G } from "@/lib/constants";
 import { solveBelay, type Belayed } from "@/visualisations/body-belay-solver";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
@@ -5,8 +6,6 @@ import { SURFACES } from "@/visualisations/body-belay-surfaces";
  * The article's figures, worked out by the body belay page's own solver, so they always match what the page
  * shows for the same settings.
  */
-
-const G = 9.81;
 
 /** The body belay page's defaults, in its units (masses in kg). */
 export const DEFAULTS = {
