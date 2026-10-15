@@ -83,10 +83,10 @@ export const DIESEL = 0.84;
 export const TARE_FUEL = 10;
 
 /** How far a bullbar's and winch's mass sits back from the front bumper. */
-const BULLBAR_DEPTH = 0.2;
+export const BULLBAR_DEPTH = 0.2;
 /** The tub's floor ends this far short of the rear bumper; the tow ball sits this far past it. */
-const TAILGATE = 0.15;
-const BALL_PAST_BUMPER = 0.1;
+export const TAILGATE = 0.15;
+export const BALL_PAST_BUMPER = 0.1;
 
 /** Where the front fit-out, the tub and the tow ball sit in a ute of these dimensions. */
 export function layoutFor(u: {

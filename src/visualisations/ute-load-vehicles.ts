@@ -382,4 +382,10 @@ export const UTES: Ute[] = [
     },
 ];
 
+/** Fit-outs to start from, as masses for each group (kg). "Rescue" is a typical emergency-service fit-out. */
+export const FITOUTS = {
+    bare: { front: 0, cab: 0, tub: 0, underbody: 0 },
+    rescue: { front: 105, cab: 28, tub: 222, underbody: 32 },
+} as const;
+
 export const uteFor = (key: string) => UTES.find((u) => u.key === key) ?? UTES[0];

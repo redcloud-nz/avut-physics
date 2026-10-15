@@ -13,7 +13,7 @@ import { Arrow, Label } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { vec2 } from "@/lib/vector2";
 
-import { UteLoadNotes } from "./ute-load-notes";
+import { NEAR, UteLoadNotes } from "./ute-load-notes";
 import {
     CAB,
     checksFor,
@@ -24,7 +24,7 @@ import {
     type Check,
     type Load,
 } from "./ute-load-solver";
-import { uteFor, UTES } from "./ute-load-vehicles";
+import { FITOUTS, uteFor, UTES } from "./ute-load-vehicles";
 
 const COLORS = {
     load: "#facc15",
@@ -36,8 +36,6 @@ const COLORS = {
     outline: "#64748b",
 };
 
-/** A rating counts as nearly reached from this share of it. */
-const NEAR = 0.9;
 /** Shown in place of a value that doesn't apply. */
 const NONE = "—";
 
@@ -53,11 +51,6 @@ const CHECK_LABELS: Record<Check["key"], string> = {
     towBall: "Tow ball download",
 };
 
-/** Fit-outs to start from, as masses for each group (kg). "Rescue" is a typical emergency-service fit-out. */
-const FITOUTS = {
-    bare: { front: 0, cab: 0, tub: 0, underbody: 0 },
-    rescue: { front: 105, cab: 28, tub: 222, underbody: 32 },
-} as const;
 type Fitout = keyof typeof FITOUTS | "custom";
 
 /** The drawing's width in SVG units, and the span of the world it shows (metres from the front axle). */
@@ -435,26 +428,6 @@ export default function UteLoad() {
                         onChange={setCrew}
                     />
                     <Slider
-                        label="Each crew member, with gear"
-                        value={crewMass}
-                        min={50}
-                        max={150}
-                        step={1}
-                        unit="kg"
-                        digits={0}
-                        onChange={setCrewMass}
-                    />
-                    <Slider
-                        label="Fuel"
-                        value={fuel}
-                        min={0}
-                        max={100}
-                        step={5}
-                        unit="%"
-                        digits={0}
-                        onChange={setFuel}
-                    />
-                    <Slider
                         label="Cargo in the tub"
                         value={cargo}
                         min={0}
@@ -465,16 +438,6 @@ export default function UteLoad() {
                         onChange={setCargo}
                     />
                     <Slider
-                        label="Cargo's position (front to tailgate)"
-                        value={cargoAt}
-                        min={0}
-                        max={100}
-                        step={5}
-                        unit="%"
-                        digits={0}
-                        onChange={setCargoAt}
-                    />
-                    <Slider
                         label="Trailer, loaded"
                         value={trailer}
                         min={0}
@@ -483,17 +446,6 @@ export default function UteLoad() {
                         unit="kg"
                         digits={0}
                         onChange={setTrailer}
-                    />
-                    <Slider
-                        label="Tow ball share of trailer"
-                        value={ballPct}
-                        min={0}
-                        max={15}
-                        step={0.5}
-                        unit="%"
-                        digits={1}
-                        disabled={trailer === 0}
-                        onChange={setBallPct}
                     />
                     <Separator />
                     <Choice
@@ -508,6 +460,47 @@ export default function UteLoad() {
                     />
                     {more(
                         <>
+                            <Slider
+                                label="Fuel"
+                                value={fuel}
+                                min={0}
+                                max={100}
+                                step={5}
+                                unit="%"
+                                digits={0}
+                                onChange={setFuel}
+                            />
+                            <Slider
+                                label="Each crew member, with gear"
+                                value={crewMass}
+                                min={50}
+                                max={150}
+                                step={1}
+                                unit="kg"
+                                digits={0}
+                                onChange={setCrewMass}
+                            />
+                            <Slider
+                                label="Cargo's position (front to tailgate)"
+                                value={cargoAt}
+                                min={0}
+                                max={100}
+                                step={5}
+                                unit="%"
+                                digits={0}
+                                onChange={setCargoAt}
+                            />
+                            <Slider
+                                label="Tow ball share of trailer"
+                                value={ballPct}
+                                min={0}
+                                max={15}
+                                step={0.5}
+                                unit="%"
+                                digits={1}
+                                disabled={trailer === 0}
+                                onChange={setBallPct}
+                            />
                             <Slider
                                 label="Bullbar, winch, lights (front)"
                                 value={masses.front}

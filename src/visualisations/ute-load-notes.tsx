@@ -1,6 +1,16 @@
 import { Part } from "./ladder-hinge-notes";
-import { CAB, DIESEL, TARE_FUEL } from "./ute-load-solver";
-import type { Ute } from "./ute-load-vehicles";
+import {
+    BALL_PAST_BUMPER,
+    BULLBAR_DEPTH,
+    CAB,
+    DIESEL,
+    TAILGATE,
+    TARE_FUEL,
+} from "./ute-load-solver";
+import { FITOUTS, type Ute } from "./ute-load-vehicles";
+
+/** A rating counts as nearly reached from this share of it. */
+export const NEAR = 0.9;
 
 const FIGURES: { key: keyof Ute; label: string; format: (u: Ute) => string }[] = [
     { key: "tare", label: "Tare", format: (u) => `${u.tare} kg` },
@@ -76,21 +86,113 @@ export function UteLoadNotes(props: { ute: Ute }) {
 
             <Part title="Where the loads sit">
                 <p>
-                    Cabs are much alike, so every ute here uses the same positions, measured back
-                    from the front axle: the front seats at {CAB.frontSeat} m, the rear seats at{" "}
-                    {CAB.rearSeat} m, the roof light bar, radios and sirens at {CAB.roof} m, bash
-                    plates at {CAB.underbody} m and the fuel tank at {CAB.fuelTank} m. The first two
-                    crew sit in the front. Bullbar and winch sit just behind the front bumper. The
-                    canopy and drawers sit at the middle of the tub, and the tub and tow ball come
-                    from each ute’s overhangs and tub length. These positions are estimates, good to
-                    perhaps 0.2 m.
+                    Every position is measured back from the centre of the front axle. Each ute’s
+                    wheelbase, overhangs and tub length come from its figures below. Everything else
+                    sits at the same place in every ute, because dual cabs are laid out much alike.
+                    These positions are estimates from a typical dual cab’s layout, not
+                    measurements, and are good to perhaps 0.2 m. Moving 100 kg by 0.2 m shifts about
+                    6 kg from one axle to the other.
                 </p>
+                <ul className="flex list-disc flex-col gap-1.5 pl-5">
+                    <li>
+                        Crew: the first two sit in the front seats, at {CAB.frontSeat} m, and the
+                        rest in the back seats, at {CAB.rearSeat} m, roughly where a seated person’s
+                        hips are. Each weighs 100 kg to start with, counting PPE and personal gear.
+                    </li>
+                    <li>
+                        Bullbar, winch, recovery points, spotlights and snorkel: together,{" "}
+                        {BULLBAR_DEPTH} m behind the front bumper. The snorkel really sits further
+                        back, but it’s light.
+                    </li>
+                    <li>Bash plates: at {CAB.underbody} m, under the engine.</li>
+                    <li>
+                        Light bar, radios, sirens and aerials: together at {CAB.roof} m, about over
+                        the front seats.
+                    </li>
+                    <li>
+                        The tub: its floor ends {TAILGATE} m in from the rear bumper and runs
+                        forward for the tub’s length. The canopy and drawers sit at its middle, as
+                        if spread evenly along it. Cargo sits at one point along it, set by “Cargo’s
+                        position”, from the tub’s front wall (0%) to the tailgate (100%).
+                    </li>
+                    <li>
+                        Fuel: the tank sits at {CAB.fuelTank} m, between the axles behind the cab.
+                        The tare already counts {TARE_FUEL} L, so the “Fuel” setting adds the rest,
+                        as diesel at {DIESEL} kg/L. Below {TARE_FUEL} L it takes a little off.
+                    </li>
+                    <li>
+                        The tow ball: {BALL_PAST_BUMPER} m past the rear bumper. Tow bars vary, and
+                        one that reaches further back puts more on the rear axle and takes more off
+                        the front.
+                    </li>
+                </ul>
+            </Part>
+
+            <Part title="The “Rescue” fit-out">
                 <p>
-                    The “Rescue” fit-out is a typical emergency-service ute: a steel bullbar and
-                    winch with recovery points, spotlights and a snorkel (105 kg); a roof light bar,
-                    radios, sirens and aerials (28 kg); a fibreglass canopy and twin drawer system
-                    (222 kg); and bash plates (32 kg). Fuel is diesel at {DIESEL} kg/L.
+                    This is an itemised estimate for one emergency-service ute, taking the middle of
+                    each item’s likely range:
                 </p>
+                <ul className="flex list-disc flex-col gap-1.5 pl-5">
+                    <li>
+                        Front, {FITOUTS.rescue.front} kg: a steel bullbar (55–65 kg, from the
+                        maker’s weight less the factory bumper it replaces), a winch (30–35 kg),
+                        recovery points (4–8 kg), spotlights (2–5 kg) and a snorkel (3–5 kg).
+                    </li>
+                    <li>
+                        Cab and roof, {FITOUTS.rescue.cab} kg: a full-size light bar (10–20 kg),
+                        radios (5–10 kg), sirens (2–4 kg) and aerials (2–4 kg).
+                    </li>
+                    <li>
+                        Tub, {FITOUTS.rescue.tub} kg: a fibreglass canopy (90–130 kg) and a twin
+                        drawer system (107–118 kg, from the maker’s weights).
+                    </li>
+                    <li>Underbody, {FITOUTS.rescue.underbody} kg: bash plates (25–40 kg).</li>
+                </ul>
+                <p>
+                    All told, that’s 335 to 444 kg; the middle figure is{" "}
+                    {Object.values(FITOUTS.rescue).reduce((a, b) => a + b, 0)} kg. A different
+                    canopy, drawers or bullbar can easily change it by 100 kg.
+                </p>
+            </Part>
+
+            <Part title="Where the figures come from">
+                <p>
+                    The ratings, masses and dimensions come from spec listings by CarExpert and
+                    carsales (Redbook), linked below for each ute. Most are for Australian models.
+                    Where New Zealand figures were also found, they matched. The makers’ own spec
+                    sheets mostly couldn’t be found online. Some figures had to be worked out or
+                    assumed:
+                </p>
+                <ul className="flex list-disc flex-col gap-1.5 pl-5">
+                    <li>
+                        How the empty ute’s weight splits between its axles. No maker publishes
+                        this, and no weighbridge readings were found. Every diesel ute here assumes
+                        58% on the front, a typical share for a front-engined dual cab rather than a
+                        measurement of any of them. The Shark 6 assumes 55%, as its battery sits
+                        under the floor. Each percentage point moves about 21 kg between the axles
+                        of a 2.1 tonne ute, so this matters most for the front axle. It can be
+                        changed under “More settings”.
+                    </li>
+                    <li>
+                        Tare, where only the kerb mass (with a full tank) was published: the kerb
+                        mass less the fuel above {TARE_FUEL} L, at {DIESEL} kg/L.
+                    </li>
+                    <li>
+                        Axle ratings. The listings call these “axle weights”. For most utes the
+                        front and rear figures add up to well over the GVM, as ratings do. The Shark
+                        6’s add up to exactly its GVM, so they may be a split of the GVM rather than
+                        ratings.
+                    </li>
+                    <li>
+                        Tow ball limits, where none was published: a tenth of the braked towing
+                        capacity.
+                    </li>
+                    <li>
+                        Tub lengths and overhangs, where only some were published: worked out from
+                        the overall length, or taken from similar utes.
+                    </li>
+                </ul>
             </Part>
 
             <Part title="Assumptions and shortcuts">
@@ -100,20 +202,19 @@ export function UteLoadNotes(props: { ute: Ute }) {
                         slopes all move weight between the axles.
                     </li>
                     <li>
-                        The makers don’t publish how an empty ute’s weight splits between its axles.
-                        Where no weighbridge figure was found, the split is an estimate, and it can
-                        be changed under “More settings”. A weighbridge that weighs each axle gives
-                        the real figure.
-                    </li>
-                    <li>
                         Ratings change between variants, years and markets, and a GVM upgrade or a
                         different tow bar changes them again. The plate on the vehicle is the
-                        authority.
+                        authority. A weighbridge that weighs each axle gives the real loads.
                     </li>
                     <li>Tyres and wheels have load ratings of their own, not checked here.</li>
                     <li>
                         Nothing is off to one side. Real loads rarely sit on the centreline, which
                         loads one wheel more than the other.
+                    </li>
+                    <li>
+                        A bar turns amber from {NEAR * 100}% of its rating, and red past it.
+                        “Heaviest trailer at full GVM” is the GCM less the GVM, but no more than the
+                        braked towing capacity.
                     </li>
                 </ul>
             </Part>
