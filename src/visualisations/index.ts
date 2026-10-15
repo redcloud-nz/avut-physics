@@ -1,5 +1,10 @@
 export type Visualisation = {
-    href: "/block-on-an-incline" | "/ladder-hinge-lower" | "/two-point-lower" | "/body-belay";
+    href:
+        | "/block-on-an-incline"
+        | "/ladder-hinge-lower"
+        | "/two-point-lower"
+        | "/body-belay"
+        | "/ute-load";
     title: string;
     description: string;
 };
@@ -32,5 +37,12 @@ export const bodyBelay: Visualisation = {
         "The two-point lower with no anchor: two belayers standing side by side on the wall top each hold a rope round their waist and lean back against its pull. Shows how the angle between their ropes loads them, and whether their feet grip well enough to stop them sliding towards the edge.",
 };
 
+export const uteLoad: Visualisation = {
+    href: "/ute-load",
+    title: "Loading a Ute",
+    description:
+        "A dual-cab ute, side on, loaded with crew, fit-out, cargo and a trailer. Shows how the weight shares between the axles, how a tow ball lifts weight off the front wheels, and how close each total comes to the ute's ratings.",
+};
+
 /** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
-export const visualisations: Visualisation[] = [ladderHinge, twoPointLower, bodyBelay];
+export const visualisations: Visualisation[] = [ladderHinge, twoPointLower, bodyBelay, uteLoad];
