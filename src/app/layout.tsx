@@ -26,7 +26,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
             <body className="h-dvh overflow-hidden font-sans">
                 {/* The page scrolls inside this box rather than the window, so its scrollbar can be styled everywhere. */}
-                <div className="page-scroll flex h-full flex-col overflow-y-auto">{children}</div>
+                <div className="page-scroll flex h-full flex-col overflow-y-auto">
+                    {children}
+                    <footer className="mt-auto px-4 pb-6 text-center text-sm text-slate-500 print:hidden">
+                        <a
+                            href="https://github.com/redcloud-nz/avut-physics"
+                            className="hover:text-sky-300"
+                        >
+                            Source on GitHub
+                        </a>
+                    </footer>
+                </div>
             </body>
         </html>
     );
