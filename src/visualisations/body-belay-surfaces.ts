@@ -2,6 +2,12 @@
  * The surfaces the belayers might stand on, each with the friction coefficient between it and rubber-soled boots,
  * dry and wet. These are rough, middle-of-the-range figures: the real value varies a lot with the boots' tread
  * and wear, the surface's finish and age, and what's on it.
+ *
+ * Painted and chequer-plate steel follow slip-tester measurements: English & Marletta, "An Investigation of Surface
+ * Slip Resistance on Structural Steel" (CPWR, 1995), and Vidal, "Comparison of Slip Resistance of Tread Plate and
+ * Smooth Steel with Various Finishes Using a Variable Incidence Tribometer" (AAFS, 2010). Smooth painted steel
+ * measured 0.7 to 0.9 dry and 0.14 to 0.26 wet with glossy paints, and higher with primers; these take the low end
+ * dry and allow for less glossy paint wet. The rest are estimates.
  */
 export const SURFACES = [
   { key: "concrete", label: "Concrete", dry: 0.8, wet: 0.6 },
@@ -11,8 +17,8 @@ export const SURFACES = [
   { key: "gravel", label: "Loose gravel", dry: 0.5, wet: 0.45 },
   { key: "grass", label: "Grass", dry: 0.45, wet: 0.25 },
   { key: "timber", label: "Timber decking", dry: 0.6, wet: 0.35 },
-  { key: "chequer", label: "Chequer-plate steel", dry: 0.6, wet: 0.4 },
-  { key: "painted-steel", label: "Painted steel", dry: 0.5, wet: 0.25 },
+  { key: "chequer", label: "Chequer-plate steel", dry: 0.75, wet: 0.6 },
+  { key: "painted-steel", label: "Painted steel", dry: 0.7, wet: 0.3 },
 ] as const;
 
 type Surface = (typeof SURFACES)[number];

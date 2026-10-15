@@ -1,4 +1,5 @@
 import { solveBelay, type Belayed } from "@/visualisations/body-belay-solver";
+import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
 /*
  * The write-up's figures, worked out by the body belay page's own solver, so they always match what the page
@@ -16,7 +17,7 @@ export const DEFAULTS = {
   belayerMass: 80,
   stretcherMass: 90,
   /** Dry painted steel, a shipping container's roof. */
-  grip: 0.5,
+  grip: SURFACES.find((s) => s.key === "painted-steel")!.dry,
   /** A painted steel container rail. */
   edgeFriction: 0.2,
   teamDistance: 4,
@@ -25,8 +26,8 @@ export const DEFAULTS = {
 
 export type Case = Partial<typeof DEFAULTS>;
 
-/** One belayer's load, for the page's defaults changed by `c`. */
-export function belay(c: Case = {}) {
+/** The solver's whole arrangement, stretcher and belayers, for the page's defaults changed by `c`. */
+export function arrangement(c: Case = {}): Belayed {
   const i = { ...DEFAULTS, ...c };
   const r = solveBelay({
     wallHeight: i.wallHeight,
@@ -41,7 +42,12 @@ export function belay(c: Case = {}) {
     barWeight: i.stretcherMass * G,
   });
   if (r.kind === "none") throw new Error(`The body belay solver found no arrangement for ${JSON.stringify(c)}`);
-  const b: Belayed = r;
+  return r;
+}
+
+/** One belayer's load, for the page's defaults changed by `c`. */
+export function belay(c: Case = {}) {
+  const b = arrangement(c);
   return {
     /** Each rope's tension at the stretcher (N). */
     loadTension: b.loadTension,

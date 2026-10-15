@@ -157,11 +157,18 @@ html {
     @apply font-sans;
   }
 }
-/* Printed (or saved as a PDF), the page flows onto as many sheets as it needs, rather than scrolling in its box. */
+/* Printed (or saved as a PDF), the page flows onto as many sheets as it needs, rather than scrolling in its box,
+   in black on white paper. */
 @media print {
+  html {
+    color-scheme: light;
+    height: auto;
+  }
   body,
   .page-scroll {
+    display: block;
     height: auto;
     overflow: visible;
+    background: white;
   }
 }
