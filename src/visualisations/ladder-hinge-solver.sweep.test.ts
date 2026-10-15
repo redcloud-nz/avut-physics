@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { solve } from "./ladder-hinge-solver";
 import { arrangement, randomInputs, setupFor } from "./ladder-hinge-solver.checks";
 
@@ -9,8 +10,12 @@ import { arrangement, randomInputs, setupFor } from "./ladder-hinge-solver.check
  * `npm run test:sweep -- -u`.
  */
 describe.runIf(process.env.SWEEP)("sweep", () => {
-  it("matches the recorded arrangements", { timeout: 120_000 }, async () => {
-    const lines = randomInputs(2000, 7).map((i) => `${JSON.stringify(i)}  →  ${arrangement(solve(setupFor(i)))}`);
-    await expect(lines.join("\n") + "\n").toMatchFileSnapshot("__snapshots__/ladder-hinge-sweep.txt");
-  });
+    it("matches the recorded arrangements", { timeout: 120_000 }, async () => {
+        const lines = randomInputs(2000, 7).map(
+            (i) => `${JSON.stringify(i)}  →  ${arrangement(solve(setupFor(i)))}`,
+        );
+        await expect(lines.join("\n") + "\n").toMatchFileSnapshot(
+            "__snapshots__/ladder-hinge-sweep.txt",
+        );
+    });
 });
