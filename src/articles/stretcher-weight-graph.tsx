@@ -1,4 +1,4 @@
-import { DEFAULTS, holding } from "@/articles/standing-body-belays-figures";
+import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { linearScale } from "@/lib/math";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
@@ -10,10 +10,10 @@ import { SURFACES } from "@/visualisations/body-belay-surfaces";
 const STEEL = SURFACES.find((s) => s.key === "painted-steel")!;
 
 /** The training loads shaded on the graph (kg). */
-export const TRAINING = { from: 45, to: 75 };
+const TRAINING = FIGURES.training;
 
 // The plot, in SVG user units: the axes' ranges and where they're drawn.
-const MASS = { from: 40, to: 140, step: 5 };
+const MASS = { from: 40, to: 140 };
 const SAFETY = { from: 0, to: 3 };
 const W = 480;
 const H = 300;
@@ -28,16 +28,9 @@ const path = (points: [number, number][]) =>
         .join(" ");
 
 export function StretcherWeightGraph() {
-    const masses = Array.from(
-        { length: (MASS.to - MASS.from) / MASS.step + 1 },
-        (_, i) => MASS.from + i * MASS.step,
-    );
     // The grip needed doesn't depend on the surface, so one solve gives both lines.
-    const needed = masses.map(
-        (m) => [m, holding({ stretcherMass: m, grip: STEEL.dry }).gripNeeded] as const,
-    );
-    const dry = needed.map(([m, g]) => [m, STEEL.dry / g] as [number, number]);
-    const wet = needed.map(([m, g]) => [m, STEEL.wet / g] as [number, number]);
+    const dry = FIGURES.graph.map((p) => [p.mass, STEEL.dry / p.gripNeeded] as [number, number]);
+    const wet = FIGURES.graph.map((p) => [p.mass, STEEL.wet / p.gripNeeded] as [number, number]);
     const end = (line: [number, number][]) => line[line.length - 1];
 
     return (

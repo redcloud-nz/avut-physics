@@ -40,6 +40,7 @@ npm run dev              # http://localhost:3000
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `npm test`           | Runs the tests (Vitest)                                                            |
 | `npm run test:sweep` | Runs the ladder hinge sweep: 2000 random setups against a recorded snapshot        |
+| `npm run figures`    | Works out the articles' figures again where they're out of date                    |
 | `npm run lint`       | ESLint                                                                             |
 | `npx tsc --noEmit`   | Type check                                                                         |
 | `npm run format`     | Formats everything with Prettier (also run on staged files by the pre-commit hook) |
@@ -68,6 +69,12 @@ through anything else. They don't reuse the solvers' own working.
 The solvers find the resting position by minimising potential energy (with Nelder–Mead), then
 solve the balance of forces exactly at that position. The numerical methods are in
 `src/lib/numeric.ts`.
+
+The articles quote figures from the same solvers, too many to work out as the site builds. Each
+article's `src/articles/<name>.compute.ts` works them out, and `npm run figures` saves them in
+`<name>.figures.json`, which the article reads. The file records a hash of the compute module and
+every local file it imports, so changing an article's inputs or a solver it uses marks its figures
+out of date, and the build and the pre-commit hook refuse to go on until they're worked out again.
 
 ## Licence
 

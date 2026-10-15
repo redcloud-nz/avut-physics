@@ -1,4 +1,4 @@
-import { arrangement, DEFAULTS } from "@/articles/standing-body-belays-figures";
+import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { linearScale } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
@@ -79,10 +79,18 @@ function Dimension(props: {
 }
 
 export function SetupDiagram() {
-    const a = arrangement({ edgeFriction: 0 });
-    const { l, b } = a;
+    const s = FIGURES.scene;
+    const at = (p: { x: number; y: number }) => vec2(p.x, p.y);
+    const l = {
+        anchor: at(s.anchor),
+        wrapEdge: s.wrapEdge && at(s.wrapEdge),
+        barEnd1: at(s.barEnd1),
+        barEnd2: at(s.barEnd2),
+        lineEdge: s.lineEdge && at(s.lineEdge),
+        team: at(s.team),
+    };
     const wall = DEFAULTS.wallHeight;
-    const feet = b.feet.xy();
+    const feet = at(s.feet);
     const waist = l.anchor;
     const rope = [waist, ...(l.wrapEdge ? [l.wrapEdge] : []), l.barEnd1];
     const line = [l.barEnd2, ...(l.lineEdge ? [l.lineEdge] : []), l.team];

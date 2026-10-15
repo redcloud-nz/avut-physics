@@ -1,4 +1,4 @@
-import { arrangement, DEFAULTS } from "@/articles/standing-body-belays-figures";
+import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
 import { newtons } from "@/lib/format";
@@ -20,13 +20,13 @@ const WAIST = 1;
 const SHOULDER = 1.45;
 
 export function BelayerForcesDiagram() {
-    const b = arrangement({ edgeFriction: 0 }).b;
+    const b = FIGURES.hold;
     const weight = DEFAULTS.belayerMass * G;
-    const up = b.ground.y;
-    const grip = Math.hypot(b.ground.x, b.ground.z);
+    const up = b.up;
+    const grip = b.sideways;
     const most = DEFAULTS.grip * up;
     // The rope's pull, seen in its own plane: towards the edge as hard as the boots grip, and a little down.
-    const pull = vec2(grip, -b.pull.y);
+    const pull = vec2(grip, b.ropeDown);
     const tension = pull.len();
 
     // Their body leans back, away from the edge (to the right), in line with the ground's push.

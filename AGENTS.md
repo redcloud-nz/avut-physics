@@ -8,6 +8,7 @@ Interactive physics visualisations and articles on rope rescue, served at physic
 ```bash
 npm test                   # Vitest
 npm run test:sweep         # Ladder hinge sweep against its recorded snapshot (not part of npm test)
+npm run figures            # Work out articles' figures again where they're out of date
 npm run lint               # ESLint
 npx tsc --noEmit -p .      # Type check
 npm run format             # Prettier over everything
@@ -42,7 +43,15 @@ compiles for around 20 seconds.
   answer.
 - `src/visualisations/<name>-notes.tsx` (and `-maths.tsx`): the "How this is calculated" section.
 - `src/visualisations/index.ts`: the registry of visualisations listed on the home page.
-- `src/articles/`: article figures. Article pages themselves are in `src/app`.
+- `src/articles/`: article figures. Article pages themselves are in `src/app`. Articles never run
+  solvers as they render: the solvers are too slow, and a page taking over a minute to build fails
+  the Vercel build. Instead `<name>.compute.ts` holds an article's inputs and works out its figures,
+  `npm run figures` saves them in `<name>.figures.json` (with a hash of the compute module and every
+  local file it imports), and `<name>-figures.ts` gives the article them typed.
+  `scripts/figures.mjs --check` runs before every build and commit, and fails when a hash no longer
+  matches. After changing a solver, its shared maths or an article's inputs, run `npm run figures`
+  and commit the JSON with the change. The hash is of the raw source, so a Prettier reformat counts
+  as a change too.
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`) and slider controls.
   Drawing only, no maths.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:

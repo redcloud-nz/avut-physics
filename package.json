@@ -5,12 +5,14 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/figures.mjs --check",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:sweep": "SWEEP=1 vitest run sweep",
+    "figures": "FIGURES=1 vitest run src/articles/figures.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

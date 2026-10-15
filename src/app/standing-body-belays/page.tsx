@@ -3,8 +3,8 @@ import Link from "next/link";
 
 import { BelayerForcesDiagram } from "@/articles/belayer-forces-diagram";
 import { SetupDiagram } from "@/articles/setup-diagram";
-import { DEFAULTS, holding } from "@/articles/standing-body-belays-figures";
-import { StretcherWeightGraph, TRAINING } from "@/articles/stretcher-weight-graph";
+import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
+import { StretcherWeightGraph } from "@/articles/stretcher-weight-graph";
 import { Eq, M } from "@/components/tex";
 import { degrees, kg, newtons } from "@/lib/format";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
@@ -20,28 +20,6 @@ const r = String.raw;
 /** A safety factor, to two places. */
 const sf = (x: number) => x.toFixed(2);
 
-/** A training pair (a heavy belayer, a light mock casualty) and a real one (a heavy casualty and their gear). */
-const TRAINING_PAIR = { belayer: 90, stretcher: 70 };
-const REAL_PAIR = { belayer: 70, stretcher: 120 };
-
-/** The belayers' and stretchers' weights (kg) in the table of safety factors by weight. */
-const TABLE_BELAYERS = [60, 70, 80, 90, 100];
-const TABLE_STRETCHERS = [75, 95, 115, 135];
-
-/** How far back from the edge the belayers stand, and how far apart (m), in the table of safety factors by placing. */
-const PLACING_BACKS = [1.5, 2, 3, 4, 6];
-const PLACING_GAPS = [0, 1, 2, 3, 4];
-
-/**
- * The heaviest stretcher (kg, to the nearest 1, from 40 kg) the common case's belayers hold still with at least
- * `safety`, with the footing's friction coefficient `grip`.
- */
-function heaviestAt(safety: number, grip: number = DEFAULTS.grip) {
-    let m = 39;
-    while (grip / holding({ stretcherMass: m + 1 }).gripNeeded >= safety) m++;
-    return m;
-}
-
 /** A list, joined with commas and a final "and". */
 const listed = (items: string[]) =>
     items.length < 2
@@ -49,28 +27,13 @@ const listed = (items: string[]) =>
         : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 
 export default function Page() {
-    const hold = holding();
-    const placings = PLACING_BACKS.map((back) =>
-        PLACING_GAPS.map((gap) => holding({ belayerBack: back, gap }).safety),
-    );
-    const bestPlacing = Math.max(...placings.flat());
+    const { hold, pairs, training, heaviest, weightTable, placingTable } = FIGURES;
+    const { training: trainingPair, real, heavy } = pairs;
+    const [equalLight, equalHeavy] = FIGURES.equal;
+    const bestPlacing = Math.max(...placingTable.safety.flat());
     const backup = 1.5;
-    const [training, real] = [TRAINING_PAIR, REAL_PAIR].map((p) => ({
-        ...p,
-        holding: holding({ belayerMass: p.belayer, stretcherMass: p.stretcher }).safety,
-    }));
-    const equal = [40, 150].map((m) => holding({ belayerMass: m, stretcherMass: m }).safety);
     const wetSteel = SURFACES.find((s) => s.key === "painted-steel")!.wet;
     const wetHold = wetSteel / hold.gripNeeded;
-    const wetHolds = heaviestAt(1, wetSteel);
-    const reachesTwo = heaviestAt(2);
-    const slides = heaviestAt(1);
-    const trainingRange = [TRAINING.from, TRAINING.to].map(
-        (m) => holding({ stretcherMass: m }).safety,
-    );
-    const weightTable = TABLE_BELAYERS.map((b) =>
-        TABLE_STRETCHERS.map((m) => holding({ belayerMass: b, stretcherMass: m }).safety),
-    );
     const footings = SURFACES.flatMap((s) => [
         { label: `dry ${s.label.toLowerCase()}`, safety: s.dry / hold.gripNeeded },
         { label: `wet ${s.label.toLowerCase()}`, safety: s.wet / hold.gripNeeded },
@@ -117,10 +80,10 @@ export default function Page() {
                     </li>
                     <li>
                         It seems to work in training because the belayers are usually heavier than
-                        the mock casualty. A {training.belayer} kg belayer holding a{" "}
-                        {training.stretcher} kg stretcher has a safety factor of about{" "}
-                        {sf(training.holding)}. A {real.belayer} kg belayer holding a{" "}
-                        {real.stretcher} kg casualty and stretcher has about {sf(real.holding)}:
+                        the mock casualty. A {trainingPair.belayer} kg belayer holding a{" "}
+                        {trainingPair.stretcher} kg stretcher has a safety factor of about{" "}
+                        {sf(trainingPair.safety)}. A {real.belayer} kg belayer holding a{" "}
+                        {real.stretcher} kg casualty and stretcher has about {sf(real.safety)}:
                         their feet slide even on a dry roof.
                     </li>
                     <li>
@@ -321,18 +284,19 @@ export default function Page() {
                 </p>
                 <StretcherWeightGraph />
                 <p>
-                    In Figure 3, on dry steel, a training load of {TRAINING.from}–{TRAINING.to} kg
-                    gives a safety factor of about {sf(trainingRange[1])} to {sf(trainingRange[0])},
-                    and only loads up to about {reachesTwo} kg reach 2. A real casualty in a
-                    stretcher, {DEFAULTS.stretcherMass} kg or more, gives about {sf(hold.safety)} or
-                    less, and from about {slides + 1} kg the belayer’s feet slide even on a dry
-                    roof. On wet steel, only loads up to about {wetHolds} kg stay above 1.
+                    In Figure 3, on dry steel, a training load of {training.from}–{training.to} kg
+                    gives a safety factor of about {sf(training.safety[1])} to{" "}
+                    {sf(training.safety[0])}, and only loads up to about {heaviest.reachesTwo} kg
+                    reach 2. A real casualty in a stretcher, {DEFAULTS.stretcherMass} kg or more,
+                    gives about {sf(hold.safety)} or less, and from about {heaviest.slides + 1} kg
+                    the belayer’s feet slide even on a dry roof. On wet steel, only loads up to
+                    about {heaviest.wetHolds} kg stay above 1.
                 </p>
                 <p>
                     When the belayers and stretcher weigh the same, the safety factor stays between
-                    about {sf(equal[0])} and {sf(equal[1])}, from 40 kg to 150 kg. A team that has
-                    only ever held light mock casualties has trained with a margin a real casualty
-                    won’t give them.
+                    about {sf(equalLight.safety)} and {sf(equalHeavy.safety)}, from{" "}
+                    {equalLight.mass} kg to {equalHeavy.mass} kg. A team that has only ever held
+                    light mock casualties has trained with a margin a real casualty won’t give them.
                 </p>
                 <p>
                     For other weights, the table below gives the safety factor on dry painted steel,
@@ -340,8 +304,14 @@ export default function Page() {
                     compared with the belayer’s that sets it.
                 </p>
                 <Table
-                    head={["Belayer ↓ / stretcher →", ...TABLE_STRETCHERS.map((m) => `${m} kg`)]}
-                    rows={TABLE_BELAYERS.map((b, i) => [`${b} kg`, ...weightTable[i].map(sf)])}
+                    head={[
+                        "Belayer ↓ / stretcher →",
+                        ...weightTable.stretchers.map((m) => `${m} kg`),
+                    ]}
+                    rows={weightTable.belayers.map((b, i) => [
+                        `${b} kg`,
+                        ...weightTable.safety[i].map(sf),
+                    ])}
                     highlight={(cell) => Number(cell) < 1}
                 />
             </Section>
@@ -356,14 +326,17 @@ export default function Page() {
                     Figure 1.
                 </p>
                 <Table
-                    head={["Back from edge ↓ / apart →", ...PLACING_GAPS.map((g) => `${g} m`)]}
-                    rows={PLACING_BACKS.map((b, i) => [`${b} m`, ...placings[i].map(sf)])}
+                    head={["Back from edge ↓ / apart →", ...placingTable.gaps.map((g) => `${g} m`)]}
+                    rows={placingTable.backs.map((b, i) => [
+                        `${b} m`,
+                        ...placingTable.safety[i].map(sf),
+                    ])}
                     highlight={(cell) => Number(cell) < 1}
                 />
                 <p>
-                    The best placing, shoulder to shoulder and {PLACING_BACKS[0]} m from the edge,
-                    gives {sf(bestPlacing)}: still short of 2. And rescuers within 2 m of the edge
-                    should be tied off anyway, and an anchor good enough to tie off to is good
+                    The best placing, shoulder to shoulder and {placingTable.backs[0]} m from the
+                    edge, gives {sf(bestPlacing)}: still short of 2. And rescuers within 2 m of the
+                    edge should be tied off anyway, and an anchor good enough to tie off to is good
                     enough for a hard belay.
                 </p>
                 <p>Nor do these:</p>
@@ -387,13 +360,13 @@ export default function Page() {
                         {sf(hold.safety * backup)}. That only just reaches 2, and only in the common
                         case on a dry roof. It relies on two people’s footing and on the backup
                         staying pressed into the belayer. With a {real.stretcher} kg casualty it’s
-                        about {sf(real.holding * backup)}, and on a wet roof about{" "}
+                        about {sf(real.safety * backup)}, and on a wet roof about{" "}
                         {sf(wetHold * backup)}: well short of 2.
                     </li>
                     <li>
                         <strong className={STRONG}>Heavier belayers.</strong> This helps, but only
-                        compared with the load. A 100 kg belayer holding a 120 kg casualty is back
-                        down to {sf(holding({ belayerMass: 100, stretcherMass: 120 }).safety)}.
+                        compared with the load. A {heavy.belayer} kg belayer holding a{" "}
+                        {heavy.stretcher} kg casualty is back down to {sf(heavy.safety)}.
                     </li>
                 </ul>
                 <p>
