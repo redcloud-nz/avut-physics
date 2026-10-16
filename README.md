@@ -13,6 +13,9 @@ settles and the forces through it, and lets you change the setup with sliders to
   ladder. Either the system settles where it balances, or a ground team holds the ladder.
 - **Two-Point Lower** (`/two-point-lower`): a stretcher lowered over a wall on a rope from an
   anchor, with a ground team pulling a line from its other end to keep it off the wall.
+- **Four-Point Lower** (`/four-point-lower`): a stretcher lowered level down a slot on four
+  ropes, one from each corner to a belay beside the slot. Shows each rope's tension as the belays
+  move apart or back.
 - **Body-Belayed Two-Point Lower** (`/body-belay`): the same lower with no anchor, held by two
   belayers standing on the wall top with the rope round their waists. Shows whether their feet
   grip.

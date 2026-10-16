@@ -3,6 +3,7 @@ export type Visualisation = {
         | "/block-on-an-incline"
         | "/ladder-hinge-lower"
         | "/two-point-lower"
+        | "/four-point-lower"
         | "/body-belay"
         | "/ute-load";
     title: string;
@@ -30,6 +31,13 @@ export const twoPointLower: Visualisation = {
         "A 2 m stretcher lowered over a wall on a rope from an anchor behind its top, with a line from its other end to a ground team out in front, who pull it steadily to keep it off the wall. The stretcher settles where the forces and torques on it balance.",
 };
 
+export const fourPointLower: Visualisation = {
+    href: "/four-point-lower",
+    title: "Four-Point Lower",
+    description:
+        "A 2 m stretcher lowered level down a slot on four ropes, one from each corner to a belay beside the slot. Shows how the tension in each rope grows as the ropes lean, with the belays further apart or set further back, and how hard they pull the stretcher apart.",
+};
+
 export const bodyBelay: Visualisation = {
     href: "/body-belay",
     title: "Body-Belayed Two-Point Lower",
@@ -45,4 +53,10 @@ export const uteLoad: Visualisation = {
 };
 
 /** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
-export const visualisations: Visualisation[] = [ladderHinge, twoPointLower, bodyBelay, uteLoad];
+export const visualisations: Visualisation[] = [
+    ladderHinge,
+    twoPointLower,
+    fourPointLower,
+    bodyBelay,
+    uteLoad,
+];
