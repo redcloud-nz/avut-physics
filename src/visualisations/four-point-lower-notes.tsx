@@ -27,10 +27,10 @@ export function FourPointLowerNotes() {
                 <p>
                     The stretcher starts lying on the floor along the slot, 10 cm back from its
                     edge, with every rope just snug. Each belayer has a slider, in their rope’s
-                    colour: how much rope they’ve paid out since the start, or taken in (below
-                    zero). The sliders are laid out like the belays, head on top and near side on
-                    the left. “Start again” puts the stretcher back on the floor; changing the setup
-                    does too.
+                    colour, reading how much rope they have out, from their belay to the stretcher’s
+                    corner; sliding it pays out or takes in. The sliders are laid out like the
+                    belays, head on top and near side on the left. “Start again” puts the stretcher
+                    back on the floor; changing the setup does too.
                 </p>
                 <p>
                     Between each pair of neighbouring sliders is a link. Click it once to couple the
@@ -45,6 +45,13 @@ export function FourPointLowerNotes() {
                     Where the stretcher can’t settle any further, the belayers stop at the last
                     point where it did. Taking in against each other soon lifts it off the floor
                     between them, until the ropes are as tight as they’ll go.
+                </p>
+                <p>
+                    A belayer can only take in against so much: “Most a belayer can take in
+                    against”, 500 N to start with. A rope pulling harder than that can’t be taken in
+                    at all (nor can any rope coupled to move with it) until it’s eased, by paying it
+                    out or moving the others; a move that takes a rope past it stops there. Paying
+                    out is never stopped.
                 </p>
                 <p>
                     One way through: couple the near side, the far side, and the head pair the other

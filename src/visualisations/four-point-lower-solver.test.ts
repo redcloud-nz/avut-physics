@@ -383,6 +383,21 @@ describe("four-point lower, rope by rope", () => {
         expect(p.contacts.every((c) => c.surface === "bottom")).toBe(true);
     }, 30_000);
 
+    it("stops a move at the first step where it's told to", () => {
+        // Taking in against each other lifts the stretcher and the ropes' pulls climb.
+        const limit = 0.5 * s.barWeight;
+        const steps = follow(
+            s,
+            atStart,
+            start.out.map((l) => l - 0.6),
+            { stopAfter: (p) => p.ropes.some((r) => r.tension > limit) },
+        );
+        const pulls = steps.map((r) => Math.max(...placed(r).ropes.map((x) => x.tension)));
+        expect(steps.length).toBeLessThan(30);
+        expect(pulls[pulls.length - 1]).toBeGreaterThan(limit);
+        for (const t of pulls.slice(0, -1)) expect(t).toBeLessThanOrEqual(limit);
+    });
+
     it("needs a pay-out about the slot's depth to reach its bottom", () => {
         expect(payOutNeeded(s)).toBeGreaterThan(s.slotDepth);
         expect(payOutNeeded(s)).toBeLessThan(s.slotDepth + 2);

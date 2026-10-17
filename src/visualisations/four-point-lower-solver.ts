@@ -761,9 +761,14 @@ export function payOutNeeded(s: Setup): number {
  * The belayers paying out (or taking in) from where the stretcher is, `from`, until they have `out`: a few
  * centimetres at a time, each step's search starting from where the last one settled, so the stretcher follows on
  * from where it was. Where a step won't settle, it's tried again in smaller steps. Gives where it settles at each
- * step, up to the last, or the first it can't settle at.
+ * step, up to the last, the first it can't settle at, or the first where `stopAfter` says to stop.
  */
-export function follow(s: Setup, from: Placed, out: number[], most = 0.02): PlaceResult[] {
+export function follow(
+    s: Setup,
+    from: Placed,
+    out: number[],
+    { most = 0.02, stopAfter }: { most?: number; stopAfter?: (p: Placed) => boolean } = {},
+): PlaceResult[] {
     const was = from.ropes.map((r) => r.out);
     const count = Math.max(
         1,
@@ -783,7 +788,7 @@ export function follow(s: Setup, from: Placed, out: number[], most = 0.02): Plac
             }
         }
         results.push(result);
-        if (result.kind === "none") break;
+        if (result.kind === "none" || stopAfter?.(result.p)) break;
         q = result.p.q;
     }
     return results;

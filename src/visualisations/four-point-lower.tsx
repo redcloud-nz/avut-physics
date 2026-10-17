@@ -143,6 +143,7 @@ export default function FourPointLower() {
     const [anchorUp, setAnchorUp] = useState(1);
     const [anchorBack, setAnchorBack] = useState(2);
     const [couplings, setCouplings] = useState<Coupling[]>([0, 0, 0, 0]);
+    const [holdLimit, setHoldLimit] = useState(500);
 
     const barWeight = barMass * G;
     const setup: Setup = useMemo(
@@ -172,6 +173,7 @@ export default function FourPointLower() {
     const fresh = useMemo(() => (inBrowser ? startMoves(setup) : null), [inBrowser, setup]);
     const moves = saved?.setup === setup ? saved : fresh;
     const mostOut = Math.ceil(payOutNeeded(setup) * 10) / 10 + 0.1;
+    const startOut = useMemo(() => startOf(setup).out, [setup]);
 
     /** Belayer i (and any moving with them) paying out or taking in to `value` paid out since the start. */
     const pay = (i: number, value: number) => {
@@ -186,28 +188,41 @@ export default function FourPointLower() {
         });
         const paidOut = moves.paidOut.map((p, j) => p + signs[j] * change);
         if (!moves.last) return setSaved({ ...moves, paidOut });
+        // No belayer can take in against more than the limit: a rope already over it can't be taken in at all
+        // (nor, coupled, can the ropes moving with it), and a move stops once it takes one over.
+        const takingIn = [0, 1, 2, 3].filter((j) => signs[j] * change < 0);
+        const overLimit = (p: Placed) => takingIn.find((j) => p.ropes[j].tension > holdLimit);
+        const tooHard = (j: number, p: Placed) =>
+            `${ROPES[j].name} is pulling ${p.ropes[j].tension.toFixed(0)} N, more than its belayer can take in against (${holdLimit} N). Pay it out, or move the others, to ease it.`;
+        const already = overLimit(moves.last);
+        if (already !== undefined)
+            return setSaved({ ...moves, stopped: tooHard(already, moves.last) });
         const start = startOf(setup).out;
         const steps = follow(
             setup,
             moves.last,
             start.map((l, j) => l + paidOut[j]),
+            { stopAfter: (p) => overLimit(p) !== undefined },
         );
         const settled = steps.flatMap((r) => (r.kind === "placed" ? [r.p] : []));
         const last = settled.length ? settled[settled.length - 1] : moves.last;
         const end = steps[steps.length - 1];
-        // Where it can't settle, the belayers stop at the last step where it did.
-        const takingIn = signs.some((sign) => sign * change < 0);
+        const over = end.kind === "placed" ? overLimit(end.p) : undefined;
+        // Where it can't settle, or a rope goes over the limit, the belayers stop at the last step where it settled.
+        const stoppedShort = end.kind === "none" || over !== undefined;
         setSaved({
             setup,
-            paidOut: end.kind === "none" ? last.ropes.map((r, j) => r.out - start[j]) : paidOut,
+            paidOut: stoppedShort ? last.ropes.map((r, j) => r.out - start[j]) : paidOut,
             last,
             result: end,
             stopped:
-                end.kind === "placed"
-                    ? null
-                    : takingIn
-                      ? "The ropes are as tight as they'll go: taking in any more would need them to stretch."
-                      : `It can't settle any further this way. ${end.reason}`,
+                over !== undefined
+                    ? tooHard(over, last)
+                    : end.kind === "placed"
+                      ? null
+                      : takingIn.length
+                        ? "The ropes are as tight as they'll go: taking in any more would need them to stretch."
+                        : `It can't settle any further this way. ${end.reason}`,
             trace: [...moves.trace, ...settled.map(sampleOf)].slice(-TRACE_LENGTH),
         });
     };
@@ -377,7 +392,9 @@ export default function FourPointLower() {
         <RopeSlider
             key={`rope${i}`}
             index={i}
+            overLimit={!!view && view.ropes[i].tension > holdLimit}
             value={moves?.paidOut[i] ?? 0}
+            ropeOut={startOut[i] + (moves?.paidOut[i] ?? 0)}
             min={-MOST_IN}
             max={mostOut}
             disabled={!moves}
@@ -525,6 +542,17 @@ export default function FourPointLower() {
                         digits={0}
                         onChange={setBarMass}
                     />
+                    <Separator />
+                    <Slider
+                        label="Most a belayer can take in against"
+                        value={holdLimit}
+                        min={100}
+                        max={2000}
+                        step={50}
+                        unit="N"
+                        digits={0}
+                        onChange={setHoldLimit}
+                    />
                 </>
             }
             readouts={
@@ -585,9 +613,15 @@ export default function FourPointLower() {
     );
 }
 
-/** A belayer's slider: how much rope they've paid out since the start (below zero, taken in), in their rope's colour. */
+/**
+ * A belayer's slider, in their rope's colour: it moves by how much they pay out or take in, and reads how much rope
+ * they have out, from their belay to the stretcher's corner.
+ */
 function RopeSlider(props: {
     index: number;
+    ropeOut: number;
+    /** Pulling harder than its belayer can take in against. */
+    overLimit: boolean;
     value: number;
     min: number;
     max: number;
@@ -616,8 +650,11 @@ function RopeSlider(props: {
                     {rope.name}
                 </span>
                 <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
-                    {props.value.toFixed(2)} m
+                    {props.ropeOut.toFixed(2)} m
                 </span>
+                {props.overLimit && (
+                    <span className="w-full text-xs text-amber-400">Too hard to take in</span>
+                )}
             </span>
             <input
                 type="range"
@@ -626,7 +663,8 @@ function RopeSlider(props: {
                 step={0.01}
                 value={props.value}
                 disabled={props.disabled}
-                aria-label={`${rope.name}: rope paid out`}
+                aria-label={`${rope.name}: rope out`}
+                aria-valuetext={`${props.ropeOut.toFixed(2)} m out`}
                 onChange={(e) => props.onChange(Number(e.target.value))}
                 className="rope-range"
                 style={
