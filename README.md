@@ -27,6 +27,10 @@ settles and the forces through it, and lets you change the setup with sliders to
 
 **Articles**
 
+- **A Gentle Introduction to Rescue Physics, Part 1** (`/gentle-introduction/part-1`): weight
+  and kilonewtons, forces as arrows, and how angles change the load on anchor legs and redirects.
+  Written for rescuers with no physics, with small slider figures and the maths kept in
+  "Why is this?" boxes.
 - **Standing Body Belays** (`/standing-body-belays`): how much grip a belayer's boots need to hold
   a stretcher still, and why even the best case leaves too little margin.
 

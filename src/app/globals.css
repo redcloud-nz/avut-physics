@@ -220,3 +220,11 @@ html {
 .rope-range:disabled {
   cursor: default;
 }
+
+/* Printed, the "Why is this?" boxes are open. */
+@media print {
+  details::details-content {
+    content-visibility: visible;
+    display: contents;
+  }
+}
