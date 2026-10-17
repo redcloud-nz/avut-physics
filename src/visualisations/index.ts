@@ -35,7 +35,7 @@ export const fourPointLower: Visualisation = {
     href: "/four-point-lower",
     title: "Four-Point Lower",
     description:
-        "A 2 m stretcher lowered level down a slot on four ropes, one from each corner to a belay beside the slot. Shows how the tension in each rope grows as the ropes lean, with the belays further apart or set further back, and how hard they pull the stretcher apart.",
+        "A stretcher taken from the floor beside a slot, out over it and down, on four ropes from its corners to belays beside the slot. Pay out or take in each belayer's rope, alone or linked with others, and see where the stretcher goes and how hard each rope pulls.",
 };
 
 export const bodyBelay: Visualisation = {
