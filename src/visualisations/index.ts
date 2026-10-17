@@ -5,7 +5,8 @@ export type Visualisation = {
         | "/two-point-lower"
         | "/four-point-lower"
         | "/body-belay"
-        | "/ute-load";
+        | "/ute-load"
+        | "/multi-point-anchor";
     title: string;
     description: string;
 };
@@ -52,11 +53,19 @@ export const uteLoad: Visualisation = {
         "A dual-cab ute, side on, loaded with crew, fit-out, cargo and a trailer. Shows how the weight shares between the axles, how a tow ball lifts weight off the front wheels, and how close each total comes to the ute's ratings.",
 };
 
+export const multiPointAnchor: Visualisation = {
+    href: "/multi-point-anchor",
+    title: "Multi-Point Anchor",
+    description:
+        "Two or three anchors joined to a master point, rigged either pre-equalised or sliding. Swing the load to one side and see how each rig shares it between the anchors, how the angle between the legs adds to their load, and how far the master point moves.",
+};
+
 /** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
 export const visualisations: Visualisation[] = [
     ladderHinge,
     twoPointLower,
     fourPointLower,
     bodyBelay,
+    multiPointAnchor,
     uteLoad,
 ];

@@ -19,6 +19,9 @@ settles and the forces through it, and lets you change the setup with sliders to
 - **Body-Belayed Two-Point Lower** (`/body-belay`): the same lower with no anchor, held by two
   belayers standing on the wall top with the rope round their waists. Shows whether their feet
   grip.
+- **Multi-Point Anchor** (`/multi-point-anchor`): two or three anchors joined to a master point,
+  pre-equalised or sliding. Swing the load to one side and see how each rig shares it between the
+  anchors and how far the master point moves.
 - **Block on an Incline** (`/block-on-an-incline`): a free-body diagram with static and kinetic
   friction. Not listed on the home page.
 
