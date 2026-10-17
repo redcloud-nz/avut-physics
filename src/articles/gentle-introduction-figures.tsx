@@ -240,6 +240,181 @@ export function ForcesFigure() {
     );
 }
 
+/** A square drawn on one side of a triangle, from `a` to `b`, out along `out`. */
+function SideSquare(props: { a: Vector2; b: Vector2; out: Vector2; color: string }) {
+    const pts = [props.a, props.b, props.b.add(props.out), props.a.add(props.out)];
+    return (
+        <polygon
+            points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill={props.color}
+            fillOpacity={0.12}
+            stroke={props.color}
+            strokeOpacity={0.5}
+        />
+    );
+}
+
+/** Text in two lines: a large `top` and a smaller `bottom` under it, centred on `at`. */
+function TwoLines(props: { at: Vector2; color: string; top: string; bottom: string }) {
+    return (
+        <>
+            <Tag at={props.at.add(vec2(0, -8))} color={props.color}>
+                <tspan fontSize={16}>{props.top}</tspan>
+            </Tag>
+            <Tag at={props.at.add(vec2(0, 10))} color={props.color}>
+                {props.bottom}
+            </Tag>
+        </>
+    );
+}
+
+/** For Figure 1's "Why is this?": its forces' triangle with a square on each side, showing a² + b² = c². */
+export function PythagorasFigure() {
+    // The triangle from Figure 1, bigger: weight down, tag line across, rope back up to the start.
+    const W = 90;
+    const side = W * Math.tan(rad(30));
+    const p = vec2(110, 62);
+    const q = p.add(vec2(0, W));
+    const r = q.add(vec2(side, 0));
+    // Each square sits on the outside of its side.
+    const rope = p.sub(r);
+    const out = vec2(-rope.y, rope.x);
+
+    return (
+        <Figure
+            id="pythagoras"
+            caption={
+                <>
+                    The three forces from Figure 1 make a triangle with a square corner, where the
+                    level tag line meets the weight. Draw a square on each side: the square on the
+                    long side, the rope, has exactly the area of the other two squares together.
+                </>
+            }
+        >
+            <svg
+                viewBox="10 0 252 214"
+                className="mx-auto w-full max-w-xs text-slate-400"
+                fontSize={12}
+                role="img"
+                aria-labelledby="pythagoras-caption"
+            >
+                <SideSquare a={p} b={q} out={vec2(-W, 0)} color={COLORS.load} />
+                <SideSquare a={q} b={r} out={vec2(0, side)} color={COLORS.sideways} />
+                <SideSquare a={r} b={p} out={out} color={COLORS.pull} />
+                <polyline
+                    points={`${q.x},${q.y - 10} ${q.x + 10},${q.y - 10} ${q.x + 10},${q.y}`}
+                    fill="none"
+                    stroke="currentColor"
+                />
+                <Arrow from={p} v={q.sub(p)} color={COLORS.load} />
+                <Arrow from={q} v={r.sub(q)} color={COLORS.sideways} />
+                <Arrow from={r} v={rope} color={COLORS.pull} />
+                <TwoLines
+                    at={vec2(p.x - W / 2, p.y + W / 2)}
+                    color={COLORS.load}
+                    top="a²"
+                    bottom="Weight"
+                />
+                <TwoLines
+                    at={vec2(q.x + side / 2, q.y + side / 2)}
+                    color={COLORS.sideways}
+                    top="b²"
+                    bottom="Tag line"
+                />
+                <TwoLines
+                    at={r.add(p).scale(0.5).add(out.scale(0.5))}
+                    color={COLORS.pull}
+                    top="c²"
+                    bottom="Rope"
+                />
+            </svg>
+        </Figure>
+    );
+}
+
+/** For Figure 2's "Why is this?": legs 120° apart, each leg's pull split into a sideways part and an up part. */
+export function LegPartsFigure() {
+    const W = 100;
+    const half = rad(60);
+    const top = 40;
+    const master = vec2(240, 130);
+    const ROPE = (master.y - top) / Math.cos(half);
+    const share = legShare(2 * half);
+    const up = share * W * Math.cos(half);
+    const across = share * W * Math.sin(half);
+
+    return (
+        <Figure
+            id="leg-parts"
+            caption={
+                <>
+                    Each leg’s pull, <em>T</em>, split into a sideways part, <em>x</em>, and an up
+                    part, <em>y</em>, laid tip to tail. With the legs 120° apart, each leg is 60°
+                    off straight up (<em>θ</em>, shown on one side; the other mirrors it), and its
+                    up part is only half its pull. The sideways parts pull against each other and
+                    cancel; the two up parts together hold the load’s weight, <em>W</em>.
+                </>
+            }
+        >
+            <svg
+                viewBox="60 25 360 225"
+                className="mx-auto w-full max-w-lg text-slate-400"
+                fontSize={13}
+                role="img"
+                aria-labelledby="leg-parts-caption"
+            >
+                <Rock y={top} width={480} />
+                <Rope from={master} to={vec2(master.x, top)} dashed />
+                {[-1, 1].map((sign) => {
+                    const anchor = master.add(
+                        vec2(sign * Math.sin(half), -Math.cos(half)).scale(ROPE),
+                    );
+                    const corner = master.add(vec2(sign * across, 0));
+                    const tip = corner.add(vec2(0, -up));
+                    const outer = sign < 0 ? "end" : "start";
+                    return (
+                        <g key={sign}>
+                            <Rope from={master} to={anchor} />
+                            <Anchor at={anchor} />
+                            <Arrow from={master} v={tip.sub(master)} color={COLORS.pull} />
+                            <Arrow from={master} v={corner.sub(master)} color={COLORS.sideways} />
+                            <Arrow from={corner} v={tip.sub(corner)} color={COLORS.load} />
+                            <Tag
+                                at={master.add(tip.sub(master).scale(0.7)).add(vec2(0, -16))}
+                                color={COLORS.pull}
+                            >
+                                <tspan fontStyle="italic">T</tspan>
+                            </Tag>
+                            <Tag
+                                at={corner.add(vec2(sign * 6, -up / 2))}
+                                color={COLORS.load}
+                                anchor={outer}
+                            >
+                                <tspan fontStyle="italic">y</tspan>
+                            </Tag>
+                            <Tag
+                                at={master.add(vec2(sign * (across / 2), 16))}
+                                color={COLORS.sideways}
+                            >
+                                <tspan fontStyle="italic">x</tspan>
+                            </Tag>
+                        </g>
+                    );
+                })}
+                <AngleArc center={master} radius={28} startDeg={-90} sweepDeg={60} />
+                <Tag at={master.add(vec2(Math.sin(rad(35)), -Math.cos(rad(35))).scale(42))}>
+                    <tspan fontStyle="italic">θ</tspan>
+                </Tag>
+                <Arrow from={master} v={vec2(0, W)} color={COLORS.load} />
+                <Tag at={master.add(vec2(10, W - 6))} color={COLORS.load} anchor="start">
+                    <tspan fontStyle="italic">W</tspan>
+                </Tag>
+                <circle cx={master.x} cy={master.y} r={4} fill="currentColor" />
+            </svg>
+        </Figure>
+    );
+}
+
 /** Figure 2: two legs from anchors to a master point, with a slider for the angle between them. */
 export function TwoLegsFigure() {
     const [angle, setAngle] = useState(60);
@@ -440,10 +615,11 @@ export function SwingFigure() {
                     );
                 })}
                 <Arrow from={master} v={vec2(d.x, -d.y).scale(W)} color={COLORS.load} />
+                {/* Beside the arrow, on its lower left, so it stays in the drawing with the main line straight down. */}
                 <Tag
-                    at={master.add(vec2(d.x, -d.y).scale(W + 16))}
+                    at={master.add(vec2(d.x, -d.y).scale(W * 0.7)).add(vec2(d.y, d.x).scale(10))}
                     color={COLORS.load}
-                    anchor="middle"
+                    anchor="end"
                 >
                     Main line
                 </Tag>

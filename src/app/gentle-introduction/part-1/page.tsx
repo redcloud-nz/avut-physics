@@ -4,6 +4,8 @@ import Link from "next/link";
 import { legShare, preEqualised, redirectShare } from "@/articles/gentle-introduction";
 import {
     ForcesFigure,
+    LegPartsFigure,
+    PythagorasFigure,
     RedirectFigure,
     SwingFigure,
     TwoLegsFigure,
@@ -23,6 +25,13 @@ export const metadata: Metadata = { title: `${TITLE}, ${SUBTITLE}`, description:
 
 const r = String.raw;
 const HREF = "/gentle-introduction/part-1";
+
+/** The tag line example in Figure 1's "Why is this?". */
+const TAGGED = { mass: 200, lean: 30 };
+const tagged = {
+    side: TAGGED.mass * Math.tan(rad(TAGGED.lean)),
+    rope: TAGGED.mass / Math.cos(rad(TAGGED.lean)),
+};
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 /** A mass's weight in kilonewtons, to one place. */
@@ -156,12 +165,29 @@ export default function Page() {
                 </p>
                 <Why>
                     <p>
-                        Gravity pulls on every kilogram near the Earth’s surface with about 9.81 N.
-                        That figure, called <em>g</em>, turns a mass into its weight:
+                        Gravity is an acceleration, not a force. Drop something near the Earth’s
+                        surface and, ignoring air, it speeds up by 9.81 metres per second every
+                        second it falls. That acceleration is called <em>g</em>.
+                    </p>
+                    <p>
+                        A force is what it takes to make a mass accelerate: force = mass ×
+                        acceleration. A newton is the force that speeds up 1 kg by 1 metre per
+                        second every second. “Metres per second, every second” is written m/s²
+                        (metres per second squared), so the newton is built from kilograms, metres
+                        and seconds:
+                    </p>
+                    <Eq tex={r`1\,\text{N} = 1\,\text{kg} \times 1\,\text{m/s}^2`} />
+                    <p>
+                        The force gravity puts on a mass, its weight, is its mass times <em>g</em>.
+                        Kilograms times m/s² gives newtons:
                     </p>
                     <Eq
-                        tex={r`\text{weight} = \text{mass} \times g = 80\,\text{kg} \times 9.81\,\text{N/kg} \approx 785\,\text{N}`}
+                        tex={r`\text{weight} = \text{mass} \times g = 80\,\text{kg} \times 9.81\,\text{m/s}^2 \approx 785\,\text{N}`}
                     />
+                    <p>
+                        To hold the load still, the rope has to pull up with that same force, so
+                        that nothing is left over to speed the load up.
+                    </p>
                     <p>
                         Rounding <em>g</em> up to 10 makes the sums easy and comes out 2% high,
                         which errs on the safe side. A newton on its own is small: about the weight
@@ -206,6 +232,27 @@ export default function Page() {
                         load out. A tag line held from below, pulling down as well as out, adds even
                         more, because the main line has to hold its downward pull too.
                     </p>
+                    <p>
+                        The tag line is level and the weight pulls straight down, so the triangle
+                        has a square corner. The sides of any triangle with a square corner follow
+                        Pythagoras’ rule: square the two short sides, add them, and you get the long
+                        side squared.
+                    </p>
+                    <PythagorasFigure />
+                    <Eq tex={r`a^2 + b^2 = c^2`} />
+                    <p>
+                        Here <em>a</em> is the weight, <em>b</em> the tag line and <em>c</em> the
+                        rope. On a {TAGGED.mass} kg load with the rope leaning {TAGGED.lean}°, the
+                        tag line pulls with about {Math.round(tagged.side)} kg and the rope with
+                        about {Math.round(tagged.rope)} kg:
+                    </p>
+                    <Eq
+                        tex={r`${TAGGED.mass}^2 + ${Math.round(tagged.side)}^2 \approx ${Math.round(tagged.rope)}^2`}
+                    />
+                    <p>
+                        So the rope always pulls harder than the weight or the tag line alone, but
+                        less than the two added together.
+                    </p>
                 </Why>
             </Section>
 
@@ -246,20 +293,38 @@ export default function Page() {
                 </p>
                 <Why>
                     <p>
-                        Split each leg’s pull into an up part and a sideways part. The two up parts
-                        must add up to the load; the sideways parts cancel. With an angle <em>θ</em>{" "}
-                        between the legs, each leg is <em>θ</em>/2 off straight up, and its up part
-                        is its pull times the cosine of that angle (a number a calculator gives: 1
-                        for 0°, falling to 0 at 90°):
+                        Split each leg’s pull into an up part and a sideways part, laid tip to tail
+                        so that together they make the same arrow as the leg. The two up parts must
+                        add up to the load; the sideways parts cancel.
+                    </p>
+                    <LegPartsFigure />
+                    <p>
+                        Call each leg’s pull <em>T</em>, for tension, and the angle between one leg
+                        and straight up <em>θ</em>. The two legs mirror each other, so <em>θ</em> is
+                        half the angle between them: legs 120° apart have <em>θ</em> = 60°. The sine
+                        and cosine of <em>θ</em>, numbers a calculator gives, split <em>T</em> into
+                        its two parts:
+                    </p>
+                    <Eq tex={r`x = T \sin\theta \qquad y = T \cos\theta`} />
+                    <p>
+                        The cosine is 1 at 0° and falls to 0 at 90°; the sine does the opposite. The
+                        two parts are the short sides of a triangle with a square corner, and the
+                        leg’s pull is its long side, so Pythagoras’ rule holds here too: <em>x</em>²
+                        + <em>y</em>² = <em>T</em>².
+                    </p>
+                    <p>
+                        The two legs’ up parts, <em>y</em>, together hold the load’s weight,{" "}
+                        <em>W</em>:
                     </p>
                     <Eq
-                        tex={r`2 \times \text{each leg's pull} \times \cos\frac{\theta}{2} = \text{load}`}
+                        tex={r`2 T \cos\theta = W \qquad\text{so}\qquad T = \frac{W}{2\cos\theta}`}
                     />
-                    <Eq tex={r`\text{each leg's share} = \frac{1}{2\cos(\theta/2)}`} />
                     <p>
-                        At 0°, cos 0° = 1, so each takes half. At 120°, cos 60° = ½, so each takes
-                        the whole load. As the legs approach 180° (straight across), the cosine
-                        heads to zero and the pull grows without limit.
+                        Legs hanging side by side have <em>θ</em> = 0°, and cos 0° = 1, so each
+                        takes half. Legs 120° apart have <em>θ</em> = 60°, and cos 60° = ½, so each
+                        takes the whole load. As the legs approach straight across, <em>θ</em>{" "}
+                        approaches 90°, the cosine heads to zero, and <em>T</em> grows without
+                        limit.
                     </p>
                     <p>
                         Real slings stretch a little under load, which closes the angle a few
@@ -347,12 +412,11 @@ export default function Page() {
                     <p>
                         It’s the same triangle as in Figure 2, from the other end. There, the two
                         legs’ pulls together had to make the load, and we worked out each leg. Here,
-                        each part of the rope pulls with the rope’s tension, and we work out the two
-                        together:
+                        each part of the rope pulls with the rope’s tension, <em>T</em>, and we work
+                        out the two together. As before, <em>θ</em> is the angle between one part
+                        and the middle line, half the angle between the two parts:
                     </p>
-                    <Eq
-                        tex={r`\text{pull on the redirect} = 2 \times \text{tension} \times \cos\frac{\theta}{2}`}
-                    />
+                    <Eq tex={r`\text{pull on the redirect} = 2 T \cos\theta`} />
                     <p>
                         That’s why the two tables run opposite ways. In Figure 2 the load is fixed,
                         and as the legs spread, each must pull harder to make it up. Here the rope’s
