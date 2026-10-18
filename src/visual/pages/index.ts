@@ -8,15 +8,22 @@ import counting from "./counting/page";
 import equilibrium from "./equilibrium/page";
 import force from "./force/page";
 import friction from "./friction/page";
+import inclines from "./inclines/page";
 import introduction from "./introduction/page";
+import levers from "./levers/page";
 import mass from "./mass/page";
 import pulleyOnTheAnchor from "./pulley-on-the-anchor/page";
 import pullingOffCentre from "./pulling-off-centre/page";
 import pullingSideways from "./pulling-sideways/page";
 import redirect from "./redirect/page";
+import ropeStretch from "./rope-stretch/page";
+import safetyFactors from "./safety-factors/page";
+import shockLoading from "./shock-loading/page";
 import splittingArrows from "./splitting-arrows/page";
+import surfaceFriction from "./surface-friction/page";
 import tMethodCompound from "./t-method-compound/page";
 import tMethod from "./t-method/page";
+import theEnd from "./the-end/page";
 import twoAnchors from "./two-anchors/page";
 import units from "./units/page";
 import velocity from "./velocity/page";
@@ -66,4 +73,11 @@ export const PAGES: VisualPage[] = [
     tMethod,
     tMethodCompound,
     friction,
+    inclines,
+    surfaceFriction,
+    levers,
+    safetyFactors,
+    shockLoading,
+    ropeStretch,
+    theEnd,
 ];
