@@ -32,7 +32,7 @@ export function Layout(props: {
     return (
         <div className="flex flex-1 flex-col gap-3">
             {/* Sized by the room it's given, not by its drawing, so a short screen squeezes it no smaller than its minimum. */}
-            <div className="flex min-h-36 flex-1 items-center justify-center contain-size [@media(min-height:640px)]:min-h-48">
+            <div className="relative flex min-h-36 flex-1 items-center justify-center contain-size [@media(min-height:640px)]:min-h-48">
                 {props.drawing}
             </div>
             {props.slider}
@@ -41,7 +41,8 @@ export function Layout(props: {
     );
 }
 
-export const SVG = "h-full max-h-full w-full text-slate-400";
+/** A figure's drawing, filling the box Layout gives it whatever that box's size. */
+export const SVG = "absolute inset-0 h-full w-full text-slate-400";
 
 /** Grey for what's faint in a drawing: where something was, and notes. */
 export const GHOST = "#64748b";

@@ -30,7 +30,7 @@ function swipe(start: { x: number; y: number }, end: { clientX: number; clientY:
  *
  * On touch screens the window scrolls a little (see globals.css), so a phone's browser can tuck its bars away. The
  * page stays pinned to the screen, and a swipe up only brings the details up once the window can't scroll further.
- * On a screen too short for the page, the page scrolls within itself rather than running under the buttons. Tapping the series' name at the top brings its contents down from the
+ * On a screen too short for the page, the page grows and scrolls rather than running under the buttons. Tapping the series' name at the top brings its contents down from the
  * top in the same way.
  */
 export function Card(props: {
@@ -69,7 +69,7 @@ export function Card(props: {
         <>
             <main
                 data-visual-card
-                className="mx-auto flex h-full w-full max-w-md shrink-0 flex-col gap-3 overflow-y-auto px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-coarse:sticky pointer-coarse:top-0 pointer-coarse:h-dvh"
+                className="mx-auto flex min-h-full w-full max-w-md shrink-0 flex-col gap-3 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-coarse:sticky pointer-coarse:top-0 pointer-coarse:min-h-dvh"
                 onTouchStart={(e) => {
                     // A drag on a slider, or on a drawing that's dragged, is its own.
                     const target = e.target as Element;
@@ -159,9 +159,6 @@ export function Card(props: {
                 <DrawerContent
                     aria-describedby={undefined}
                     className="mx-auto max-h-[85dvh] max-w-md border-slate-700 bg-slate-900 text-base text-slate-300"
-                    // The drawer's touches are its own (dragging it down puts it away), not swipes between pages.
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
                 >
                     <DrawerTitle className="sr-only">More on: {props.title}</DrawerTitle>
                     <div className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
@@ -174,8 +171,6 @@ export function Card(props: {
                 <DrawerContent
                     aria-describedby={undefined}
                     className="mx-auto max-h-[85dvh] max-w-md border-slate-700 bg-slate-900 pt-[env(safe-area-inset-top)] text-base text-slate-300"
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
                 >
                     <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-4 pb-2">
                         <DrawerTitle className="text-base font-semibold text-slate-100">
