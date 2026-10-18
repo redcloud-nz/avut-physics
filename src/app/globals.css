@@ -61,22 +61,6 @@ html {
     scrollbar-color: #334155 #020617;
   }
 }
-/*
- * On a phone, the visual introduction's pages scroll the window rather than the page box, and are a pixel taller than
- * the screen with the browser's bars tucked away, so scrolling tucks them away. The card stays pinned (see card.tsx).
- */
-@media (pointer: coarse) {
-  body:has([data-visual-card]) {
-    height: auto;
-    overflow: visible;
-  }
-  body:has([data-visual-card]) .page-scroll {
-    height: auto;
-    min-height: calc(100lvh + 1px);
-    overflow: visible;
-  }
-}
-
 .page-scroll::-webkit-scrollbar {
   width: 12px;
 }

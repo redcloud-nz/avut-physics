@@ -33,7 +33,7 @@ export function ControlsFigure() {
             </Control>
             <Control
                 icon={<span className="h-1.5 w-5 rounded-full bg-sky-300" />}
-                action="Swipe up, or tap the pill"
+                action="Tap the pill"
             >
                 When the pill between the buttons is lit, there’s more on that page, like the maths.
                 Try it here.
