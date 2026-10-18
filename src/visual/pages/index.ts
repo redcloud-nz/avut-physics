@@ -3,18 +3,20 @@ import acceleration from "./acceleration/page";
 import addingArrows from "./adding-arrows/page";
 import arrows from "./arrows/page";
 import compound from "./compound/page";
+import equilibrium from "./equilibrium/page";
 import force from "./force/page";
 import friction from "./friction/page";
 import introduction from "./introduction/page";
 import mass from "./mass/page";
 import pulleyOnTheAnchor from "./pulley-on-the-anchor/page";
+import pullingOffCentre from "./pulling-off-centre/page";
+import pullingSideways from "./pulling-sideways/page";
 import redirect from "./redirect/page";
-import sideLoad from "./side-load/page";
 import splittingArrows from "./splitting-arrows/page";
 import tMethodCompound from "./t-method-compound/page";
 import tMethod from "./t-method/page";
-import tagLine from "./tag-line/page";
-import twoLegs from "./two-legs/page";
+import twoAnchors from "./two-anchors/page";
+import units from "./units/page";
 import velocity from "./velocity/page";
 import weight from "./weight/page";
 import zRig from "./z-rig/page";
@@ -44,12 +46,14 @@ export const PAGES: VisualPage[] = [
     mass,
     force,
     weight,
+    units,
     arrows,
     addingArrows,
+    equilibrium,
     splittingArrows,
-    tagLine,
-    twoLegs,
-    sideLoad,
+    pullingSideways,
+    twoAnchors,
+    pullingOffCentre,
     redirect,
     pulleyOnTheAnchor,
     twoToOne,

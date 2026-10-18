@@ -10,7 +10,7 @@ import { Layout, Readout } from "@/visual/frame";
 
 const TOGETHER = "#f1f5f9";
 
-/** Two pulls on one bolt, and the one pull they make together: each drawn again from the other's tip, either order. */
+/** Two forces on one bolt, and the one force they make together: each drawn again from the other's tip, either order. */
 export function AddingFigure() {
     const [tips, setTips] = useState([
         vec2(3, -1).scale(KN).add(ORIGIN),
@@ -24,7 +24,7 @@ export function AddingFigure() {
                 <DragGrid
                     tips={tips}
                     onChange={setTips}
-                    label="Two pulls on a bolt, added tip to tail"
+                    label="Two forces on a bolt, added tip to tail"
                 >
                     <g opacity={0.7}>
                         <Arrow from={ORIGIN.add(a)} v={b} color={COLORS.redirect} dashed />

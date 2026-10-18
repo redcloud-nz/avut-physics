@@ -9,7 +9,7 @@ import { vec2 } from "@/lib/vector2";
 import { DRAG_HINT, DragGrid, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
-/** One pull on a bolt as an arrow: how hard, and which way. */
+/** One force on a bolt as an arrow: how big, and which way. */
 export function ArrowsFigure() {
     const [tips, setTips] = useState([vec2(3, -2).scale(KN).add(ORIGIN)]);
     const f = kn(tips[0]);
@@ -21,7 +21,7 @@ export function ArrowsFigure() {
                 <DragGrid
                     tips={tips}
                     onChange={setTips}
-                    label="An arrow for a pull on a bolt, on a grid of 1 kN squares"
+                    label="An arrow for a force on a bolt, on a grid of 1 kN squares"
                 >
                     <line
                         x1={ORIGIN.x}
@@ -40,7 +40,7 @@ export function ArrowsFigure() {
             slider={DRAG_HINT}
             readouts={
                 <>
-                    <Readout label="how hard" value={kNText(f.len())} color={COLORS.pull} />
+                    <Readout label="how big" value={kNText(f.len())} color={COLORS.pull} />
                     <Readout label="round from pointing right" value={`${angle}°`} />
                 </>
             }

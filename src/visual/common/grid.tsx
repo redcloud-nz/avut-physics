@@ -5,7 +5,7 @@ import { vec2, Vector2 } from "@/lib/vector2";
 import { Note, SVG } from "@/visual/frame";
 
 /*
- * Pulls on a bolt, drawn as arrows on a grid of 1 kN squares, for the pages on arrows.
+ * Forces on a bolt, drawn as arrows on a grid of 1 kN squares, for the pages on arrows.
  */
 
 /** One kilonewton, in drawing units: a square of the grid. */
@@ -17,7 +17,7 @@ export const kn = (tip: Vector2) => vec2((tip.x - ORIGIN.x) / KN, (ORIGIN.y - ti
 export const kNText = (v: number) => `${v.toFixed(1)} kN`;
 
 /**
- * Pulls on a bolt, drawn on a grid of 1 kN squares, with arrow tips that can be dragged. A drag moves whichever tip
+ * Forces on a bolt, drawn on a grid of 1 kN squares, with arrow tips that can be dragged. A drag moves whichever tip
  * is nearest where it starts. `children` draws the arrows from the tips.
  */
 export function DragGrid(props: {

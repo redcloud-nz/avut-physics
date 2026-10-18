@@ -6,11 +6,11 @@ import { COLORS } from "@/articles/colors";
 import { Anchor, Rock, Rope, Tag } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
-import { G } from "@/lib/constants";
 import { vec2 } from "@/lib/vector2";
 import { Layout, Readout, SVG } from "@/visual/frame";
 
-const kN = (kg: number) => `${((kg * G) / 1000).toFixed(1)} kN`;
+/** Gravity, rounded to 10 m/s² as on the page. */
+const g = 10;
 
 /** A load hanging on a rope, its weight drawn to scale. */
 export function WeightFigure() {
@@ -69,7 +69,7 @@ export function WeightFigure() {
             readouts={
                 <>
                     <Readout label="mass" value={`${mass} kg`} />
-                    <Readout label="weight" value={kN(mass)} color={COLORS.load} />
+                    <Readout label="weight" value={`${mass * g} N`} color={COLORS.load} />
                 </>
             }
         />

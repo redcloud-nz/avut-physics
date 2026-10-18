@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -115,15 +115,23 @@ export function Card(props: {
                     <nav className="grid w-full grid-cols-2 gap-3">
                         <Link
                             href={prev}
-                            className="rounded-xl border border-slate-700 py-2 text-center text-sm font-medium text-slate-200 hover:border-sky-500"
+                            className="flex items-center justify-center gap-1 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500"
                         >
-                            ‹ Back
+                            <ChevronLeft className="size-5" aria-hidden />
+                            Back
                         </Link>
                         <Link
                             href={next}
-                            className="rounded-xl bg-sky-500 py-2 text-center text-sm font-medium text-slate-950 hover:bg-sky-400"
+                            className="flex items-center justify-center gap-1 rounded-xl bg-sky-500 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
                         >
-                            {props.index + 1 === total ? "Finish" : "Next ›"}
+                            {props.index + 1 === total ? (
+                                "Finish"
+                            ) : (
+                                <>
+                                    Next
+                                    <ChevronRight className="size-5" aria-hidden />
+                                </>
+                            )}
                         </Link>
                     </nav>
                     <button

@@ -42,15 +42,23 @@ export const tiedAt = (r: TwoAnchors) => vec2(0, -Math.sqrt(r.leg ** 2 - (r.gap 
  * the master point swings out to hang from the near one alone.
  */
 export function preEqualised(r: TwoAnchors, swing: number): Swung {
-    const anchors = anchorsOf(r);
+    return tiedOff(anchorsOf(r), tiedAt(r), swing);
+}
+
+/**
+ * Two anchors with their legs tied off at a master point anywhere below them, so each leg is just snug and keeps
+ * its length. The load pulls on the master point swung `swing` off straight down; as in `preEqualised`, a leg the
+ * load would have to push on goes slack instead, and the master point hangs from the other.
+ */
+export function tiedOff(anchors: [Vector2, Vector2], m: Vector2, swing: number): Swung {
     const d = swungDown(swing);
-    const m = tiedAt(r);
     const [u, v] = anchors.map((a) => a.sub(m).unit());
     // The legs' pulls, T₁u + T₂v, balance the load's, d.
     const det = u.cross(v);
     const t1 = -d.cross(v) / det;
     const t2 = -u.cross(d) / det;
-    if (t1 < 0) return { master: anchors[1].add(d.scale(r.leg)), anchors, shares: [0, 1] };
-    if (t2 < 0) return { master: anchors[0].add(d.scale(r.leg)), anchors, shares: [1, 0] };
+    const legs = anchors.map((a) => a.distanceTo(m));
+    if (t1 < 0) return { master: anchors[1].add(d.scale(legs[1])), anchors, shares: [0, 1] };
+    if (t2 < 0) return { master: anchors[0].add(d.scale(legs[0])), anchors, shares: [1, 0] };
     return { master: m, anchors, shares: [t1, t2] };
 }

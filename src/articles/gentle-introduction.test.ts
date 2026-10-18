@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { rad } from "@/lib/math";
+import { vec2, type Vector2 } from "@/lib/vector2";
 import { solveAnchor } from "@/visualisations/multi-point-anchor-solver";
 
 import {
@@ -9,6 +10,7 @@ import {
     redirectShare,
     swungDown,
     tiedAt,
+    tiedOff,
     type Swung,
     type TwoAnchors,
 } from "./gentle-introduction";
@@ -69,6 +71,21 @@ describe("gentle introduction", () => {
         const [left, right] = preEqualised(RIG, rad(20)).shares;
         expect(Math.round(left * 100)).toBe(88);
         expect(Math.round(right * 100)).toBe(20);
+    });
+
+    it("tied off to one side: the master point balances, and the steeper leg takes more", () => {
+        const anchors: [Vector2, Vector2] = [vec2(-1, 0), vec2(1, 0)];
+        const m = vec2(0.5, -1.2);
+        for (const swing of SWINGS) {
+            const s = tiedOff(anchors, m, swing);
+            expect(imbalance(s, swing)).toBeLessThan(1e-12);
+            expect(Math.min(...s.shares)).toBeGreaterThanOrEqual(0);
+            s.anchors.forEach((a) =>
+                expect(a.distanceTo(s.master)).toBeLessThanOrEqual(a.distanceTo(m) + 1e-12),
+            );
+        }
+        const [left, right] = tiedOff(anchors, m, 0).shares;
+        expect(right).toBeGreaterThan(left);
     });
 
     it("agrees with the multi-point anchor's solver, whose slings stretch a little", () => {

@@ -6,7 +6,7 @@ const page: VisualPage = {
     slug: "arrows",
     name: "Arrows",
     title: "We draw forces as arrows",
-    text: "A force has a size and a direction, and so does an arrow. The longer it is, the harder the pull, and it points the way it pulls.",
+    text: "A force has a size and a direction, and so does an arrow. The longer the arrow, the bigger the force, and it points the way the force acts.",
     Figure: ArrowsFigure,
 };
 
