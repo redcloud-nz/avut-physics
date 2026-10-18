@@ -44,7 +44,7 @@ export type VisualPage = {
     title: string;
     text: React.ReactNode;
     Figure: () => React.ReactNode;
-    /** Further reading, such as the maths, in a drawer that swipes up from under the page. */
+    /** Further reading, such as the maths, in a drawer that the pill between the buttons brings up. */
     More?: () => React.ReactNode;
 };
 

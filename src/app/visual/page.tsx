@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PAGES, SERIES } from "@/visual/pages";
+import { SERIES_DESCRIPTION as DESCRIPTION } from "@/visual/series";
 import { Share } from "@/visual/share";
 
-const DESCRIPTION =
-    "The physics of rope rescue, one idea per screen: a picture to play with and a sentence or two.";
-
-export const metadata: Metadata = { title: SERIES, description: DESCRIPTION };
+export const metadata: Metadata = {
+    title: SERIES,
+    description: DESCRIPTION,
+    openGraph: { title: SERIES, description: DESCRIPTION, url: "/visual", type: "website" },
+};
 
 export default function Page() {
     return (

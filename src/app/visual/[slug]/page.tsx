@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { Card } from "@/visual/card";
 import { PAGES, SERIES } from "@/visual/pages";
+import { SERIES_DESCRIPTION } from "@/visual/series";
 
 export function generateStaticParams() {
     return PAGES.map((p) => ({ slug: p.slug }));
@@ -11,7 +12,17 @@ export function generateStaticParams() {
 export async function generateMetadata(props: PageProps<"/visual/[slug]">): Promise<Metadata> {
     const { slug } = await props.params;
     const page = PAGES.find((p) => p.slug === slug);
-    return page ? { title: `${page.title}, ${SERIES}` } : {};
+    if (!page) return {};
+    return {
+        title: `${page.title}, ${SERIES}`,
+        description: SERIES_DESCRIPTION,
+        openGraph: {
+            title: page.title,
+            description: `${SERIES}: ${SERIES_DESCRIPTION}`,
+            url: `/visual/${slug}`,
+            type: "website",
+        },
+    };
 }
 
 export default async function Page(props: PageProps<"/visual/[slug]">) {

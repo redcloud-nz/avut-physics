@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { SITE } from "@/articles/prose";
 import { SiteFooter } from "@/components/SiteFooter";
 
 import "./globals.css";
@@ -16,6 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+    // Links shared from the site, and their pictures, need its full address.
+    metadataBase: new URL(`https://${SITE}`),
     title: { template: "%s | Physics Visualisations", default: "Physics Visualisations" },
     description: "Interactive physics diagrams with adjustable parameters",
 };
