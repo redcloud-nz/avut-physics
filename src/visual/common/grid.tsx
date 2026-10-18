@@ -16,14 +16,23 @@ export const ORIGIN = vec2(150, 150);
 export const kn = (tip: Vector2) => vec2((tip.x - ORIGIN.x) / KN, (ORIGIN.y - tip.y) / KN);
 export const kNText = (v: number) => `${v.toFixed(1)} kN`;
 
+/** How far in from the grid's edge a tip has to stay, so its arrowhead is drawn whole. */
+const MARGIN = 12;
+
+/** Whether a point is far enough inside the grid for an arrow ending there to be drawn whole. */
+export const onGrid = (p: Vector2) =>
+    p.x >= MARGIN && p.x <= 300 - MARGIN && p.y >= MARGIN && p.y <= 300 - MARGIN;
+
 /**
  * Forces on a bolt, drawn on a grid of 1 kN squares, with arrow tips that can be dragged. A drag moves whichever tip
- * is nearest where it starts. `children` draws the arrows from the tips.
+ * is nearest where it starts. `children` draws the arrows from the tips. `fits` says whether the arrows drawn from a
+ * set of tips all stay on the grid; a drag that would take them off stops where they still fit.
  */
 export function DragGrid(props: {
     tips: Vector2[];
     onChange: (tips: Vector2[]) => void;
     label: string;
+    fits?: (tips: Vector2[]) => boolean;
     children: React.ReactNode;
 }) {
     const svg = useRef<SVGSVGElement>(null);
@@ -39,9 +48,25 @@ export function DragGrid(props: {
         const p = point(e);
         if (!p || dragging.current === null) return;
         // Snap to tenths of a kilonewton, and keep the tip on the grid.
-        const snap = (v: number) => Math.round(clamp(v, 12, 288) / (KN / 10)) * (KN / 10);
+        const snap = (v: number) =>
+            Math.round(clamp(v, MARGIN, 300 - MARGIN) / (KN / 10)) * (KN / 10);
         const i = dragging.current;
-        props.onChange(props.tips.map((t, j) => (j === i ? vec2(snap(p.x), snap(p.y)) : t)));
+        const from = props.tips[i];
+        // The tips with the dragged one moved a fraction `f` of the way from where it is to the pointer.
+        const at = (f: number) => {
+            const q = from.add(p.sub(from).scale(f));
+            return props.tips.map((t, j) => (j === i ? vec2(snap(q.x), snap(q.y)) : t));
+        };
+        const fits = props.fits ?? (() => true);
+        if (fits(at(1))) return props.onChange(at(1));
+        // Otherwise go as far towards the pointer as still fits.
+        let [lo, hi] = [0, 1];
+        for (let n = 0; n < 20; n++) {
+            const mid = (lo + hi) / 2;
+            if (fits(at(mid))) lo = mid;
+            else hi = mid;
+        }
+        if (lo > 0) props.onChange(at(lo));
     };
 
     return (

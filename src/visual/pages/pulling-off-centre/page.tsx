@@ -141,6 +141,7 @@ function TriangleDrawing() {
 
 function PullingOffCentreMore() {
     const [left, right] = EXAMPLE.shares.map((share) => (2 * share).toFixed(1));
+    const total = (2 * (EXAMPLE.shares[0] + EXAMPLE.shares[1])).toFixed(2);
     return (
         <>
             <Section title="Working it out">
@@ -182,8 +183,8 @@ function PullingOffCentreMore() {
                 <p>
                     The left anchor takes more, though the master point is tied off nearer the right
                     one: the angled pull lines the load up with the left rope. Between them the
-                    anchors hold 2.5 kN, more than the load, because the leaning ropes pull against
-                    each other too.
+                    anchors hold about {total} kN, more than the load, because the leaning ropes
+                    pull against each other too.
                 </p>
             </Section>
             <Section title="Most in line takes most">
@@ -200,6 +201,14 @@ function PullingOffCentreMore() {
                     left anchor alone.
                 </p>
             </Section>
+            <Section title="Tied off, or sliding">
+                <p>
+                    This anchor is tied off at the master point (pre-equalised), so it doesn’t
+                    adjust as the pull swings. A sliding (self-equalising) master point instead
+                    moves until both ropes make the same angle with the load, so they share it
+                    equally. The cost is that it drops a little, with a jolt, if one anchor fails.
+                </p>
+            </Section>
         </>
     );
 }
@@ -208,7 +217,7 @@ const page: VisualPage = {
     slug: "pulling-off-centre",
     name: "Pulling off centre",
     title: "The anchor most in line takes most",
-    text: "Off centre, the anchor whose rope lines up best with the load takes more. Swing the pull past one rope and the other goes slack.",
+    text: "With the master point tied off, the anchor whose rope lines up best with the load takes more. Swing the pull past one rope and the other goes slack.",
     Figure: PullingOffCentreFigure,
     More: PullingOffCentreMore,
 };

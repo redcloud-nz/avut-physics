@@ -237,10 +237,11 @@ function TwoAnchorsMore() {
             <Section title="Why 120° is the magic number">
                 <CurvesDrawing />
                 <p>
-                    cos <em>θ</em> is the share of a rope’s pull that goes up, and sin <em>θ</em>{" "}
-                    the share that goes sideways. Hanging straight (<em>θ</em> = 0°) all of it goes
-                    up. As the rope leans, less and less does, slowly at first and then faster,
-                    until lying flat (<em>θ</em> = 90°) none of it does.
+                    cos <em>θ</em> is how big the up part is, as a fraction of the rope’s pull, and
+                    sin <em>θ</em> how big the sideways part is. They’re at right angles, so the two
+                    don’t add up to 1. Hanging straight (<em>θ</em> = 0°) all of it goes up. As the
+                    rope leans, less and less does, slowly at first and then faster, until lying
+                    flat (<em>θ</em> = 90°) none of it does.
                 </p>
                 <p>
                     Each rope’s up part still has to be half the load, so as cos <em>θ</em> shrinks,{" "}
@@ -253,8 +254,15 @@ function TwoAnchorsMore() {
                 />
                 <p>
                     Each rope 60° from straight up puts them 120° apart. Wider than that, each
-                    anchor holds more than the whole load, and most of its pull goes into the
-                    sideways part, straining against the other anchor: sin 60° is about 0.87.
+                    anchor holds more than the whole load. By then each rope’s sideways part is much
+                    bigger than its up part (sin 60° is about 0.87, against cos 60° = ½), and it
+                    goes into straining against the other anchor.
+                </p>
+            </Section>
+            <Section title="In practice">
+                <p>
+                    Keep the ropes under about 90° apart where you can: each then holds about 71% of
+                    the load. Treat 120° as the widest you’d accept.
                 </p>
             </Section>
         </>
@@ -270,8 +278,9 @@ const page: VisualPage = {
             Two anchors can share a load, with a rope from each to one master point. Their up parts{" "}
             <Var color={COLORS.redirect}>y</Var> hold the load, half each. Spread the anchors and
             each rope leans, so it pulls sideways too: a part <Var color={COLORS.sideways}>x</Var>{" "}
-            the other anchor cancels. A leaning pull is bigger than its up part alone, so with the
-            ropes 120° apart each anchor holds the whole load.
+            the other anchor cancels. A leaning pull is bigger than its up part alone, so each
+            anchor holds more than half. With the ropes 120° apart, each holds the whole load; any
+            wider, more than the whole load.
         </>
     ),
     Figure: TwoAnchorsFigure,

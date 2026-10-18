@@ -11,7 +11,7 @@ import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { Layout, percent, Readout, SVG } from "@/visual/frame";
 
-/** A rope turning round a karabiner on a redirect. */
+/** A rope turning round a redirect, running freely. */
 export function RedirectFigure() {
     const [angle, setAngle] = useState(90);
     const share = redirectShare(rad(angle));

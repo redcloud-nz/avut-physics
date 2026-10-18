@@ -5,7 +5,7 @@ import { useState } from "react";
 import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
-import { DragGrid, KN, kNText, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 const TOGETHER = "#f1f5f9";
@@ -25,6 +25,7 @@ export function AddingFigure() {
                     tips={tips}
                     onChange={setTips}
                     label="Two forces on a bolt, added tip to tail"
+                    fits={([p, q]) => onGrid(p.add(q).sub(ORIGIN))}
                 >
                     <g opacity={0.7}>
                         <Arrow from={ORIGIN.add(a)} v={b} color={COLORS.redirect} dashed />

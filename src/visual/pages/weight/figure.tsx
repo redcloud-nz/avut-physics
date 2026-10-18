@@ -17,8 +17,8 @@ export function WeightFigure() {
     const [mass, setMass] = useState(100);
     const side = 18 + Math.sqrt(mass) * 3;
     const top = 40;
-    const box = vec2(150, 110);
-    const arrow = mass * 0.55;
+    const box = vec2(150, 100);
+    const arrow = mass * 0.48;
     return (
         <Layout
             drawing={
