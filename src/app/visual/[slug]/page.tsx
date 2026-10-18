@@ -25,11 +25,12 @@ export default async function Page(props: PageProps<"/visual/[slug]">) {
         <Card
             key={slug}
             index={index}
-            total={PAGES.length}
+            contents={PAGES.map((p, i) => ({ name: p.name, href: href(i) }))}
             title={page.title}
             text={page.text}
             prev={href(index - 1)}
             next={href(index + 1)}
+            details={page.More && <page.More />}
         >
             <page.Figure />
         </Card>

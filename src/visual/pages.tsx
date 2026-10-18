@@ -21,13 +21,15 @@ import {
     ZRigFigure,
     ZRigTMethodFigure,
 } from "./figures";
+import { ControlsFigure } from "./intro";
+import { IntroductionMore, SplittingArrowsMore } from "./more";
 
 /*
  * The pages of A Visual Introduction to Rescue Physics, in order. Each is one idea: a headline, a sentence or two, and
- * a figure.
+ * a figure, and on some pages more for those who want it.
  */
 
-export const SERIES = "A Visual Introduction to Rescue Physics";
+export { SERIES } from "./series";
 
 export type VisualPage = {
     slug: string;
@@ -36,9 +38,19 @@ export type VisualPage = {
     title: string;
     text: React.ReactNode;
     Figure: () => React.ReactNode;
+    /** Further reading, such as the maths, in a drawer that swipes up from under the page. */
+    More?: () => React.ReactNode;
 };
 
 export const PAGES: VisualPage[] = [
+    {
+        slug: "introduction",
+        name: "Introduction",
+        title: "One idea per page",
+        text: "Each page has one idea: a sentence or two, and a picture to play with. Here’s how to get around.",
+        Figure: ControlsFigure,
+        More: IntroductionMore,
+    },
     {
         slug: "velocity",
         name: "Velocity",
@@ -92,8 +104,15 @@ export const PAGES: VisualPage[] = [
         slug: "splitting-arrows",
         name: "Splitting arrows",
         title: "Any arrow splits into two",
-        text: "Any pull can be split into a sideways part and an up-or-down part. Tip to tail, they end up where the arrow does, so together they pull just the same.",
+        text: (
+            <>
+                Any pull can be split into a horizontal part, written <em>x</em>, and a vertical
+                part, written <em>y</em>. Level and upright pulls are much easier to reason about
+                than slanting ones, and tip to tail the two parts pull just the same as the arrow.
+            </>
+        ),
         Figure: SplitFigure,
+        More: SplittingArrowsMore,
     },
     {
         slug: "tag-line",

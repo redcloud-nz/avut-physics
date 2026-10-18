@@ -14,10 +14,7 @@ export default function Page() {
             <Link href="/" className="text-sm text-sky-400 hover:text-sky-300">
                 ← Physics Visualisations
             </Link>
-            <header className="flex flex-col gap-2">
-                <h1 className="text-3xl leading-tight font-semibold text-slate-50">{SERIES}</h1>
-                <p className="text-slate-400">{DESCRIPTION}</p>
-            </header>
+            <h1 className="text-3xl leading-tight font-semibold text-slate-50">{SERIES}</h1>
             <Link
                 href={`/visual/${PAGES[0].slug}`}
                 className="rounded-xl bg-sky-500 py-2 text-center text-sm font-medium text-slate-950 hover:bg-sky-400"

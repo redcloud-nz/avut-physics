@@ -10,7 +10,6 @@ import { clamp, deg } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import { Layout, Readout, SVG } from "./frame";
-import { ink, LiveEq } from "./live-tex";
 
 /*
  * The first figures in the visual introduction, for readers who haven't done physics since school: velocity,
@@ -570,22 +569,13 @@ export function AddingFigure() {
     );
 }
 
-/** Text in an arrow's colour, to tie a number in the maths to its arrow. */
-function Ink(props: { color: string; children: React.ReactNode }) {
-    return <span style={{ color: props.color }}>{props.children}</span>;
-}
-
 /** One pull, and its sideways and up-or-down parts drawn tip to tail. */
 export function SplitFigure() {
     const [tips, setTips] = useState([vec2(2.4, -1.8).scale(KN).add(ORIGIN)]);
     const tip = tips[0];
     const f = kn(tip);
     const corner = vec2(tip.x, ORIGIN.y);
-    const size = f.len();
-    // From level, up or down, as sin and cos want it.
-    const angle = deg(Math.atan2(Math.abs(f.y), Math.abs(f.x)));
     const left = f.x < 0;
-    const one = (v: number) => Math.abs(v).toFixed(1);
     return (
         <Layout
             drawing={
@@ -605,33 +595,14 @@ export function SplitFigure() {
             readouts={
                 <>
                     <Readout
-                        label={left ? "to the left" : "to the right"}
+                        label={left ? "x, to the left" : "x, to the right"}
                         value={kNText(Math.abs(f.x))}
                         color={COLORS.sideways}
                     />
                     <Readout
-                        label={f.y < 0 ? "down" : "up"}
+                        label={f.y < 0 ? "y, down" : "y, up"}
                         value={kNText(Math.abs(f.y))}
                         color={COLORS.redirect}
-                    />
-                </>
-            }
-            maths={
-                <>
-                    <p>
-                        The <Ink color={COLORS.pull}>arrow</Ink> pulls{" "}
-                        <Ink color={COLORS.pull}>{one(size)} kN</Ink>, {Math.round(angle)}° from
-                        level. Its parts are:
-                    </p>
-                    <LiveEq
-                        tex={`${ink(COLORS.sideways, "\\text{sideways}")} = ${ink(COLORS.pull, one(size))} \\times \\cos ${Math.round(angle)}^\\circ = ${ink(COLORS.sideways, `${one(f.x)}\\text{ kN}`)}`}
-                    />
-                    <LiveEq
-                        tex={`${ink(COLORS.redirect, f.y < 0 ? "\\text{down}" : "\\text{up}")} = ${ink(COLORS.pull, one(size))} \\times \\sin ${Math.round(angle)}^\\circ = ${ink(COLORS.redirect, `${one(f.y)}\\text{ kN}`)}`}
-                    />
-                    <p className="mt-2">And back again, by Pythagoras:</p>
-                    <LiveEq
-                        tex={`\\sqrt{${ink(COLORS.sideways, one(f.x))}^2 + ${ink(COLORS.redirect, one(f.y))}^2} = ${ink(COLORS.pull, `${one(size)}\\text{ kN}`)}`}
                     />
                 </>
             }

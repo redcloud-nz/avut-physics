@@ -7,6 +7,7 @@ import { AngleArc, Arrow } from "@/components/diagram/svg";
 import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
+import { COLORS } from "./colors";
 import {
     legShare,
     preEqualised,
@@ -22,12 +23,7 @@ import {
  * first have one slider. They're drawn in SVG units with y down; the maths is in metres with y up.
  */
 
-export const COLORS = {
-    load: "#fbbf24",
-    pull: "#38bdf8",
-    sideways: "#f472b6",
-    redirect: "#a78bfa",
-};
+export { COLORS };
 
 /** The load used to turn shares into kilograms. */
 const LOAD_KG = 200;

@@ -1,11 +1,8 @@
 "use client";
 
-import { Details } from "./details";
-
 /*
  * The frame every figure in the visual introduction shares: a drawing that grows to the space it has, its slider, and
- * a big number or two that change as the slider moves, and on some pages the maths behind them, in the page's
- * details.
+ * a big number or two that change as the slider moves.
  */
 
 /** A number to read at a glance, with what it is under it. */
@@ -23,30 +20,18 @@ export function Readout(props: { label: string; value: React.ReactNode; color?: 
     );
 }
 
-/** A figure's parts: the drawing, filling what room there is, then its slider and readouts, and any maths. */
+/** A figure's parts: the drawing, filling what room there is, then its slider and readouts. */
 export function Layout(props: {
     drawing: React.ReactNode;
     /** The slider, or a hint for a drawing that's dragged instead. */
     slider: React.ReactNode;
     readouts: React.ReactNode;
-    /** How the readouts are worked out, in the page's details. */
-    maths?: React.ReactNode;
 }) {
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
             <div className="flex min-h-48 flex-1 items-center justify-center">{props.drawing}</div>
             {props.slider}
             <div className="flex gap-2">{props.readouts}</div>
-            {props.maths && (
-                <Details>
-                    <section className="flex flex-col gap-2 pt-3 pb-2">
-                        <h2 className="font-semibold text-slate-100">The maths</h2>
-                        <div className="flex flex-col gap-1 text-slate-300 tabular-nums">
-                            {props.maths}
-                        </div>
-                    </section>
-                </Details>
-            )}
         </div>
     );
 }
