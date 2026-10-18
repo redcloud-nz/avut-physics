@@ -41,26 +41,49 @@ function PartsDrawing() {
 
 function SplittingArrowsMore() {
     return (
-        <Section title="Working out the parts">
-            <PartsDrawing />
-            <p>
-                Take a rope pulling with <Var color={COLORS.pull}>T</Var>, for tension. Its parts{" "}
-                <Var color={COLORS.sideways}>x</Var> and <Var color={COLORS.redirect}>y</Var> meet
-                at a square corner, marked with the little square, and <em>θ</em> is the angle
-                between <Var color={COLORS.pull}>T</Var> and its up part: how far the rope leans
-                from straight up. The sine and cosine of <em>θ</em>, numbers a calculator gives,
-                split <Var color={COLORS.pull}>T</Var> between them:
-            </p>
-            <Eq tex={r`${X} = ${T} \sin\theta \qquad ${Y} = ${T} \cos\theta`} />
-            <p>For a 3 kN pull at 37° from straight up:</p>
-            <Eq
-                tex={r`${X} = ${ink(COLORS.pull, "3")} \times \sin 37^\circ = ${ink(COLORS.sideways, r`1.8\,\text{kN}`)}`}
-            />
-            <Eq
-                tex={r`${Y} = ${ink(COLORS.pull, "3")} \times \cos 37^\circ = ${ink(COLORS.redirect, r`2.4\,\text{kN}`)}`}
-            />
-            <p>Going the other way, from the parts back to the pull, is on the next page.</p>
-        </Section>
+        <>
+            <Section title="Working out the parts">
+                <PartsDrawing />
+                <p>
+                    Take a rope pulling with <Var color={COLORS.pull}>T</Var>, for tension. Its
+                    parts <Var color={COLORS.sideways}>x</Var> and{" "}
+                    <Var color={COLORS.redirect}>y</Var> meet at a square corner, marked with the
+                    little square, and <em>θ</em> is the angle between{" "}
+                    <Var color={COLORS.pull}>T</Var> and its up part: how far the rope leans from
+                    straight up. The sine and cosine of <em>θ</em>, numbers a calculator gives,
+                    split <Var color={COLORS.pull}>T</Var> between them:
+                </p>
+                <Eq tex={r`${X} = ${T} \sin\theta \qquad ${Y} = ${T} \cos\theta`} />
+                <p>For a 3 kN pull at 37° from straight up:</p>
+                <Eq
+                    tex={r`${X} = ${ink(COLORS.pull, "3")} \times \sin 37^\circ = ${ink(COLORS.sideways, r`1.8\,\text{kN}`)}`}
+                />
+                <Eq
+                    tex={r`${Y} = ${ink(COLORS.pull, "3")} \times \cos 37^\circ = ${ink(COLORS.redirect, r`2.4\,\text{kN}`)}`}
+                />
+                <p>Going the other way, from the parts back to the pull, is on the next page.</p>
+            </Section>
+            <Section title="Real rigs aren’t flat">
+                <p>
+                    These pages draw every rig flat, as if it were on the page. Real ones often
+                    aren’t: anchors set at different depths in a rock face, a redirect pulling the
+                    rope out from the cliff, the legs of a tripod.
+                </p>
+                <p>
+                    Nothing new is needed for them. A force can also point in towards the cliff or
+                    out from it, so it splits into three parts rather than two: sideways{" "}
+                    <Var color={COLORS.sideways}>x</Var>, up and down{" "}
+                    <Var color={COLORS.redirect}>y</Var>, and in and out <em>z</em>. Each part has
+                    to balance on its own, just as <Var color={COLORS.sideways}>x</Var> and{" "}
+                    <Var color={COLORS.redirect}>y</Var> do on the flat pages.
+                </p>
+                <p>
+                    It matters because an angle you can’t see from in front still counts. Two anchor
+                    ropes that look close together from the front can be far apart seen from the
+                    side, and then each holds more than it seems to.
+                </p>
+            </Section>
+        </>
     );
 }
 

@@ -5,8 +5,8 @@ import { ink } from "@/visual/common/details";
 
 /*
  * The worked example in pages' details: a rope pulling with 3 kN up and to the right, 1.8 kN across and 2.4 kN up,
- * drawn 40 units to the kN. The maths is written as in A Gentle Introduction to Rescue Physics: the rope's pull T, at
- * an angle θ from straight up, split into sideways x and up y.
+ * drawn 40 units to the kN. The maths names the rope's pull T, at an angle θ from straight up, split into sideways x
+ * and up y.
  *
  * The pull starts at the bolt, `BOLT`; its sideways part runs to the square corner, `CORNER`, and its up part on to
  * the tip.

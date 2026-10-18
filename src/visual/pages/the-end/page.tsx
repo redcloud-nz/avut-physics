@@ -12,12 +12,6 @@ function EndMore() {
         <>
             <Section title="Where next">
                 <p>
-                    <Link href="/gentle-introduction/part-1" className={LINK}>
-                        A Gentle Introduction to Rescue Physics
-                    </Link>{" "}
-                    goes through the same ideas at more length, as an article to read through.
-                </p>
-                <p>
                     The{" "}
                     <Link href="/" className={LINK}>
                         visualisations
@@ -31,6 +25,10 @@ function EndMore() {
                     These pages round numbers and leave things out to keep each idea clear. Use them
                     to understand why rope systems behave as they do, and use your training, your
                     team’s standards and the gear’s ratings to build them.
+                </p>
+                <p>
+                    The pages also draw every rig flat. Real ones lean in towards the cliff and out
+                    from it too, so check angles from the side as well as the front.
                 </p>
             </Section>
         </>

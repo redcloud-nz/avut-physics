@@ -27,18 +27,21 @@ settles and the forces through it, and lets you change the setup with sliders to
 
 **Articles**
 
-- **A Visual Introduction to Rescue Physics** (`/visual`): the ideas of the Gentle Introduction
-  retold for phones, one per screen (`/visual/<idea>`): a headline, a sentence or two, and a
-  figure to play with, starting from velocity and force for readers with no physics. Swipe or use
-  the arrow keys to move between them; some pages have details (such as the maths) to swipe up, and
-  tapping the series' name brings down the contents. The first page shows how it all works.
-- **A Gentle Introduction to Rescue Physics, Part 1** (`/gentle-introduction/part-1`): weight
-  and kilonewtons, forces as arrows, and how angles change the load on anchor legs and redirects.
-  Written for rescuers with no physics, with small slider figures and the maths kept in
-  "Why is this?" boxes.
-- **A Gentle Introduction to Rescue Physics, Part 2** (`/gentle-introduction/part-2`): pulleys
-  and mechanical advantage, from a single pulley to a 2:1 on a Z-rig, working systems out with
-  the T method, and how friction in the pulleys eats into the advantage.
+- **A Visual Introduction to Rescue Physics** (`/visual`): the physics of rope rescue for phones,
+  one idea per screen (`/visual/<idea>`): a headline, a sentence or two, and a figure to play
+  with, starting from velocity and force for readers with no physics. Swipe or use the arrow keys
+  to move between them; some pages have details (such as the maths) to swipe up, and tapping the
+  series' name brings down the contents. The first page shows how it all works.
+- **A Gentle Introduction to Rescue Physics** (parked draft): two parts, kept for now but not
+  listed on the home page or linked from the Visual Introduction, which has taken over their
+  ideas. The Visual Introduction still uses some of their drawing pieces and maths
+  (`src/articles/gentle-introduction*`).
+  - **Part 1** (`/gentle-introduction/part-1`): weight and kilonewtons, forces as arrows, and
+    how angles change the load on anchor legs and redirects. Written for rescuers with no physics,
+    with small slider figures and the maths kept in "Why is this?" boxes.
+  - **Part 2** (`/gentle-introduction/part-2`): pulleys and mechanical advantage, from a single
+    pulley to a 2:1 on a Z-rig, working systems out with the T method, and how friction in the
+    pulleys eats into the advantage.
 - **Standing Body Belays** (`/standing-body-belays`): how much grip a belayer's boots need to hold
   a stretcher still, and why even the best case leaves too little margin.
 
