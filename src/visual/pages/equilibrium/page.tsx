@@ -5,8 +5,8 @@ import { EquilibriumFigure } from "./figure";
 const page: VisualPage = {
     slug: "equilibrium",
     name: "Equilibrium",
-    title: "When nothing moves, the forces add to nothing",
-    text: "Something that stays still is in equilibrium: the forces on it balance. Added tip to tail, they lead straight back to where they started, so the third rope here must pull against the other two together. The same goes for something moving steadily: if its velocity isn’t changing, the forces on it balance too.",
+    title: "Nothing moves: the forces cancel",
+    text: "When something stays still, or moves steadily, the forces on it balance. Tip to tail they lead back to the start, so the third rope must pull against the other two together.",
     Figure: EquilibriumFigure,
 };
 

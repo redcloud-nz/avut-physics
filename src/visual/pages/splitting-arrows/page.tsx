@@ -93,10 +93,9 @@ const page: VisualPage = {
     title: "Any arrow splits into two",
     text: (
         <>
-            Any force can be split into a sideways part, written{" "}
-            <Var color={COLORS.sideways}>x</Var>, and an up part, written{" "}
-            <Var color={COLORS.redirect}>y</Var>. Sideways and up forces are much easier to reason
-            about than slanting ones, and tip to tail the two parts add up to the arrow.
+            Any force splits into a sideways part <Var color={COLORS.sideways}>x</Var> and an up
+            part <Var color={COLORS.redirect}>y</Var>. They’re easier to work with than a slanting
+            force, and tip to tail they add back up to it.
         </>
     ),
     Figure: SplitFigure,

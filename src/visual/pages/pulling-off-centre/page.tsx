@@ -216,7 +216,7 @@ function PullingOffCentreMore() {
 const page: VisualPage = {
     slug: "pulling-off-centre",
     name: "Pulling off centre",
-    title: "The anchor most in line takes most",
+    title: "The anchor in line takes most",
     text: "With the master point tied off, the anchor whose rope lines up best with the load takes more. Swing the pull past one rope and the other goes slack.",
     Figure: PullingOffCentreFigure,
     More: PullingOffCentreMore,

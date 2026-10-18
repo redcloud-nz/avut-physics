@@ -8,15 +8,20 @@ function FiveToOneMore() {
         <>
             <Section title="Two double pulleys">
                 <p>
-                    In practice, a 5:1 is two double pulleys: two wheels side by side on one axle.
-                    One hangs from the anchor and one is clipped to the load. The rope’s end ties to
-                    the load’s double, to a small attachment point at its bottom called the becket.
-                    Then the rope goes up and down, round one wheel at each end, then the other.
+                    One way to build a 5:1 is with two double pulleys: two wheels side by side on
+                    one axle. One hangs from the anchor and one is clipped to the load. The rope’s
+                    end ties to the load’s double, to a small attachment point at its bottom called
+                    the becket. Then the rope goes up and down, round one wheel at each end, then
+                    the other.
                 </p>
                 <p>
                     The drawing pulls each double apart into two wheels, so you can see the rope’s
                     path and count its parts. Side by side on one axle, the wheels do just the same
                     job.
+                </p>
+                <p>
+                    Rescuers often build a 5:1 from single pulleys instead, as a complex system (see
+                    Counting rope parts).
                 </p>
             </Section>
             <Section title="Tied to the load, or to the anchor">
@@ -43,7 +48,7 @@ const page: VisualPage = {
     slug: "5-to-1",
     name: "5:1",
     title: "Back and forth: 5:1",
-    text: "Tie the rope to the load and run it up and down round two pulleys on the anchor and two on the load. Five parts of rope pull the load, so you pull a fifth. One way to build it is with a pair of double pulleys, drawn apart here so you can see each wheel.",
+    text: "Tie the rope to the load and run it round two pulleys on the anchor and two on the load. Five parts pull the load, so you pull a fifth.",
     Figure: FiveToOneFigure,
     More: FiveToOneMore,
 };

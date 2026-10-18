@@ -30,8 +30,11 @@ export function Layout(props: {
     readouts: React.ReactNode;
 }) {
     return (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex min-h-48 flex-1 items-center justify-center">{props.drawing}</div>
+        <div className="flex flex-1 flex-col gap-3">
+            {/* Sized by the room it's given, not by its drawing, so a short screen squeezes it no smaller than its minimum. */}
+            <div className="flex min-h-36 flex-1 items-center justify-center contain-size [@media(min-height:640px)]:min-h-48">
+                {props.drawing}
+            </div>
             {props.slider}
             <div className="flex gap-2">{props.readouts}</div>
         </div>

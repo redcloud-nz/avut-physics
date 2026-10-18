@@ -56,7 +56,7 @@ function SurfaceFrictionMore() {
 const page: VisualPage = {
     slug: "surface-friction",
     name: "Surface friction",
-    title: "The ground’s grip works against the way the load slides",
+    title: "Grip works against sliding",
     text: "Hauling up a slope, friction adds to the pull. Lowering, it helps hold the load back, and on a gentle slope it can hold the load by itself.",
     Figure: SurfaceFrictionFigure,
     More: SurfaceFrictionMore,

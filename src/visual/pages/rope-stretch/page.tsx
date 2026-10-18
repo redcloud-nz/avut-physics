@@ -72,7 +72,7 @@ function RopeStretchMore() {
 const page: VisualPage = {
     slug: "rope-stretch",
     name: "Rope stretch",
-    title: "Stretchy rope makes a softer catch",
+    title: "Stretchy rope catches softer",
     text: "A rope that stretches stops a fall over a longer distance, so it pulls less hard. Static rescue rope stretches little, so even a short fall onto it hits hard.",
     Figure: RopeStretchFigure,
     More: RopeStretchMore,

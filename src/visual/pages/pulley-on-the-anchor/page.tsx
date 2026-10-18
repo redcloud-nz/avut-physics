@@ -83,7 +83,7 @@ function PulleyOnTheAnchorMore() {
 const page: VisualPage = {
     slug: "pulley-on-the-anchor",
     name: "Pulley on the anchor",
-    title: "A pulley on the anchor only turns the rope",
+    title: "An anchor pulley only redirects",
     text: "You still pull with the whole load, and the load moves as far as the rope does. The anchor holds both parts.",
     Figure: RedirectHaulFigure,
     More: PulleyOnTheAnchorMore,

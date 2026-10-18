@@ -5,7 +5,7 @@ import { ZRigTMethodFigure } from "./figure";
 const page: VisualPage = {
     slug: "t-method",
     name: "The T method",
-    title: "Follow the tension to find the advantage",
+    title: "Follow the tension: the T method",
     text: "Call your pull 1T. A rope keeps its T round every (perfect) pulley. Where ropes meet, add them up. What reaches the load is the advantage.",
     Figure: ZRigTMethodFigure,
 };

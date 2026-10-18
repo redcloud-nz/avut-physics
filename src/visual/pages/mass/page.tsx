@@ -5,7 +5,7 @@ import { MassFigure } from "./figure";
 const page: VisualPage = {
     slug: "mass",
     name: "Mass",
-    title: "Mass is how much there is, not how heavy it is",
+    title: "Mass is how much, not how heavy",
     text: "Mass is measured in kilograms (kg), and it’s the same everywhere. On the Moon, or floating far out in space, a 100 kg load is still 100 kg: just as hard to get moving, but lighter or weightless.",
     Figure: MassFigure,
 };

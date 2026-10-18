@@ -116,14 +116,14 @@ function PullingSidewaysMore() {
 const page: VisualPage = {
     slug: "pulling-sideways",
     name: "Pulling sideways",
-    title: "Sideways and up parts make a slanting pull",
+    title: "Two parts make a slanting pull",
     text: (
         <>
-            A tag line pulls the load sideways, so the rope has to hold a sideways part{" "}
+            A tag line pulls the load sideways, so the rope holds a sideways part{" "}
             <Var color={COLORS.sideways}>x</Var> as well as the up part{" "}
-            <Var color={COLORS.redirect}>y</Var> that holds the weight. Tip to tail, they make the
-            rope’s slanting pull <Var color={COLORS.pull}>T</Var>: more than the load weighs, as
-            soon as the tag line pulls at all.
+            <Var color={COLORS.redirect}>y</Var>. Tip to tail, they make the rope’s pull{" "}
+            <Var color={COLORS.pull}>T</Var>, which is more than the load weighs once the tag line
+            pulls.
         </>
     ),
     Figure: PullingSidewaysFigure,

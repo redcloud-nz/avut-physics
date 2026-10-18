@@ -76,8 +76,8 @@ function SafetyFactorsMore() {
 const page: VisualPage = {
     slug: "safety-factors",
     name: "Safety factors",
-    title: "Aim for every part to hold ten times the load",
-    text: "A two-person rescue load weighs about 2 kN. Rescue systems commonly aim for a safety factor of 10:1: every part should hold at least ten times what it carries, so 20 kN here. That’s something you build in, not something the gear gives you, so check each part’s rating.",
+    title: "Aim for ten times the load",
+    text: "A two-person rescue load weighs about 2 kN. Rescue systems commonly aim for every part to hold ten times what it carries, 20 kN here: a safety factor of 10:1. Check each part’s rating.",
     Figure: SafetyFactorsFigure,
     More: SafetyFactorsMore,
 };

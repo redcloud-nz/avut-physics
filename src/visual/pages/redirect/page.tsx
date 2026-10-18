@@ -29,7 +29,7 @@ function RedirectMore() {
 const page: VisualPage = {
     slug: "redirect",
     name: "Redirects",
-    title: "A redirect feels both parts of the rope",
+    title: "A redirect feels both parts",
     text: "A rope pulls just as hard on both sides of a redirect, so the redirect feels both. The tighter the rope turns, the harder it pulls. Doubled right back, it pulls with twice the rope’s tension.",
     Figure: RedirectFigure,
     More: RedirectMore,

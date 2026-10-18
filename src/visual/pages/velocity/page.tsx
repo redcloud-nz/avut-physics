@@ -28,8 +28,8 @@ function VelocityMore() {
 const page: VisualPage = {
     slug: "velocity",
     name: "Velocity",
-    title: "Velocity is how fast something goes, and which way",
-    text: "Something moving at 2 metres per second (2 m/s) goes another 2 m every second. The marks are where it was after each second: evenly spaced, because its velocity doesn’t change. The arrow shows the velocity: its length is how fast, and it points the way the thing is going.",
+    title: "Velocity is speed and direction",
+    text: "Something moving at 2 metres per second (2 m/s) goes another 2 m every second, so the marks of where it was are evenly spaced. The arrow is its velocity: how fast, and which way.",
     Figure: VelocityFigure,
     More: VelocityMore,
 };

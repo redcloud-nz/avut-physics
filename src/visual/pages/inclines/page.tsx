@@ -54,8 +54,8 @@ function InclinesMore() {
 const page: VisualPage = {
     slug: "inclines",
     name: "Inclines",
-    title: "On a slope, the rope holds only part of the load",
-    text: "Part of the load’s weight pulls it down the slope, and another part presses it into the ground. They’re at right angles, so as on Pulling sideways they add up to more than the weight. The rope only holds the part down the slope: half the load at 30°.",
+    title: "On a slope, the rope holds part",
+    text: "Part of the load’s weight pulls it down the slope, and another part presses it into the ground. The rope only holds the part down the slope: half the load at 30°.",
     Figure: InclinesFigure,
     More: InclinesMore,
 };

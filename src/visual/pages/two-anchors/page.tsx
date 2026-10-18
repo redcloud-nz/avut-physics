@@ -272,15 +272,13 @@ function TwoAnchorsMore() {
 const page: VisualPage = {
     slug: "two-anchors",
     name: "Two anchors",
-    title: "Spread anchors each hold more than half",
+    title: "Spread anchors hold more",
     text: (
         <>
-            Two anchors can share a load, with a rope from each to one master point. Their up parts{" "}
-            <Var color={COLORS.redirect}>y</Var> hold the load, half each. Spread the anchors and
-            each rope leans, so it pulls sideways too: a part <Var color={COLORS.sideways}>x</Var>{" "}
-            the other anchor cancels. A leaning pull is bigger than its up part alone, so each
-            anchor holds more than half. With the ropes 120° apart, each holds the whole load; any
-            wider, more than the whole load.
+            Two anchors share a load through one master point, each rope’s up part{" "}
+            <Var color={COLORS.redirect}>y</Var> holding half. Spread them and each rope leans,
+            adding a sideways part <Var color={COLORS.sideways}>x</Var>, so each holds more than
+            half. At 120° apart, each holds the whole load.
         </>
     ),
     Figure: TwoAnchorsFigure,

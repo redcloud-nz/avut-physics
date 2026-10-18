@@ -25,8 +25,12 @@ function swipe(start: { x: number; y: number }, end: { clientX: number; clientY:
  * One page of the visual introduction, filling the screen: where it is in the series, its headline and text, its
  * figure, and buttons to the pages either side. Swiping sideways or the arrow keys move between pages too.
  *
- * Under the buttons is a pill. When the page has details, swiping up (or tapping the pill) brings them up in a drawer
- * over the page; dragging it down puts it away. Tapping the series' name at the top brings its contents down from the
+ * Between the buttons is a pill. When the page has details, swiping up (or tapping the pill) brings them up in a drawer
+ * over the page; dragging it down puts it away.
+ *
+ * On touch screens the window scrolls a little (see globals.css), so a phone's browser can tuck its bars away. The
+ * page stays pinned to the screen, and a swipe up only brings the details up once the window can't scroll further.
+ * On a screen too short for the page, the page scrolls within itself rather than running under the buttons. Tapping the series' name at the top brings its contents down from the
  * top in the same way.
  */
 export function Card(props: {
@@ -42,7 +46,7 @@ export function Card(props: {
     children: React.ReactNode;
 }) {
     const router = useRouter();
-    const touch = useRef<{ x: number; y: number } | null>(null);
+    const touch = useRef<{ x: number; y: number; bottom: boolean } | null>(null);
     const [open, setOpen] = useState(false);
     const [contents, setContents] = useState(false);
     const { prev, next } = props;
@@ -64,13 +68,18 @@ export function Card(props: {
     return (
         <>
             <main
-                className="mx-auto flex h-full w-full max-w-md shrink-0 flex-col gap-3 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)]"
+                data-visual-card
+                className="mx-auto flex h-full w-full max-w-md shrink-0 flex-col gap-3 overflow-y-auto px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-coarse:sticky pointer-coarse:top-0 pointer-coarse:h-dvh"
                 onTouchStart={(e) => {
                     // A drag on a slider, or on a drawing that's dragged, is its own.
                     const target = e.target as Element;
                     if (target instanceof HTMLInputElement || target.closest("[data-no-swipe]"))
                         return (touch.current = null);
-                    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    // A swipe up that the window can still scroll is the browser's, to put its bars away.
+                    const page = document.scrollingElement;
+                    const bottom =
+                        !page || page.scrollTop + window.innerHeight >= page.scrollHeight - 2;
+                    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, bottom };
                 }}
                 onTouchEnd={(e) => {
                     const start = touch.current;
@@ -79,7 +88,7 @@ export function Card(props: {
                     const way = swipe(start, e.changedTouches[0]);
                     if (way === "left") router.push(next);
                     if (way === "right") router.push(prev);
-                    if (way === "up" && hasDetails) setOpen(true);
+                    if (way === "up" && hasDetails && start.bottom) setOpen(true);
                 }}
             >
                 <header className="flex items-center gap-3 text-xs text-slate-400">
@@ -104,42 +113,25 @@ export function Card(props: {
                         />
                     ))}
                 </div>
-                <h1 className="text-2xl leading-tight font-semibold text-slate-50">
-                    {props.title}
-                </h1>
+                <h1 className="text-xl leading-tight font-semibold text-slate-50">{props.title}</h1>
                 <p className="text-slate-300">{props.text}</p>
 
-                <div className="flex min-h-0 flex-1 flex-col">{props.children}</div>
+                <div className="flex flex-1 flex-col">{props.children}</div>
 
-                <div className="flex flex-col items-center">
-                    <nav className="grid w-full grid-cols-2 gap-3">
-                        <Link
-                            href={prev}
-                            className="flex items-center justify-center gap-1 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500"
-                        >
-                            <ChevronLeft className="size-5" aria-hidden />
-                            Back
-                        </Link>
-                        <Link
-                            href={next}
-                            className="flex items-center justify-center gap-1 rounded-xl bg-sky-500 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
-                        >
-                            {props.index + 1 === total ? (
-                                "Finish"
-                            ) : (
-                                <>
-                                    Next
-                                    <ChevronRight className="size-5" aria-hidden />
-                                </>
-                            )}
-                        </Link>
-                    </nav>
+                <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                    <Link
+                        href={prev}
+                        className="flex items-center justify-center gap-1 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500"
+                    >
+                        <ChevronLeft className="size-5" aria-hidden />
+                        Back
+                    </Link>
                     <button
                         type="button"
                         disabled={!hasDetails}
                         aria-label={hasDetails ? "Show the details" : "No details on this page"}
                         onClick={() => setOpen(true)}
-                        className="group mt-1 flex h-6 w-20 items-center justify-center"
+                        className="group flex h-10 w-16 items-center justify-center"
                     >
                         <Pill
                             className={
@@ -147,7 +139,20 @@ export function Card(props: {
                             }
                         />
                     </button>
-                </div>
+                    <Link
+                        href={next}
+                        className="flex items-center justify-center gap-1 rounded-xl bg-sky-500 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
+                    >
+                        {props.index + 1 === total ? (
+                            "Finish"
+                        ) : (
+                            <>
+                                Next
+                                <ChevronRight className="size-5" aria-hidden />
+                            </>
+                        )}
+                    </Link>
+                </nav>
             </main>
 
             <Drawer open={open} onOpenChange={setOpen}>
