@@ -110,8 +110,11 @@ export default function Page() {
                     where a rule comes from, open the “Why is this?” box under it.
                 </p>
                 <p>
-                    This part covers weight and the forces in ropes and anchors. Part 2 will cover
-                    pulleys, mechanical advantage, and the friction that eats into it.
+                    This part covers weight and the forces in ropes and anchors.{" "}
+                    <Link href="/gentle-introduction/part-2" className={LINK}>
+                        Part 2
+                    </Link>{" "}
+                    covers pulleys, mechanical advantage, and the friction that eats into it.
                 </p>
                 <p>
                     Throughout, things are held still or moving at a steady speed. Those two come to

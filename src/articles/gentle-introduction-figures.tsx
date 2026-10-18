@@ -22,7 +22,7 @@ import {
  * first have one slider. They're drawn in SVG units with y down; the maths is in metres with y up.
  */
 
-const COLORS = {
+export const COLORS = {
     load: "#fbbf24",
     pull: "#38bdf8",
     sideways: "#f472b6",
@@ -38,7 +38,7 @@ const ofLoad = (share: number, kg = LOAD_KG) =>
     `${Math.round(share * kg)} kg (${((share * kg * 9.81) / 1000).toFixed(1)} kN)`;
 
 /** Text in a figure, with a halo in the page's colour so lines behind it don't run through it. */
-function Tag(props: {
+export function Tag(props: {
     at: Vector2;
     color?: string;
     anchor?: "start" | "middle" | "end";
@@ -61,7 +61,7 @@ function Tag(props: {
 }
 
 /** A figure: its drawing, an optional slider under it, and a caption. */
-function Figure(props: { id: string; caption: React.ReactNode; children: React.ReactNode }) {
+export function Figure(props: { id: string; caption: React.ReactNode; children: React.ReactNode }) {
     return (
         <figure
             className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/30 p-3 sm:p-4 print:break-inside-avoid print:border-slate-400 print:bg-transparent"

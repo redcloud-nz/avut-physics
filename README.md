@@ -31,6 +31,9 @@ settles and the forces through it, and lets you change the setup with sliders to
   and kilonewtons, forces as arrows, and how angles change the load on anchor legs and redirects.
   Written for rescuers with no physics, with small slider figures and the maths kept in
   "Why is this?" boxes.
+- **A Gentle Introduction to Rescue Physics, Part 2** (`/gentle-introduction/part-2`): pulleys
+  and mechanical advantage, from a single pulley to a 2:1 on a Z-rig, working systems out with
+  the T method, and how friction in the pulleys eats into the advantage.
 - **Standing Body Belays** (`/standing-body-belays`): how much grip a belayer's boots need to hold
   a stretcher still, and why even the best case leaves too little margin.
 

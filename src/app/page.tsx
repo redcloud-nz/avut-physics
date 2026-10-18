@@ -46,6 +46,20 @@ export default function Home() {
                 </li>
                 <li>
                     <Link
+                        href="/gentle-introduction/part-2"
+                        className="flex h-full flex-col gap-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-sky-500"
+                    >
+                        <h3 className="text-lg font-semibold text-slate-100">
+                            A Gentle Introduction to Rescue Physics, Part 2
+                        </h3>
+                        <p className="text-sm text-slate-400">
+                            Pulleys and mechanical advantage: how a Z-rig and its relatives work,
+                            the T method, and what friction takes away.
+                        </p>
+                    </Link>
+                </li>
+                <li>
+                    <Link
                         href="/standing-body-belays"
                         className="flex h-full flex-col gap-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-sky-500"
                     >
