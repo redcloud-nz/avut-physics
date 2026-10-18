@@ -52,6 +52,10 @@ compiles for around 20 seconds.
   matches. After changing a solver, its shared maths or an article's inputs, run `npm run figures`
   and commit the JSON with the change. The hash is of the raw source, so a Prettier reformat counts
   as a change too.
+- `src/visual/`: A Visual Introduction to Rescue Physics, served at `/visual/<slug>`. Each page is a
+  folder in `pages/`: `page.tsx` (server) holds its name, headline, text and any details, and
+  `figure.tsx` (client) its figure. `pages/index.ts` sets the order. Pieces several pages share
+  are in `common/`, and `card.tsx` and `frame.tsx` are the chrome around every page and figure.
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`) and slider controls.
   Drawing only, no maths.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:

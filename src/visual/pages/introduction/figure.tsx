@@ -1,9 +1,5 @@
 import { ChevronDown, Hand, MoveHorizontal } from "lucide-react";
 
-/*
- * The first page of the visual introduction: how to get around it.
- */
-
 /** One way of getting around: what to do, beside a picture of it, and what it does. */
 function Control(props: {
     icon: React.ReactNode;

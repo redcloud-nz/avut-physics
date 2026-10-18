@@ -1,5 +1,7 @@
 "use client";
 
+import type { Vector2 } from "@/lib/vector2";
+
 /*
  * The frame every figure in the visual introduction shares: a drawing that grows to the space it has, its slider, and
  * a big number or two that change as the slider moves.
@@ -37,3 +39,31 @@ export function Layout(props: {
 }
 
 export const SVG = "h-full max-h-full w-full text-slate-400";
+
+/** Grey for what's faint in a drawing: where something was, and notes. */
+export const GHOST = "#64748b";
+
+/** Small grey text in a drawing: a time, a distance, a scale. */
+export function Note(props: {
+    at: Vector2;
+    anchor?: "start" | "middle" | "end";
+    children: React.ReactNode;
+}) {
+    return (
+        <text
+            x={props.at.x}
+            y={props.at.y}
+            fontSize={13}
+            fill={GHOST}
+            textAnchor={props.anchor ?? "middle"}
+            dominantBaseline="middle"
+        >
+            {props.children}
+        </text>
+    );
+}
+
+/** The load used to turn shares into kilograms. */
+export const LOAD_KG = 200;
+
+export const percent = (share: number) => `${Math.round(share * 100)}%`;

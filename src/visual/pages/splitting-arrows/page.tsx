@@ -3,47 +3,19 @@ import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
 import { Eq } from "@/components/tex";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
+import { ink, Letter, r, Section, Var } from "@/visual/common/details";
+import type { VisualPage } from "@/visual/pages";
+
+import { SplitFigure } from "./figure";
 
 /*
- * More on some pages of the visual introduction, for readers who want it: the maths behind an idea, say. It's further
- * reading rather than part of the figure, so it's typeset once on the server. The maths is written as in A Gentle
- * Introduction to Rescue Physics: a pull T at an angle θ from straight up, split into sideways x and up y.
+ * The maths is written as in A Gentle Introduction to Rescue Physics: a pull T at an angle θ from straight up, split
+ * into sideways x and up y.
  */
-
-const r = String.raw;
-
-/** TeX in an arrow's colour, to tie a quantity to its arrow in the figure. */
-const ink = (color: string, tex: string) => r`\textcolor{${color}}{${tex}}`;
 
 const T = ink(COLORS.pull, "T");
 const X = ink(COLORS.sideways, "x");
 const Y = ink(COLORS.redirect, "y");
-
-/** A letter in the text, in its arrow's colour. */
-function Var(props: { color: string; children: React.ReactNode }) {
-    return <em style={{ color: props.color }}>{props.children}</em>;
-}
-
-/** A section of a page's details, under a heading. */
-function Section(props: { title: React.ReactNode; children: React.ReactNode }) {
-    return (
-        <section className="flex flex-col gap-2">
-            <h2 className="font-semibold text-slate-100">{props.title}</h2>
-            {props.children}
-        </section>
-    );
-}
-
-/** A letter in a drawing, in italics like the maths. */
-function Letter(props: { at: Vector2; color: string; children: React.ReactNode }) {
-    return (
-        <Label at={props.at} color={props.color}>
-            <tspan fontStyle="italic" fontSize={16}>
-                {props.children}
-            </tspan>
-        </Label>
-    );
-}
 
 /*
  * The worked example: a 3 kN pull up and to the right, 2.4 kN across and 1.8 kN up, drawn 40 units to the kN. It
@@ -185,7 +157,7 @@ function SquaresDrawing() {
     );
 }
 
-export function SplittingArrowsMore() {
+function SplittingArrowsMore() {
     return (
         <>
             <Section title="Working out the parts">
@@ -235,14 +207,19 @@ export function SplittingArrowsMore() {
     );
 }
 
-export function IntroductionMore() {
-    return (
-        <Section title="More, if you want it">
-            <p>
-                Some pages have more in this drawer: the maths behind an idea, say, or the reasoning
-                in full. You don’t need it to follow along, so skip it whenever you like.
-            </p>
-            <p>Drag this back down, or tap the page behind it, to put it away.</p>
-        </Section>
-    );
-}
+const page: VisualPage = {
+    slug: "splitting-arrows",
+    name: "Splitting arrows",
+    title: "Any arrow splits into two",
+    text: (
+        <>
+            Any pull can be split into a horizontal part, written <em>x</em>, and a vertical part,
+            written <em>y</em>. Level and upright pulls are much easier to reason about than
+            slanting ones, and tip to tail the two parts pull just the same as the arrow.
+        </>
+    ),
+    Figure: SplitFigure,
+    More: SplittingArrowsMore,
+};
+
+export default page;
