@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PAGES, SERIES } from "@/visual/pages";
+import { Share } from "@/visual/share";
 
 const DESCRIPTION =
     "The physics of rope rescue, one idea per screen: a picture to play with and a sentence or two.";
@@ -36,6 +37,7 @@ export default function Page() {
                     </li>
                 ))}
             </ol>
+            <Share title={SERIES} text={DESCRIPTION} path="/visual" />
         </main>
     );
 }

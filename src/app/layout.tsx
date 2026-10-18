@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { SiteFooter } from "@/components/SiteFooter";
@@ -19,6 +19,9 @@ export const metadata: Metadata = {
     title: { template: "%s | Physics Visualisations", default: "Physics Visualisations" },
     description: "Interactive physics diagrams with adjustable parameters",
 };
+
+/** The browser's bars, where it colours them (Chrome on Android, Safari), take the page's background. */
+export const viewport: Viewport = { themeColor: "#020617" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
     return (
