@@ -23,17 +23,28 @@ function InclinesMore() {
                     the part along the slope. At 30°, sin <em>θ</em> is ½, so the rope holds half
                     the load.
                 </p>
+                <p>
+                    The two parts meet at a square corner, so they add like arrows, not like
+                    numbers: at 30° they’re 50% and 87% of the weight.
+                </p>
             </Section>
             <Section title="Steep slopes hold most of it">
                 <p>
-                    Like cos on Two anchors, sin starts slowly: a gentle slope of 10° puts only 17%
-                    of the load on the rope. But by 45° it’s 71%, and at 60° 87%. Past about 60°,
-                    the rope is holding nearly the whole load, and the slope is doing little more
-                    than steering it.
+                    Unlike cos on Two anchors, sin rises quickly at first and then levels off: a
+                    gentle slope of 10° already puts 17% of the load on the rope, 45° puts 71%, and
+                    60° puts 87%. Past about 60°, the rope is holding most of the load, and the
+                    slope is doing little more than steering it.
                 </p>
                 <p>
                     That’s without friction. On a real slope the ground grips the load too, as the
                     next page shows.
+                </p>
+            </Section>
+            <Section title="Rig for the whole load anyway">
+                <p>
+                    A slope can steepen along the way, and the load can come off the ground over a
+                    step or a lip. Then the rope holds all of it, so rig as if the load might hang
+                    free.
                 </p>
             </Section>
         </>
@@ -44,7 +55,7 @@ const page: VisualPage = {
     slug: "inclines",
     name: "Inclines",
     title: "On a slope, the rope holds only part of the load",
-    text: "Part of the load’s weight pulls it down the slope, and the rest presses it into the ground. The rope only holds the part down the slope: half the load at 30°.",
+    text: "Part of the load’s weight pulls it down the slope, and another part presses it into the ground. They’re at right angles, so as on Pulling sideways they add up to more than the weight. The rope only holds the part down the slope: half the load at 30°.",
     Figure: InclinesFigure,
     More: InclinesMore,
 };

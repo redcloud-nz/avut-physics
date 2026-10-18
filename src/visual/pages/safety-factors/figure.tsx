@@ -7,7 +7,7 @@ import { Slider } from "@/components/diagram/controls";
 import { vec2 } from "@/lib/vector2";
 import { kN, Layout, Note, Readout, SVG } from "@/visual/frame";
 
-/** What the gear is rated to hold, in kilonewtons: a common rating for rescue karabiners and pulleys. */
+/** What the gear is rated to hold, in kilonewtons: a basic karabiner, which only just clears ten times a two-person load. */
 const RATED = 22;
 /** The safety factor rescue systems commonly aim for. */
 const FACTOR = 10;
@@ -16,7 +16,7 @@ const LEFT = 20;
 const PER_KN = 7;
 const MAX = 40;
 
-/** A load against gear rated at 22 kN, and the ten-to-one the gear should cover, with the load on the slider. */
+/** A load against gear rated at 22 kN, and the ten-to-one the system should aim for, with the load on the slider. */
 export function SafetyFactorsFigure() {
     const [load, setLoad] = useState(2);
     const factor = RATED / load;

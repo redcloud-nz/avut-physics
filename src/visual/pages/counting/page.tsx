@@ -39,6 +39,11 @@ function CountingMore() {
                     and you get 3: the 2:1 on its haul line moves with the Z-rig’s rope, not the
                     load, so the count misses it. For those, use the T method.
                 </p>
+                <p>
+                    The same goes for complex systems, which are neither simple nor compound: in
+                    them, some pulley moves the opposite way to the load. Use the T method for those
+                    too.
+                </p>
             </Section>
         </>
     );
@@ -48,7 +53,7 @@ const page: VisualPage = {
     slug: "counting",
     name: "Counting rope parts",
     title: "Count the parts that get shorter",
-    text: "In a simple system, count the parts of rope that get shorter as the load comes up. That’s the advantage.",
+    text: "In a simple system, where every moving pulley moves with the load, count the parts of rope that get shorter as the load comes up. That’s the advantage.",
     Figure: CountingFigure,
     More: CountingMore,
 };

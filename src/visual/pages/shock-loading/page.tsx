@@ -35,7 +35,7 @@ function ShockLoadingMore() {
                 <p>
                     Fall-arrest gear for people working at height is designed to keep the pull on a
                     person to about 6 kN: more than that starts to injure. The figure turns its pull
-                    pink past 6 kN. Gear is stronger than people, but a 20 kN rating is soon used
+                    pink past 6 kN. Gear is stronger than people, but a 22 kN rating is soon used
                     up: a 1 m fall stopped over 5 cm takes 21 kN on 100 kg.
                 </p>
             </Section>

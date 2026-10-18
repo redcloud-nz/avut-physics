@@ -16,11 +16,15 @@ const IDEAS: { slug: string; color: string; idea: string }[] = [
     {
         slug: "counting",
         color: COLORS.pull,
-        idea: "Count the parts that get shorter for the advantage.",
+        idea: "In a simple system, count the parts that get shorter; the T method works on any.",
     },
     { slug: "friction", color: "#fb923c", idea: "Friction eats the advantage." },
     { slug: "inclines", color: COLORS.redirect, idea: "On a slope, the rope holds only part." },
-    { slug: "safety-factors", color: COLORS.load, idea: "Gear holds ten times the load." },
+    {
+        slug: "safety-factors",
+        color: COLORS.load,
+        idea: "Aim for every part to hold ten times what it carries.",
+    },
     { slug: "shock-loading", color: "#fda4af", idea: "Falling doesn’t hurt; stopping does." },
 ];
 

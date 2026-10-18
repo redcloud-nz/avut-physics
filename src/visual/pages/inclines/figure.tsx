@@ -31,7 +31,11 @@ export function InclinesFigure() {
             readouts={
                 <>
                     <Readout label="rope holds" value={percent(along)} color={COLORS.pull} />
-                    <Readout label="ground holds" value={percent(into)} color={COLORS.redirect} />
+                    <Readout
+                        label="presses into ground"
+                        value={percent(into)}
+                        color={COLORS.redirect}
+                    />
                 </>
             }
         />
