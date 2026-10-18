@@ -35,7 +35,7 @@ export function RopeStretchFigure() {
             slider={
                 <div className="flex flex-col gap-2">
                     <Slider
-                        label="Fall before the rope comes tight"
+                        label="Fall before 2 m of rope comes tight"
                         value={fall}
                         min={0}
                         max={2}
@@ -60,7 +60,11 @@ export function RopeStretchFigure() {
                 <>
                     <Readout label="rope stretches" value={`${Math.round(stretched * 100)} cm`} />
                     <Readout
-                        label="rope pulls, on 100 kg"
+                        label={
+                            force > 6
+                                ? "rope pulls, on 100 kg: enough to injure"
+                                : "rope pulls, on 100 kg"
+                        }
                         value={kN(Math.round(force * 10) / 10)}
                         color={force > 6 ? "#fda4af" : COLORS.pull}
                     />

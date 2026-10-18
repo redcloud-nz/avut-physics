@@ -19,7 +19,7 @@ function PartsDrawing() {
             viewBox="20 40 130 140"
             className="mx-auto w-full max-w-48 text-slate-400"
             role="img"
-            aria-label="A pull T split into a horizontal part x and a vertical part y that meet at a square corner, with θ the angle between T and y"
+            aria-label="A pull T split into a sideways part x and an up part y that meet at a square corner, with θ the angle between T and y"
         >
             <AngleArc center={TIP} radius={30} startDeg={90} sweepDeg={back - 90} />
             <Letter at={TIP.add(Vector2.fromAngle(rad((back + 90) / 2), 44))} color="#e2e8f0">
@@ -93,9 +93,9 @@ const page: VisualPage = {
     title: "Any arrow splits into two",
     text: (
         <>
-            Any force can be split into a horizontal part, written{" "}
-            <Var color={COLORS.sideways}>x</Var>, and a vertical part, written{" "}
-            <Var color={COLORS.redirect}>y</Var>. Level and upright forces are much easier to reason
+            Any force can be split into a sideways part, written{" "}
+            <Var color={COLORS.sideways}>x</Var>, and an up part, written{" "}
+            <Var color={COLORS.redirect}>y</Var>. Sideways and up forces are much easier to reason
             about than slanting ones, and tip to tail the two parts add up to the arrow.
         </>
     ),

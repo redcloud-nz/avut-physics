@@ -80,6 +80,11 @@ export function LeversFigure() {
                     <Letter at={right.add(vec2(-14, -arrow / 2 - 4))} color={COLORS.pull}>
                         F
                     </Letter>
+                    {push * PER_KN > LONGEST && (
+                        <Note at={right.add(vec2(-12, -LONGEST + 8))} anchor="end">
+                            off the scale
+                        </Note>
+                    )}
                     {[
                         [left.x, p.x, "a"],
                         [p.x, right.x, "b"],

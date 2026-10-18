@@ -23,14 +23,14 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### introduction
 
-- [ ] **suggestion**: Introduction doesn't say what the series covers or who it's for. `src/visual/pages/introduction/page.tsx:22`. Raised by: teaching.
+- [x] **suggestion**: Introduction doesn't say what the series covers or who it's for. `src/visual/pages/introduction/page.tsx:22`. Raised by: teaching.
   - **Problem:** The first page only explains how to get around. It never says this is about the physics behind rope rescue systems, that no maths is needed, or roughly where it goes (forces → anchors → pulleys → friction → falls). Readers without a physics background benefit from that reassurance and sense of direction before velocity and acceleration.
   - **Fix:** Text: "Why rope rescue systems behave as they do, from what a force is to pulley systems and falls. No maths needed. Each page has one idea: a sentence or two, and a picture to play with. Here's how to get around."
   - **Checker:** introduction/page.tsx:22 only explains navigation. A sentence saying what the series covers and that no maths is needed would reassure readers without a physics background. Cheap to add.
 
 ### velocity
 
-- [ ] **minor**: Defines velocity as just 'how fast', leaving out direction. `src/visual/pages/velocity/page.tsx:31`. Raised by: physics, teaching.
+- [x] **minor**: Defines velocity as just 'how fast', leaving out direction. `src/visual/pages/velocity/page.tsx:31`. Raised by: physics, teaching.
   - **Problem:** 'Velocity is how fast something goes' is the definition of speed. The page draws velocity as an arrow, and the series goes on to say that what makes arrows apt is having 'a size and a direction' (Arrows). Leaving direction out here sets up the usual speed/velocity mix-up, and the arrow on this page goes unexplained.
   - **Teaching reviewer adds:** The headline says "Velocity is how fast something goes", which is speed. Velocity also has a direction, and the figure draws it as an arrow. Three pages later, arrows are introduced as having "a size and a direction". The velocity figure's labels say "steady speed", and Force and Shock loading use "speed". Nothing tells the reader whether speed and velocity are the same thing.
   - **Fix:** Use 'Velocity is how fast something goes, and which way', and add a few words to the text saying the arrow shows both: its length is how fast, and it points the way the thing is going.
@@ -38,7 +38,7 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### mass
 
-- [ ] **minor**: 'Space' with zero gravity repeats the 'no gravity in space' myth. `src/visual/pages/mass/figure.tsx:16`. Raised by: physics.
+- [x] **minor**: 'Space' with zero gravity repeats the 'no gravity in space' myth. `src/visual/pages/mass/figure.tsx:16`. Raised by: physics.
   - **Problem:** The third button sets gravity to 0 under the name 'Space', and the page text says 'floating in space ... weightless'. In orbit, where people actually float, gravity is still about 90% of Earth's. They float because they're falling freely, not because gravity is gone. Zero gravity only holds far from any planet or star.
   - **Fix:** Rename the button to 'Deep space', and say 'far out in space' (or 'far from any planet') in the page text and the figure's doc comment.
   - **Checker:** PLACES has { name: 'Space', gravity: 0 }, and mass/page.tsx line 9 says 'floating in space ... weightless'. Gravity in low Earth orbit is still about 90% of surface gravity, and astronauts float because they're in free fall. The wording backs up a common misconception. It's minor, since 'deep space' makes zero gravity a fair approximation.
@@ -52,7 +52,7 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### units
 
-- [ ] **minor**: 'A newton is a kilogram speeded up by 1 m/s²' equates a force with a mass. `src/visual/pages/units/page.tsx:71`. Raised by: physics.
+- [x] **minor**: 'A newton is a kilogram speeded up by 1 m/s²' equates a force with a mass. `src/visual/pages/units/page.tsx:71`. Raised by: physics.
   - **Problem:** As written, the sentence says a newton is a kilogram. The Force page gets it right: a newton is the force that speeds 1 kg up by 1 m/s².
   - **Fix:** Write 'A newton is the force that speeds a kilogram up by 1 m/s²', to match the Force page.
   - **Checker:** units/page.tsx:71 reads 'A newton is a kilogram speeded up by 1 m/s²', which equates a force with a mass. force/page.tsx:30 has the correct wording: 'just enough force to speed 1 kg up by 1 m/s²'.
@@ -66,29 +66,29 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### equilibrium
 
-- [ ] **minor**: Equilibrium is defined as staying still, but the pulley pages also apply it to steady hauling. `src/visual/pages/equilibrium/page.tsx:8`. Raised by: teaching.
+- [x] **minor**: Equilibrium is defined as staying still, but the pulley pages also apply it to steady hauling. `src/visual/pages/equilibrium/page.tsx:8`. Raised by: teaching.
   - **Problem:** The headline and text say "When nothing moves…" and "Something that stays still is in equilibrium". Later, the pulley pages (2-to-1's drawer: "While it's held still, or moving steadily, those balance"), the friction table and the surface-friction haul and lower numbers all apply balance to a load that is moving. A beginner told "when nothing moves" may think the pulley numbers only hold while the load is stopped. The Force page has already set up the reason: force changes velocity, so steady velocity means no overall force.
   - **Fix:** Add: "The same goes for something moving steadily: if its velocity isn't changing, nothing overall is pushing it (as on Force)."
   - **Checker:** equilibrium/page.tsx defines equilibrium only as 'stays still'. The 2:1 drawer ('or moving steadily'), the friction table and surface-friction haul/lower all apply balance to a load moving at steady speed. Force has already set up that force changes velocity, so one sentence closes the gap.
 
 ### splitting-arrows
 
-- [ ] **minor**: Names for the parts drift: horizontal/level/sideways, vertical/upright/up. `src/visual/pages/splitting-arrows/page.tsx:96`. Raised by: teaching.
+- [x] **minor**: Names for the parts drift: horizontal/level/sideways, vertical/upright/up. `src/visual/pages/splitting-arrows/page.tsx:96`. Raised by: teaching.
   - **Problem:** Splitting arrows calls the parts "horizontal" and "vertical". The next page's headline says "Level and upright parts", and the figures and later pages say "sideways" and "up" ("x, each anchor", "sideways part"). Varying the names makes a beginner wonder whether they mean different things. Separately, "x" is a sideways force on these pages but becomes the rope's stretch (a distance) in the Rope stretch drawer (rope-stretch/page.tsx line 29).
   - **Fix:** Use 'sideways' and 'up' throughout: Splitting arrows text "a sideways part x and an up part y. Sideways and up forces are much easier to reason about…"; Pulling sideways title "Sideways and up parts make a slanting pull". In rope-stretch line 29, write "the stretch" without the letter x, or use s.
   - **Checker:** Splitting arrows uses 'horizontal'/'vertical' (line 96-97) and 'Level and upright forces' (line 98). Pulling sideways' headline is 'Level and upright parts'. The figures and later pages use 'sideways'/'up' ('x, each anchor', 'sideways part'). Rope-stretch's drawer uses x for the stretch (line 29), clashing with x as the sideways force.
 
 ### pulling-sideways
 
-- [ ] **minor**: 'more than the load weighs' is false at the slider's starting value of 0. `src/visual/pages/pulling-sideways/page.tsx:121`. Raised by: physics.
+- [x] **minor**: 'more than the load weighs' is false at the slider's starting value of 0. `src/visual/pages/pulling-sideways/page.tsx:121`. Raised by: physics.
   - **Problem:** The tag-line slider goes down to 0 kN. There T = hypot(0, 2.4) = 2.4 kN, exactly the load's weight, while the page text says T is 'more than the load weighs'.
   - **Fix:** Write 'more than the load weighs whenever the tag line pulls' (or 'more than the load weighs, as soon as the tag line pulls at all').
   - **Checker:** The slider has min={0}, and at 0 T = hypot(0, 2.4) = 2.4 kN, which equals the weight. The page text says T is 'more than the load weighs' with no condition. It's an edge case, since the slider starts at 1.8.
-- [ ] **suggestion**: The angle arc at the anchor has no plumb line or name. `src/visual/pages/pulling-sideways/figure.tsx:50`. Raised by: physics.
+- [x] **suggestion**: The angle arc at the anchor has no plumb line or name. `src/visual/pages/pulling-sideways/figure.tsx:50`. Raised by: physics.
   - **Problem:** The AngleArc runs from the rope (90° − lean in screen degrees) to 90° (straight down). No vertical line is drawn from the anchor, so the arc measures against an invisible line, and the angle isn't named or read out. The next pages use θ from straight up, so this is where readers should first see it.
   - **Fix:** Draw a faint dashed vertical down from the anchor, the length of the arc radius or a little more, so the arc has a visible reference. Labelling it θ is optional, and worth doing only if Two anchors picks the label up.
   - **Checker:** The AngleArc (figure.tsx:50) runs from the rope to straight down, but no vertical line is drawn from the anchor, so the arc measures against an invisible line. The page text never discusses the angle, so naming it θ here is optional. A faint plumb line is the useful part.
-- [ ] **suggestion**: The tag line in the worked example pulls far harder than a real one. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/pulling-sideways/page.tsx:88`. Raised by: practice.
+- [x] **suggestion**: The tag line in the worked example pulls far harder than a real one. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/pulling-sideways/page.tsx:88`. Raised by: practice.
   - **Problem:** The example has a 2.4 kN load (240 kg, more than the series' 200 kg rescue load) with a tag line pulling 1.8 kN, about 180 kg sideways. Real tag lines are hand-held and pull a few hundred newtons. Also, tag lines are usually pulled from below, so their pull has a downward part that adds to the main line's load. The page only shows a level pull, which understates the main line.
   - **Fix:** After the example, add: 'A real tag line pulls much less than this, but usually from below, so it adds to the main line's load as well as pulling it sideways.'
   - **Checker:** The 2.4/1.8/3 kN numbers are a worked 3-4-5 triangle to show Pythagoras, not a claim about real tag lines, so it isn't really wrong. The point that tag lines often pull from below, adding to the main line's load, is a worthwhile note, and the page only shows a level pull.
@@ -143,14 +143,14 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### pulley-on-the-anchor
 
-- [ ] **minor**: "It's still the start of every haul system" isn't true. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/pulley-on-the-anchor/page.tsx:75`. Raised by: practice.
+- [x] **minor**: "It's still the start of every haul system" isn't true. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/pulley-on-the-anchor/page.tsx:75`. Raised by: practice.
   - **Problem:** The page's own 2:1 has no anchor pulley; it's tied to the anchor. Many hauls start with a rope grab on the main line rather than with an anchor pulley.
   - **Fix:** Change it to 'It's still part of most haul systems.'
   - **Checker:** Line 75, 'It's still the start of every haul system', is too absolute. The series' own 2:1 is tied to the anchor and has no anchor pulley. It is a small overstatement.
 
 ### 2-to-1
 
-- [ ] **minor**: "Advantage" and the n:1 notation are never defined in main text. `src/visual/pages/2-to-1/page.tsx:61`. Raised by: teaching.
+- [x] **minor**: "Advantage" and the n:1 notation are never defined in main text. `src/visual/pages/2-to-1/page.tsx:61`. Raised by: teaching.
   - **Problem:** The page is named "2:1" and its headline says "halves the pull", but nothing on a main page says what "2:1" means or what an "advantage" is. The only definition is in the drawer ("That amount is the advantage"). The Z-rig ("The Z-rig: 3:1"), Counting ("That's the advantage") and the friction readouts all use the term as if it were known. The series also never mentions "mechanical advantage" or "MA", the terms rescuers will hear in training.
   - **Fix:** 2-to-1 text: "Two parts of the rope share the load, so you pull half: a 2:1. That ratio is the system's mechanical advantage (MA). The price: you pull in 2 m of rope for every metre the load moves."
   - **Checker:** 'Advantage' is only defined in the 2:1 drawer (line 50). The Z-rig and Counting main texts use it as known, and grep finds 'mechanical advantage' and 'MA' nowhere in src/visual. Rescuers will meet those terms in training, so tying them in is worthwhile.
@@ -169,12 +169,12 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### 5-to-1
 
-- [ ] **minor**: Odd/even rule stated for all systems but only holds for simple ones. `src/visual/pages/5-to-1/page.tsx:26`. Raised by: physics, teaching.
+- [x] **minor**: Odd/even rule stated for all systems but only holds for simple ones. `src/visual/pages/5-to-1/page.tsx:26`. Raised by: physics, teaching.
   - **Problem:** "Tied to the load, a system's advantage is an odd number; tied to the anchor, an even one." The compound 6:1 two pages later has its Z-rig rope tied to the load and an even advantage. The rule holds only for simple systems with no pure redirects counted.
   - **Teaching reviewer adds:** "Tied to the load, a system's advantage is an odd number; tied to the anchor, an even one" holds only for simple systems. The very next compound shown, the 6:1, has its rope end tied off and comes out even for a different reason. Stated without the qualifier, it reads as a general rule.
   - **Fix:** "Tied to the load, a simple system's advantage is an odd number; tied to the anchor, an even one." Optionally add: "(Compound systems, a few pages on, don't follow this.)"
   - **Checker:** 5-to-1/page.tsx:26-27 states the odd/even rule for "a system" in general. The compound 6:1 two pages later is even, and the Counting page itself says simple and compound systems behave differently, so the rule should be scoped.
-- [ ] **minor**: "In practice, a 5:1 is two double pulleys" overstates one way of building it. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/5-to-1/page.tsx:11`. Raised by: practice.
+- [x] **minor**: "In practice, a 5:1 is two double pulleys" overstates one way of building it. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/5-to-1/page.tsx:11`. Raised by: practice.
   - **Problem:** In rope rescue the double-pulley block and tackle is more often rigged as a 4:1 (tied off to the anchor's double, as with a pre-rigged 4:1), and 5:1s are usually built as complex systems from single pulleys off a Z-rig (the 'complex 5:1' in the CMC Rope Rescue Manual). In rescue, the moving block also goes on a rope grab on the main line rather than straight onto the load. Line 26-27, "Tied to the load, a system's advantage is an odd number; tied to the anchor, an even one", is only true for simple systems; the page's own 6:1 compound is tied to the load.
   - **Fix:** Change it to 'One way to build a 5:1 is with two double pulleys ...', and add that rescuers often build one from single pulleys as a complex system instead. Change the rule to 'In a simple system, tied to the load ...'.
   - **Checker:** 'In practice, a 5:1 is two double pulleys' overstates one way of building it. In rescue, a 5:1 is often a complex system built from single pulleys. 'Tied to the load, odd; tied to the anchor, even' only holds for simple systems. The series' own 6:1 compound has the main line on the load and comes out even.
@@ -192,33 +192,33 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### compound
 
-- [ ] **suggestion**: No warning that big advantages make it easy to overload the system. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/compound/page.tsx:9`. Raised by: practice.
+- [x] **suggestion**: No warning that big advantages make it easy to overload the system. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/compound/page.tsx:9`. Raised by: practice.
   - **Problem:** A recognised practice point in rescue (Rigging for Rescue, the CMC manual) is that with a 6:1 or more, a few haulers can put several kN on the system without feeling it if the load snags at an edge, which can damage gear or the patient. Since the page celebrates multiplying the advantage, that trade-off is worth stating.
   - **Fix:** Add a More drawer: 'More advantage isn't always better. On a 6:1, three people pulling 0.3 kN each can put around 4–5 kN on a load that snags on an edge, and hardly feel it. Use the least advantage that does the job, and stop if hauling suddenly gets hard.'
   - **Checker:** The compound page has no More drawer and no warning about the cost of a big advantage. 'Use the least advantage that does the job' is a widely taught practice point. The suggested numbers are a bit high: 3 × 0.3 kN × 6 = 5.4 kN with no friction, and friction brings it down to roughly 4 kN.
 
 ### t-method
 
-- [ ] **suggestion**: "A rope keeps its T round every pulley" without saying "perfect". `src/visual/pages/t-method/page.tsx:9`. Raised by: physics.
+- [x] **suggestion**: "A rope keeps its T round every pulley" without saying "perfect". `src/visual/pages/t-method/page.tsx:9`. Raised by: physics.
   - **Problem:** The rule is stated as a fact, and Pulley friction (a few pages later) then shows that each pulley passes on only e of it. Pulley on the anchor flags its "perfect pulley" assumption; this page doesn't.
   - **Fix:** "A rope keeps its T round every (perfect) pulley." Or add a one-line More drawer pointing to Pulley friction.
   - **Checker:** Pulley on the anchor flags the perfect-pulley assumption and defers friction, so it's covered in context. But the T method page states "A rope keeps its T round every pulley" as a rule with no More drawer. Adding one word is cheap.
-- [ ] **suggestion**: Some headlines are labels, not the page's idea. `src/visual/pages/t-method/page.tsx:8`. Raised by: teaching.
+- [ ] **suggestion**: Some headlines are labels, not the page's idea. `src/visual/pages/t-method/page.tsx:8`. Raised by: teaching. Part done: the T method's headline now states its idea; the Z-rig and 5:1 headlines are unchanged.
   - **Problem:** The series promises "one idea per page, with the idea in the headline", and most headlines are sentences that state it. A few are only names: "The T method", "The Z-rig: 3:1" (z-rig/page.tsx line 8) and "Back and forth: 5:1" (5-to-1/page.tsx line 44).
   - **Fix:** t-method: "Follow the tension to find the advantage"; z-rig: "A Z-rig gives 3:1 from two pulleys and a grab"; 5-to-1: "Two double pulleys make a 5:1".
   - **Checker:** The series doesn't explicitly promise 'the idea in the headline': the intro says only 'Each page has one idea: a sentence or two'. Still, almost every headline is a sentence stating the idea, so 'The T method', 'The Z-rig: 3:1' and 'Back and forth: 5:1' stand out as labels. Low priority.
 
 ### friction
 
-- [ ] **minor**: "part after it pulls less than the part before it" can read backwards. `src/visual/pages/friction/page.tsx:29`. Raised by: physics.
+- [x] **minor**: "part after it pulls less than the part before it" can read backwards. `src/visual/pages/friction/page.tsx:29`. Raised by: physics.
   - **Problem:** The sentence has just said the rope runs towards you. Read in the direction the rope runs, the part "after" the pulley is the part nearer your hands, and that part pulls more, not less. The intended meaning (the load's side carries e times your side) only works if "after" means further from your hands.
   - **Fix:** "...so the part on the load's side of it pulls a little less than the part on your side."
   - **Checker:** Line 29 says the rope runs towards you, so read along the rope's run, "after" the pulley is your side. Your side pulls more (T against eT), so the sentence as written says the opposite of what's meant.
-- [ ] **suggestion**: Slider says "efficiency", text says "passes on". `src/visual/pages/friction/figure.tsx:30`. Raised by: teaching.
+- [x] **suggestion**: Slider says "efficiency", text says "passes on". `src/visual/pages/friction/figure.tsx:30`. Raised by: teaching.
   - **Problem:** The slider is labelled "Pulley efficiency" but the page text and drawer only talk about what a pulley "passes on". The text also doesn't say the figure is a Z-rig. "Efficiency" is the word on gear specs and in courses, so it's worth linking the two.
   - **Fix:** Text: "Every pulley passes on a little less than it gets: that share is its efficiency. Good pulleys pass on about 90%; a karabiner, about half. Here's the Z-rig again."
   - **Checker:** The friction figure's slider is 'Pulley efficiency' (figure.tsx:30), but the text and drawer only say 'passes on'. 'Efficiency' is the term on gear specs and in courses. The figure is a Z-rig, which the main text never says (the drawer's table and working imply it).
-- [ ] **suggestion**: Edge friction isn't covered anywhere. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/friction/page.tsx:84`. Raised by: practice.
+- [x] **suggestion**: Edge friction isn't covered anywhere. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/friction/page.tsx:84`. Raised by: practice.
   - **Problem:** The series covers pulley friction and the friction of the ground on the load, but not the rope running over a cliff edge, which in real hauls often costs more than all the pulleys together and wears the rope. The only mention is 'Knots and edges' in the safety factors list.
   - **Fix:** Add a short section to the friction More drawer: 'A rope running over an edge, even a padded one, loses much more than a pulley does, and wears the rope. An edge roller, or a high directional that lifts the rope clear of the edge, gets much of it back.'
   - **Checker:** Edges come up only in the safety-factors list. Friction over an edge often costs more than the pulleys and wears the rope, and the friction page is the natural place for it.
@@ -245,7 +245,7 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### surface-friction
 
-- [ ] **minor**: "If the grip is more than the part down the slope" mixes a ratio with a force. `src/visual/pages/surface-friction/page.tsx:39`. Raised by: physics, teaching.
+- [x] **minor**: "If the grip is more than the part down the slope" mixes a ratio with a force. `src/visual/pages/surface-friction/page.tsx:39`. Raised by: physics, teaching.
   - **Problem:** "Grip" was just defined as μ, a share. Here it is compared with a force (W sin θ). What is actually compared is the most friction can give, μW cos θ.
   - **Teaching reviewer adds:** "If the grip is more than the part down the slope" compares μ, which the page defines as a share, with a force. What's meant is the friction μW cos θ against the part W sin θ. The sentence then uses "the angle whose tan is μ", but tan has never been introduced; only sin and cos have.
   - **Fix:** "If the most the ground can grip, μW cos θ, is more than the part down the slope, the load holds itself..." (or in words: "If the most friction can give is more than the part down the slope...").
@@ -253,7 +253,7 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### levers
 
-- [ ] **suggestion**: Push arrow silently capped at 2.5 kN. `src/visual/pages/levers/figure.tsx:31`. Raised by: physics.
+- [x] **suggestion**: Push arrow silently capped at 2.5 kN. `src/visual/pages/levers/figure.tsx:31`. Raised by: physics.
   - **Problem:** The arrow is limited to LONGEST = 150 units (2.5 kN at 60 units per kN). With the pivot past about 1.43 m, the readout keeps rising (up to 9 kN at 1.8 m) but the arrow stops growing. FallDrawing shows an "off the scale" note in the same situation; this figure doesn't.
   - **Fix:** When push \* PER_KN > LONGEST, draw a Note "off the scale" next to the push arrow, as FallDrawing does.
   - **Checker:** The arrow is capped at min(push\*60, 150), which is 2.5 kN, reached with the pivot at about 1.43 m. Past that, the readout keeps rising to 9 kN at 1.8 m but the arrow doesn't grow. common/fall.tsx shows an "off the scale" note in the same situation; levers doesn't. The readout stays correct, so this is cosmetic.
@@ -276,11 +276,11 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
 
 ### shock-loading
 
-- [ ] **minor**: Readout turns pink past 6 kN without explanation on the page. `src/visual/pages/shock-loading/figure.tsx:60`. Raised by: teaching.
+- [x] **minor**: Readout turns pink past 6 kN without explanation on the page. `src/visual/pages/shock-loading/figure.tsx:60`. Raised by: teaching.
   - **Problem:** The "rope pulls" readout changes colour above 6 kN, here and on Rope stretch. Only the Shock loading drawer explains why (6 kN is roughly where fall arrest starts to injure). A reader who doesn't open the drawer sees a colour change with no meaning, and on Rope stretch it's never explained at all.
   - **Fix:** When pink, change the readout label to e.g. "rope pulls, on 100 kg: enough to injure". Or mention 6 kN in one clause of each page's text, e.g. Rope stretch: "…so even a short fall onto it hits hard: past 6 kN, enough to injure."
   - **Checker:** shock-loading/figure.tsx:60 and rope-stretch/figure.tsx:65 turn the readout pink past 6 kN. Only the Shock loading drawer (line 37-38) explains it, and Rope stretch never does.
-- [ ] **suggestion**: Zero fall gives 1× weight here but 2× on Rope stretch. `src/visual/pages/shock-loading/figure.tsx:32`. Raised by: physics.
+- [x] **suggestion**: Zero fall gives 1× weight here but 2× on Rope stretch. `src/visual/pages/shock-loading/figure.tsx:32`. Raised by: physics.
   - **Problem:** With the Fall slider at 0, stoppingForce gives W(1 + 0/d) = W, so the figure says a load that hasn't fallen is stopped with just its weight. The next page states that "even with no fall at all, a load dropped onto a slack-free rope pulls with twice its weight". The even-stop model can't describe a drop from rest: an even pull of W never speeds the load up, so there is nothing to stop over d. Readers who compare the two figures at 0 m will see a contradiction.
   - **Fix:** Start the Fall slider at 0.1 m, or add to the More drawer: "With no fall, there's no speed to take away, so this model gives just the weight; the next page shows a real rope still briefly pulls harder."
   - **Checker:** Confirmed: with Fall at 0, F = W(1 + 0/d) = 1 kN, while Rope stretch says a load dropped with no fall pulls with twice its weight. The More drawer already says a real stop's peak is higher than the even-stop figure, which softens this, so it's a suggestion rather than minor.
@@ -288,18 +288,18 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
   - **Problem:** Safety factors builds its case on 22 kN gear, and this page then says "a 20 kN rating is soon used up". It's a small inconsistency a careful reader may notice.
   - **Fix:** Use "a 22 kN rating" to match Safety factors.
   - **Checker:** It's a small inconsistency with Safety factors' 22 kN, though 20 kN is also a real standard minimum, and Safety factors itself says ten times 2 kN is 20 kN. The point stands either way, and it's trivial to change.
-- [ ] **suggestion**: Doesn't link shock loads to belay practice and the drop test. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/shock-loading/page.tsx:42`. Raised by: practice.
+- [x] **suggestion**: Doesn't link shock loads to belay practice and the drop test. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/shock-loading/page.tsx:42`. Raised by: practice.
   - **Problem:** The physics is sound, but the page stops at 'keep slack out'. Rescue practice handles falls with a separate belay line and belay devices that slip to limit the force. The standard check is the belay competence drop test (BCDT, now ASTM F2436): a 200 kg load dropped 1 m on 3 m of rescue rope must be stopped within 1 m of extra travel with a peak under 15 kN (see CMC 540 Rescue Belay, https://www.cmcpro.com/equipment/traverse-540-rescue-belay/). That ties the page's sliders straight to a number rescuers already know.
   - **Fix:** Add a section: 'Rescue belays are tested for exactly this: 200 kg dropped 1 m onto 3 m of rope must stop within about 1 m more, pulling under 15 kN. The belay lets the rope slip a little, stretching out the stop as the slider does.'
   - **Checker:** The shock-loading drawer stops at 'keep slack out'. The belay competence drop test (200 kg, 1 m drop on 3 m of rope, stop within about 1 m, peak under 15 kN) is a well-known benchmark and ties directly to the stopping-distance slider. Not every NZ team uses ASTM terms, so keep the citation light.
 
 ### rope-stretch
 
-- [ ] **minor**: Rope length (2 m) isn't shown, and "dropped with no fall" contradicts itself. `src/visual/pages/rope-stretch/figure.tsx:11`. Raised by: teaching.
+- [x] **minor**: Rope length (2 m) isn't shown, and "dropped with no fall" contradicts itself. `src/visual/pages/rope-stretch/figure.tsx:11`. Raised by: teaching.
   - **Problem:** The figure always uses 2 m of rope, but neither the page nor the figure says so. The drawer then says length matters (fall factor), so a reader can't connect the readouts to it. The drawer's "Even with no fall at all, a load dropped onto a slack-free rope pulls with twice its weight" (page.tsx line 36) contradicts itself: it says "dropped" and "no fall" in the same sentence.
   - **Fix:** Slider label: "Fall before 2 m of rope comes tight". Drawer: "Even with no fall at all, a load let go suddenly onto a rope that's just come tight pulls with twice its weight for a moment."
   - **Checker:** rope-stretch/figure.tsx:13 fixes LENGTH = 2 m, but no label or text says so (the slider label is 'Fall before the rope comes tight'). The drawer's fall-factor section mentions '2 m of rope' only as an example. Drawer line 36, 'a load dropped onto a slack-free rope … with no fall at all', is self-contradictory wording.
-- [ ] **minor**: Calls rescue rope "static" without mentioning the usual names, low-stretch or semi-static. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/rope-stretch/page.tsx:51`. Raised by: practice.
+- [x] **minor**: Calls rescue rope "static" without mentioning the usual names, low-stretch or semi-static. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/pages/rope-stretch/page.tsx:51`. Raised by: practice.
   - **Problem:** EN 1891 covers 'low stretch kernmantel ropes', and gear catalogues and many NZ courses call them low-stretch or semi-static. The page itself says they stretch 3-4%. 'Static' alone suggests they don't stretch at all, which is the opposite of what the page then shows.
   - **Fix:** Change it to 'Rescue ropes are low-stretch (often called static or semi-static): they stretch only a few percent ...'.
   - **Checker:** EN 1891's title is 'low stretch kernmantel ropes'. The same sentence goes on to say they stretch a few percent, so the harm is small. Adding the name 'low-stretch' still helps readers match the page to the gear they use.
@@ -330,7 +330,7 @@ Severity: **error** is wrong, or teaches something false. **Misleading** is defe
   - **Problem:** The 2:1, Z-rig, 5:1, compound and T method figures label every rope part and the haul readout with exact numbers (0.4 kN, 0.24 kN). The only place that says pulleys are treated as perfect is the Pulley on the anchor drawer ("for now we'll leave that out"). The main texts of the 2:1, Z-rig and T method pages say nothing about it, and Pulley friction only comes after all of them.
   - **Fix:** In the T method text: "A rope keeps its T round every pulley (a perfect one; Pulley friction comes later)." Or add '(perfect pulleys)' to the haul readout label in common/haul.tsx, e.g. `you pull, for a ${LOAD_KN} kN load, perfect pulleys`.
   - **Checker:** The only 'perfect pulley' caveat is in the Pulley on the anchor drawer (lines 32-33). The 2:1, Z-rig, 5:1, compound and T method figures show exact pulls with no note on the page. The 5:1 drawer mentions friction, but its main text doesn't. Worth one clause.
-- [ ] **suggestion**: The working load changes from page to page. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/frame.tsx:70`. Raised by: practice.
+- [x] **suggestion**: The working load changes from page to page. `/Users/awestphal/projects/avut-project/avut-physics/src/visual/frame.tsx:70`. Raised by: practice.
   - **Problem:** The pulley pages use 1.2 kN ('one person and their gear', LOAD_KN). Safety factors and Pulling off centre use 2 kN as the two-person rescue load. Shock loading, Rope stretch and Levers use 100 kg. The safety factors page tells readers the rescue load is 2 kN, but the shock pages then show forces for half of that. A reader comparing the 21 kN shock with the 22 kN rating may not realise a real two-person load would roughly double the shock.
   - **Fix:** Add to Shock loading's 'How hard is too hard': 'A two-person rescue load, 200 kg, pulls about twice as hard as these numbers.'
   - **Checker:** The loads do vary from page to page (1.2 kN, 2 kN, 100 kg), but each readout is labelled: 'rope pulls, on 100 kg', 'for a 1.2 kN load'. The shock page's text says '21 kN on 100 kg' explicitly. The force does scale with the load, so the 'roughly double' remark is right. This is a nice-to-have, not an inconsistency that misleads, so suggestion.

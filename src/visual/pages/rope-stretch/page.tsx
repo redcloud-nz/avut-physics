@@ -26,15 +26,15 @@ function RopeStretchMore() {
                 </p>
                 <p>
                     At the bottom, the rope’s stretch has taken up all of gravity’s work, the weight
-                    times the fall <em>h</em> and the stretch <em>x</em>. A spring’s work is half
-                    its final pull times its stretch, and that gives the pull:
+                    times the fall <em>h</em> and the stretch. A spring’s work is half its final
+                    pull times its stretch, and that gives the pull:
                 </p>
                 <Eq
                     tex={r`F = ${W} + \sqrt{${W}^2 + 2\,${W}\,k\,h} \qquad k = \frac{1}{\text{stretch} \times L}`}
                 />
                 <p>
-                    Even with no fall at all, a load dropped onto a slack-free rope pulls with twice
-                    its weight for a moment.
+                    Even with no fall at all, a load let go suddenly onto a rope that’s just come
+                    tight pulls with twice its weight for a moment.
                 </p>
             </Section>
             <Section title="Fall factor">
@@ -48,10 +48,10 @@ function RopeStretchMore() {
             </Section>
             <Section title="Static and dynamic rope">
                 <p>
-                    Rescue ropes are static: they stretch only a few percent, so the load doesn’t
-                    bounce and every metre hauled lifts the load. That’s why they catch falls hard.
-                    Climbing ropes are dynamic, made to stretch much more to catch a climber’s fall
-                    softly.
+                    Rescue ropes are low-stretch (often called static or semi-static): they stretch
+                    only a few percent, so the load doesn’t bounce and every metre hauled lifts the
+                    load. That’s why they catch falls hard. Climbing ropes are dynamic, made to
+                    stretch much more to catch a climber’s fall softly.
                 </p>
                 <p>
                     Dynamic ropes are described differently: their static elongation, with 80 kg

@@ -13,10 +13,10 @@ import { Layout, Readout, SVG } from "@/visual/frame";
 const PLACES = [
     { name: "Earth", gravity: G },
     { name: "Moon", gravity: 1.62 },
-    { name: "Space", gravity: 0 },
+    { name: "Deep space", gravity: 0 },
 ];
 
-/** The same 100 kg load on Earth, on the Moon and floating in space: its mass stays put, its weight doesn't. */
+/** The same 100 kg load on Earth, on the Moon and floating far out in space: its mass stays put, its weight doesn't. */
 export function MassFigure() {
     const [place, setPlace] = useState(0);
     const { gravity } = PLACES[place];

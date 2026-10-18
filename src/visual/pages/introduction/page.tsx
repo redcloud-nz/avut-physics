@@ -19,7 +19,7 @@ const page: VisualPage = {
     slug: "introduction",
     name: "Introduction",
     title: "One idea per page",
-    text: "Each page has one idea: a sentence or two, and a picture to play with. Here’s how to get around.",
+    text: "Why rope rescue systems behave as they do, from what a force is to pulley systems and falls. No maths needed. Each page has one idea: a sentence or two, and a picture to play with. Here’s how to get around.",
     Figure: ControlsFigure,
     More: IntroductionMore,
 };

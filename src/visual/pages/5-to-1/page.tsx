@@ -23,8 +23,9 @@ function FiveToOneMore() {
                 <p>
                     Tie the rope’s end to the anchor’s double instead, and the part from the anchor
                     down to the first wheel no longer gets shorter as the load comes up. Four parts
-                    are left to count: a 4:1. Tied to the load, a system’s advantage is an odd
-                    number; tied to the anchor, an even one.
+                    are left to count: a 4:1. Tied to the load, a simple system’s advantage is an
+                    odd number; tied to the anchor, an even one. Compound systems, a few pages on,
+                    don’t follow this.
                 </p>
             </Section>
             <Section title="The cost">
@@ -42,7 +43,7 @@ const page: VisualPage = {
     slug: "5-to-1",
     name: "5:1",
     title: "Back and forth: 5:1",
-    text: "Tie the rope to the load and run it up and down round two pulleys on the anchor and two on the load. Five parts of rope pull the load, so you pull a fifth. It’s a pair of double pulleys, drawn apart so you can see each wheel.",
+    text: "Tie the rope to the load and run it up and down round two pulleys on the anchor and two on the load. Five parts of rope pull the load, so you pull a fifth. One way to build it is with a pair of double pulleys, drawn apart here so you can see each wheel.",
     Figure: FiveToOneFigure,
     More: FiveToOneMore,
 };

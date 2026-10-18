@@ -105,6 +105,10 @@ function PullingSidewaysMore() {
                 up to more than that (1.8 + 2.4 = 4.2), but they’re at right angles, so together
                 they only make 3 kN. Still, that’s more than the load weighs.
             </p>
+            <p>
+                A real tag line pulls much less than this, but usually from below, so it adds to the
+                main line’s load as well as pulling it sideways.
+            </p>
         </Section>
     );
 }
@@ -112,13 +116,14 @@ function PullingSidewaysMore() {
 const page: VisualPage = {
     slug: "pulling-sideways",
     name: "Pulling sideways",
-    title: "Level and upright parts make a slanting pull",
+    title: "Sideways and up parts make a slanting pull",
     text: (
         <>
             A tag line pulls the load sideways, so the rope has to hold a sideways part{" "}
             <Var color={COLORS.sideways}>x</Var> as well as the up part{" "}
             <Var color={COLORS.redirect}>y</Var> that holds the weight. Tip to tail, they make the
-            rope’s slanting pull <Var color={COLORS.pull}>T</Var>: more than the load weighs.
+            rope’s slanting pull <Var color={COLORS.pull}>T</Var>: more than the load weighs, as
+            soon as the tag line pulls at all.
         </>
     ),
     Figure: PullingSidewaysFigure,

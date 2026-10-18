@@ -47,6 +47,17 @@ export function PullingSidewaysFigure() {
                     <Rope from={load} to={vec2(load.x + 110, load.y)} dashed />
                     <Anchor at={anchor} />
                     {tag > 0 && (
+                        <line
+                            x1={anchor.x}
+                            y1={anchor.y}
+                            x2={anchor.x}
+                            y2={anchor.y + 46}
+                            stroke="currentColor"
+                            strokeDasharray="3 3"
+                            opacity={0.7}
+                        />
+                    )}
+                    {tag > 0 && (
                         <AngleArc
                             center={anchor}
                             radius={34}

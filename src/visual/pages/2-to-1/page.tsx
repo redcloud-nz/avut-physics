@@ -59,7 +59,7 @@ const page: VisualPage = {
     slug: "2-to-1",
     name: "2:1",
     title: "A pulley on the load halves the pull",
-    text: "Two parts of the rope share the load. The price: you pull in 2 m of rope for every metre the load moves.",
+    text: "Two parts of the rope share the load, so you pull half: a 2:1. That ratio is the system’s mechanical advantage. The price: you pull in 2 m of rope for every metre the load moves.",
     Figure: TwoToOneFigure,
     More: TwoToOneMore,
 };

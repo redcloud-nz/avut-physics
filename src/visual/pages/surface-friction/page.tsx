@@ -36,8 +36,8 @@ function SurfaceFrictionMore() {
                     tex={r`\text{haul} = ${W}(\sin\theta + ${MU}\cos\theta) \qquad \text{lower} = ${W}(\sin\theta - ${MU}\cos\theta)`}
                 />
                 <p>
-                    If the grip is more than the part down the slope, the load holds itself and
-                    needs pulling down. That happens below the angle whose tan is{" "}
+                    If the most friction can give is more than the part down the slope, the load
+                    holds itself and needs pulling down. That happens below the angle whose tan is{" "}
                     <Var color={FRICTION}>μ</Var>: about 22° for a grip of 40%.
                 </p>
             </Section>

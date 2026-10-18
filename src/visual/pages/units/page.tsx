@@ -68,8 +68,8 @@ function UnitsMore() {
             <Section title="The kilogram, not the gram">
                 <p>
                     Mass is the odd one: the prefixes go on the gram, but the kilogram is the unit
-                    everything else is built on. A newton is a kilogram speeded up by 1 m/s², and a
-                    litre of water has a mass of a kilogram:
+                    everything else is built on. A newton is the force that speeds a kilogram up by
+                    1 m/s², and a litre of water has a mass of a kilogram:
                 </p>
                 <Eq tex={r`1\,\text{N} = 1\,\text{kg} \times 1\,\text{m/s}^2`} />
                 <Eq

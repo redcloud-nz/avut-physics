@@ -72,8 +72,8 @@ function PulleyOnTheAnchorMore() {
                     than lifting.
                 </p>
                 <p>
-                    It’s still the start of every haul system. Pulleys that move with the load are
-                    what share the pull out, and the next pages show how.
+                    It’s still part of most haul systems. Pulleys that move with the load are what
+                    share the pull out, and the next pages show how.
                 </p>
             </Section>
         </>

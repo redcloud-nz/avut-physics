@@ -26,8 +26,8 @@ function FrictionMore() {
                 <p>
                     Say each pulley passes on a share <Var color={COLORS.redirect}>e</Var> of the
                     rope’s pull: 90% is <Var color={COLORS.redirect}>e</Var> = 0.9. While you haul,
-                    the rope runs towards you, and the pulley holds a little back, so the part after
-                    it pulls a little less than the part before it.
+                    the rope runs towards you, and the pulley holds a little back, so the part on
+                    the load’s side of it pulls a little less than the part on your side.
                 </p>
                 <p>
                     You pull the haul line with 1<Var color={COLORS.pull}>T</Var>. Round the
@@ -88,6 +88,13 @@ function FrictionMore() {
                     load back.
                 </p>
             </Section>
+            <Section title="Edges">
+                <p>
+                    A rope running over an edge, even a padded one, loses much more than a pulley
+                    does, and wears the rope. An edge roller, or a high redirect that lifts the rope
+                    clear of the edge, gets much of it back.
+                </p>
+            </Section>
         </>
     );
 }
@@ -96,7 +103,7 @@ const page: VisualPage = {
     slug: "friction",
     name: "Pulley friction",
     title: "Friction eats the advantage",
-    text: "Every pulley passes on a little less than it gets. Good pulleys pass on about 90%; a karabiner, about half.",
+    text: "Every pulley passes on a little less than it gets: that share is its efficiency. Good pulleys pass on about 90%; a karabiner, about half. Here’s the Z-rig again.",
     Figure: FrictionFigure,
     More: FrictionMore,
 };

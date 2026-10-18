@@ -55,7 +55,11 @@ export function ShockLoadingFigure() {
                         value={`${fallSpeed(fall).toFixed(1)} m/s`}
                     />
                     <Readout
-                        label="rope pulls, on 100 kg"
+                        label={
+                            force > 6
+                                ? "rope pulls, on 100 kg: enough to injure"
+                                : "rope pulls, on 100 kg"
+                        }
                         value={kN(Math.round(force * 10) / 10)}
                         color={force > 6 ? "#fda4af" : COLORS.pull}
                     />
