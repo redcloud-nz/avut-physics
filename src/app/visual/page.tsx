@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { PAGES, SERIES } from "@/visual/pages";
+
+const DESCRIPTION =
+    "The physics of rope rescue, one idea per screen: a picture to play with and a sentence or two.";
+
+export const metadata: Metadata = { title: SERIES, description: DESCRIPTION };
+
+export default function Page() {
+    return (
+        <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pt-4 pb-10">
+            <Link href="/" className="text-sm text-sky-400 hover:text-sky-300">
+                ← Physics Visualisations
+            </Link>
+            <header className="flex flex-col gap-2">
+                <h1 className="text-3xl leading-tight font-semibold text-slate-50">{SERIES}</h1>
+                <p className="text-slate-400">{DESCRIPTION}</p>
+            </header>
+            <Link
+                href={`/visual/${PAGES[0].slug}`}
+                className="rounded-xl bg-sky-500 py-2 text-center text-sm font-medium text-slate-950 hover:bg-sky-400"
+            >
+                Start
+            </Link>
+            <ol className="flex flex-col gap-1">
+                {PAGES.map((p, i) => (
+                    <li key={p.slug}>
+                        <Link
+                            href={`/visual/${p.slug}`}
+                            className="flex gap-3 rounded-lg px-2 py-2 text-slate-200 hover:bg-slate-900"
+                        >
+                            <span className="w-5 shrink-0 text-right text-slate-500 tabular-nums">
+                                {i + 1}
+                            </span>
+                            {p.name}
+                        </Link>
+                    </li>
+                ))}
+            </ol>
+        </main>
+    );
+}

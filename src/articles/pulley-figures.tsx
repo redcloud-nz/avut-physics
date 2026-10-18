@@ -41,7 +41,7 @@ const px = (x: number) => ANCHOR_X + x * PER_METRE;
 const kgOf = (share: number) => `${Math.round(share * LOAD_KG)} kg`;
 
 /** A pull in units of the team's pull, T: whole numbers as they are, others to two places. */
-function T(props: { t: number }) {
+export function T(props: { t: number }) {
     const t = Math.abs(props.t);
     const text = Math.abs(t - Math.round(t)) < 0.005 ? String(Math.round(t)) : t.toFixed(2);
     return (
@@ -52,7 +52,7 @@ function T(props: { t: number }) {
     );
 }
 
-type Labels = {
+export type Labels = {
     /** A rope part's label, by its key: `rope.part`, or `rope.part.grab` for the part between a grab and its body. */
     part?: (key: string, tension: number) => React.ReactNode;
     /** A pulley's sling's label, by the pulley's id. */
@@ -83,13 +83,24 @@ function partsOf(sys: PulleySystem, at: Positions, r: number) {
     });
 }
 
-/** A pulley system as it sits after `pulled` metres of rope has come in. */
-function SystemDrawing(props: {
+/**
+ * Upright drawings spread the rope parts this many times further apart, squash their length to fit a phone screen,
+ * and leave room at the sides and ends for labels.
+ */
+const SPREAD = 1.9;
+const ALONG = 0.5;
+const UP_PAD = 70;
+const UP_END = 30;
+
+/** A pulley system as it sits after `pulled` metres of rope has come in, across the page or upright. */
+export function SystemDrawing(props: {
     sys: PulleySystem;
     pulled: number;
     efficiency?: number;
     labels: Labels;
-    labelledBy: string;
+    labelledBy?: string;
+    upright?: boolean;
+    className?: string;
 }) {
     const { sys } = props;
     const at = hauled(sys, props.pulled);
@@ -207,21 +218,37 @@ function SystemDrawing(props: {
     const haulDir = Math.sign(haulPart.b.x - haulPart.a.x);
     const haulTip = haulPart.b.add(vec2(-haulDir * 8, 0));
 
+    // Everything above is laid out across the page. Upright, it's turned a quarter turn: the load at the top, the
+    // anchor and the team at the bottom, and the rope parts spread further apart to leave room for their labels.
+    const laneMin = Math.min(...lanes) - R;
+    const laneMax = Math.max(...lanes) + R;
+    const up = props.upright;
+    const P = (p: Vector2) =>
+        up ? vec2(UP_PAD + (p.y - laneMin) * SPREAD, UP_END + (WIDTH - p.x) * ALONG) : p;
+    const V = (v: Vector2) => (up ? vec2(v.y * SPREAD, -v.x * ALONG) : v);
+    const r = up ? R * SPREAD : R;
+    const viewBox = up
+        ? `0 0 ${(laneMax - laneMin) * SPREAD + 2 * UP_PAD} ${WIDTH * ALONG + 2 * UP_END}`
+        : `0 0 ${WIDTH} ${height}`;
+    const line = (a: Vector2, b: Vector2) => {
+        const [p, q] = [P(a), P(b)];
+        return { x1: p.x, y1: p.y, x2: q.x, y2: q.y };
+    };
+    const box = [P(vec2(load.x, load.y - 20)), P(vec2(load.x + 26, load.y + 20))];
+
     return (
         <svg
-            viewBox={`0 0 ${WIDTH} ${height}`}
-            className="w-full text-slate-400"
+            viewBox={viewBox}
+            className={props.className ?? "w-full text-slate-400"}
             fontSize={15}
             role="img"
             aria-labelledby={props.labelledBy}
+            aria-label={props.labelledBy ? undefined : "A pulley system"}
         >
             {slings.map((s) => (
                 <line
                     key={s.id}
-                    x1={s.a.x}
-                    y1={s.a.y}
-                    x2={s.b.x}
-                    y2={s.b.y}
+                    {...line(s.a, s.b)}
                     stroke="currentColor"
                     strokeWidth={3}
                     opacity={0.5}
@@ -229,21 +256,21 @@ function SystemDrawing(props: {
             ))}
             {bolts.map((b, i) => (
                 <g key={i}>
-                    <circle cx={b.x} cy={b.y} r={5} fill="currentColor" />
-                    <Tag at={b.add(vec2(-10, 0))} anchor="end">
+                    <circle cx={P(b).x} cy={P(b).y} r={5} fill="currentColor" />
+                    <Tag
+                        at={up ? P(b).add(vec2(0, 18)) : b.add(vec2(-10, 0))}
+                        anchor={up ? "middle" : "end"}
+                    >
                         Anchor
                     </Tag>
                 </g>
             ))}
 
-            {ropes.flatMap((parts, r) =>
-                parts.map((part, i) => (
+            {ropes.flatMap((parts, i) =>
+                parts.map((part, j) => (
                     <line
-                        key={`${r}.${i}`}
-                        x1={part.a.x}
-                        y1={part.a.y}
-                        x2={part.b.x}
-                        y2={part.b.y}
+                        key={`${i}.${j}`}
+                        {...line(part.a, part.b)}
                         stroke="currentColor"
                         strokeWidth={2}
                         strokeDasharray={part.tail ? "4 4" : undefined}
@@ -254,42 +281,47 @@ function SystemDrawing(props: {
             {marks.map((m, i) => (
                 <line
                     key={i}
-                    x1={m.x}
-                    x2={m.x}
-                    y1={m.y - 4}
-                    y2={m.y + 4}
+                    {...line(
+                        m.add(vec2(0, -4 / (up ? SPREAD : 1))),
+                        m.add(vec2(0, 4 / (up ? SPREAD : 1))),
+                    )}
                     stroke="currentColor"
                     strokeWidth={2}
                     opacity={0.6}
                 />
             ))}
 
-            {pulleys.map((p) => (
-                <g key={p.id}>
-                    <circle
-                        cx={p.c.x}
-                        cy={p.c.y}
-                        r={R - 1}
-                        className="fill-slate-950 print:fill-white"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        opacity={0.9}
-                    />
-                    <path
-                        d={`M ${p.c.x} ${p.c.y - R} A ${R} ${R} 0 0 ${p.right ? 1 : 0} ${p.c.x} ${p.c.y + R}`}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        opacity={0.8}
-                    />
-                    <circle cx={p.c.x} cy={p.c.y} r={2.5} fill="currentColor" />
-                </g>
-            ))}
+            {pulleys.map((p) => {
+                const c = P(p.c);
+                const top = P(p.c.add(vec2(0, -R)));
+                const bottom = P(p.c.add(vec2(0, R)));
+                return (
+                    <g key={p.id}>
+                        <circle
+                            cx={c.x}
+                            cy={c.y}
+                            r={r - 1}
+                            className="fill-slate-950 print:fill-white"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                            opacity={0.9}
+                        />
+                        <path
+                            d={`M ${top.x} ${top.y} A ${r} ${r} 0 0 ${p.right ? 1 : 0} ${bottom.x} ${bottom.y}`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            opacity={0.8}
+                        />
+                        <circle cx={c.x} cy={c.y} r={2.5} fill="currentColor" />
+                    </g>
+                );
+            })}
             {grabs.map((g) => (
                 <rect
                     key={g.id}
-                    x={g.at.x - 6}
-                    y={g.at.y - 5}
+                    x={P(g.at).x - 6}
+                    y={P(g.at).y - 5}
                     width={12}
                     height={10}
                     rx={2}
@@ -297,18 +329,35 @@ function SystemDrawing(props: {
                 />
             ))}
 
-            <rect x={load.x} y={load.y - 20} width={26} height={40} fill="currentColor" />
-            <Arrow from={vec2(load.x + 30, load.y)} v={vec2(28, 0)} color={COLORS.load} />
-            <Tag at={vec2(load.x + 13, load.y - 30)}>Load</Tag>
+            <rect
+                x={Math.min(box[0].x, box[1].x)}
+                y={Math.min(box[0].y, box[1].y)}
+                width={Math.abs(box[1].x - box[0].x)}
+                height={Math.abs(box[1].y - box[0].y)}
+                fill="currentColor"
+            />
+            <Arrow from={P(vec2(load.x + 30, load.y))} v={V(vec2(28, 0))} color={COLORS.load} />
+            <Tag
+                at={
+                    up
+                        ? P(vec2(load.x + 13, load.y)).add(
+                              vec2(Math.abs(box[1].x - box[0].x) / 2 + 8, 0),
+                          )
+                        : vec2(load.x + 13, load.y - 30)
+                }
+                anchor={up ? "start" : "middle"}
+            >
+                Load
+            </Tag>
             <Arrow
-                from={haulTip.add(vec2(-haulDir * 34, 0))}
-                v={vec2(haulDir * 34, 0)}
+                from={P(haulTip.add(vec2(-haulDir * 34, 0)))}
+                v={V(vec2(haulDir * 34, 0))}
                 color={COLORS.pull}
             />
             <Tag
-                at={haulTip.add(vec2(0, 16))}
+                at={up ? P(haulTip).add(vec2(10, -10)) : haulTip.add(vec2(0, 16))}
                 color={COLORS.pull}
-                anchor={haulDir < 0 ? "start" : "end"}
+                anchor={up || haulDir < 0 ? "start" : "end"}
             >
                 Team pulls
             </Tag>
@@ -318,11 +367,13 @@ function SystemDrawing(props: {
                     const label = props.labels.sling!(s.id, Math.abs(pulls.pull[s.id]));
                     if (!label) return null;
                     const level = Math.abs(s.a.y - s.b.y) < 1;
-                    const mid = s.a.add(s.b).scale(0.5);
+                    const mid = P(s.a.add(s.b).scale(0.5));
+                    // Upright, a travelling pulley's label goes beside it, past the rope on its far side.
+                    const at = level ? mid : up ? P(s.a).add(vec2(r + 8, 0)) : mid.add(vec2(8, 0));
                     return (
                         <Tag
                             key={s.id}
-                            at={level ? mid : mid.add(vec2(8, 0))}
+                            at={at}
                             color={color(s.id)}
                             anchor={level ? "middle" : "start"}
                         >
@@ -334,9 +385,14 @@ function SystemDrawing(props: {
                 labels.map((l) => {
                     const label = props.labels.part!(l.key, l.tension);
                     // A part too short for its label goes without, as the Z-rig's pulleys near a reset.
-                    if (!label || l.room < 60) return null;
+                    if (!label || l.room < (up ? 40 : 60)) return null;
+                    // Upright, a label sits on its rope part rather than above it.
                     return (
-                        <Tag key={l.key} at={l.at} color={color(l.key)}>
+                        <Tag
+                            key={l.key}
+                            at={up ? P(l.at.add(vec2(0, 10))) : l.at}
+                            color={color(l.key)}
+                        >
                             <tspan fontSize={14}>{label}</tspan>
                         </Tag>
                     );

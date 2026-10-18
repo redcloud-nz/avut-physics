@@ -76,7 +76,7 @@ export function Figure(props: { id: string; caption: React.ReactNode; children: 
 }
 
 /** A rock face along the top of a drawing, above `y`. */
-function Rock(props: { y: number; width: number }) {
+export function Rock(props: { y: number; width: number }) {
     return (
         <g>
             <rect
@@ -100,11 +100,11 @@ function Rock(props: { y: number; width: number }) {
     );
 }
 
-function Anchor(props: { at: Vector2 }) {
+export function Anchor(props: { at: Vector2 }) {
     return <circle cx={props.at.x} cy={props.at.y} r={4} fill="currentColor" />;
 }
 
-function Rope(props: { from: Vector2; to: Vector2; dashed?: boolean }) {
+export function Rope(props: { from: Vector2; to: Vector2; dashed?: boolean }) {
     return (
         <line
             x1={props.from.x}

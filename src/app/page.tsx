@@ -32,6 +32,19 @@ export default function Home() {
             <ul className="grid gap-4 sm:grid-cols-2">
                 <li>
                     <Link
+                        href="/visual"
+                        className="flex h-full flex-col gap-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-sky-500"
+                    >
+                        <h3 className="text-lg font-semibold text-slate-100">
+                            A Visual Introduction to Rescue Physics
+                        </h3>
+                        <p className="text-sm text-slate-400">
+                            The physics of rope rescue, one idea per screen, made for phones.
+                        </p>
+                    </Link>
+                </li>
+                <li>
+                    <Link
                         href="/gentle-introduction/part-1"
                         className="flex h-full flex-col gap-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4 transition-colors hover:border-sky-500"
                     >

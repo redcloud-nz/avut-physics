@@ -27,6 +27,10 @@ settles and the forces through it, and lets you change the setup with sliders to
 
 **Articles**
 
+- **A Visual Introduction to Rescue Physics** (`/visual`): the ideas of the Gentle Introduction
+  retold for phones, one per screen (`/visual/<idea>`): a headline, a sentence or two, and a
+  figure to play with, starting from velocity and force for readers with no physics. Swipe or use
+  the arrow keys to move between them; some pages have details (such as the maths) to swipe up.
 - **A Gentle Introduction to Rescue Physics, Part 1** (`/gentle-introduction/part-1`): weight
   and kilonewtons, forces as arrows, and how angles change the load on anchor legs and redirects.
   Written for rescuers with no physics, with small slider figures and the maths kept in
