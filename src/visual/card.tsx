@@ -107,9 +107,12 @@ export function Card(props: {
 
                 <div className="flex flex-1 flex-col">{props.children}</div>
 
+                {/* The pages either side are prefetched whole, not only the route's shared shell, so moving to them
+                    (by button or by swipe) doesn't wait on the server. */}
                 <nav className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                     <Link
                         href={prev}
+                        prefetch
                         className="flex items-center justify-center gap-1 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500"
                     >
                         <ChevronLeft className="size-5" aria-hidden />
@@ -130,6 +133,7 @@ export function Card(props: {
                     </button>
                     <Link
                         href={next}
+                        prefetch
                         className="flex items-center justify-center gap-1 rounded-xl bg-sky-500 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
                     >
                         {props.index + 1 === total ? (
