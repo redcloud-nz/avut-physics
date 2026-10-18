@@ -203,6 +203,23 @@ export function pullsOf(sys: PulleySystem, efficiency = 1): Pulls {
     };
 }
 
+/**
+ * The rope parts a quick count takes for the advantage, by key (`rope.part`): those pulling on the load, or on a pulley
+ * or grab that moves with it. They're the parts that get shorter as the load comes up, with the haul end held still
+ * as the rope runs through your hands. Their number is the advantage of a simple system, but not of a compound,
+ * where one system pulls on another's rope.
+ */
+export function partsOnTheLoad(sys: PulleySystem): string[] {
+    const load = loadOf(sys);
+    return sys.ropes.flatMap((rope, r) =>
+        rope.path
+            .slice(1)
+            .flatMap((id, i) =>
+                rootOf(sys, id) === load || rootOf(sys, rope.path[i]) === load ? [`${r}.${i}`] : [],
+            ),
+    );
+}
+
 /* The systems in the article, laid out as their figures draw them. Parts of a rope are 28 apart in the drawing. */
 
 /** A pulley on the anchor turning the rope back: 1:1. */
@@ -227,6 +244,18 @@ export const TWO_TO_ONE: PulleySystem = {
     ropes: [{ path: ["anchor", "m1", "haul"], lanes: [40, 68] }],
 };
 
+/** The 2:1 with its haul line back round a pulley on the anchor, so the team pulls towards the load: still 2:1. */
+export const TWO_TO_ONE_REDIRECTED: PulleySystem = {
+    bodies: {
+        anchor: { kind: "anchor" },
+        load: { kind: "load", x: 4 },
+        m1: { kind: "pulley", x: 3.75, on: "load" },
+        p1: { kind: "pulley", x: 0.9, fixed: true },
+        haul: { kind: "haul", x: 4.3 },
+    },
+    ropes: [{ path: ["anchor", "m1", "p1", "haul"], lanes: [40, 68, 96] }],
+};
+
 /** The Z-rig: the main line round a pulley on the anchor, and back round one on a rope grab on the main line: 3:1. */
 export const Z_RIG: PulleySystem = {
     bodies: {
@@ -238,6 +267,23 @@ export const Z_RIG: PulleySystem = {
         haul: { kind: "haul", x: 1 },
     },
     ropes: [{ path: ["load", "p1", "p2", "haul"], lanes: [40, 68, 96] }],
+};
+
+/**
+ * A rope tied to the load, up and down round two pulleys on the anchor and two on the load: 5:1. It's a pair of double
+ * pulleys drawn apart, one wheel at a time.
+ */
+export const FIVE_TO_ONE: PulleySystem = {
+    bodies: {
+        anchor: { kind: "anchor" },
+        p1: { kind: "pulley", x: 0.9, fixed: true },
+        p2: { kind: "pulley", x: 0.9, fixed: true },
+        load: { kind: "load", x: 4 },
+        m1: { kind: "pulley", x: 3.75, on: "load" },
+        m2: { kind: "pulley", x: 3.75, on: "load" },
+        haul: { kind: "haul", x: 1 },
+    },
+    ropes: [{ path: ["load", "p1", "m1", "p2", "m2", "haul"], lanes: [40, 68, 96, 124, 152] }],
 };
 
 /** A 2:1 on a rope grab on the Z-rig's haul line: 6:1. */

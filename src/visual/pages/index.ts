@@ -1,8 +1,10 @@
 import twoToOne from "./2-to-1/page";
+import fiveToOne from "./5-to-1/page";
 import acceleration from "./acceleration/page";
 import addingArrows from "./adding-arrows/page";
 import arrows from "./arrows/page";
 import compound from "./compound/page";
+import counting from "./counting/page";
 import equilibrium from "./equilibrium/page";
 import force from "./force/page";
 import friction from "./friction/page";
@@ -58,6 +60,8 @@ export const PAGES: VisualPage[] = [
     pulleyOnTheAnchor,
     twoToOne,
     zRig,
+    fiveToOne,
+    counting,
     compound,
     tMethod,
     tMethodCompound,

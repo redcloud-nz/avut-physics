@@ -100,6 +100,10 @@ export function SystemDrawing(props: {
     labels: Labels;
     labelledBy?: string;
     upright?: boolean;
+    /** What the haul end's arrow says. */
+    haulLabel?: string;
+    /** Upright, how much to stretch the drawing along the ropes, for a system that's wide for its height. */
+    stretch?: number;
     className?: string;
 }) {
     const { sys } = props;
@@ -136,6 +140,8 @@ export function SystemDrawing(props: {
         ),
     ];
     const load = vec2(px(at[loadId]), (Math.min(...onLoad) + Math.max(...onLoad)) / 2);
+    // Wide enough to reach everything on it.
+    const loadHalf = Math.max(20, (Math.max(...onLoad) - Math.min(...onLoad)) / 2 + 14);
 
     // Slings: fixed pulleys to the anchor, others to what they're clipped to.
     const slings: { id: string; a: Vector2; b: Vector2 }[] = [];
@@ -218,23 +224,30 @@ export function SystemDrawing(props: {
     const haulDir = Math.sign(haulPart.b.x - haulPart.a.x);
     const haulTip = haulPart.b.add(vec2(-haulDir * 8, 0));
 
-    // Everything above is laid out across the page. Upright, it's turned a quarter turn: the load at the top, the
-    // anchor and the team at the bottom, and the rope parts spread further apart to leave room for their labels.
+    // Everything above is laid out across the page. Upright, it's turned a quarter turn: the anchor and the team at
+    // the top, the load hanging below, and the rope parts spread further apart to leave room for their labels.
     const laneMin = Math.min(...lanes) - R;
     const laneMax = Math.max(...lanes) + R;
     const up = props.upright;
+    const along = ALONG * (props.stretch ?? 1);
     const P = (p: Vector2) =>
-        up ? vec2(UP_PAD + (p.y - laneMin) * SPREAD, UP_END + (WIDTH - p.x) * ALONG) : p;
-    const V = (v: Vector2) => (up ? vec2(v.y * SPREAD, -v.x * ALONG) : v);
+        up ? vec2(UP_PAD + (laneMax - p.y) * SPREAD, UP_END + p.x * along) : p;
+    const V = (v: Vector2) => (up ? vec2(-v.y * SPREAD, v.x * along) : v);
     const r = up ? R * SPREAD : R;
     const viewBox = up
-        ? `0 0 ${(laneMax - laneMin) * SPREAD + 2 * UP_PAD} ${WIDTH * ALONG + 2 * UP_END}`
+        ? `0 0 ${(laneMax - laneMin) * SPREAD + 2 * UP_PAD} ${WIDTH * along + 2 * UP_END}`
         : `0 0 ${WIDTH} ${height}`;
     const line = (a: Vector2, b: Vector2) => {
         const [p, q] = [P(a), P(b)];
         return { x1: p.x, y1: p.y, x2: q.x, y2: q.y };
     };
-    const box = [P(vec2(load.x, load.y - 20)), P(vec2(load.x + 26, load.y + 20))];
+    const box = [P(vec2(load.x, load.y - loadHalf)), P(vec2(load.x + 26, load.y + loadHalf))];
+    // One anchor: a bar joining its bolts, if there's more than one, and one tag.
+    const boltLanes = bolts.map((b) => b.y);
+    const anchorEnds = [Math.min(...boltLanes), Math.max(...boltLanes)].map((y) =>
+        vec2(ANCHOR_X, y),
+    );
+    const anchorMid = anchorEnds[0].add(anchorEnds[1]).scale(0.5);
 
     return (
         <svg
@@ -254,17 +267,22 @@ export function SystemDrawing(props: {
                     opacity={0.5}
                 />
             ))}
+            {bolts.length > 1 && (
+                <line
+                    {...line(anchorEnds[0], anchorEnds[1])}
+                    stroke="currentColor"
+                    strokeWidth={4}
+                />
+            )}
             {bolts.map((b, i) => (
-                <g key={i}>
-                    <circle cx={P(b).x} cy={P(b).y} r={5} fill="currentColor" />
-                    <Tag
-                        at={up ? P(b).add(vec2(0, 18)) : b.add(vec2(-10, 0))}
-                        anchor={up ? "middle" : "end"}
-                    >
-                        Anchor
-                    </Tag>
-                </g>
+                <circle key={i} cx={P(b).x} cy={P(b).y} r={5} fill="currentColor" />
             ))}
+            <Tag
+                at={up ? P(anchorMid).add(vec2(0, -16)) : anchorMid.add(vec2(-10, 0))}
+                anchor={up ? "middle" : "end"}
+            >
+                Anchor
+            </Tag>
 
             {ropes.flatMap((parts, i) =>
                 parts.map((part, j) => (
@@ -354,12 +372,13 @@ export function SystemDrawing(props: {
                 v={V(vec2(haulDir * 34, 0))}
                 color={COLORS.pull}
             />
+            {/* Upright, the label goes to the left of the haul end's rope, clear of the parts beside it. */}
             <Tag
-                at={up ? P(haulTip).add(vec2(10, -10)) : haulTip.add(vec2(0, 16))}
+                at={up ? P(haulTip).add(vec2(-10, haulDir > 0 ? -6 : 6)) : haulTip.add(vec2(0, 16))}
                 color={COLORS.pull}
-                anchor={up || haulDir < 0 ? "start" : "end"}
+                anchor={up ? "end" : haulDir < 0 ? "start" : "end"}
             >
-                Team pulls
+                {props.haulLabel ?? "Team pulls"}
             </Tag>
 
             {props.labels.sling &&

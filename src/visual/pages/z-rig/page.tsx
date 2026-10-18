@@ -6,7 +6,7 @@ const page: VisualPage = {
     slug: "z-rig",
     name: "Z-rig",
     title: "The Z-rig: 3:1",
-    text: "The main line doubles back round a travelling pulley on a rope grab (green). Three parts of rope pull the load, so the team pulls a third.",
+    text: "The main line doubles back round a travelling pulley on a rope grab (green). Three parts of rope pull the load, so you pull a third.",
     Figure: ZRigFigure,
 };
 

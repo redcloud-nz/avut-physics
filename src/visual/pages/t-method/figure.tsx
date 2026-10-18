@@ -7,7 +7,7 @@ export const ZRigTMethodFigure = () => (
     <TSteps
         sys={Z_RIG}
         steps={[
-            { text: "The team pulls the haul line: 1T.", show: ["0.2"] },
+            { text: "You pull the haul line: 1T.", show: ["0.2"] },
             {
                 text: "Round the pulleys, the rope keeps its 1T, up to the rope grab.",
                 show: ["0.1", "0.0"],

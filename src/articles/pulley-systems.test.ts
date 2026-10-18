@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    FIVE_TO_ONE,
     hauled,
     loadPerMetre,
+    partsOnTheLoad,
     pullsOf,
     REDIRECT,
     SIX_TO_ONE,
     TWO_TO_ONE,
+    TWO_TO_ONE_REDIRECTED,
     Z_RIG,
     type PulleySystem,
 } from "./pulley-systems";
@@ -14,7 +17,9 @@ import {
 const SYSTEMS: [string, PulleySystem, number][] = [
     ["a pulley on the anchor", REDIRECT, 1],
     ["a 2:1", TWO_TO_ONE, 2],
+    ["a 2:1 redirected at the anchor", TWO_TO_ONE_REDIRECTED, 2],
     ["the Z-rig", Z_RIG, 3],
+    ["a 5:1", FIVE_TO_ONE, 5],
     ["a 2:1 on the Z-rig", SIX_TO_ONE, 6],
 ];
 
@@ -27,6 +32,17 @@ const lengths = (sys: PulleySystem, pulled: number) => {
 };
 
 describe("pulley systems", () => {
+    it.each(SYSTEMS.slice(0, 5))(
+        "counting rope parts on the load gets %s right",
+        (_, sys, advantage) => {
+            expect(partsOnTheLoad(sys)).toHaveLength(advantage);
+        },
+    );
+
+    it("counting rope parts on the load gets the 2:1 on the Z-rig wrong", () => {
+        expect(partsOnTheLoad(SIX_TO_ONE)).toHaveLength(3);
+    });
+
     it.each(SYSTEMS)("%s keeps its ropes' lengths as the team hauls", (_, sys) => {
         const start = lengths(sys, 0);
         lengths(sys, 0.8).forEach((l, i) => expect(l).toBeCloseTo(start[i], 12));

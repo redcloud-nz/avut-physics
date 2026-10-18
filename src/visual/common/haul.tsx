@@ -1,10 +1,11 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { SystemDrawing, T } from "@/articles/pulley-figures";
 import { loadPerMetre, pullsOf, type PulleySystem } from "@/articles/pulley-systems";
 import { Slider } from "@/components/diagram/controls";
-import { Layout, LOAD_KG, Readout, SVG } from "@/visual/frame";
+import { kN, Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
 
 /*
  * Pulley systems drawn upright, for the pages on pulleys: hauled with a slider, or worked through with the T method
@@ -12,10 +13,16 @@ import { Layout, LOAD_KG, Readout, SVG } from "@/visual/frame";
  */
 
 /** A pulley system standing upright, with a slider for rope pulled in. */
-export function Haul(props: { sys: PulleySystem; max: number; sling?: (id: string) => boolean }) {
+export function Haul(props: {
+    sys: PulleySystem;
+    max: number;
+    sling?: (id: string) => boolean;
+    /** How much to stretch the drawing along the ropes. */
+    stretch?: number;
+}) {
     const [pulled, setPulled] = useState(0);
     const advantage = pullsOf(props.sys).advantage;
-    const kg = (share: number) => `${Math.round(share * LOAD_KG)} kg`;
+    const force = (share: number) => kN(share * LOAD_KN);
     return (
         <Layout
             drawing={
@@ -23,11 +30,13 @@ export function Haul(props: { sys: PulleySystem; max: number; sling?: (id: strin
                     sys={props.sys}
                     pulled={pulled}
                     upright
+                    haulLabel="Pull"
+                    stretch={props.stretch}
                     className={SVG}
                     labels={{
-                        part: (_, t) => kg(t / advantage),
+                        part: (_, t) => force(t / advantage),
                         sling: (id, pull) =>
-                            (props.sling?.(id) ?? true) ? kg(pull / advantage) : null,
+                            (props.sling?.(id) ?? true) ? force(pull / advantage) : null,
                     }}
                 />
             }
@@ -46,8 +55,8 @@ export function Haul(props: { sys: PulleySystem; max: number; sling?: (id: strin
             readouts={
                 <>
                     <Readout
-                        label={`team pulls, for ${LOAD_KG} kg`}
-                        value={kg(1 / advantage)}
+                        label={`you pull, for a ${LOAD_KN} kN load`}
+                        value={force(1 / advantage)}
                         color={COLORS.pull}
                     />
                     <Readout
@@ -74,6 +83,7 @@ export function TSteps(props: { sys: PulleySystem; steps: { text: string; show: 
                     sys={props.sys}
                     pulled={0}
                     upright
+                    haulLabel="Pull"
                     className={SVG}
                     labels={{
                         part: label,
@@ -82,22 +92,53 @@ export function TSteps(props: { sys: PulleySystem; steps: { text: string; show: 
                     }}
                 />
             }
-            slider={
-                <Slider
-                    label="Step"
-                    value={step}
-                    min={1}
-                    max={props.steps.length}
-                    step={1}
-                    digits={0}
-                    onChange={setStep}
-                />
-            }
+            slider={<Stepper step={step} steps={props.steps.length} onChange={setStep} />}
             readouts={
                 <p className="min-h-12 flex-1 text-center text-sm text-slate-200">
                     {props.steps[step - 1].text}
                 </p>
             }
         />
+    );
+}
+
+/** Buttons to go back and forward a step, with a dot for each step between them. */
+function Stepper(props: { step: number; steps: number; onChange: (step: number) => void }) {
+    const button =
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800";
+    return (
+        <div className="flex items-center gap-3">
+            <button
+                className={button}
+                onClick={() => props.onChange(props.step - 1)}
+                disabled={props.step <= 1}
+                aria-label="Previous step"
+            >
+                <ChevronLeft className="size-6" aria-hidden />
+            </button>
+            <div className="flex flex-1 flex-col items-center gap-1.5">
+                <span className="text-sm text-slate-300" aria-live="polite">
+                    Step {props.step} of {props.steps}
+                </span>
+                <div className="flex gap-1.5" aria-hidden>
+                    {Array.from({ length: props.steps }, (_, i) => (
+                        <button
+                            key={i}
+                            tabIndex={-1}
+                            onClick={() => props.onChange(i + 1)}
+                            className={`size-2 rounded-full ${i < props.step ? "bg-amber-400" : "bg-slate-700"}`}
+                        />
+                    ))}
+                </div>
+            </div>
+            <button
+                className={button}
+                onClick={() => props.onChange(props.step + 1)}
+                disabled={props.step >= props.steps}
+                aria-label="Next step"
+            >
+                <ChevronRight className="size-6" aria-hidden />
+            </button>
+        </div>
     );
 }

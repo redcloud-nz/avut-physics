@@ -63,7 +63,13 @@ export function Note(props: {
     );
 }
 
-/** The load used to turn shares into kilograms. */
-export const LOAD_KG = 200;
+/**
+ * The load the pulley pages share out, in kilonewtons: about 120 kg, one person and their gear. It divides evenly by
+ * 1, 2, 3 and 6, so every pulley system's pulls come out as round numbers.
+ */
+export const LOAD_KN = 1.2;
+
+/** A force in kilonewtons, to two places at most: 0.4 kN, 0.44 kN. */
+export const kN = (v: number) => `${Number(v.toFixed(2))} kN`;
 
 export const percent = (share: number) => `${Math.round(share * 100)}%`;

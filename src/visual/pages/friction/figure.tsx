@@ -6,7 +6,7 @@ import { COLORS } from "@/articles/colors";
 import { SystemDrawing, T } from "@/articles/pulley-figures";
 import { pullsOf, Z_RIG } from "@/articles/pulley-systems";
 import { Slider } from "@/components/diagram/controls";
-import { Layout, LOAD_KG, Readout, SVG } from "@/visual/frame";
+import { kN, Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
 
 export function FrictionFigure() {
     const [efficiency, setEfficiency] = useState(90);
@@ -20,13 +20,14 @@ export function FrictionFigure() {
                     pulled={0}
                     efficiency={e}
                     upright
+                    haulLabel="Pull"
                     className={SVG}
                     labels={{ part: (_, t) => <T t={t} />, sling: (_, t) => <T t={t} /> }}
                 />
             }
             slider={
                 <Slider
-                    label="Each pulley passes on"
+                    label="Pulley efficiency"
                     value={efficiency}
                     min={40}
                     max={100}
@@ -44,8 +45,8 @@ export function FrictionFigure() {
                         color={COLORS.load}
                     />
                     <Readout
-                        label={`team pulls, for ${LOAD_KG} kg`}
-                        value={`${Math.round(LOAD_KG / advantage)} kg`}
+                        label={`you pull, for a ${LOAD_KN} kN load`}
+                        value={kN(LOAD_KN / advantage)}
                         color={COLORS.pull}
                     />
                 </>
