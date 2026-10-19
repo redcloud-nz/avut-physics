@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 
-import { COLORS } from "@/articles/colors";
 import { SITE } from "@/articles/prose";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
@@ -11,8 +10,14 @@ import { vec2, type Vector2 } from "@/lib/vector2";
 
 export const SHARE_IMAGE_SIZE = { width: 1200, height: 630 };
 
+/*
+ * next/og draws this without the page's stylesheet, so it can't use the colour tokens in globals.css. These are their
+ * dark values, and the picture is the same whatever theme a viewer uses.
+ */
 const BACKGROUND = "#020617";
 const TOGETHER = "#f1f5f9";
+const PULL = "#38bdf8";
+const REDIRECT = "#a78bfa";
 
 /** One kilonewton on the drawing's grid. */
 const KN = 60;
@@ -75,11 +80,11 @@ function Forces() {
                     />
                 </g>
             ))}
-            {arrow({ from: BOLT.add(a), v: b, color: COLORS.redirect, dashed: true })}
-            {arrow({ from: BOLT.add(b), v: a, color: COLORS.pull, dashed: true })}
+            {arrow({ from: BOLT.add(a), v: b, color: REDIRECT, dashed: true })}
+            {arrow({ from: BOLT.add(b), v: a, color: PULL, dashed: true })}
             {arrow({ from: BOLT, v: a.add(b), color: TOGETHER })}
-            {arrow({ from: BOLT, v: a, color: COLORS.pull })}
-            {arrow({ from: BOLT, v: b, color: COLORS.redirect })}
+            {arrow({ from: BOLT, v: a, color: PULL })}
+            {arrow({ from: BOLT, v: b, color: REDIRECT })}
             <circle cx={BOLT.x} cy={BOLT.y} r={11} fill="#94a3b8" />
         </svg>
     );

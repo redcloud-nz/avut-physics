@@ -20,11 +20,11 @@ export function Slider(props: {
 }) {
     return (
         <label
-            className={`flex flex-col gap-1 text-sm text-slate-300 ${props.disabled ? "opacity-40" : ""}`}
+            className={`flex flex-col gap-1 text-sm text-ink-soft ${props.disabled ? "opacity-40" : ""}`}
         >
             <span className="flex justify-between gap-2">
                 {props.label}
-                <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
+                <span className="shrink-0 font-mono whitespace-nowrap text-ink-muted">
                     {props.value.toFixed(props.digits ?? 1)}
                     {props.unit && ` ${props.unit}`}
                 </span>
@@ -37,7 +37,7 @@ export function Slider(props: {
                 value={props.value}
                 disabled={props.disabled}
                 onChange={(e) => props.onChange(Number(e.target.value))}
-                className="accent-sky-500"
+                className="accent-action"
             />
         </label>
     );
@@ -45,12 +45,12 @@ export function Slider(props: {
 
 export function Toggle(props: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
     return (
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-ink-soft">
             <input
                 type="checkbox"
                 checked={props.checked}
                 onChange={(e) => props.onChange(e.target.checked)}
-                className="accent-sky-500"
+                className="accent-action"
             />
             {props.label}
         </label>
@@ -65,10 +65,10 @@ export function Choice<T extends string>(props: {
     onChange: (v: T) => void;
 }) {
     return (
-        <div className="flex flex-col gap-1 text-sm text-slate-300">
+        <div className="flex flex-col gap-1 text-sm text-ink-soft">
             {props.label}
             <div
-                className="flex rounded-lg bg-slate-800 p-0.5"
+                className="flex rounded-lg bg-surface-raised p-0.5"
                 role="radiogroup"
                 aria-label={props.label}
             >
@@ -80,8 +80,8 @@ export function Choice<T extends string>(props: {
                         onClick={() => props.onChange(o.value)}
                         className={`flex-1 rounded-md px-2 py-1 text-sm transition-colors ${
                             o.value === props.value
-                                ? "bg-sky-500 text-slate-950"
-                                : "text-slate-300 hover:bg-slate-700"
+                                ? "bg-action text-primary-foreground"
+                                : "text-ink-soft hover:bg-line-faint"
                         }`}
                     >
                         {o.label}
@@ -106,12 +106,12 @@ export function Select<T extends string>(props: {
             </option>
         ));
     return (
-        <label className="flex flex-col gap-1 text-sm text-slate-300">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
             {props.label}
             <select
                 value={props.value}
                 onChange={(e) => props.onChange(e.target.value as T)}
-                className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="rounded-lg border border-line-faint bg-surface-raised px-2 py-1.5 text-sm text-ink focus:ring-2 focus:ring-action focus:outline-none"
             >
                 {props.groups.map((g, i) =>
                     g.label ? (
@@ -131,8 +131,8 @@ export function Select<T extends string>(props: {
 export function Readout(props: { label: string; value: string; color?: string }) {
     return (
         <div className="flex justify-between text-sm">
-            <span className="text-slate-400">{props.label}</span>
-            <span className="font-mono" style={{ color: props.color ?? "#e2e8f0" }}>
+            <span className="text-ink-muted">{props.label}</span>
+            <span className="font-mono" style={{ color: props.color ?? "var(--ink)" }}>
                 {props.value}
             </span>
         </div>
@@ -148,7 +148,7 @@ const collapsed: More = (children) => (
             <Button
                 variant="ghost"
                 size="sm"
-                className="group h-auto justify-between px-0 text-sm font-normal text-slate-300 hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-slate-300"
+                className="group h-auto justify-between px-0 text-sm font-normal text-ink-soft hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-ink-soft"
             >
                 More settings
                 <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
@@ -174,7 +174,7 @@ export function VisualisationLayout(props: {
         typeof props.controls === "function" ? props.controls(more) : props.controls;
     return (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+            <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
                 {props.diagram}
                 <Sheet>
                     <SheetTrigger asChild>
@@ -196,11 +196,11 @@ export function VisualisationLayout(props: {
                 </Sheet>
             </div>
             <div className="flex flex-col gap-4">
-                <section className="hidden flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 lg:flex">
+                <section className="hidden flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 lg:flex">
                     {controls(collapsed)}
                 </section>
                 {props.readouts && (
-                    <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                    <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
                         {props.readouts}
                     </section>
                 )}
@@ -224,17 +224,17 @@ export function RawValues(props: { title: string; data: unknown }) {
         setTimeout(() => setCopied(false), 1500);
     };
     return (
-        <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-slate-300">{props.title}</h3>
+                <h3 className="text-sm font-medium text-ink-soft">{props.title}</h3>
                 <button
                     onClick={copy}
-                    className="rounded-md bg-slate-800 px-3 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+                    className="rounded-md bg-surface-raised px-3 py-1 text-sm text-ink-soft transition-colors hover:bg-line-faint"
                 >
                     {copied ? "Copied" : "Copy"}
                 </button>
             </div>
-            <pre className="max-h-80 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-400">
+            <pre className="max-h-80 overflow-auto rounded-lg bg-background p-3 font-mono text-xs text-ink-muted">
                 {text}
             </pre>
         </section>

@@ -61,7 +61,7 @@ export function AngleArc({
     startDeg,
     sweepDeg,
     label,
-    color = "#94a3b8",
+    color = "var(--ink-muted)",
 }: {
     center: Vector2;
     radius: number;
@@ -98,7 +98,7 @@ export function AngleArc({
 
 export function Label({
     at,
-    color = "#e2e8f0",
+    color = "var(--ink)",
     children,
 }: {
     at: Vector2;
@@ -115,7 +115,7 @@ export function Label({
             textAnchor="middle"
             dominantBaseline="middle"
             paintOrder="stroke"
-            stroke="#0f172a"
+            stroke="var(--halo)"
             strokeWidth={4}
         >
             {children}

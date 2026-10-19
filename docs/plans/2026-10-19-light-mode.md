@@ -24,6 +24,18 @@ decide we want a light mode; it's written out here so stage one is built with it
   and wall tension, weight, bar, hinge, contact, hold, warning, timber…), with the same hue for the same meaning
   sharing one token. The CSS variables are defined in `globals.css` and registered in `@theme inline` as
   `--color-<name>: var(--<name>)`, so `text-ink-muted`, `fill-surface` and `stroke-line` work as Tailwind classes.
+  SVG attributes use the base name (`var(--ink-muted)`), since Tailwind only outputs a `--color-*` variable once a
+  class uses it. The full list, as Task 1 settled it, is in `globals.css`; the second rope's token is
+  `--rope-tension` (class `text-rope`), because `.rope-range` already takes a `--rope` per slider.
+- **A token's dark value is exactly what it replaces.** Drawing tokens hold the hex the drawings use today. Tokens
+  that replace accent classes in later tasks (links, warnings, the "In short" box) hold Tailwind's own variable, such
+  as `var(--color-sky-400)`, because v4's palette is defined in oklch and its accents differ visibly from the v3 hex
+  values (sky-400 is `#38bdf8` in v3, about `#00bcff` in v4). The slate neutrals are the one place a class and a hex
+  value share a token: there the two differ by at most 4/255 per channel, which can't be seen.
+- **Today's colours don't always match their meaning, and stage one keeps them anyway.** Friction is orange in the
+  visual introduction (`friction`) but pink on the incline (`incline-friction`); several unrelated quantities share
+  a hue (`pull`, `normal` and `anchor-a` are all sky). They get separate tokens with today's values, so the light
+  pass can tidy them without hunting through drawings.
 - **We won't redefine the slate scale.** Redefining `--color-slate-*` in light mode would flip every existing
   class with no migration, but `text-slate-300` would then mean dark text, and every later edit would have to know
   that.
@@ -59,7 +71,7 @@ decide we want a light mode; it's written out here so stage one is built with it
 
 ### Review group 1: tokens and shared pieces
 
-- [ ] **1. Colour tokens** — Add colour tokens for the site and its drawings
+- [x] **1. Colour tokens** — Add colour tokens for the site and its drawings
   - **Files:** `src/app/globals.css`
   - **Do:**
     - Add the drawing and quantity tokens from Decisions to the `.dark` block, with today's hex values, and register
@@ -67,10 +79,14 @@ decide we want a light mode; it's written out here so stage one is built with it
     - Use them in `globals.css` itself: the scrollbar colours and the `.rope-range` track and thumb.
     - While the dev server is running, check by hand that a `<line stroke="var(--load)">` draws in Chrome, Firefox
       and Safari, and record the result in this plan.
+    - **Result (2026-10-19):** fills and strokes given as `var(--…)` attributes on `line`, `rect` and `text` compute to
+      the variable's colour in Chrome 153 and Safari 18.6. Firefox isn't installed on this Mac, so it's unchecked:
+      after Task 2, open a visual page in Firefox; if its arrows and labels draw black, switch the primitives to
+      the `style` fallback.
   - **Done when:** pages look as before (scrollbar and rope sliders included), and `var()` in an SVG attribute is
     confirmed in all three browsers. Type check, lint and `npm test` pass.
 
-- [ ] **2. Shared primitives and palettes** — Draw the shared diagram pieces with colour tokens
+- [x] **2. Shared primitives and palettes** — Draw the shared diagram pieces with colour tokens
   - **Files:** `src/components/diagram/svg.tsx`, `src/components/diagram/controls.tsx`, `src/visual/frame.tsx`,
     `src/articles/colors.ts`, `src/visual/share-image.tsx`, `src/components/tex.tsx`
   - **Do:**

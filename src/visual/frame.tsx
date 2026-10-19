@@ -10,14 +10,14 @@ import type { Vector2 } from "@/lib/vector2";
 /** A number to read at a glance, with what it is under it. */
 export function Readout(props: { label: string; value: React.ReactNode; color?: string }) {
     return (
-        <div className="flex min-w-0 flex-1 flex-col items-center rounded-lg bg-slate-900/60 px-2 py-1.5">
+        <div className="flex min-w-0 flex-1 flex-col items-center rounded-lg bg-surface/60 px-2 py-1.5">
             <span
                 className="text-2xl font-semibold tabular-nums"
-                style={{ color: props.color ?? "#f1f5f9" }}
+                style={{ color: props.color ?? "var(--ink-strong)" }}
             >
                 {props.value}
             </span>
-            <span className="text-center text-xs text-slate-400">{props.label}</span>
+            <span className="text-center text-xs text-ink-muted">{props.label}</span>
         </div>
     );
 }
@@ -42,10 +42,10 @@ export function Layout(props: {
 }
 
 /** A figure's drawing, filling the box Layout gives it whatever that box's size. */
-export const SVG = "absolute inset-0 h-full w-full text-slate-400";
+export const SVG = "absolute inset-0 h-full w-full text-ink-muted";
 
 /** Grey for what's faint in a drawing: where something was, and notes. */
-export const GHOST = "#64748b";
+export const GHOST = "var(--ghost)";
 
 /** Small grey text in a drawing: a time, a distance, a scale. */
 export function Note(props: {

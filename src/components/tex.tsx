@@ -64,7 +64,7 @@ export function Eq(props: { tex: string }) {
     return (
         <div
             aria-label={props.tex}
-            className="overflow-x-auto py-1 text-center text-slate-300 [&>svg]:inline-block"
+            className="overflow-x-auto py-1 text-center text-ink-soft [&>svg]:inline-block"
             dangerouslySetInnerHTML={{ __html: svgFor(props.tex, true) }}
         />
     );

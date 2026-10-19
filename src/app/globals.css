@@ -47,6 +47,57 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Drawing and quantity colours, defined per theme below. */
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-link: var(--link);
+  --color-highlight: var(--highlight);
+  --color-highlight-strong: var(--highlight-strong);
+  --color-warning: var(--warning);
+  --color-summary: var(--summary);
+  --color-summary-heading: var(--summary-heading);
+  --color-ink-bright: var(--ink-bright);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-ghost: var(--ghost);
+  --color-line: var(--line);
+  --color-line-faint: var(--line-faint);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface: var(--surface);
+  --color-halo: var(--halo);
+  --color-load: var(--load);
+  --color-pull: var(--pull);
+  --color-sideways: var(--sideways);
+  --color-redirect: var(--redirect);
+  --color-overload: var(--overload);
+  --color-friction: var(--friction);
+  --color-velocity: var(--velocity);
+  --color-grab: var(--grab);
+  --color-ice: var(--ice);
+  --color-rope: var(--rope-tension);
+  --color-mass: var(--mass);
+  --color-weight: var(--weight);
+  --color-contact: var(--contact);
+  --color-team: var(--team);
+  --color-belayer: var(--belayer);
+  --color-timber: var(--timber);
+  --color-hinge: var(--hinge);
+  --color-push: var(--push);
+  --color-normal: var(--normal);
+  --color-incline-friction: var(--incline-friction);
+  --color-net: var(--net);
+  --color-ok: var(--ok);
+  --color-caution: var(--caution);
+  --color-danger: var(--danger);
+  --color-anchor-a: var(--anchor-a);
+  --color-anchor-b: var(--anchor-b);
+  --color-anchor-c: var(--anchor-c);
+  --color-strand-1: var(--strand-1);
+  --color-strand-2: var(--strand-2);
+  --color-strand-3: var(--strand-3);
+  --color-strand-4: var(--strand-4);
 }
 
 /* Dark native controls (range sliders, checkboxes) to match the page. */
@@ -58,22 +109,22 @@ html {
    Safari use the -webkit- pseudo-elements, which Chrome ignores if scrollbar-color is also set. */
 @supports (-moz-appearance: none) {
   .page-scroll {
-    scrollbar-color: #334155 #020617;
+    scrollbar-color: var(--line-faint) var(--background);
   }
 }
 .page-scroll::-webkit-scrollbar {
   width: 12px;
 }
 .page-scroll::-webkit-scrollbar-track {
-  background: #020617;
+  background: var(--background);
 }
 .page-scroll::-webkit-scrollbar-thumb {
-  background: #334155;
-  border: 3px solid #020617;
+  background: var(--line-faint);
+  border: 3px solid var(--background);
   border-radius: 6px;
 }
 .page-scroll::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--line);
 }
 
 :root {
@@ -144,6 +195,71 @@ html {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* The site's accents, from Tailwind's own palette (its v4 values, which the pages used as classes): filled buttons
+     and the slider thumb (action), links, the current or chosen item (highlight), warnings, and the "In short" box. */
+  --action: var(--color-sky-500);
+  --action-hover: var(--color-sky-400);
+  --link: var(--color-sky-400);
+  --highlight: var(--color-sky-300);
+  --highlight-strong: var(--color-sky-200);
+  --warning: var(--color-amber-400);
+  --summary: var(--color-amber-500);
+  --summary-heading: var(--color-amber-200);
+
+  /* Drawings' neutrals, lightest to darkest: text and strokes (ink), faint and construction lines (ghost, line),
+     and fills behind them (surface). The halo is the outline drawn behind a label so it reads over lines. */
+  --ink-bright: #f8fafc;
+  --ink-strong: #f1f5f9;
+  --ink: #e2e8f0;
+  --ink-soft: #cbd5e1;
+  --ink-muted: #94a3b8;
+  --ghost: #64748b;
+  --line: #475569;
+  --line-faint: #334155;
+  --surface-raised: #1e293b;
+  --surface: #0f172a;
+  --halo: #0f172a;
+
+  /* What the arrows and ropes stand for, shared by the articles and the visual introduction: a load, a pull, its
+     sideways part, a redirect, a force over its limit, friction, a speed, a hand's grab and ice. */
+  --load: #fbbf24;
+  --pull: #38bdf8;
+  --sideways: #f472b6;
+  --redirect: #a78bfa;
+  --overload: #fda4af;
+  --friction: #fb923c;
+  --velocity: #34d399;
+  --grab: #34d399;
+  --ice: #bae6fd;
+
+  /* The visualisations' quantities. The main line pulls in --pull, and a second rope (or the wall cable) in
+     --rope-tension (named so it can't clash with .rope-range's --rope); --mass is the stretcher or load held. */
+  --rope-tension: #818cf8;
+  --mass: #facc15;
+  --weight: #f97316;
+  --contact: #34d399;
+  --team: #a3e635;
+  --belayer: #fb923c;
+  --timber: #a16207;
+  --hinge: #f472b6;
+  --push: #c4b5fd;
+  --normal: #38bdf8;
+  --incline-friction: #f472b6;
+  --net: #34d399;
+  /* A limit's state: within it, close to it, past it (or slipping). */
+  --ok: #34d399;
+  --caution: #fbbf24;
+  --danger: #f87171;
+  /* Series where each member just needs its own colour: a multi-point anchor's anchors, the four-point lower's
+     ropes (red, green, blue, yellow). */
+  --anchor-a: #38bdf8;
+  --anchor-b: #f472b6;
+  --anchor-c: #a3e635;
+  --strand-1: #f2555a;
+  --strand-2: #23935a;
+  --strand-3: #3d83f0;
+  --strand-4: #d9a816;
 }
 
 @layer base {
@@ -184,7 +300,7 @@ html {
 .rope-range::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(to right, var(--rope) var(--fill), #475569 var(--fill));
+  background: linear-gradient(to right, var(--rope) var(--fill), var(--line) var(--fill));
 }
 .rope-range::-webkit-slider-thumb {
   appearance: none;
@@ -192,13 +308,13 @@ html {
   height: 16px;
   margin-top: -6px;
   border-radius: 50%;
-  border: 2px solid #0f172a;
+  border: 2px solid var(--surface);
   background: var(--rope);
 }
 .rope-range::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: #475569;
+  background: var(--line);
 }
 .rope-range::-moz-range-progress {
   height: 4px;
@@ -209,7 +325,7 @@ html {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid #0f172a;
+  border: 2px solid var(--surface);
   background: var(--rope);
 }
 .rope-range:focus-visible {
