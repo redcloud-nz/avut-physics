@@ -57,7 +57,7 @@ export function PulleyForces(props: { on: "anchor" | "load" }) {
     return (
         <svg
             viewBox={`20 0 220 ${H}`}
-            className="mx-auto w-full max-w-60 text-slate-400"
+            className="mx-auto w-full max-w-60 text-ink-muted"
             fontSize={14}
             role="img"
             aria-label={
@@ -96,7 +96,7 @@ export function PulleyForces(props: { on: "anchor" | "load" }) {
                 cx={c.x}
                 cy={c.y}
                 r={R - 1}
-                className="fill-slate-950"
+                className="fill-background"
                 stroke="currentColor"
                 strokeWidth={1.5}
             />
@@ -112,7 +112,7 @@ export function PulleyForces(props: { on: "anchor" | "load" }) {
             {anchor ? (
                 <>
                     <circle cx={mount.x} cy={mount.y} r={5} fill="currentColor" />
-                    <Tag at={mount.add(vec2(0, -12))} color="#94a3b8">
+                    <Tag at={mount.add(vec2(0, -12))} color="var(--ink-muted)">
                         Anchor
                     </Tag>
                     <rect
@@ -122,7 +122,7 @@ export function PulleyForces(props: { on: "anchor" | "load" }) {
                         height={18}
                         fill="currentColor"
                     />
-                    <Tag at={ends.left.add(vec2(-24, 9))} color="#94a3b8" anchor="end">
+                    <Tag at={ends.left.add(vec2(-24, 9))} color="var(--ink-muted)" anchor="end">
                         Load
                     </Tag>
                 </>
@@ -135,11 +135,11 @@ export function PulleyForces(props: { on: "anchor" | "load" }) {
                         height={18}
                         fill="currentColor"
                     />
-                    <Tag at={mount.add(vec2(38, 5))} color="#94a3b8" anchor="start">
+                    <Tag at={mount.add(vec2(38, 5))} color="var(--ink-muted)" anchor="start">
                         Load
                     </Tag>
                     <circle cx={ends.left.x} cy={ends.left.y} r={5} fill="currentColor" />
-                    <Tag at={ends.left.add(vec2(-10, 0))} color="#94a3b8" anchor="end">
+                    <Tag at={ends.left.add(vec2(-10, 0))} color="var(--ink-muted)" anchor="end">
                         Anchor
                     </Tag>
                 </>

@@ -45,25 +45,25 @@ export function UnitsFigure() {
                     {rungs.map((rung, i) => (
                         <li key={rung.unit} className="flex flex-col items-center">
                             {i > 0 && (
-                                <span className="py-1 text-xs text-slate-500" aria-hidden>
+                                <span className="py-1 text-xs text-ghost" aria-hidden>
                                     ↑ × 1000
                                 </span>
                             )}
-                            <div className="flex w-full items-center gap-3 rounded-lg bg-slate-900/60 px-3 py-2.5">
-                                <span className="w-12 shrink-0 text-center text-2xl font-semibold text-sky-300">
+                            <div className="flex w-full items-center gap-3 rounded-lg bg-surface/60 px-3 py-2.5">
+                                <span className="w-12 shrink-0 text-center text-2xl font-semibold text-highlight">
                                     {rung.unit}
                                 </span>
                                 <div className="flex min-w-0 flex-col">
-                                    <span className="font-medium text-slate-100">
+                                    <span className="font-medium text-ink-strong">
                                         {rung.name}
                                         {rung.is && (
-                                            <span className="font-normal text-slate-400">
+                                            <span className="font-normal text-ink-muted">
                                                 {" "}
                                                 = {rung.is}
                                             </span>
                                         )}
                                     </span>
-                                    <span className="text-sm text-slate-400">{rung.like}</span>
+                                    <span className="text-sm text-ink-muted">{rung.like}</span>
                                 </div>
                             </div>
                         </li>
@@ -80,8 +80,8 @@ export function UnitsFigure() {
                             onClick={() => setChosen(i)}
                             className={`rounded-lg border py-1.5 text-sm ${
                                 chosen === i
-                                    ? "border-sky-500 bg-sky-500/15 text-slate-100"
-                                    : "border-slate-700 text-slate-400"
+                                    ? "border-action bg-action/15 text-ink-strong"
+                                    : "border-line-faint text-ink-muted"
                             }`}
                         >
                             {l.name}

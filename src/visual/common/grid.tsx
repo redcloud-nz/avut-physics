@@ -91,7 +91,7 @@ export function DragGrid(props: {
             onPointerCancel={() => (dragging.current = null)}
         >
             {Array.from({ length: 11 }, (_, i) => (
-                <g key={i} className="stroke-slate-800">
+                <g key={i} className="stroke-surface-raised">
                     <line x1={i * KN} y1={0} x2={i * KN} y2={300} />
                     <line x1={0} y1={i * KN} x2={300} y2={i * KN} />
                 </g>
@@ -105,7 +105,7 @@ export function DragGrid(props: {
                     cx={t.x}
                     cy={t.y}
                     r={14}
-                    fill="#94a3b8"
+                    fill="var(--ink-muted)"
                     opacity={0.2}
                     className="cursor-grab"
                 />
@@ -115,5 +115,5 @@ export function DragGrid(props: {
 }
 
 export const DRAG_HINT = (
-    <p className="text-center text-sm text-slate-400">Drag the arrow’s tip.</p>
+    <p className="text-center text-sm text-ink-muted">Drag the arrow’s tip.</p>
 );

@@ -14,13 +14,13 @@ export const metadata: Metadata = {
 export default function Page() {
     return (
         <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pt-4 pb-10">
-            <Link href="/" className="text-sm text-sky-400 hover:text-sky-300">
+            <Link href="/" className="text-sm text-link hover:text-highlight">
                 ← Physics Visualisations
             </Link>
-            <h1 className="text-3xl leading-tight font-semibold text-slate-50">{SERIES}</h1>
+            <h1 className="text-3xl leading-tight font-semibold text-ink-bright">{SERIES}</h1>
             <Link
                 href={`/visual/${PAGES[0].slug}`}
-                className="rounded-xl bg-sky-500 py-2 text-center text-sm font-medium text-slate-950 hover:bg-sky-400"
+                className="rounded-xl bg-action py-2 text-center text-sm font-medium text-primary-foreground hover:bg-action-hover"
             >
                 Start
             </Link>
@@ -29,9 +29,9 @@ export default function Page() {
                     <li key={p.slug}>
                         <Link
                             href={`/visual/${p.slug}`}
-                            className="flex gap-3 rounded-lg px-2 py-2 text-slate-200 hover:bg-slate-900"
+                            className="flex gap-3 rounded-lg px-2 py-2 text-ink hover:bg-surface"
                         >
-                            <span className="w-5 shrink-0 text-right text-slate-500 tabular-nums">
+                            <span className="w-5 shrink-0 text-right text-ghost tabular-nums">
                                 {i + 1}
                             </span>
                             {p.name}

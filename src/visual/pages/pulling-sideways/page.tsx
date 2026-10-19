@@ -48,7 +48,7 @@ function SquaresDrawing() {
     return (
         <svg
             viewBox="-66 -28 284 260"
-            className="mx-auto w-full max-w-64 text-slate-400"
+            className="mx-auto w-full max-w-64 text-ink-muted"
             role="img"
             aria-label="A square on each side of the triangle: the squares on x and y, 3.24 and 5.76, together make the square on T, 9"
         >

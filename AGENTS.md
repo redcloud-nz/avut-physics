@@ -58,6 +58,12 @@ compiles for around 20 seconds.
   are in `common/`, and `card.tsx` and `frame.tsx` are the chrome around every page and figure.
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`) and slider controls.
   Drawing only, no maths.
+- Colours come from the tokens in `src/app/globals.css`, named for what they show (`ink-muted`, `pull`, `mass`,
+  `warning`): token classes (`text-ink-muted`, `fill-surface`) in `className`, and `var(--pull)` in SVG attributes and
+  styles (the base name: a `--color-*` variable exists only once a class uses it). No hex values or Tailwind palette
+  classes (`text-slate-400`) in components; add a token instead. The exceptions are the share image
+  (`src/visual/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
+  own overlays) and the articles' `print:` classes.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
     `a.distanceTo(b)`); every operation returns a new vector.

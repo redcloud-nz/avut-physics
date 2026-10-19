@@ -66,7 +66,7 @@ export function RopeStretchFigure() {
                                 : "rope pulls, on 100 kg"
                         }
                         value={kN(Math.round(force * 10) / 10)}
-                        color={force > 6 ? "#fda4af" : COLORS.pull}
+                        color={force > 6 ? "var(--overload)" : COLORS.pull}
                     />
                 </>
             }

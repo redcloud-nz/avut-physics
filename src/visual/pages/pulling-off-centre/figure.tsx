@@ -120,7 +120,7 @@ export function PullingOffCentreFigure() {
                             key={side}
                             label={`${side} anchor`}
                             value={percent(s.shares[i])}
-                            color={s.shares[i] > 1.0001 ? "#fda4af" : COLORS.pull}
+                            color={s.shares[i] > 1.0001 ? "var(--overload)" : COLORS.pull}
                         />
                     ))}
                 </>

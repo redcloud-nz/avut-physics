@@ -44,8 +44,8 @@ const FIGURES: { key: keyof Ute; label: string; format: (u: Ute) => string }[] =
 export function UteLoadNotes(props: { ute: Ute }) {
     const u = props.ute;
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
+            <h2 className="text-base font-medium text-ink">How this is calculated</h2>
 
             <Part title="The ratings">
                 <p>
@@ -228,12 +228,12 @@ export function UteLoadNotes(props: { ute: Ute }) {
                     <table className="w-full max-w-md text-left">
                         <tbody>
                             {FIGURES.map((f) => (
-                                <tr key={f.key} className="border-b border-slate-800">
+                                <tr key={f.key} className="border-b border-border">
                                     <td className="py-1 pr-4">{f.label}</td>
-                                    <td className="py-1 font-mono text-slate-300">
+                                    <td className="py-1 font-mono text-ink-soft">
                                         {f.format(u)}
                                         {u.estimated.includes(f.key) && (
-                                            <span className="text-amber-400/80"> est.</span>
+                                            <span className="text-warning/80"> est.</span>
                                         )}
                                     </td>
                                 </tr>
@@ -244,7 +244,7 @@ export function UteLoadNotes(props: { ute: Ute }) {
                 <ul className="flex list-disc flex-col gap-1 pl-5">
                     {u.sources.map((s) => (
                         <li key={s.url}>
-                            <a href={s.url} className="text-sky-400 hover:text-sky-300">
+                            <a href={s.url} className="text-link hover:text-highlight">
                                 {s.label}
                             </a>
                         </li>

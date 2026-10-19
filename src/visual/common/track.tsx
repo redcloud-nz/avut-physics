@@ -3,7 +3,7 @@ import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
 import { GHOST, Note, SVG } from "@/visual/frame";
 
-export const VELOCITY = "#34d399";
+export const VELOCITY = "var(--velocity)";
 
 /**
  * A box moving along a track measured in metres, at `time` into its run: where it is and its velocity (an arrow,

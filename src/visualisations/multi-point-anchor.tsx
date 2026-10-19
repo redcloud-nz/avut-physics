@@ -26,11 +26,11 @@ import {
 } from "./multi-point-anchor-solver";
 
 const COLORS = {
-    anchors: ["#38bdf8", "#f472b6", "#a3e635"],
-    load: "#facc15",
-    taut: "#cbd5e1",
-    slack: "#94a3b8",
-    tied: "#64748b",
+    anchors: ["var(--anchor-a)", "var(--anchor-b)", "var(--anchor-c)"],
+    load: "var(--mass)",
+    taut: "var(--ink-soft)",
+    slack: "var(--ink-muted)",
+    tied: "var(--ghost)",
 };
 const NAMES = ["A", "B", "C"];
 const RIG_NAMES: Record<Rig, string> = { "pre-equalised": "Pre-equalised", sliding: "Sliding" };
@@ -159,8 +159,8 @@ export default function MultiPointAnchor() {
                 y={0}
                 width={W}
                 height={rockBottom}
-                fill="#1e293b"
-                stroke="#334155"
+                fill="var(--surface-raised)"
+                stroke="var(--line-faint)"
                 rx={8}
             />
             {/* where the master point sat as the rig was tied */}
@@ -175,8 +175,15 @@ export default function MultiPointAnchor() {
         const p = toSvg(a);
         return (
             <g key={i}>
-                <circle cx={p.x} cy={p.y} r={7} fill="none" stroke="#cbd5e1" strokeWidth={2} />
-                <circle cx={p.x} cy={p.y} r={2.5} fill="#cbd5e1" />
+                <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={7}
+                    fill="none"
+                    stroke="var(--ink-soft)"
+                    strokeWidth={2}
+                />
+                <circle cx={p.x} cy={p.y} r={2.5} fill="var(--ink-soft)" />
                 <Label at={p.add(vec2(0, -20))} color={COLORS.anchors[i]}>
                     {NAMES[i]}
                 </Label>
@@ -277,13 +284,13 @@ export default function MultiPointAnchor() {
         key?: string,
     ) => (
         <div key={key ?? label} className="contents">
-            <span className="text-slate-400" style={color ? { color } : undefined}>
+            <span className="text-ink-muted" style={color ? { color } : undefined}>
                 {label}
             </span>
             {RIGS.map((r) => (
                 <span
                     key={r}
-                    className={`text-right font-mono ${r === rig ? "text-slate-100" : "text-slate-400"}`}
+                    className={`text-right font-mono ${r === rig ? "text-ink-strong" : "text-ink-muted"}`}
                 >
                     {views[r] ? value(views[r]) : NONE}
                 </span>
@@ -296,11 +303,9 @@ export default function MultiPointAnchor() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
                         </div>
                     )}
                     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
@@ -409,7 +414,7 @@ export default function MultiPointAnchor() {
                         {RIGS.map((r) => (
                             <span
                                 key={r}
-                                className={`text-right ${r === rig ? "text-slate-200" : "text-slate-400"}`}
+                                className={`text-right ${r === rig ? "text-ink" : "text-ink-muted"}`}
                             >
                                 {RIG_NAMES[r]}
                             </span>
@@ -422,7 +427,7 @@ export default function MultiPointAnchor() {
                                     return (
                                         <>
                                             {((f / load) * 100).toFixed(0)}%
-                                            <span className="block text-xs text-slate-500">
+                                            <span className="block text-xs text-ghost">
                                                 {f.toFixed(0)} N
                                             </span>
                                         </>

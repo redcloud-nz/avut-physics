@@ -35,7 +35,7 @@ const WIDTH = 520;
 const R = 14;
 /** Rope marks, every half metre along the rope. */
 const MARKS = 0.5;
-const GRAB_COLOR = "#34d399";
+const GRAB_COLOR = "var(--grab)";
 
 const px = (x: number) => ANCHOR_X + x * PER_METRE;
 const kgOf = (share: number) => `${Math.round(share * LOAD_KG)} kg`;
@@ -252,7 +252,7 @@ export function SystemDrawing(props: {
     return (
         <svg
             viewBox={viewBox}
-            className={props.className ?? "w-full text-slate-400"}
+            className={props.className ?? "w-full text-ink-muted"}
             fontSize={15}
             role="img"
             aria-labelledby={props.labelledBy}
@@ -319,7 +319,7 @@ export function SystemDrawing(props: {
                             cx={c.x}
                             cy={c.y}
                             r={r - 1}
-                            className="fill-slate-950 print:fill-white"
+                            className="fill-background print:fill-white"
                             stroke="currentColor"
                             strokeWidth={1.5}
                             opacity={0.9}
@@ -460,10 +460,10 @@ function HaulFigure(props: {
 }
 
 const Strong = (props: { children: React.ReactNode }) => (
-    <strong className="text-slate-200">{props.children}</strong>
+    <strong className="text-ink">{props.children}</strong>
 );
 const FigureNumber = (props: { n: number }) => (
-    <strong className="text-slate-300">Figure {props.n}.</strong>
+    <strong className="text-ink-soft">Figure {props.n}.</strong>
 );
 
 /** How far the rope and load have come, in words. */

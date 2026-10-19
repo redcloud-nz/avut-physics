@@ -43,15 +43,15 @@ export default function Page() {
     const best = Math.max(...footings.map((f) => f.safety));
 
     return (
-        <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-4 pb-16 text-base leading-relaxed text-slate-300 print:max-w-none print:px-0 print:text-[11pt] print:**:text-black">
-            <Link href="/" className="text-sm text-sky-400 hover:text-sky-300 print:hidden">
+        <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 pt-4 pb-16 text-base leading-relaxed text-ink-soft print:max-w-none print:px-0 print:text-[11pt] print:**:text-black">
+            <Link href="/" className="text-sm text-link hover:text-highlight print:hidden">
                 ← Physics Visualisations
             </Link>
 
             <header className="flex flex-col gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-50">{TITLE}</h1>
-                <p className="text-lg text-slate-400">{DESCRIPTION}</p>
-                <p className="text-sm text-slate-500">
+                <h1 className="text-3xl font-semibold tracking-tight text-ink-bright">{TITLE}</h1>
+                <p className="text-lg text-ink-muted">{DESCRIPTION}</p>
+                <p className="text-sm text-ghost">
                     Article · October 2026 · Online at{" "}
                     <Link href="/standing-body-belays" className={LINK}>
                         {SITE}/standing-body-belays
@@ -59,8 +59,8 @@ export default function Page() {
                 </p>
             </header>
 
-            <section className="flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-5 print:break-inside-avoid print:border-black print:bg-transparent">
-                <h2 className="text-lg font-semibold text-amber-200">In short</h2>
+            <section className="flex flex-col gap-3 rounded-xl border border-summary/40 bg-summary/5 p-5 print:break-inside-avoid print:border-black print:bg-transparent">
+                <h2 className="text-lg font-semibold text-summary-heading">In short</h2>
                 <ul className="flex list-disc flex-col gap-2 pl-5">
                     <li>
                         A belayer standing to hold a stretcher’s rope is kept from sliding towards
@@ -93,11 +93,11 @@ export default function Page() {
                         least a footing that rescuers rely on should have.
                     </li>
                     <li>
-                        <strong className="text-slate-100">Conclusion:</strong> standing body belays
-                        shouldn’t be used to lower or hold a stretcher. Use a hard belay, where the
-                        rope runs round a solid anchor rather than round a rescuer. A seated body
-                        belay, with the feet braced against something solid, should be kept only as
-                        an emergency backup.
+                        <strong className="text-ink-strong">Conclusion:</strong> standing body
+                        belays shouldn’t be used to lower or hold a stretcher. Use a hard belay,
+                        where the rope runs round a solid anchor rather than round a rescuer. A
+                        seated body belay, with the feet braced against something solid, should be
+                        kept only as an emergency backup.
                     </li>
                 </ul>
             </section>
@@ -505,7 +505,7 @@ export default function Page() {
                 <dl className="flex flex-col gap-2">
                     {TERMS.map(([term, meaning]) => (
                         <div key={term}>
-                            <dt className="inline font-medium text-slate-100">{term}: </dt>
+                            <dt className="inline font-medium text-ink-strong">{term}: </dt>
                             <dd className="inline">{meaning}</dd>
                         </div>
                     ))}

@@ -3,8 +3,8 @@ import { Part } from "./ladder-hinge-notes";
 /** How the four-point lower page works out what it shows, and what it leaves out. */
 export function FourPointLowerNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
+            <h2 className="text-base font-medium text-ink">How this is calculated</h2>
 
             <Part title="The setup">
                 <p>

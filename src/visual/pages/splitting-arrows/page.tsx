@@ -17,12 +17,12 @@ function PartsDrawing() {
     return (
         <svg
             viewBox="20 40 130 140"
-            className="mx-auto w-full max-w-48 text-slate-400"
+            className="mx-auto w-full max-w-48 text-ink-muted"
             role="img"
             aria-label="A pull T split into a sideways part x and an up part y that meet at a square corner, with θ the angle between T and y"
         >
             <AngleArc center={TIP} radius={30} startDeg={90} sweepDeg={back - 90} />
-            <Letter at={TIP.add(Vector2.fromAngle(rad((back + 90) / 2), 44))} color="#e2e8f0">
+            <Letter at={TIP.add(Vector2.fromAngle(rad((back + 90) / 2), 44))} color="var(--ink)">
                 θ
             </Letter>
             <Triangle />

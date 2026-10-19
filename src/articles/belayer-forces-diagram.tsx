@@ -45,7 +45,7 @@ export function BelayerForcesDiagram() {
         <figure className="flex flex-col gap-2 print:break-inside-avoid">
             <svg
                 viewBox="0 70 480 290"
-                className="w-full text-slate-400"
+                className="w-full text-ink-muted"
                 fontSize={14}
                 role="img"
                 aria-labelledby="forces-caption"
@@ -73,7 +73,7 @@ export function BelayerForcesDiagram() {
 
                 {/* The belayer. */}
                 <g
-                    className="text-slate-200 print:text-black"
+                    className="text-ink print:text-black"
                     stroke="currentColor"
                     strokeLinecap="round"
                     fill="none"
@@ -90,7 +90,7 @@ export function BelayerForcesDiagram() {
                 </g>
 
                 {/* The forces. */}
-                <g className="text-sky-400 print:text-black">
+                <g className="text-figure-accent print:text-black">
                     <Arrow from={waist} v={pull.scale(PER_NEWTON)} color="currentColor" />
                     <Arrow from={waist} v={vec2(0, weight * PER_NEWTON)} color="currentColor" />
                     <Arrow
@@ -113,7 +113,7 @@ export function BelayerForcesDiagram() {
                 </g>
 
                 {/* Their labels. */}
-                <g fill="currentColor" className="text-slate-300 print:text-black">
+                <g fill="currentColor" className="text-ink-soft print:text-black">
                     <text x={ropeEnd.x + 10} y={ropeEnd.y - 4}>
                         Rope pulls, {newtons(tension)}
                     </text>
@@ -142,8 +142,8 @@ export function BelayerForcesDiagram() {
                     </text>
                 </g>
             </svg>
-            <figcaption id="forces-caption" className="text-sm text-slate-400">
-                <strong className="font-medium text-slate-300">Figure 2.</strong> The forces on one
+            <figcaption id="forces-caption" className="text-sm text-ink-muted">
+                <strong className="font-medium text-ink-soft">Figure 2.</strong> The forces on one
                 belayer, holding still, to scale, seen from the side, square on to their rope. The
                 ground pushes up with their weight plus the rope’s downward pull. Their boots must
                 grip as hard as the rope pulls towards the edge: on dry painted steel, that takes

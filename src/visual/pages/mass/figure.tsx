@@ -68,7 +68,7 @@ export function MassFigure() {
                         y={box.y}
                         textAnchor="middle"
                         dominantBaseline="middle"
-                        className="fill-slate-950"
+                        className="fill-background"
                         fontSize={16}
                         fontWeight={600}
                     >
@@ -108,8 +108,8 @@ export function MassFigure() {
                             onClick={() => setPlace(i)}
                             className={`rounded-lg border py-1.5 text-sm ${
                                 place === i
-                                    ? "border-sky-500 bg-sky-500/15 text-slate-100"
-                                    : "border-slate-700 text-slate-400"
+                                    ? "border-action bg-action/15 text-ink-strong"
+                                    : "border-line-faint text-ink-muted"
                             }`}
                         >
                             {p.name}

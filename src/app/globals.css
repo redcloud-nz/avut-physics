@@ -56,6 +56,12 @@
   --color-warning: var(--warning);
   --color-summary: var(--summary);
   --color-summary-heading: var(--summary-heading);
+  --color-indicator: var(--indicator);
+  --color-step: var(--step);
+  --color-alarm: var(--alarm);
+  --color-sliding: var(--sliding);
+  --color-figure-accent: var(--figure-accent);
+  --color-figure-alarm: var(--figure-alarm);
   --color-ink-bright: var(--ink-bright);
   --color-ink-strong: var(--ink-strong);
   --color-ink: var(--ink);
@@ -206,6 +212,15 @@ html {
   --warning: var(--color-amber-400);
   --summary: var(--color-amber-500);
   --summary-heading: var(--color-amber-200);
+  /* Progress: the visual introduction's page bar and details pill (indicator), and a haul's steps taken (step). */
+  --indicator: var(--color-sky-400);
+  --step: var(--color-amber-400);
+  /* A value past its limit in an article's table (alarm), and the incline's "sliding" message. */
+  --alarm: var(--color-rose-300);
+  --sliding: var(--color-emerald-400);
+  /* The standing body belay article's figures draw ropes, forces and data in one accent, and shade where feet slide. */
+  --figure-accent: var(--color-sky-400);
+  --figure-alarm: var(--color-rose-400);
 
   /* Drawings' neutrals, lightest to darkest: text and strokes (ink), faint and construction lines (ghost, line),
      and fills behind them (surface). The halo is the outline drawn behind a label so it reads over lines. */

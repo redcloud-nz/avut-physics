@@ -94,7 +94,7 @@ export function TSteps(props: { sys: PulleySystem; steps: { text: string; show: 
             }
             slider={<Stepper step={step} steps={props.steps.length} onChange={setStep} />}
             readouts={
-                <p className="min-h-12 flex-1 text-center text-sm text-slate-200">
+                <p className="min-h-12 flex-1 text-center text-sm text-ink">
                     {props.steps[step - 1].text}
                 </p>
             }
@@ -105,7 +105,7 @@ export function TSteps(props: { sys: PulleySystem; steps: { text: string; show: 
 /** Buttons to go back and forward a step, with a dot for each step between them. */
 function Stepper(props: { step: number; steps: number; onChange: (step: number) => void }) {
     const button =
-        "flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800";
+        "flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-raised text-ink-strong hover:bg-line-faint disabled:opacity-30 disabled:hover:bg-surface-raised";
     return (
         <div className="flex items-center gap-3">
             <button
@@ -117,7 +117,7 @@ function Stepper(props: { step: number; steps: number; onChange: (step: number) 
                 <ChevronLeft className="size-6" aria-hidden />
             </button>
             <div className="flex flex-1 flex-col items-center gap-1.5">
-                <span className="text-sm text-slate-300" aria-live="polite">
+                <span className="text-sm text-ink-soft" aria-live="polite">
                     Step {props.step} of {props.steps}
                 </span>
                 <div className="flex gap-1.5" aria-hidden>
@@ -126,7 +126,7 @@ function Stepper(props: { step: number; steps: number; onChange: (step: number) 
                             key={i}
                             tabIndex={-1}
                             onClick={() => props.onChange(i + 1)}
-                            className={`size-2 rounded-full ${i < props.step ? "bg-amber-400" : "bg-slate-700"}`}
+                            className={`size-2 rounded-full ${i < props.step ? "bg-step" : "bg-line-faint"}`}
                         />
                     ))}
                 </div>

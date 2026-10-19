@@ -9,8 +9,8 @@ const r = String.raw;
 /** The body belay page's maths, step by step, as the solver works it out. Rendered on the server. */
 export function BodyBelayMaths() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">The maths</h2>
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
+            <h2 className="text-base font-medium text-ink">The maths</h2>
             <p>
                 Coordinates: <M tex="x" /> out from the wall’s face, <M tex="y" /> up from the
                 ground, <M tex="z" /> sideways along the wall, with the stretcher in the plane{" "}

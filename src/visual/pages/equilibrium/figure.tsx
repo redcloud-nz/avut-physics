@@ -40,7 +40,7 @@ export function EquilibriumFigure() {
                     <Arrow from={ORIGIN} v={b} color={COLORS.redirect} width={3} />
                 </DragGrid>
             }
-            slider={<p className="text-center text-sm text-slate-400">Drag either arrow’s tip.</p>}
+            slider={<p className="text-center text-sm text-ink-muted">Drag either arrow’s tip.</p>}
             readouts={
                 <>
                     <Readout label="one" value={kNText(a.len() / KN)} color={COLORS.pull} />

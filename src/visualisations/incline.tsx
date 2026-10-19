@@ -9,11 +9,11 @@ import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 const COLORS = {
-    weight: "#f97316",
-    normal: "#38bdf8",
-    friction: "#f472b6",
-    net: "#34d399",
-    component: "#94a3b8",
+    weight: "var(--weight)",
+    normal: "var(--normal)",
+    friction: "var(--incline-friction)",
+    net: "var(--net)",
+    component: "var(--ink-muted)",
 };
 
 const W = 640;
@@ -61,8 +61,8 @@ export default function Incline() {
                 <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
                     <polygon
                         points={`${bottomLeft.x},${bottomLeft.y} ${top.x},${top.y} ${corner.x},${corner.y}`}
-                        fill="#1e293b"
-                        stroke="#475569"
+                        fill="var(--surface-raised)"
+                        stroke="var(--line)"
                         strokeWidth={1.5}
                     />
                     <line
@@ -70,7 +70,7 @@ export default function Incline() {
                         y1={corner.y}
                         x2={W - 20}
                         y2={corner.y}
-                        stroke="#475569"
+                        stroke="var(--line)"
                         strokeWidth={1.5}
                     />
                     <AngleArc
@@ -87,8 +87,8 @@ export default function Incline() {
                         width={blockW}
                         height={blockH}
                         rx={4}
-                        fill="#334155"
-                        stroke="#64748b"
+                        fill="var(--line-faint)"
+                        stroke="var(--ghost)"
                         transform={`rotate(${angle} ${centre.x} ${centre.y})`}
                     />
 
@@ -212,13 +212,13 @@ export default function Incline() {
                     <Readout label="Acceleration" value={`${accel.toFixed(2)} m/s²`} />
                     <Readout label="Slips above" value={`${criticalAngle.toFixed(1)}°`} />
                     <p
-                        className={`mt-1 text-sm font-medium ${sliding ? "text-emerald-400" : "text-slate-300"}`}
+                        className={`mt-1 text-sm font-medium ${sliding ? "text-sliding" : "text-ink-soft"}`}
                     >
                         {sliding
                             ? "Block is sliding down the slope."
                             : "Block is held in place by static friction."}
                     </p>
-                    {muK > muS && <p className="text-xs text-amber-400">μk is capped at μs.</p>}
+                    {muK > muS && <p className="text-xs text-warning">μk is capped at μs.</p>}
                 </>
             }
         />

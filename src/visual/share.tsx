@@ -6,7 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { SITE } from "@/articles/prose";
 
 const BUTTON =
-    "flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500";
+    "flex items-center justify-center gap-1.5 rounded-xl border border-line-faint py-2 text-sm font-medium text-ink hover:border-action";
 
 const noSubscribe = () => () => {};
 
@@ -38,13 +38,13 @@ export function Share(props: { title: string; text: string; path: string }) {
     ];
 
     return (
-        <section className="flex flex-col gap-3 border-t border-slate-800 pt-5">
-            <h2 className="text-sm font-medium text-slate-400">Share this series</h2>
+        <section className="flex flex-col gap-3 border-t border-border pt-5">
+            <h2 className="text-sm font-medium text-ink-muted">Share this series</h2>
             <div className="grid grid-cols-2 gap-2">
                 {canShare && (
                     <button
                         type="button"
-                        className={`${BUTTON} col-span-2 border-sky-500 text-sky-300`}
+                        className={`${BUTTON} col-span-2 border-action text-highlight`}
                         // Closing the share sheet without sharing rejects; there's nothing to do then.
                         onClick={() =>
                             navigator

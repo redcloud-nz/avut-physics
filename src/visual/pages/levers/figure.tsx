@@ -95,7 +95,7 @@ export function LeversFigure() {
                                 y1={Y + 50}
                                 x2={Number(to)}
                                 y2={Y + 50}
-                                stroke="#64748b"
+                                stroke="var(--ghost)"
                                 strokeWidth={1.5}
                             />
                             <Note at={vec2((Number(from) + Number(to)) / 2, Y + 64)}>

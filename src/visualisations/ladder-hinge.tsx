@@ -21,14 +21,14 @@ import { LadderHingeNotes } from "./ladder-hinge-notes";
 import { minWallCable, phiMax, solve } from "./ladder-hinge-solver";
 
 const COLORS = {
-    tensionBeam: "#38bdf8",
-    tensionWall: "#818cf8",
-    weight: "#f97316",
-    bar: "#facc15",
-    hinge: "#f472b6",
-    component: "#94a3b8",
-    contact: "#34d399",
-    hold: "#a3e635",
+    tensionBeam: "var(--pull)",
+    tensionWall: "var(--rope-tension)",
+    weight: "var(--weight)",
+    bar: "var(--mass)",
+    hinge: "var(--hinge)",
+    component: "var(--ink-muted)",
+    contact: "var(--contact)",
+    hold: "var(--team)",
 };
 
 type LadderMode = "free" | "level";
@@ -208,14 +208,14 @@ export default function LadderHinge() {
 
     const ground = (
         <>
-            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="var(--line)" strokeWidth={1.5} />
             <rect
                 x={O.x - anchorBack * PPM}
                 y={wallS.y}
                 width={anchorBack * PPM}
                 height={wallHeight * PPM}
-                fill="#1e293b"
-                stroke="#475569"
+                fill="var(--surface-raised)"
+                stroke="var(--line)"
             />
             {/* post holding the cable anchor */}
             <line
@@ -223,11 +223,11 @@ export default function LadderHinge() {
                 y1={wallS.y}
                 x2={anchorS.x}
                 y2={anchorS.y}
-                stroke="#475569"
+                stroke="var(--line)"
                 strokeWidth={4}
                 strokeLinecap="round"
             />
-            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="#cbd5e1" />
+            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="var(--ink-soft)" />
         </>
     );
 
@@ -246,11 +246,18 @@ export default function LadderHinge() {
                     y1={O.y}
                     x2={tipS.x}
                     y2={tipS.y}
-                    stroke="#64748b"
+                    stroke="var(--ghost)"
                     strokeWidth={BEAM_THICKNESS * PPM}
                     strokeLinecap="round"
                 />
-                <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
+                <circle
+                    cx={O.x}
+                    cy={O.y}
+                    r={7}
+                    fill="var(--surface)"
+                    stroke="var(--ink-soft)"
+                    strokeWidth={2}
+                />
                 {angle > 0.05 && (
                     <AngleArc
                         center={O}
@@ -269,7 +276,7 @@ export default function LadderHinge() {
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke="#a16207"
+            stroke="var(--timber)"
             strokeWidth={BAR_THICKNESS * PPM}
             strokeLinecap="round"
         />
@@ -397,7 +404,7 @@ export default function LadderHinge() {
                         eq.barEnd1,
                     ])}
                     fill="none"
-                    stroke="#cbd5e1"
+                    stroke="var(--ink-soft)"
                     strokeWidth={1.5}
                     strokeLinejoin="round"
                 />
@@ -406,7 +413,7 @@ export default function LadderHinge() {
                     y1={end2S.y}
                     x2={attachS.x}
                     y2={attachS.y}
-                    stroke="#cbd5e1"
+                    stroke="var(--ink-soft)"
                     strokeWidth={1.5}
                 />
 
@@ -452,7 +459,7 @@ export default function LadderHinge() {
                 <polyline
                     points={wallPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
-                    stroke={h.cableTaut ? "#cbd5e1" : "#94a3b8"}
+                    stroke={h.cableTaut ? "var(--ink-soft)" : "var(--ink-muted)"}
                     strokeWidth={1.5}
                     strokeDasharray={h.cableTaut ? undefined : "5 5"}
                     strokeLinejoin="round"
@@ -460,7 +467,7 @@ export default function LadderHinge() {
                 {!h.cableTaut && (
                     <Label
                         at={wallPath[last - 1].add(wallPath[last]).scale(0.5).add(vec2(0, -14))}
-                        color="#94a3b8"
+                        color="var(--ink-muted)"
                     >
                         slack
                     </Label>
@@ -470,7 +477,7 @@ export default function LadderHinge() {
                     y1={end2S.y}
                     x2={attachS.x}
                     y2={attachS.y}
-                    stroke={h.beamCableTaut ? "#cbd5e1" : "#94a3b8"}
+                    stroke={h.beamCableTaut ? "var(--ink-soft)" : "var(--ink-muted)"}
                     strokeWidth={1.5}
                     strokeDasharray={h.beamCableTaut ? undefined : "5 5"}
                 />
@@ -515,7 +522,7 @@ export default function LadderHinge() {
             <polyline
                 points={cablePath(pts)}
                 fill="none"
-                stroke={taut ? "#cbd5e1" : "#94a3b8"}
+                stroke={taut ? "var(--ink-soft)" : "var(--ink-muted)"}
                 strokeWidth={1.5}
                 strokeDasharray={taut ? undefined : "5 5"}
                 strokeLinejoin="round"
@@ -578,7 +585,14 @@ export default function LadderHinge() {
         diagram = (
             <>
                 {ground}
-                <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
+                <circle
+                    cx={O.x}
+                    cy={O.y}
+                    r={7}
+                    fill="var(--surface)"
+                    stroke="var(--ink-soft)"
+                    strokeWidth={2}
+                />
             </>
         );
     }
@@ -655,11 +669,9 @@ export default function LadderHinge() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
                         </div>
                     )}
                     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">

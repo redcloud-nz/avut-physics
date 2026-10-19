@@ -25,10 +25,10 @@ import {
 } from "./four-point-lower-solver";
 
 /** Each rope its own colour, in the ropes' order: red, green, blue, yellow. Head ropes solid, foot ropes dashed. */
-const ROPE_COLORS = ["#f2555a", "#23935a", "#3d83f0", "#d9a816"];
+const ROPE_COLORS = ["var(--strand-1)", "var(--strand-2)", "var(--strand-3)", "var(--strand-4)"];
 const ropeColor = (i: number) => ROPE_COLORS[i];
 const ropeDash = (i: number) => (ROPES[i].end < 0 ? "7 5" : undefined);
-const COLORS = { bar: "#e2e8f0", barFill: "#475569", push: "#c4b5fd" };
+const COLORS = { bar: "var(--ink)", barFill: "var(--line)", push: "var(--push)" };
 
 const MAX_ARROW = 160;
 const BAR_LENGTH = 2;
@@ -278,14 +278,14 @@ export default function FourPointLower() {
     );
     const planView = (
         <svg viewBox={`0 0 ${W} ${planH}`} className="block h-auto w-full">
-            <rect x={0} y={0} width={W} height={planH} fill="#1e293b" />
+            <rect x={0} y={0} width={W} height={planH} fill="var(--surface-raised)" />
             <rect
                 x={above(vec3(-edgeX, 0, 0)).x}
                 y={0}
                 width={slotWidth * PPM}
                 height={planH}
-                fill="#0f172a"
-                stroke="#475569"
+                fill="var(--surface)"
+                stroke="var(--line)"
             />
             {view && (
                 <polygon
@@ -302,7 +302,7 @@ export default function FourPointLower() {
                 <circle key={i} cx={above(c.at).x} cy={above(c.at).y} r={4} fill={COLORS.push} />
             ))}
             {belays.map((p, i) => (
-                <circle key={i} cx={above(p).x} cy={above(p).y} r={5} fill="#cbd5e1" />
+                <circle key={i} cx={above(p).x} cy={above(p).y} r={5} fill="var(--ink-soft)" />
             ))}
             {view && (
                 <Label
@@ -320,7 +320,7 @@ export default function FourPointLower() {
     const bottom = endOn(vec3(0, 0, 0)).y;
     const endOnView = (
         <svg viewBox={`0 0 ${W} ${endH}`} className="block h-auto w-full">
-            <line x1={0} y1={bottom} x2={W} y2={bottom} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={bottom} x2={W} y2={bottom} stroke="var(--line)" strokeWidth={1.5} />
             {[-1, 1].map((side) => {
                 const x0 = side < 0 ? 0 : endOn(vec3(edgeX, 0, 0)).x;
                 const x1 = side < 0 ? endOn(vec3(-edgeX, 0, 0)).x : W;
@@ -332,19 +332,19 @@ export default function FourPointLower() {
                             y={floorTop}
                             width={x1 - x0}
                             height={bottom - floorTop}
-                            fill="#1e293b"
-                            stroke="#475569"
+                            fill="var(--surface-raised)"
+                            stroke="var(--line)"
                         />
                         <line
                             x1={post.x}
                             y1={floorTop}
                             x2={post.x}
                             y2={post.y}
-                            stroke="#475569"
+                            stroke="var(--line)"
                             strokeWidth={4}
                             strokeLinecap="round"
                         />
-                        <circle cx={post.x} cy={post.y} r={3.5} fill="#cbd5e1" />
+                        <circle cx={post.x} cy={post.y} r={3.5} fill="var(--ink-soft)" />
                     </g>
                 );
             })}
@@ -458,18 +458,16 @@ export default function FourPointLower() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
                         </div>
                     )}
                     {planView}
                     {ropeSliders}
                     {endOnView}
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm text-slate-300">
+                        <p className="text-sm text-ink-soft">
                             The ropes&apos; pulls over the moves so far
                         </p>
                         <Button variant="outline" size="sm" onClick={() => setSaved(null)}>
@@ -572,7 +570,7 @@ export default function FourPointLower() {
                         value={view ? `${Math.abs(deg(view.pitch)).toFixed(1)}°` : NONE}
                     />
                     <Separator />
-                    <p className="text-xs text-slate-500">Each rope&apos;s pull</p>
+                    <p className="text-xs text-ghost">Each rope&apos;s pull</p>
                     {ROPES.map((r, i) => (
                         <Readout
                             key={r.name}
@@ -632,7 +630,7 @@ function RopeSlider(props: {
     const color = ropeColor(props.index);
     return (
         <label
-            className={`flex min-w-0 flex-col gap-1 text-sm text-slate-300 ${props.disabled ? "opacity-40" : ""}`}
+            className={`flex min-w-0 flex-col gap-1 text-sm text-ink-soft ${props.disabled ? "opacity-40" : ""}`}
         >
             <span className="flex flex-wrap items-center justify-between gap-x-2">
                 <span className="flex items-center gap-1.5">
@@ -649,11 +647,11 @@ function RopeSlider(props: {
                     </svg>
                     {rope.name}
                 </span>
-                <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
+                <span className="shrink-0 font-mono whitespace-nowrap text-ink-muted">
                     {props.ropeOut.toFixed(2)} m
                 </span>
                 {props.overLimit && (
-                    <span className="w-full text-xs text-amber-400">Too hard to take in</span>
+                    <span className="w-full text-xs text-warning">Too hard to take in</span>
                 )}
             </span>
             <input
@@ -704,7 +702,7 @@ function LinkButton(props: {
             : props.next === -1
               ? "couple them, moving opposite ways"
               : "uncouple them";
-    const line = coupling ? "bg-slate-300" : "bg-slate-700";
+    const line = coupling ? "bg-ink-soft" : "bg-line-faint";
     const dashed =
         coupling === -1
             ? "opacity-70 [mask-image:repeating-linear-gradient(90deg,#000_0_4px,transparent_4px_7px)]"
@@ -721,7 +719,7 @@ function LinkButton(props: {
                 title={`The ${props.name}: ${state.says}. Click to ${next}.`}
                 aria-label={`The ${props.name}: ${state.says}. Click to ${next}.`}
                 onClick={props.onClick}
-                className={coupling ? "" : "text-slate-500"}
+                className={coupling ? "" : "text-ghost"}
             >
                 <state.Icon />
             </Button>
@@ -765,7 +763,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
         text: string,
         at: Vector2,
         anchor: "start" | "middle" | "end",
-        color = "#94a3b8",
+        color = "var(--ink-muted)",
     ) => (
         <text
             x={at.x}
@@ -782,7 +780,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
 
     return (
         <div className="flex flex-col gap-2">
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
                 {series.map((s) => (
                     <li key={s.name} className="flex items-center gap-1.5">
                         <svg width="22" height="8" aria-hidden>
@@ -809,11 +807,17 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
                 {Array.from({ length: Math.round(yMax / tick) + 1 }, (_, i) => i * tick).map(
                     (v) => (
                         <g key={v}>
-                            <line x1={left} y1={y(v)} x2={W - right} y2={y(v)} stroke="#1e293b" />
+                            <line
+                                x1={left}
+                                y1={y(v)}
+                                x2={W - right}
+                                y2={y(v)}
+                                stroke="var(--surface-raised)"
+                            />
                             <text
                                 x={left - 8}
                                 y={y(v)}
-                                fill="#94a3b8"
+                                fill="var(--ink-muted)"
                                 fontSize={17}
                                 textAnchor="end"
                                 dominantBaseline="middle"
@@ -859,7 +863,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
                             cy={y(s.value(latest))}
                             r={4.5}
                             fill={s.color}
-                            stroke="#0f172a"
+                            stroke="var(--surface)"
                             strokeWidth={2}
                         />
                     ))}
@@ -904,7 +908,7 @@ function Caption({ children }: { children: React.ReactNode }) {
         <text
             x={12}
             y={22}
-            fill="#94a3b8"
+            fill="var(--ink-muted)"
             fontSize={14}
             fontFamily="var(--font-geist-mono), monospace"
         >

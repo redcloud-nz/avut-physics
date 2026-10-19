@@ -3,8 +3,8 @@ import { HOLD_HEIGHT } from "./ladder-hinge-held";
 /** How the ladder hinge page works out what it shows, and what it leaves out. */
 export function LadderHingeNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
+            <h2 className="text-base font-medium text-ink">How this is calculated</h2>
 
             <Part title="The setup">
                 <p>
@@ -118,7 +118,7 @@ export function LadderHingeNotes() {
 export function Part(props: { title: string; children: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-2">
-            <h3 className="font-medium text-slate-300">{props.title}</h3>
+            <h3 className="font-medium text-ink-soft">{props.title}</h3>
             {props.children}
         </div>
     );

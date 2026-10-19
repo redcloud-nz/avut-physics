@@ -25,7 +25,7 @@ function UnitsMore() {
                 </p>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="text-slate-400">
+                        <thead className="text-ink-muted">
                             <tr>
                                 <th className="py-1 pr-3 font-medium">Prefix</th>
                                 <th className="py-1 pr-3 font-medium">Times</th>
@@ -34,14 +34,14 @@ function UnitsMore() {
                         </thead>
                         <tbody>
                             {PREFIXES.map((p) => (
-                                <tr key={p.times} className="border-t border-slate-800">
+                                <tr key={p.times} className="border-t border-border">
                                     <td className="py-1 pr-3 whitespace-nowrap">
                                         {p.name ? (
                                             <>
                                                 {p.name} ({p.symbol})
                                             </>
                                         ) : (
-                                            <span className="text-slate-500">none</span>
+                                            <span className="text-ghost">none</span>
                                         )}
                                     </td>
                                     <td className="py-1 pr-3 whitespace-nowrap tabular-nums">

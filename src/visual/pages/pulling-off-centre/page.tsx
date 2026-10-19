@@ -13,7 +13,7 @@ import { ANCHORS, DEPTH, OFFSET, SWING } from "./rig";
 /** The worked example. The left rope is 30° from the load's line, α, and the right one about 49°, β. */
 const EXAMPLE = tiedOff(ANCHORS, vec2(OFFSET, -DEPTH), rad(SWING));
 
-const FAINT = "#64748b";
+const FAINT = "var(--ghost)";
 const TL = ink(COLORS.pull, r`T_\text{left}`);
 const TR = ink(COLORS.pull, r`T_\text{right}`);
 const W = ink(COLORS.load, "W");
@@ -28,7 +28,7 @@ function Corner(props: { at: Vector2; a: Vector2; b: Vector2; radius: number; na
     return (
         <>
             <AngleArc center={props.at} radius={props.radius} startDeg={start} sweepDeg={sweep} />
-            <Letter at={props.at.add(Vector2.fromAngle(mid, props.radius + 13))} color="#e2e8f0">
+            <Letter at={props.at.add(Vector2.fromAngle(mid, props.radius + 13))} color="var(--ink)">
                 {props.name}
             </Letter>
         </>
@@ -49,7 +49,7 @@ function RigDrawing() {
     return (
         <svg
             viewBox="20 15 220 230"
-            className="mx-auto w-full max-w-64 text-slate-400"
+            className="mx-auto w-full max-w-64 text-ink-muted"
             role="img"
             aria-label="The rig in the example: the master point off centre and the load pulling to the right of straight down. The load's line, carried on up past the master point, is 30° from the left rope, α, and 49° from the right one, β."
         >
@@ -117,7 +117,7 @@ function TriangleDrawing() {
     return (
         <svg
             viewBox="-15 0 160 175"
-            className="mx-auto w-full max-w-48 text-slate-400"
+            className="mx-auto w-full max-w-48 text-ink-muted"
             role="img"
             aria-label="The load's pull W, then the left rope's pull, then the right rope's, tip to tail, closing a triangle. The angle between W and the left rope is α, and between W and the right rope is β."
         >

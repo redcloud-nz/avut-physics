@@ -6,7 +6,7 @@ import { slopeParts } from "@/visual/common/mechanics";
 import { Note, SVG } from "@/visual/frame";
 
 /** Friction's colour: the surface's grip, against the way the load slides. */
-export const FRICTION = "#fb923c";
+export const FRICTION = "var(--friction)";
 
 /** Drawing units for the load's whole weight. */
 const W = 90;

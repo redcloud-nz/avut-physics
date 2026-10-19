@@ -103,7 +103,7 @@ _End of review group 1._
 
 ### Review group 2: move every page to tokens (visual checkpoint: dark looks unchanged)
 
-- [ ] **3. Visualisations** `mechanical` — Draw the visualisations with colour tokens
+- [x] **3. Visualisations** `mechanical` — Draw the visualisations with colour tokens
   - **Files:** `src/visualisations/{body-belay,four-point-lower,incline,ladder-hinge,multi-point-anchor,two-point-lower,ute-load}.tsx`
     and their `-notes.tsx`, plus `body-belay-maths.tsx`
   - **Do:** follow the pattern from Task 2. The palette object at the top of each file moves to tokens, and so do
@@ -113,14 +113,14 @@ _End of review group 1._
     `src/visualisations/*.tsx` finds nothing. Type check, lint, `npm test` and `npm run test:sweep` pass, and
     `scripts/figures.mjs --check` passes.
 
-- [ ] **4. Articles** `mechanical` — Draw the articles with colour tokens
+- [x] **4. Articles** `mechanical` — Draw the articles with colour tokens
   - **Files:** `src/articles/{prose,setup-diagram,gentle-introduction-figures,pulley-figures,belayer-forces-diagram,stretcher-weight-graph}.tsx`,
     `src/app/standing-body-belays/page.tsx`, `src/app/gentle-introduction/part-{1,2}/page.tsx`
   - **Do:** as Task 3. Leave every `print:` class as it is. They stay needed until the light theme exists (Task 9).
   - **Done when:** the three articles look as before, on screen and in print preview. `scripts/figures.mjs --check`
     passes. Type check, lint and `npm test` pass.
 
-- [ ] **5. Visual introduction** `mechanical` — Draw the visual introduction with colour tokens
+- [x] **5. Visual introduction** `mechanical` — Draw the visual introduction with colour tokens
   - **Files:** `src/visual/card.tsx`, `src/visual/share.tsx`, `src/visual/common/*.tsx`, and the `page.tsx` and
     `figure.tsx` in `src/visual/pages/*` that use hex or palette classes (about 20 files; `grep -rlE` from the
     investigation lists them). Local `FAINT = "#64748b"` constants become the `ghost` token.
@@ -128,7 +128,7 @@ _End of review group 1._
   - **Done when:** every visual page, its contents drawer and its details look as before, at phone width.
     Type check, lint and `npm test` pass.
 
-- [ ] **6. Site chrome, and the convention** — Use colour tokens in the site's chrome, and say so in AGENTS.md
+- [x] **6. Site chrome, and the convention** — Use colour tokens in the site's chrome, and say so in AGENTS.md
   - **Files:** `src/app/page.tsx`, `src/app/visual/page.tsx`, `src/components/VisualisationPage.tsx`,
     `src/components/SiteFooter.tsx`, `AGENTS.md`
   - **Do:**
@@ -137,7 +137,8 @@ _End of review group 1._
       use hex values or Tailwind palette classes. The exceptions are the share image and `src/components/ui`
       (shadcn's own overlays).
   - **Done when:** a grep for hex literals and `-(slate|sky|amber|…)-` classes over `src` finds only
-    `share-image.tsx` and `src/components/ui/*`. The home page and visual index look as before. Type check, lint and
+    `share-image.tsx`, `src/components/ui/*`, `viewport.themeColor` in `layout.tsx` (a meta value, so it can't be a
+    variable; Task 8 replaces it) and the articles' `print:` classes (Task 9). The home page and visual index look as before. Type check, lint and
     `npm test` pass.
 
 _End of review group 2._

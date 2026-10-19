@@ -5,7 +5,7 @@ import type { VisualPage } from "@/visual/pages";
 
 import { EndFigure } from "./figure";
 
-const LINK = "text-sky-300 underline underline-offset-2 hover:text-sky-200";
+const LINK = "text-highlight underline underline-offset-2 hover:text-highlight-strong";
 
 function EndMore() {
     return (

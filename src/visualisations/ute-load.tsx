@@ -27,13 +27,13 @@ import {
 import { FITOUTS, uteFor, UTES } from "./ute-load-vehicles";
 
 const COLORS = {
-    load: "#facc15",
-    ok: "#34d399",
-    near: "#fbbf24",
-    over: "#f87171",
-    trailer: "#94a3b8",
-    body: "#334155",
-    outline: "#64748b",
+    load: "var(--mass)",
+    ok: "var(--ok)",
+    near: "var(--caution)",
+    over: "var(--danger)",
+    trailer: "var(--ink-muted)",
+    body: "var(--line-faint)",
+    outline: "var(--ghost)",
 };
 
 /** Shown in place of a value that doesn't apply. */
@@ -192,7 +192,7 @@ export default function UteLoad() {
                     cx={c.x}
                     cy={c.y}
                     r={WHEEL * PPM}
-                    fill="#0f172a"
+                    fill="var(--surface)"
                     stroke={COLORS.outline}
                     strokeWidth={6}
                 />
@@ -229,7 +229,7 @@ export default function UteLoad() {
     const crewLabel = crew ? `${crew} × ${crewMass} kg` : null;
     const diagram = (
         <>
-            <line x1={0} y1={ground} x2={W} y2={ground} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={ground} x2={W} y2={ground} stroke="var(--line)" strokeWidth={1.5} />
             {trailer > 0 && (
                 <g opacity={0.8}>
                     <line
@@ -247,14 +247,14 @@ export default function UteLoad() {
                             [trailerFront + BOX, BOX_TOP],
                             [trailerFront + BOX, BOX_BOTTOM],
                         ])}
-                        fill="#1e293b"
+                        fill="var(--surface-raised)"
                         stroke={COLORS.trailer}
                     />
                     <circle
                         cx={toSvg(trailerAxle, 0.3).x}
                         cy={toSvg(trailerAxle, 0.3).y}
                         r={0.3 * PPM}
-                        fill="#0f172a"
+                        fill="var(--surface)"
                         stroke={COLORS.trailer}
                         strokeWidth={5}
                     />
@@ -291,19 +291,19 @@ export default function UteLoad() {
             />
             {wheel(0)}
             {wheel(ute.wheelbase)}
-            <circle cx={ballS.x} cy={ballS.y} r={4} fill="#cbd5e1" />
+            <circle cx={ballS.x} cy={ballS.y} r={4} fill="var(--ink-soft)" />
             {/* the empty ute's centre of mass */}
             <circle
                 cx={toSvg(ute.wheelbase * (1 - frontShare), 0.85).x}
                 cy={toSvg(ute.wheelbase * (1 - frontShare), 0.85).y}
                 r={6}
                 fill="none"
-                stroke="#e2e8f0"
+                stroke="var(--ink)"
                 strokeWidth={1.5}
             />
             <Label
                 at={toSvg(ute.wheelbase * (1 - frontShare), 0.85).add(vec2(0, 18))}
-                color="#e2e8f0"
+                color="var(--ink)"
             >
                 {`empty ${ute.tare} kg`}
             </Label>
@@ -368,7 +368,7 @@ export default function UteLoad() {
             {(view ? checks : []).map((c) => (
                 <div key={c.key} className="flex flex-col gap-1 text-sm">
                     <div className="flex justify-between gap-2">
-                        <span className="text-slate-300">{CHECK_LABELS[c.key]}</span>
+                        <span className="text-ink-soft">{CHECK_LABELS[c.key]}</span>
                         <span
                             className="font-mono whitespace-nowrap"
                             style={{ color: statusColor(c) }}
@@ -376,7 +376,7 @@ export default function UteLoad() {
                             {Math.round(c.value)} / {c.limit} kg
                         </span>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-2 overflow-hidden rounded-full bg-surface-raised">
                         <div
                             className="h-full rounded-full"
                             style={{
@@ -399,9 +399,9 @@ export default function UteLoad() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {sol.kind === "none" && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">No balance for these settings</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">{sol.reason}</p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{sol.reason}</p>
                         </div>
                     )}
                     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">

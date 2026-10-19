@@ -37,7 +37,7 @@ export function StretcherWeightGraph() {
         <figure className="flex flex-col gap-2 print:break-inside-avoid">
             <svg
                 viewBox={`0 0 ${W} ${H}`}
-                className="w-full text-slate-300"
+                className="w-full text-ink-soft"
                 fontSize={14}
                 role="img"
                 aria-labelledby="stretcher-weight-caption"
@@ -66,7 +66,7 @@ export function StretcherWeightGraph() {
                     y={y(1)}
                     width={PLOT.right - PLOT.left}
                     height={PLOT.bottom - y(1)}
-                    className="text-rose-400 print:text-black"
+                    className="text-figure-alarm print:text-black"
                     fill="currentColor"
                     opacity={0.1}
                 />
@@ -129,7 +129,7 @@ export function StretcherWeightGraph() {
 
                 {/* The lines, each labelled at its end. */}
                 <g
-                    className="text-sky-400 print:text-black"
+                    className="text-figure-accent print:text-black"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={2.5}
@@ -146,8 +146,8 @@ export function StretcherWeightGraph() {
                     </text>
                 </g>
             </svg>
-            <figcaption id="stretcher-weight-caption" className="text-sm text-slate-400">
-                <strong className="font-medium text-slate-300">Figure 3.</strong> The safety factor
+            <figcaption id="stretcher-weight-caption" className="text-sm text-ink-muted">
+                <strong className="font-medium text-ink-soft">Figure 3.</strong> The safety factor
                 holding still, for one {DEFAULTS.belayerMass} kg belayer, against the weight of the
                 stretcher and casualty: on a painted steel container roof, dry (solid) and wet
                 (dashed). Every other setting is the common case’s: a high cube container, the

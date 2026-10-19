@@ -30,8 +30,8 @@ export function ForceFigure() {
                     role="img"
                     aria-label="A load pushed across ice, speeding up"
                 >
-                    <rect x={0} y={ice} width={320} height={10} fill="#bae6fd" opacity={0.25} />
-                    <line x1={0} y1={ice} x2={320} y2={ice} stroke="#bae6fd" />
+                    <rect x={0} y={ice} width={320} height={10} fill="var(--ice)" opacity={0.25} />
+                    <line x1={0} y1={ice} x2={320} y2={ice} stroke="var(--ice)" />
                     {[1, 2, 3].map((t) => {
                         const x = at(t);
                         const label = x - lastLabel >= 24;

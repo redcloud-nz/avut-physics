@@ -4,8 +4,8 @@ import { SLING_STIFFNESS } from "./multi-point-anchor-solver";
 /** How the multi-point anchor page works out what it shows, and what it leaves out. */
 export function MultiPointAnchorNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
+            <h2 className="text-base font-medium text-ink">How this is calculated</h2>
 
             <Part title="The setup">
                 <p>
@@ -29,7 +29,7 @@ export function MultiPointAnchorNotes() {
                 </p>
                 <ul className="flex list-disc flex-col gap-1.5 pl-5">
                     <li>
-                        <span className="text-slate-300">Pre-equalised:</span> each anchor has its
+                        <span className="text-ink-soft">Pre-equalised:</span> each anchor has its
                         own leg to the master point, tied off so every leg is just snug with the
                         master point at the cross. The legs can’t change length (other than
                         stretching), so when the load swings, the master point stays nearly where it
@@ -37,7 +37,7 @@ export function MultiPointAnchorNotes() {
                         slack.
                     </li>
                     <li>
-                        <span className="text-slate-300">Sliding:</span> one sling whose strands run
+                        <span className="text-ink-soft">Sliding:</span> one sling whose strands run
                         freely through the master point karabiner, so every strand carries the same
                         tension. With two anchors it’s a sliding X: one strand to each. With three,
                         it’s tied off at the two outer anchors and runs through a karabiner on the

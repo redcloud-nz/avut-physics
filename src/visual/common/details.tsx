@@ -20,7 +20,7 @@ export function Var(props: { color: string; children: React.ReactNode }) {
 export function Section(props: { title: React.ReactNode; children: React.ReactNode }) {
     return (
         <section className="flex flex-col gap-2">
-            <h2 className="font-semibold text-slate-100">{props.title}</h2>
+            <h2 className="font-semibold text-ink-strong">{props.title}</h2>
             {props.children}
         </section>
     );

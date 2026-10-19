@@ -19,12 +19,12 @@ import { TwoPointLowerNotes } from "./two-point-lower-notes";
 import { maxRope, minRope, solveLower, TEAM_HEIGHT } from "./two-point-lower-solver";
 
 const COLORS = {
-    line: "#38bdf8",
-    rope: "#818cf8",
-    bar: "#facc15",
-    component: "#94a3b8",
-    contact: "#34d399",
-    team: "#a3e635",
+    line: "var(--pull)",
+    rope: "var(--rope-tension)",
+    bar: "var(--mass)",
+    component: "var(--ink-muted)",
+    contact: "var(--contact)",
+    team: "var(--team)",
 };
 
 const MAX_ARROW = 200;
@@ -109,14 +109,14 @@ export default function TwoPointLower() {
 
     const scene = (
         <>
-            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="var(--line)" strokeWidth={1.5} />
             <rect
                 x={O.x - anchorBack * PPM}
                 y={wallS.y}
                 width={anchorBack * PPM}
                 height={wallHeight * PPM}
-                fill="#1e293b"
-                stroke="#475569"
+                fill="var(--surface-raised)"
+                stroke="var(--line)"
             />
             {/* post holding the rope's anchor */}
             <line
@@ -124,11 +124,11 @@ export default function TwoPointLower() {
                 y1={wallS.y}
                 x2={anchorS.x}
                 y2={anchorS.y}
-                stroke="#475569"
+                stroke="var(--line)"
                 strokeWidth={4}
                 strokeLinecap="round"
             />
-            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="#cbd5e1" />
+            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="var(--ink-soft)" />
             {/* the ground team, holding the line at their hands */}
             <line
                 x1={teamFootS.x}
@@ -153,7 +153,7 @@ export default function TwoPointLower() {
                 .map((p) => `${p.x},${p.y}`)
                 .join(" ")}
             fill="none"
-            stroke={taut ? "#cbd5e1" : "#94a3b8"}
+            stroke={taut ? "var(--ink-soft)" : "var(--ink-muted)"}
             strokeWidth={1.5}
             strokeDasharray={taut ? undefined : "5 5"}
             strokeLinejoin="round"
@@ -202,7 +202,7 @@ export default function TwoPointLower() {
                 {!l.ropeTaut && (
                     <Label
                         at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))}
-                        color="#94a3b8"
+                        color="var(--ink-muted)"
                     >
                         slack
                     </Label>
@@ -212,7 +212,7 @@ export default function TwoPointLower() {
                     y1={end1S.y}
                     x2={end2S.x}
                     y2={end2S.y}
-                    stroke="#a16207"
+                    stroke="var(--timber)"
                     strokeWidth={BAR_THICKNESS * PPM}
                     strokeLinecap="round"
                 />
@@ -286,11 +286,9 @@ export default function TwoPointLower() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
                         </div>
                     )}
                     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">

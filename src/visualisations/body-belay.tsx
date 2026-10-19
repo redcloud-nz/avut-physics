@@ -30,14 +30,14 @@ import {
 import { TEAM_HEIGHT } from "./two-point-lower-solver";
 
 const COLORS = {
-    line: "#38bdf8",
-    rope: "#818cf8",
-    bar: "#facc15",
-    component: "#94a3b8",
-    contact: "#34d399",
-    team: "#a3e635",
-    belayer: "#fb923c",
-    slipping: "#f87171",
+    line: "var(--pull)",
+    rope: "var(--rope-tension)",
+    bar: "var(--mass)",
+    component: "var(--ink-muted)",
+    contact: "var(--contact)",
+    team: "var(--team)",
+    belayer: "var(--belayer)",
+    slipping: "var(--danger)",
 };
 
 const MAX_ARROW = 200;
@@ -142,14 +142,14 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
 
     const scene = (
         <>
-            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="var(--line)" strokeWidth={1.5} />
             <rect
                 x={O.x - back * PPM}
                 y={wallS.y}
                 width={back * PPM}
                 height={wallHeight * PPM}
-                fill="#1e293b"
-                stroke="#475569"
+                fill="var(--surface-raised)"
+                stroke="var(--line)"
             />
             {/* the ground team, holding the line at their hands */}
             <line
@@ -175,7 +175,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 .map((p) => `${p.x},${p.y}`)
                 .join(" ")}
             fill="none"
-            stroke={taut ? "#cbd5e1" : "#94a3b8"}
+            stroke={taut ? "var(--ink-soft)" : "var(--ink-muted)"}
             strokeWidth={1.5}
             strokeDasharray={taut ? undefined : "5 5"}
             strokeLinejoin="round"
@@ -224,7 +224,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
             <g stroke={color} strokeWidth={4} strokeLinecap="round" fill="none">
                 <line x1={f.x} y1={f.y} x2={sh.x} y2={sh.y} />
                 <circle cx={head.x} cy={head.y} r={0.12 * PPM} fill={color} stroke="none" />
-                <circle cx={w.x} cy={w.y} r={3.5} fill="#cbd5e1" stroke="none" />
+                <circle cx={w.x} cy={w.y} r={3.5} fill="var(--ink-soft)" stroke="none" />
             </g>
         );
     };
@@ -260,7 +260,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 {!l.ropeTaut && (
                     <Label
                         at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))}
-                        color="#94a3b8"
+                        color="var(--ink-muted)"
                     >
                         slack
                     </Label>
@@ -270,7 +270,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                     y1={end1S.y}
                     x2={end2S.x}
                     y2={end2S.y}
-                    stroke="#a16207"
+                    stroke="var(--timber)"
                     strokeWidth={BAR_THICKNESS * PPM}
                     strokeLinecap="round"
                 />
@@ -365,7 +365,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                               <polyline
                                   points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
                                   fill="none"
-                                  stroke="#cbd5e1"
+                                  stroke="var(--ink-soft)"
                                   strokeWidth={1.5}
                               />
                               <line
@@ -387,16 +387,16 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
         const end2 = r && toPlan({ x: r.l.barEnd2.x, z: 0 });
         return (
             <>
-                <rect x={0} y={0} width={face.x} height={planH} fill="#1e293b" />
+                <rect x={0} y={0} width={face.x} height={planH} fill="var(--surface-raised)" />
                 <line
                     x1={face.x}
                     y1={0}
                     x2={face.x}
                     y2={planH}
-                    stroke="#475569"
+                    stroke="var(--line)"
                     strokeWidth={1.5}
                 />
-                <PlanText at={vec2(8, planH - 14)} color="#94a3b8" anchor="start">
+                <PlanText at={vec2(8, planH - 14)} color="var(--ink-muted)" anchor="start">
                     wall top
                 </PlanText>
                 {end1 && end2 && (
@@ -406,7 +406,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             y1={end2.y}
                             x2={team.x}
                             y2={team.y}
-                            stroke="#cbd5e1"
+                            stroke="var(--ink-soft)"
                             strokeWidth={1.5}
                         />
                         <line
@@ -414,7 +414,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             y1={end1.y}
                             x2={end2.x}
                             y2={end2.y}
-                            stroke="#a16207"
+                            stroke="var(--timber)"
                             strokeWidth={Math.max(BAR_THICKNESS * planPpm, 4)}
                             strokeLinecap="round"
                         />
@@ -492,18 +492,16 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
+                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
                             <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
+                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
                         </div>
                     )}
                     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
                         {inBrowser ? diagram : scene}
                     </svg>
                     <div className="flex flex-col gap-1">
-                        <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+                        <h3 className="text-xs font-medium tracking-wide text-ghost uppercase">
                             From above
                         </h3>
                         <svg viewBox={`0 0 ${W} ${planH}`} className="block h-auto w-full">
@@ -755,7 +753,7 @@ function PlanText(props: {
             textAnchor={props.anchor}
             dominantBaseline="middle"
             paintOrder="stroke"
-            stroke="#0f172a"
+            stroke="var(--halo)"
             strokeWidth={4}
         >
             {props.children}
