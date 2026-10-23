@@ -4,7 +4,9 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "next dev",
+    "dev": "bash scripts/dev.sh",
+    "dev:port": "bash scripts/dev-port.sh",
+    "worktree:setup": "bash scripts/worktree-setup.sh",
     "prebuild": "node scripts/figures.mjs --check",
     "build": "next build",
     "start": "next start",

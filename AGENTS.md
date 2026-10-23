@@ -17,13 +17,40 @@ npm run format             # Prettier over everything
 Before calling a change done, run the type check, lint and `npm test`. After touching a solver or
 anything in `src/lib`, run `npm run test:sweep` too.
 
-## Dev server
+## Dev servers
 
-Next allows one `next dev` per checkout; a second one exits with "Another next dev server is
-already running" and names the port the running one is on. If one is running, use it rather than
-starting another (it reloads as files change). Check pages in a browser after changing anything
-the user sees: passing tests don't show that a diagram draws correctly. The article's first load
-compiles for around 20 seconds.
+Every checkout gets its own port, and Next allows one `next dev` per checkout (a second one exits
+with "Another next dev server is already running" and names the port the running one is on). The
+ports sit clear of the `avut` repo's, so both can run at once.
+
+| Port  | Whose                                                                                                                                                           |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3200  | The user's server in the main checkout. Agents may use it but never start it.                                                                                   |
+| 3300  | An agent's server in the main checkout, only when the user's 3200 isn't running: `PORT=3300 npm run dev`. Stop it when you're done, since it blocks the user's. |
+| 3301+ | One fixed port per worktree, in its `.dev-port` (gitignored). `npm run dev` there serves on it.                                                                 |
+
+- Agents may start and stop servers on 3300 and up without asking. Never touch 3200.
+- `npm run dev:port` prints the checkout's port: 3200 in the main checkout, the `.dev-port` in a
+  worktree (allocating one on first use: the lowest free port from 3301).
+- `npm run dev` always passes the port explicitly, so a busy port fails instead of drifting. Off
+  3200, the inspector moves too (port + 6229).
+
+If this checkout's server is running, use it rather than starting another (it reloads as files
+change). Check pages in a browser after changing anything the user sees: passing tests don't show
+that a diagram draws correctly. The article's first load compiles for around 20 seconds.
+
+## Worktrees
+
+- All git worktrees go under `.claude/worktrees/<name>` inside the repo (gitignored, and left out
+  of the type check, ESLint and Prettier). Don't create them beside the repo or anywhere else: one
+  place keeps `git worktree list` and cleanup predictable.
+- Set up a fresh worktree with `npm run worktree:setup` (from inside it, or pass its name). It
+  copies `.env.local`, links `.vercel`, installs dependencies (on macOS by cloning the main
+  checkout's `node_modules`, otherwise `npm ci`), generates route types and allocates the
+  worktree's dev-server port. It's safe to re-run. `.claude/settings.local.json` isn't copied, so
+  expect more permission prompts there.
+- Remove one with `git worktree remove .claude/worktrees/<name>` (add `--force` if it has
+  uncommitted changes, which are lost). If its folder was deleted by hand, run `git worktree prune`.
 
 ## Git
 

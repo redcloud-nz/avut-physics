@@ -54,7 +54,7 @@ Needs Node.js 20.9 or later.
 
 ```bash
 npm install
-npm run dev              # http://localhost:3000
+npm run dev              # http://localhost:3200 (worktrees use their own port, see AGENTS.md)
 ```
 
 | Command              | What it does                                                                       |

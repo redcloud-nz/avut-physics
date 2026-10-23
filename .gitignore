@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# git worktrees of this same repo (AGENTS.md → Worktrees)
+.claude/worktrees/
+
+# per-worktree dev-server port (scripts/dev-port.sh)
+.dev-port
