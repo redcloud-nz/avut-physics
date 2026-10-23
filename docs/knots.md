@@ -5,45 +5,44 @@ they tighten. Work in progress at `/knots`, not listed on the home page.
 
 ## Stages
 
-1. **A loose figure-8** (done). Drawn from its centreline.
+1. **A loose figure-8** (done). Written as SVG path segments, each plain or over.
 2. **Tying it.** An animation of the figure-8 being tied, with hands and a bar.
 3. **Tightening it.** Pulling the ends and watching the knot draw up.
 
-## How a rope is held
+## How a knot is written
 
-A rope (`src/knots/rope.ts`) is its centreline: points evenly spaced along its middle, in metres, with x and y
-in the page's plane and z out of it. z is only ever a rope diameter or so either way, just enough to say which
-strand is on top where the rope crosses itself. All three stages work on this one shape, so whatever moves the
-rope (an authored path, a tying animation, a simulation) only has to produce points.
+For drawing and animating, a rope is SVG path data (`src/knots/rope-path.ts`), in rope diameters with y down
+as in SVG, so a stroke 1 wide is the rope's thickness. It's a list of segments, each a few path commands
+(M, L, H, V, C and A) carrying on from where the last ended, and each either `plain` or `over`. Mark the stretch
+of rope going over at every place it crosses itself, reaching at least a diameter either side; leave the rest
+plain. Over and under are written down, never worked out from the shape.
 
-A knot is authored with `layRope`: the crossings, each named and placed, and the points the rope passes
-through, in order, with `over("waist")` or `under("waist")` where it passes a crossing. The points are smoothed
-with a natural cubic spline (which bends least through them, as a loose rope does) and respaced evenly, and the rope rises over or dips under at each named
-crossing. Over and under are written down, never worked out: the geometry is only used to check that the rope
-crosses itself at the named crossings and nowhere else, and `layRope` throws if it doesn't, or if a crossing
-isn't passed once over and once under.
+The figure-8 (`figure-eight.ts`) is about a dozen segments: half circles (arcs) for the top of the upper loop
+and the bottom of the lower loop, and cubic Béziers for the S-curves through the middle, their control points
+straight above or below their ends so they meet the half circles smoothly. It's laid out upright as it's
+usually shown, both ends running up the middle, and looks the same turned upside down.
 
-The figure-8 is laid out upright as it's usually shown: both ends run up the middle (the standing part from
-the bottom, the tail out of the top) with the two loops stacked between them, the same shape turned upside
-down. Its test reads the crossings back off the drawn rope and works out the knot's
-determinant (`src/knots/invariants.ts`): 5 for a figure-8, 3 for an overhand, 1 for no knot. So a slip in
-the authoring that ties a different knot fails the test.
+`src/lib/svg-path.ts` turns path data into points, so the tests can measure the rope without a browser. They
+read the crossings off the drawn path and check each has exactly one strand marked over, then work out the
+knot's determinant (`src/knots/invariants.ts`): 5 for a figure-8, 3 for an overhand, 1 for no knot. A slip that
+ties a different knot fails the test. They also check that over segments reach a diameter past their crossings,
+that the rope never bends tighter than 1.75 diameters (no corners), and that strands only meet where they cross.
 
 ## Drawing
 
-`RopeDrawing` draws the whole rope once, then draws again every stretch that overlaps another strand on the
-page, lowest first. This doesn't rely on finding crossings, so it should still hold when the knot is tight and
-strands lie side by side or on top of each other. The weave's dashes follow distance along the rope, so once the
-rope moves, offsetting them by how far the rope has slid will show it running through the knot.
+`RopeDrawing` draws the whole path once as a tube (outline, body, the sheath's weave, a highlight), then each
+`over` segment again on top. The redrawn segments have square ends, pick up the weave by their distance along
+the rope, and stop their outlines just short of their ends, so they join the rope underneath without a seam.
+Drawing over segments last is only right while no two of them overlap each other, which holds for a loose
+knot but not a tight one.
 
 ## Next
 
-- **Tying.** Probably keyframes: a handful of centreline shapes from straight rope to loose knot, with the
-  rope between them made by moving its control points, not its sampled points, so it stays smooth and keeps
-  its length. Hands and a bar are SVG props placed by the same keyframes (a hand holds a point some distance
-  along the rope). Over/under has to change as the end passes through, so each keyframe carries its own
-  layers, or the z comes from the animation itself.
-- **Tightening.** A small simulation in 3D (position-based dynamics: keep neighbouring points a fixed distance
+- **Tying.** Keyframes written as rope paths. Two keyframes with the same commands in the same order can be
+  blended by moving their numbers, so each step of the tying is a run of matching keyframes, with its own
+  over flags as the end passes through. Hands and a bar are SVG props placed by the same keyframes (a hand
+  holds a point some distance along the rope). Keeping the rope's length while it moves needs care.
+- **Tightening.** Starts from the path sampled into points along its centreline. A small simulation in 3D (position-based dynamics: keep neighbouring points a fixed distance
   apart, resist bending, keep strands at least a diameter apart, and pull the ends). It has to be in 3D:
   in 2D every crossing is a collision. Many short steps, so the rope can't pass through itself. Friction
   between strands decides how far a knot draws up for a given pull, which is where the physics gets

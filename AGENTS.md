@@ -97,7 +97,7 @@ that a diagram draws correctly. The article's first load compiles for around 20 
   (`src/visual/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
   own overlays) and the articles' `print:` classes.
 - `src/knots/`: knots drawn from their centrelines (work in progress at `/knots`; see
-  `docs/knots.md`). `rope.ts` is the rope model, `rope-drawing.tsx` draws one.
+  `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
     `a.distanceTo(b)`); every operation returns a new vector.
@@ -105,8 +105,8 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     central differences, grid minima, golden-section search, bisection, and the `Matrix` alias
     (row-major `number[][]`). `wall.ts`: the wall the lowers share, its anchor and the rope's path
     over its edge.
-  - `curve.ts`: natural cubic splines, Hermite curves, arc lengths and even resampling along a
-    polyline.
+  - `curve.ts`: arc lengths and even resampling along a polyline. `svg-path.ts`: SVG path data
+    (M, L, H, V, C, A) as points.
   - `math.ts` (`clamp`, `deg`, `rad`, `linearScale`), `constants.ts` (`G`), `format.ts` (units
     for display), `random.ts` (the seeded picker tests use for random setups).
 

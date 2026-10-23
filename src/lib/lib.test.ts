@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { arcLengths, cubicSpline, resample } from "./curve";
+import { arcLengths, resample } from "./curve";
 import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
 import { clamp, linearScale } from "./math";
+import { pathPoints } from "./svg-path";
 import { vec2 } from "./vector2";
 import { vec3 } from "./vector3";
 
@@ -75,22 +76,40 @@ describe("segmentIntersection", () => {
 });
 
 describe("curves", () => {
-    const points = [vec2(0, 0), vec2(1, 2), vec2(3, 2), vec2(4, 0)];
-
-    it("passes through every point it was given", () => {
-        const curve = cubicSpline(points, 8);
-        expect(curve).toHaveLength(1 + 3 * 8);
-        points.forEach((p, i) => {
-            expect(curve[i * 8].x).toBeCloseTo(p.x);
-            expect(curve[i * 8].y).toBeCloseTo(p.y);
-        });
-    });
-
     it("measures and evenly respaces a polyline", () => {
         expect(arcLengths([vec2(0, 0), vec2(3, 4), vec2(3, 5)])).toEqual([0, 5, 6]);
-        const even = resample(cubicSpline(points), 0.1);
+        const even = resample(pathPoints("M 0 0 C 1 2, 3 2, 4 0"), 0.1);
         const gaps = arcLengths(even).map((s, i, all) => (i ? s - all[i - 1] : 0.1));
         expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.002);
         expect(even[even.length - 1].distanceTo(vec2(4, 0))).toBeLessThan(1e-9);
+    });
+});
+
+describe("pathPoints", () => {
+    const end = (d: string) => pathPoints(d).at(-1)!;
+
+    it("follows lines, curves and arcs to where they end", () => {
+        expect(end("M 1 2 L 4 6 H 0 V -1")).toEqual(vec2(0, -1));
+        expect(end("M 0 0 C 0 1, 2 1, 2 0").distanceTo(vec2(2, 0))).toBeLessThan(1e-12);
+        expect(arcLengths(pathPoints("M 0 0 L 3 4")).at(-1)).toBeCloseTo(5);
+    });
+
+    it("draws an arc as part of a circle, the way the flags say", () => {
+        // A half circle of radius 1 from (1, 0) to (-1, 0): sweep 0 goes through y = -1, sweep 1 through y = 1.
+        const up = pathPoints("M 1 0 A 1 1 0 0 0 -1 0");
+        const down = pathPoints("M 1 0 A 1 1 0 0 1 -1 0");
+        for (const p of up) expect(p.len()).toBeCloseTo(1, 9);
+        expect(Math.min(...up.map((p) => p.y))).toBeCloseTo(-1, 3);
+        expect(Math.max(...down.map((p) => p.y))).toBeCloseTo(1, 3);
+        expect(arcLengths(up).at(-1)).toBeCloseTo(Math.PI, 3);
+        // The large-arc flag picks the long way round.
+        const long = pathPoints("M 1 0 A 1 1 0 1 0 0 1");
+        expect(arcLengths(long).at(-1)).toBeCloseTo((3 * Math.PI) / 2, 3);
+    });
+
+    it("carries on from a given point", () => {
+        expect(pathPoints("L 1 0", vec2(0, 0))[0]).toEqual(vec2(0, 0));
+        expect(() => pathPoints("L 1 0")).toThrow(/start with M/);
+        expect(() => pathPoints("M 0 0 Q 1 1 2 2")).toThrow(/Unsupported/);
     });
 });

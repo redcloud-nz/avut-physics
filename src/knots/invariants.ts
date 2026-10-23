@@ -5,7 +5,8 @@
 
 import { determinant } from "@/lib/numeric";
 
-import type { Layer } from "./rope";
+/** Which strand goes on top where the rope crosses itself. */
+export type Layer = "over" | "under";
 
 /** One time the rope passes a crossing: which crossing (numbered from 0), and whether it goes over or under. */
 export type Pass = { crossing: number; layer: Layer };
