@@ -239,3 +239,26 @@ export function bisect(
     }
     return [a, b];
 }
+
+/** The determinant of a small square matrix, by Gaussian elimination with partial pivoting. 1 for an empty one. */
+export function determinant(A: Matrix): number {
+    const n = A.length;
+    const M = A.map((row) => [...row]);
+    let det = 1;
+    for (let col = 0; col < n; col++) {
+        let pivot = col;
+        for (let r = col + 1; r < n; r++)
+            if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+        if (M[pivot][col] === 0) return 0;
+        if (pivot !== col) {
+            [M[col], M[pivot]] = [M[pivot], M[col]];
+            det = -det;
+        }
+        det *= M[col][col];
+        for (let r = col + 1; r < n; r++) {
+            const k = M[r][col] / M[col][col];
+            for (let c = col; c < n; c++) M[r][c] -= k * M[col][c];
+        }
+    }
+    return det;
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { nearestOnSegment, segmentDistance, segmentGap } from "./geometry";
+import { arcLengths, cubicSpline, resample } from "./curve";
+import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
 import { clamp, linearScale } from "./math";
 import { vec2 } from "./vector2";
 import { vec3 } from "./vector3";
@@ -57,5 +58,39 @@ describe("math", () => {
         expect(clamp(5, 0, 1)).toBe(1);
         expect(clamp(-5, 0, 1)).toBe(0);
         expect(linearScale([0, 10], [100, 0])(2.5)).toBe(75);
+    });
+});
+
+describe("segmentIntersection", () => {
+    it("says how far along each segment they cross", () => {
+        const hit = segmentIntersection(vec2(0, 0), vec2(4, 0), vec2(1, -1), vec2(1, 3));
+        expect(hit?.t).toBeCloseTo(0.25);
+        expect(hit?.u).toBeCloseTo(0.25);
+    });
+
+    it("finds nothing for parallel or separate segments", () => {
+        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1))).toBeNull();
+        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(2, -1), vec2(2, 1))).toBeNull();
+    });
+});
+
+describe("curves", () => {
+    const points = [vec2(0, 0), vec2(1, 2), vec2(3, 2), vec2(4, 0)];
+
+    it("passes through every point it was given", () => {
+        const curve = cubicSpline(points, 8);
+        expect(curve).toHaveLength(1 + 3 * 8);
+        points.forEach((p, i) => {
+            expect(curve[i * 8].x).toBeCloseTo(p.x);
+            expect(curve[i * 8].y).toBeCloseTo(p.y);
+        });
+    });
+
+    it("measures and evenly respaces a polyline", () => {
+        expect(arcLengths([vec2(0, 0), vec2(3, 4), vec2(3, 5)])).toEqual([0, 5, 6]);
+        const even = resample(cubicSpline(points), 0.1);
+        const gaps = arcLengths(even).map((s, i, all) => (i ? s - all[i - 1] : 0.1));
+        expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.002);
+        expect(even[even.length - 1].distanceTo(vec2(4, 0))).toBeLessThan(1e-9);
     });
 });

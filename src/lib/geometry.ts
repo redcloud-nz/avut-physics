@@ -32,3 +32,23 @@ export function segmentGap(a: Vector2, b: Vector2, c: Vector2, d: Vector2): numb
         segmentDistance(d, a, b),
     );
 }
+
+/**
+ * Where segments ab and cd cross, as how far along each (t on ab, u on cd, both 0 to 1), or null if they
+ * don't (parallel segments never cross).
+ */
+export function segmentIntersection(
+    a: Vector2,
+    b: Vector2,
+    c: Vector2,
+    d: Vector2,
+): { t: number; u: number } | null {
+    const r = b.sub(a);
+    const s = d.sub(c);
+    const denom = r.cross(s);
+    if (Math.abs(denom) < 1e-15) return null;
+    const ac = c.sub(a);
+    const t = ac.cross(s) / denom;
+    const u = ac.cross(r) / denom;
+    return t > 0 && t < 1 && u > 0 && u < 1 ? { t, u } : null;
+}
