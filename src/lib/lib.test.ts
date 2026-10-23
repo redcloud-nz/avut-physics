@@ -94,6 +94,11 @@ describe("pathPoints", () => {
         expect(arcLengths(pathPoints("M 0 0 L 3 4")).at(-1)).toBeCloseTo(5);
     });
 
+    it("reads numbers written with an exponent", () => {
+        expect(end("M 0 0 L 2e-16 1E+1 -1.5e-3 4")).toEqual(vec2(-0.0015, 4));
+        expect(pathPoints("M 0 0 L 2e-16 1E+1")).toContainEqual(vec2(2e-16, 10));
+    });
+
     it("draws an arc as part of a circle, the way the flags say", () => {
         // A half circle of radius 1 from (1, 0) to (-1, 0): sweep 0 goes through y = -1, sweep 1 through y = 1.
         const up = pathPoints("M 1 0 A 1 1 0 0 0 -1 0");

@@ -4,8 +4,17 @@ import { arcLengths } from "@/lib/curve";
 import type { Vector2 } from "@/lib/vector2";
 
 import { FIGURE_EIGHT } from "./figure-eight";
+import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
 import { knotDeterminant, type Pass } from "./invariants";
-import { centreline, crossings, over, plain, type RopePath } from "./rope-path";
+import {
+    centreline,
+    crossings,
+    firstPart,
+    over,
+    plain,
+    ropeLength,
+    type RopePath,
+} from "./rope-path";
 
 /** The rope's passes in order along it, read off where its centreline crosses itself and which strand is marked over. */
 function passesOf(path: RopePath): Pass[] {
@@ -128,5 +137,42 @@ describe("FIGURE_EIGHT", () => {
             for (let j = i; j < points.length; j++)
                 if (s[j] - s[i] > 3 && !nearCrossing(i) && !nearCrossing(j))
                     expect(points[i].distanceTo(points[j])).toBeGreaterThan(1);
+    });
+});
+
+describe("firstPart", () => {
+    const length = ropeLength(FIGURE_EIGHT);
+
+    it("is as long as asked, and follows the whole rope's path", () => {
+        const whole = centreline(FIGURE_EIGHT).points;
+        for (const k of [0.5, 3, 9.2, 20, length / 2, length - 0.01]) {
+            const part = firstPart(FIGURE_EIGHT, k);
+            expect(ropeLength(part)).toBeCloseTo(k, 6);
+            const end = centreline(part).points.at(-1)!;
+            expect(Math.min(...whole.map((p) => p.distanceTo(end)))).toBeLessThan(0.05);
+        }
+        expect(firstPart(FIGURE_EIGHT, length + 1)).toEqual(FIGURE_EIGHT);
+    });
+
+    it("has one strand over at every crossing, all the way through tying", () => {
+        for (let k = 1; k <= length; k += 0.25)
+            for (const c of crossings(firstPart(FIGURE_EIGHT, k))) expect(c.over).not.toBeNull();
+    });
+});
+
+describe("FIGURE_EIGHT_TYING", () => {
+    it("ends at the figure-8", () => {
+        expect(FIGURE_EIGHT_TYING.at(-1)!.path).toEqual(FIGURE_EIGHT);
+    });
+
+    it("adds crossings as it goes, each with one strand over", () => {
+        const found = FIGURE_EIGHT_TYING.map((step) => crossings(step.path));
+        expect(found.map((c) => c.length)).toEqual([0, 1, 2, 3, 4]);
+        for (const c of found.flat()) expect(c.over).not.toBeNull();
+    });
+
+    it("bends smoothly at every step", () => {
+        for (const step of FIGURE_EIGHT_TYING)
+            expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
     });
 });

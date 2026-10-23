@@ -6,7 +6,7 @@ they tighten. Work in progress at `/knots`, not listed on the home page.
 ## Stages
 
 1. **A loose figure-8** (done). Written as SVG path segments, each plain or over.
-2. **Tying it.** An animation of the figure-8 being tied, with hands and a bar.
+2. **Tying it.** The figure-8 being tied, step by step, with hands and a bar (animated later).
 3. **Tightening it.** Pulling the ends and watching the knot draw up.
 
 ## How a knot is written
@@ -38,10 +38,12 @@ knot but not a tight one.
 
 ## Next
 
-- **Tying.** Keyframes written as rope paths. Two keyframes with the same commands in the same order can be
-  blended by moving their numbers, so each step of the tying is a run of matching keyframes, with its own
-  over flags as the end passes through. Hands and a bar are SVG props placed by the same keyframes (a hand
-  holds a point some distance along the rope). Keeping the rope's length while it moves needs care.
+- **Tying.** Shown as people tie it, by twisting a loop: `figure-eight-tying.ts` has the steps as still
+  frames (a straight rope, a loop, the loop given half a turn into an 8, the end up in front, the end through
+  the top), stepped through one at a time. Animating between them is left for later; the likely way is to
+  match steps by distance along the rope (which needs every step to be the same length of rope). `firstPart` (the rope cut at a length along it) is kept for
+  retracing a follow-through and for cutting blended frames to the rope's length. Hands and a bar as SVG props
+  come after that.
 - **Tightening.** Starts from the path sampled into points along its centreline. A small simulation in 3D (position-based dynamics: keep neighbouring points a fixed distance
   apart, resist bending, keep strands at least a diameter apart, and pull the ends). It has to be in 3D:
   in 2D every crossing is a collision. Many short steps, so the rope can't pass through itself. Friction

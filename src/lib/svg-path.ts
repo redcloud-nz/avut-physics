@@ -10,12 +10,12 @@ const ARITY: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, A: 7 };
 
 /** The commands in `d`, each with its numbers. Repeated arguments after a command repeat it (after M, as L). */
 function parse(d: string): { command: string; args: number[] }[] {
-    const tokens = d.match(/[a-zA-Z]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g) ?? [];
+    const tokens = d.match(/[a-df-zA-DF-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) ?? [];
     const out: { command: string; args: number[] }[] = [];
     let i = 0;
     let command = "";
     while (i < tokens.length) {
-        if (/[a-zA-Z]/.test(tokens[i])) command = tokens[i++];
+        if (/^[a-zA-Z]$/.test(tokens[i])) command = tokens[i++];
         const arity = ARITY[command];
         if (arity === undefined)
             throw new Error(`Unsupported path command "${command}" in "${d}".`);
