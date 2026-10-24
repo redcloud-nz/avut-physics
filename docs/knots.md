@@ -44,7 +44,9 @@ knot but not a tight one.
   rope between them and any direction a pin holds, with the rope between the pins solved as the smoothest
   curve of that length. They're kept in `figure-eight-tying.json` and laid out in the rope editor at
   `/knots/edit` (development only), which saves every change straight into that file and picks up changes
-  made to it elsewhere. Animating between them is left for later; the likely way is to
+  made to it elsewhere. A step can carry arrows (smooth curves through a few points, with a head at the last)
+  showing where the rope goes next, and a step in between, the same rope as the one before with arrows on it,
+  shows a move on its own; marked as continuing it, the step after keeps the same number ("Step 2 (cont.)"). Animating between them is left for later; the likely way is to
   match steps by distance along the rope (which needs every step to be the same length of rope). `firstPart` (the rope cut at a length along it) is kept for
   retracing a follow-through and for cutting blended frames to the rope's length. Hands and a bar as SVG props
   come after that.

@@ -7,17 +7,37 @@
  * and a change made to that file elsewhere shows here as soon as the dev server reloads it, so the steps can be
  * worked on from either side.
  */
-import { ChevronLeft, ChevronRight, Save, Undo2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CopyPlus, Save, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { Button } from "@/components/ui/button";
 import { vec2, Vector2 } from "@/lib/vector2";
 
-import { TYING_DATA, TYING_DRAFTS, tyingView, type TyingStepData } from "./figure-eight-tying";
+import {
+    stepLabel,
+    TYING_DATA,
+    TYING_DRAFTS,
+    tyingView,
+    type TyingStepData,
+} from "./figure-eight-tying";
 import { ropeCrossings, ropePathOf, solveRope, type RopeShape } from "./pinned-rope";
 import { RopeDrawing } from "./rope-drawing";
-import { addPin, flipCrossing, movePin, removePin, setAngle, setLengthAfter } from "./rope-edits";
+import {
+    addArrow,
+    addPin,
+    flipCrossing,
+    moveArrowPoint,
+    movePin,
+    removeArrow,
+    removePin,
+    resizeArrow,
+    setAngle,
+    setArrowFront,
+    setLengthAfter,
+} from "./rope-edits";
+import { ropeEnd } from "./rope-path";
+import { arrowShape, TyingArrow, type Arrow } from "./tying-arrow";
 
 /** The working area: the page's frame and room round it, down to where the standing part starts. */
 const VIEW = { x: -16, y: -19, w: 32, h: 41 };
@@ -27,7 +47,10 @@ const HANDLE = 2.5;
 
 const deg = (rad: number) => (rad * 180) / Math.PI;
 
-type Drag = { kind: "pin" | "angle"; index: number };
+/** What's being dragged: a pin, a pin's direction handle, or point `point` of an arrow. */
+type Drag =
+    | { kind: "pin" | "angle"; index: number }
+    | { kind: "arrow"; index: number; point: number };
 
 /** A number that's typed in and taken when Enter's pressed or the field's left. */
 function NumberField(props: {
@@ -66,6 +89,9 @@ function NumberField(props: {
 /** The steps being edited, and each one's rope solved. */
 type Editing = { steps: TyingStepData[]; shapes: RopeShape[] };
 
+/** What undo goes back to: the steps as they were being edited, and as saved. */
+type Snapshot = { ed: Editing; approved: TyingStepData[] };
+
 const editing = (steps: TyingStepData[]): Editing => ({
     steps,
     shapes: steps.map((step) => solveRope(step)),
@@ -100,9 +126,12 @@ function Editor() {
     const [ed, setEd] = useState(() => editing(working(TYING_DATA, TYING_DRAFTS)));
     /** The steps as saved: what the knots page shows. */
     const [approved, setApproved] = useState(TYING_DATA);
-    const [history, setHistory] = useState<Editing[]>([]);
-    const [k, setK] = useState(0);
+    const [history, setHistory] = useState<Snapshot[]>([]);
+    const [wanted, setK] = useState(0);
+    /** The step shown, kept in range as steps are removed. */
+    const k = Math.min(wanted, ed.steps.length - 1);
     const [selected, setSelected] = useState<number | null>(null);
+    const [selectedArrow, setSelectedArrow] = useState<number | null>(null);
     const [labels, setLabels] = useState(true);
     const [status, setStatus] = useState("");
     const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
@@ -123,16 +152,20 @@ function Editor() {
         const text = fileText(current, TYING_DATA);
         if (text !== saved) {
             setSaved(text);
-            setHistory([...history, ed]);
+            setHistory([...history, { ed, approved }]);
             setEd(editing(current));
             setApproved(TYING_DATA);
             setSelected(null);
+            setSelectedArrow(null);
             setStatus("Reloaded from the file");
         }
     }
 
     const step = ed.steps[k];
     const shape = ed.shapes[k];
+    const arrows = step.arrows ?? [];
+    const arrowIndex =
+        selectedArrow !== null && selectedArrow < arrows.length ? selectedArrow : null;
     const path = useMemo(() => ropePathOf(step, shape), [step, shape]);
     const crossingsHere = useMemo(() => ropeCrossings(step, shape), [step, shape]);
     const frame = tyingView(ed.shapes.map((s) => s.points));
@@ -165,7 +198,7 @@ function Editor() {
             setStatus("The pins are further apart than the rope between them");
             return false;
         }
-        if (opts.record !== false) setHistory([...history, ed]);
+        if (opts.record !== false) setHistory([...history, { ed, approved }]);
         const updated = {
             steps: ed.steps.map((s, i) => (i === k ? next : s)),
             shapes: ed.shapes.map((s, i) => (i === k ? solved : s)),
@@ -188,9 +221,53 @@ function Editor() {
         const previous = history.at(-1);
         if (!previous) return;
         setHistory(history.slice(0, -1));
-        setEd(previous);
+        setEd(previous.ed);
+        setApproved(previous.approved);
         setSelected(null);
-        void save(previous.steps);
+        setSelectedArrow(null);
+        void save(previous.ed.steps, previous.approved);
+    };
+
+    /** Add a copy of this step after it, saved as it is now, and go to it. */
+    const addStep = () => {
+        const insert = <T,>(list: T[], item: T) => [
+            ...list.slice(0, k + 1),
+            item,
+            ...list.slice(k + 1),
+        ];
+        setHistory([...history, { ed, approved }]);
+        const next = { steps: insert(ed.steps, step), shapes: insert(ed.shapes, shape) };
+        const nextApproved = insert(approved, step);
+        setEd(next);
+        setApproved(nextApproved);
+        setK(k + 1);
+        setSelected(null);
+        setSelectedArrow(null);
+        void save(next.steps, nextApproved);
+    };
+
+    /** Take this step out, saved version and draft both. */
+    const removeStep = () => {
+        const drop = <T,>(list: T[]) => list.filter((_, i) => i !== k);
+        setHistory([...history, { ed, approved }]);
+        const next = { steps: drop(ed.steps), shapes: drop(ed.shapes) };
+        const nextApproved = drop(approved);
+        setEd(next);
+        setApproved(nextApproved);
+        setSelected(null);
+        setSelectedArrow(null);
+        void save(next.steps, nextApproved);
+    };
+
+    /** Add an arrow carrying on from the rope's end, and select it. */
+    const newArrow = () => {
+        const end = ropeEnd(path);
+        const along = (d: number) => end.at.add(end.heading.scale(d));
+        const { rope, index } = addArrow(step, [along(0.8), along(3.5), along(6)]);
+        if (change(rope)) {
+            setSelected(null);
+            setSelectedArrow(index);
+        }
     };
 
     useEffect(() => {
@@ -199,6 +276,10 @@ function Editor() {
             if ((e.metaKey || e.ctrlKey) && e.key === "z") {
                 e.preventDefault();
                 undo();
+            } else if ((e.key === "Delete" || e.key === "Backspace") && arrowIndex !== null) {
+                e.preventDefault();
+                change(removeArrow(step, arrowIndex));
+                setSelectedArrow(null);
             } else if (
                 (e.key === "Delete" || e.key === "Backspace") &&
                 selected !== null &&
@@ -225,7 +306,7 @@ function Editor() {
     const startDrag = (e: React.PointerEvent, d: Drag, record = true) => {
         e.stopPropagation();
         svgRef.current!.setPointerCapture(e.pointerId);
-        if (record) setHistory([...history, ed]);
+        if (record) setHistory([...history, { ed, approved }]);
         drag.current = d;
     };
 
@@ -236,9 +317,11 @@ function Editor() {
         if (!d) return;
         const pin = step.pins[d.index];
         const next =
-            d.kind === "pin"
-                ? movePin(step, d.index, p.x, p.y)
-                : setAngle(step, d.index, deg(Math.atan2(p.y - pin.y, p.x - pin.x)));
+            d.kind === "arrow"
+                ? moveArrowPoint(step, d.index, d.point, p.x, p.y)
+                : d.kind === "pin"
+                  ? movePin(step, d.index, p.x, p.y)
+                  : setAngle(step, d.index, deg(Math.atan2(p.y - pin.y, p.x - pin.x)));
         change(next, { record: false, persist: false });
     };
 
@@ -259,6 +342,7 @@ function Editor() {
         const { rope, index } = addPin(step, shape, node);
         if (rope !== step && !change(rope)) return;
         setSelected(index);
+        setSelectedArrow(null);
         // Adding the pin went into the history already; dragging it straight away is part of the same change.
         startDrag(e, { kind: "pin", index }, rope === step);
     };
@@ -282,6 +366,14 @@ function Editor() {
         return deg(Math.atan2(b.y - a.y, b.x - a.x));
     };
 
+    const drawArrow = (arrow: Arrow, a: number) => (
+        <TyingArrow
+            key={`a${a}`}
+            points={arrow.points}
+            color={a === arrowIndex ? "#0ea5e9" : undefined}
+        />
+    );
+
     const label = {
         fontSize: 0.8,
         fill: "#e2e8f0",
@@ -300,7 +392,10 @@ function Editor() {
                     onPointerMove={onMove}
                     onPointerUp={endDrag}
                     onPointerCancel={endDrag}
-                    onPointerDown={() => setSelected(null)}
+                    onPointerDown={() => {
+                        setSelected(null);
+                        setSelectedArrow(null);
+                    }}
                     onPointerLeave={() => setPointer(null)}
                 >
                     {/* A grid a diameter apart, stronger every 5, with the numbers along the left and top. */}
@@ -354,7 +449,10 @@ function Editor() {
                         strokeDasharray="0.4 0.3"
                     />
 
+                    {/* Arrows go behind the rope unless they're marked in front, as on the knots page. */}
+                    {arrows.map((arrow, a) => !arrow.front && drawArrow(arrow, a))}
                     <RopeDrawing path={path} />
+                    {arrows.map((arrow, a) => arrow.front && drawArrow(arrow, a))}
                     {/* Clicking the rope pins it there. */}
                     <polyline
                         points={shape.points.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -478,6 +576,43 @@ function Editor() {
                             />
                         </g>
                     )}
+
+                    {arrows.map(({ points }, a) => (
+                        <g
+                            key={`a${a}`}
+                            style={{ cursor: "pointer" }}
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                                setSelected(null);
+                                setSelectedArrow(a);
+                            }}
+                        >
+                            {/* A wider, unseen line along the arrow (drawn behind the rope), so it's easy to click. */}
+                            <path
+                                d={arrowShape(points)?.d}
+                                fill="none"
+                                stroke="transparent"
+                                strokeWidth={1.2}
+                                style={{ pointerEvents: "stroke" }}
+                            />
+                        </g>
+                    ))}
+                    {arrowIndex !== null &&
+                        arrows[arrowIndex].points.map((p, j) => (
+                            <circle
+                                key={`ap${j}`}
+                                cx={p.x}
+                                cy={p.y}
+                                r={0.4}
+                                fill="#0ea5e9"
+                                stroke="#f8fafc"
+                                strokeWidth={0.1}
+                                style={{ cursor: "grab" }}
+                                onPointerDown={(e) =>
+                                    startDrag(e, { kind: "arrow", index: arrowIndex, point: j })
+                                }
+                            />
+                        ))}
                 </svg>
             }
             controls={
@@ -489,6 +624,7 @@ function Editor() {
                             onClick={() => {
                                 setK(k - 1);
                                 setSelected(null);
+                                setSelectedArrow(null);
                             }}
                             disabled={k === 0}
                             aria-label="Previous step"
@@ -496,7 +632,7 @@ function Editor() {
                             <ChevronLeft />
                         </Button>
                         <span className="flex-1 text-center text-sm text-slate-300">
-                            Step {k + 1} of {ed.steps.length}
+                            {stepLabel(ed.steps, k)}
                         </span>
                         <Button
                             variant="outline"
@@ -504,11 +640,25 @@ function Editor() {
                             onClick={() => {
                                 setK(k + 1);
                                 setSelected(null);
+                                setSelectedArrow(null);
                             }}
                             disabled={k === ed.steps.length - 1}
                             aria-label="Next step"
                         >
                             <ChevronRight />
+                        </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={addStep}>
+                            <CopyPlus /> Add step after
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={removeStep}
+                            disabled={ed.steps.length === 1}
+                        >
+                            <Trash2 /> Remove step
                         </Button>
                     </div>
                     <div className="flex items-center gap-2">
@@ -532,7 +682,9 @@ function Editor() {
                             Also changed:{" "}
                             {ed.steps
                                 .map((s, i) =>
-                                    i !== k && !same(s, approved[i]) ? `step ${i + 1}` : null,
+                                    i !== k && !same(s, approved[i])
+                                        ? stepLabel(ed.steps, i)
+                                        : null,
                                 )
                                 .filter(Boolean)
                                 .join(", ")}
@@ -547,6 +699,15 @@ function Editor() {
                             change({ ...step, caption: e.target.value })
                         }
                         className="rounded border border-slate-700 bg-slate-950 p-2 text-sm text-slate-200"
+                    />
+                    <Toggle
+                        label="Continues the step before (same number)"
+                        checked={!!step.continues}
+                        onChange={(on) => {
+                            const next: TyingStepData = { ...step, continues: on };
+                            if (!on) delete next.continues;
+                            change(next);
+                        }}
                     />
 
                     {pin && pinIndex !== null ? (
@@ -620,14 +781,58 @@ function Editor() {
                                 Remove pin
                             </Button>
                         </div>
+                    ) : arrowIndex !== null ? (
+                        <div className="flex flex-col gap-2">
+                            <h2 className="text-sm font-semibold text-slate-100">
+                                Arrow {arrowIndex + 1}
+                            </h2>
+                            <p className="text-sm text-slate-400">
+                                Drag its points to shape it; the head is at the last one.
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => change(resizeArrow(step, arrowIndex, true))}
+                                >
+                                    Add point
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={arrows[arrowIndex].points.length <= 2}
+                                    onClick={() => change(resizeArrow(step, arrowIndex, false))}
+                                >
+                                    Remove point
+                                </Button>
+                            </div>
+                            <Toggle
+                                label="In front of the rope"
+                                checked={!!arrows[arrowIndex].front}
+                                onChange={(on) => change(setArrowFront(step, arrowIndex, on))}
+                            />
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    change(removeArrow(step, arrowIndex));
+                                    setSelectedArrow(null);
+                                }}
+                            >
+                                Remove arrow
+                            </Button>
+                        </div>
                     ) : (
                         <p className="text-sm text-slate-400">
                             Click the rope to pin it there, and drag pins to move them. Select a pin
                             to hold its direction or change the rope either side. Click a crossing
-                            to swap which strand is on top.
+                            to swap which strand is on top. Add an arrow to show where the rope goes
+                            next, and add a step after this one to show it in a step of its own.
                         </p>
                     )}
 
+                    <Button variant="outline" onClick={newArrow}>
+                        Add arrow
+                    </Button>
                     <Toggle
                         label="Show numbers and lengths"
                         checked={labels}

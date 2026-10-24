@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { solveRope, type PinnedRope } from "./pinned-rope";
-import { addPin, flipCrossing, removePin, setAngle, setLengthAfter } from "./rope-edits";
+import {
+    addArrow,
+    addPin,
+    flipCrossing,
+    moveArrowPoint,
+    removeArrow,
+    removePin,
+    resizeArrow,
+    setAngle,
+    setArrowFront,
+    setLengthAfter,
+} from "./rope-edits";
+import type { Arrow } from "./tying-arrow";
 
 const ROPE: PinnedRope = {
     pins: [
@@ -53,5 +65,30 @@ describe("rope edits", () => {
         expect(once.over).toEqual([5]);
         const twice = flipCrossing(once, { ...crossing, over: 0 });
         expect(twice.over).toEqual([20]);
+    });
+
+    it("adds, moves, lengthens, shortens, brings forward and removes arrows", () => {
+        const { rope, index } = addArrow<PinnedRope & { arrows?: Arrow[] }>(ROPE, [
+            { x: 0, y: -11.004 },
+            { x: 0, y: -13 },
+        ]);
+        expect(index).toBe(0);
+        expect(rope.arrows).toEqual([
+            {
+                points: [
+                    { x: 0, y: -11 },
+                    { x: 0, y: -13 },
+                ],
+            },
+        ]);
+        const longer = resizeArrow(rope, 0, true);
+        expect(longer.arrows![0].points.at(-1)).toEqual({ x: 0, y: -15 });
+        expect(resizeArrow(longer, 0, false)).toEqual(rope);
+        expect(resizeArrow(rope, 0, false)).toEqual(rope);
+        expect(moveArrowPoint(rope, 0, 1, 2, -12).arrows![0].points[1]).toEqual({ x: 2, y: -12 });
+        const front = setArrowFront(rope, 0, true);
+        expect(front.arrows![0].front).toBe(true);
+        expect(setArrowFront(front, 0, false)).toEqual(rope);
+        expect(removeArrow(rope, 0)).toEqual(ROPE);
     });
 });

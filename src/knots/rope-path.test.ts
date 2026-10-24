@@ -168,7 +168,11 @@ describe("FIGURE_EIGHT_TYING", () => {
 
     it("adds crossings as it goes, each with one strand over", () => {
         const found = FIGURE_EIGHT_TYING.map((step) => crossings(step.path));
-        expect(found.map((c) => c.length)).toEqual([0, 1, 2, 3, 4]);
+        // Steps in between, showing the next move with arrows, can repeat a count but never lose a crossing.
+        const counts = found.map((c) => c.length);
+        expect(counts[0]).toBe(0);
+        expect(counts.at(-1)).toBe(4);
+        counts.slice(1).forEach((n, i) => expect(n).toBeGreaterThanOrEqual(counts[i]));
         for (const c of found.flat()) expect(c.over).not.toBeNull();
     });
 
