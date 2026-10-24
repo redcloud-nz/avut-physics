@@ -53,7 +53,7 @@ function FrictionMore() {
             <Section title="Worse pulleys, more pulleys">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="text-slate-400">
+                        <thead className="text-ink-muted">
                             <tr>
                                 <th className="py-1 pr-3 font-normal">Each passes on</th>
                                 <th className="py-1 pr-3 font-normal">Z-rig</th>
@@ -62,10 +62,10 @@ function FrictionMore() {
                         </thead>
                         <tbody>
                             {ROWS.map(({ e, what }) => (
-                                <tr key={e} className="border-t border-slate-800">
+                                <tr key={e} className="border-t border-border">
                                     <td className="py-1 pr-3">
                                         {Math.round(e * 100)}%{" "}
-                                        <span className="text-slate-400">({what})</span>
+                                        <span className="text-ink-muted">({what})</span>
                                     </td>
                                     <td className="py-1 pr-3">{advantage(3, e).toFixed(1)}:1</td>
                                     <td className="py-1">{advantage(5, e).toFixed(1)}:1</td>

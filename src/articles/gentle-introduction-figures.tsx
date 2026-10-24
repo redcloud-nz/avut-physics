@@ -49,7 +49,7 @@ export function Tag(props: {
             dominantBaseline="middle"
             paintOrder="stroke"
             strokeWidth={4}
-            className="stroke-slate-950 print:stroke-white"
+            className="stroke-background print:stroke-white"
         >
             {props.children}
         </text>
@@ -60,11 +60,11 @@ export function Tag(props: {
 export function Figure(props: { id: string; caption: React.ReactNode; children: React.ReactNode }) {
     return (
         <figure
-            className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/30 p-3 sm:p-4 print:break-inside-avoid print:border-slate-400 print:bg-transparent"
+            className="flex flex-col gap-3 rounded-xl border border-border bg-surface/30 p-3 sm:p-4 print:break-inside-avoid print:border-slate-400 print:bg-transparent"
             aria-labelledby={`${props.id}-caption`}
         >
             {props.children}
-            <figcaption id={`${props.id}-caption`} className="text-sm text-slate-400">
+            <figcaption id={`${props.id}-caption`} className="text-sm text-ink-muted">
                 {props.caption}
             </figcaption>
         </figure>
@@ -136,7 +136,7 @@ export function ForcesFigure() {
             id="forces"
             caption={
                 <>
-                    <strong className="text-slate-300">Figure 1.</strong> Left: a load hanging still
+                    <strong className="text-ink-soft">Figure 1.</strong> Left: a load hanging still
                     on a rope. Its weight pulls it down, and the rope pulls it up just as hard.
                     Middle: the same load pulled to one side by a tag line. The rope leans over
                     until the three pulls balance, and it now pulls harder than the load weighs.
@@ -149,7 +149,7 @@ export function ForcesFigure() {
             <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start">
                 <svg
                     viewBox="0 0 340 230"
-                    className="w-full text-slate-400 sm:w-[62%]"
+                    className="w-full text-ink-muted sm:w-[62%]"
                     fontSize={13}
                     role="img"
                     aria-labelledby="forces-caption"
@@ -193,7 +193,7 @@ export function ForcesFigure() {
                 </svg>
                 <svg
                     viewBox="370 30 160 140"
-                    className="w-full max-w-56 text-slate-400 sm:w-[38%] sm:max-w-none"
+                    className="w-full max-w-56 text-ink-muted sm:w-[38%] sm:max-w-none"
                     fontSize={13}
                     aria-hidden
                 >
@@ -289,7 +289,7 @@ export function PythagorasFigure() {
         >
             <svg
                 viewBox="10 0 252 214"
-                className="mx-auto w-full max-w-xs text-slate-400"
+                className="mx-auto w-full max-w-xs text-ink-muted"
                 fontSize={12}
                 role="img"
                 aria-labelledby="pythagoras-caption"
@@ -354,7 +354,7 @@ export function LegPartsFigure() {
         >
             <svg
                 viewBox="60 25 360 225"
-                className="mx-auto w-full max-w-lg text-slate-400"
+                className="mx-auto w-full max-w-lg text-ink-muted"
                 fontSize={13}
                 role="img"
                 aria-labelledby="leg-parts-caption"
@@ -428,10 +428,10 @@ export function TwoLegsFigure() {
             id="two-legs"
             caption={
                 <>
-                    <strong className="text-slate-300">Figure 2.</strong> A load hanging from two
+                    <strong className="text-ink-soft">Figure 2.</strong> A load hanging from two
                     anchors, one leg to each. The arrows at the anchors show how hard each leg pulls
                     on its anchor. Each leg holds{" "}
-                    <strong className="text-slate-200">{percent(share)}</strong> of the load: on a{" "}
+                    <strong className="text-ink">{percent(share)}</strong> of the load: on a{" "}
                     {LOAD_KG} kg load, {ofLoad(share)} in each leg.
                     {angle > 0 && (
                         <>
@@ -445,7 +445,7 @@ export function TwoLegsFigure() {
         >
             <svg
                 viewBox="0 0 480 300"
-                className="w-full text-slate-400"
+                className="w-full text-ink-muted"
                 fontSize={13}
                 role="img"
                 aria-labelledby="two-legs-caption"
@@ -531,12 +531,12 @@ export function SwingFigure() {
             id="swing"
             caption={
                 <>
-                    <strong className="text-slate-300">Figure 3.</strong> A pre-equalised anchor:
-                    two anchors 1 m apart, each with a 1 m leg, so the legs are 60° apart. The main
-                    line pulls {swing}° off straight down, to the right. The arrows at the anchors
-                    show how hard each is pulled, as a share of the load: the left anchor takes{" "}
-                    <strong className="text-slate-200">{percent(s.shares[0])}</strong> and the right{" "}
-                    <strong className="text-slate-200">{percent(s.shares[1])}</strong>.
+                    <strong className="text-ink-soft">Figure 3.</strong> A pre-equalised anchor: two
+                    anchors 1 m apart, each with a 1 m leg, so the legs are 60° apart. The main line
+                    pulls {swing}° off straight down, to the right. The arrows at the anchors show
+                    how hard each is pulled, as a share of the load: the left anchor takes{" "}
+                    <strong className="text-ink">{percent(s.shares[0])}</strong> and the right{" "}
+                    <strong className="text-ink">{percent(s.shares[1])}</strong>.
                     {moved > 0.005 && (
                         <>
                             {" "}
@@ -549,7 +549,7 @@ export function SwingFigure() {
         >
             <svg
                 viewBox="0 0 300 220"
-                className="mx-auto w-full max-w-md text-slate-400"
+                className="mx-auto w-full max-w-md text-ink-muted"
                 fontSize={13}
                 role="img"
                 aria-labelledby="swing-caption"
@@ -666,18 +666,18 @@ export function RedirectFigure() {
             id="redirect"
             caption={
                 <>
-                    <strong className="text-slate-300">Figure 4.</strong> A rope holding a{" "}
+                    <strong className="text-ink-soft">Figure 4.</strong> A rope holding a{" "}
                     {LOAD_KG / 2} kg load turns round a karabiner on a redirect, with its two parts{" "}
                     {angle}° apart. Each part pulls on the karabiner with the rope’s tension. The
                     dashed arrow is the two together: the redirect holds{" "}
-                    <strong className="text-slate-200">{percent(share)}</strong> of the rope’s
-                    tension, {ofLoad(share, LOAD_KG / 2)}.
+                    <strong className="text-ink">{percent(share)}</strong> of the rope’s tension,{" "}
+                    {ofLoad(share, LOAD_KG / 2)}.
                 </>
             }
         >
             <svg
                 viewBox="70 20 340 280"
-                className="w-full text-slate-400"
+                className="w-full text-ink-muted"
                 fontSize={13}
                 role="img"
                 aria-labelledby="redirect-caption"

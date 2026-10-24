@@ -101,7 +101,7 @@ export function SetupDiagram() {
         <figure className="flex flex-col gap-2 print:break-inside-avoid">
             <svg
                 viewBox={`0 0 ${W} ${H}`}
-                className="w-full text-slate-400"
+                className="w-full text-ink-muted"
                 fontSize={14}
                 role="img"
                 aria-labelledby="setup-caption"
@@ -147,7 +147,7 @@ export function SetupDiagram() {
 
                 {/* The rope and the ground team's line. */}
                 <g
-                    className="text-sky-400 print:text-black"
+                    className="text-figure-accent print:text-black"
                     stroke="currentColor"
                     strokeWidth={2}
                     fill="none"
@@ -162,14 +162,14 @@ export function SetupDiagram() {
                     y1={Y(l.barEnd1.y)}
                     x2={X(l.barEnd2.x)}
                     y2={Y(l.barEnd2.y)}
-                    className="text-slate-100 print:text-black"
+                    className="text-ink-strong print:text-black"
                     stroke="currentColor"
                     strokeWidth={7}
                     strokeLinecap="round"
                 />
 
                 {/* The people: one belayer (the other is beside them, hidden behind), and the ground team. */}
-                <g className="text-slate-200 print:text-black">
+                <g className="text-ink print:text-black">
                     <Person feet={feet} toward={waist} hands={along(waist, rope[1], 0.35)} />
                     <Person feet={teamFeet} toward={vec2(teamFeet.x + 0.25, 1)} hands={l.team} />
                 </g>
@@ -194,7 +194,7 @@ export function SetupDiagram() {
                 />
 
                 {/* Labels. */}
-                <g fill="currentColor" className="text-slate-300 print:text-black">
+                <g fill="currentColor" className="text-ink-soft print:text-black">
                     <text x={X(-3.3)} y={Y(4.75)}>
                         Two belayers, {DEFAULTS.belayerMass} kg each,
                     </text>
@@ -215,8 +215,8 @@ export function SetupDiagram() {
                     </text>
                 </g>
             </svg>
-            <figcaption id="setup-caption" className="text-sm text-slate-400">
-                <strong className="font-medium text-slate-300">Figure 1.</strong> The lower, held
+            <figcaption id="setup-caption" className="text-sm text-ink-muted">
+                <strong className="font-medium text-ink-soft">Figure 1.</strong> The lower, held
                 still just after the stretcher has gone over the edge, when the ropes carry the
                 most, side on and to scale. The second belayer stands beside the first, hidden
                 behind them. Each rope runs from a belayer’s waist, over the roof’s edge, to the

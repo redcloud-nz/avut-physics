@@ -1,16 +1,20 @@
-import { Part } from "./ladder-hinge-notes";
+import { NotesCard, Part } from "@/components/notes";
+
 import {
     BALL_PAST_BUMPER,
     BULLBAR_DEPTH,
     CAB,
     DIESEL,
+    NEAR,
     TAILGATE,
     TARE_FUEL,
 } from "./ute-load-solver";
-import { FITOUTS, type Ute } from "./ute-load-vehicles";
+import { FITOUTS, UTES, type Ute } from "./ute-load-vehicles";
 
-/** A rating counts as nearly reached from this share of it. */
-export const NEAR = 0.9;
+/** The ute with the least room on its front axle when empty, by the assumed share. */
+const TIGHTEST = UTES.reduce((a, b) =>
+    b.frontAxle - b.tare * b.unladenFrontShare < a.frontAxle - a.tare * a.unladenFrontShare ? b : a,
+);
 
 const FIGURES: { key: keyof Ute; label: string; format: (u: Ute) => string }[] = [
     { key: "tare", label: "Tare", format: (u) => `${u.tare} kg` },
@@ -44,9 +48,7 @@ const FIGURES: { key: keyof Ute; label: string; format: (u: Ute) => string }[] =
 export function UteLoadNotes(props: { ute: Ute }) {
     const u = props.ute;
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The ratings">
                 <p>
                     Every ute has a set of mass limits on its compliance plate. The gross vehicle
@@ -171,8 +173,12 @@ export function UteLoadNotes(props: { ute: Ute }) {
                         58% on the front, a typical share for a front-engined dual cab rather than a
                         measurement of any of them. The Shark 6 assumes 55%, as its battery sits
                         under the floor. Each percentage point moves about 21 kg between the axles
-                        of a 2.1 tonne ute, so this matters most for the front axle. It can be
-                        changed under “More settings”.
+                        of a 2.1 tonne ute, so this matters most for the front axle. It matters most
+                        of all for the {TIGHTEST.label}, with the least room on its front axle: at{" "}
+                        {Math.round(TIGHTEST.unladenFrontShare * 100)}% it carries{" "}
+                        {Math.round(TIGHTEST.tare * TIGHTEST.unladenFrontShare)} kg of its{" "}
+                        {TIGHTEST.frontAxle} kg rating empty, so whether a fit-out overloads it
+                        rests on that guess. It can be changed under “More settings”.
                     </li>
                     <li>
                         Tare, where only the kerb mass (with a full tank) was published: the kerb
@@ -228,12 +234,12 @@ export function UteLoadNotes(props: { ute: Ute }) {
                     <table className="w-full max-w-md text-left">
                         <tbody>
                             {FIGURES.map((f) => (
-                                <tr key={f.key} className="border-b border-slate-800">
+                                <tr key={f.key} className="border-b border-border">
                                     <td className="py-1 pr-4">{f.label}</td>
-                                    <td className="py-1 font-mono text-slate-300">
+                                    <td className="py-1 font-mono text-ink-soft">
                                         {f.format(u)}
                                         {u.estimated.includes(f.key) && (
-                                            <span className="text-amber-400/80"> est.</span>
+                                            <span className="text-warning/80"> est.</span>
                                         )}
                                     </td>
                                 </tr>
@@ -244,13 +250,13 @@ export function UteLoadNotes(props: { ute: Ute }) {
                 <ul className="flex list-disc flex-col gap-1 pl-5">
                     {u.sources.map((s) => (
                         <li key={s.url}>
-                            <a href={s.url} className="text-sky-400 hover:text-sky-300">
+                            <a href={s.url} className="text-link hover:text-highlight">
                                 {s.label}
                             </a>
                         </li>
                     ))}
                 </ul>
             </Part>
-        </section>
+        </NotesCard>
     );
 }

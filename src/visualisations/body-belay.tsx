@@ -1,8 +1,10 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, useSyncExternalStore } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
 import {
+    NONE,
+    Notice,
     RawValues,
     Readout,
     Select,
@@ -10,8 +12,9 @@ import {
     Toggle,
     VisualisationLayout,
 } from "@/components/diagram/controls";
-import { Arrow, Label } from "@/components/diagram/svg";
+import { Arrow, Cable, forceScale, Label, Pull } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
+import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { deg } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
@@ -30,14 +33,14 @@ import {
 import { TEAM_HEIGHT } from "./two-point-lower-solver";
 
 const COLORS = {
-    line: "#38bdf8",
-    rope: "#818cf8",
-    bar: "#facc15",
-    component: "#94a3b8",
-    contact: "#34d399",
-    team: "#a3e635",
-    belayer: "#fb923c",
-    slipping: "#f87171",
+    line: "var(--pull)",
+    rope: "var(--rope-tension)",
+    bar: "var(--mass)",
+    component: "var(--ink-muted)",
+    contact: "var(--contact)",
+    team: "var(--team)",
+    belayer: "var(--belayer)",
+    slipping: "var(--danger)",
 };
 
 const MAX_ARROW = 200;
@@ -50,8 +53,6 @@ const BELAYER_HEIGHT = 1.75;
 const SHOULDER_HEIGHT = 1.45;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
 
 /** The drawing's width in SVG units; its height follows from the setup. */
 const W = 800;
@@ -110,46 +111,42 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
         ],
     );
     // Working out the belayers' lean takes a handful of solves, so the sliders move first and the drawing follows.
+    // The drawing is built from `input` too, so it never draws an old solve against new settings.
     const input = useDeferredValue(setup);
-    const sol = useMemo(() => solveBelay(input), [input]);
-    // The solver's last few digits differ between the server and the browser, which would make hydration
-    // fail, so results are only shown once running in the browser.
-    const inBrowser = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
-    );
+    // Solved only in the browser (see useInBrowser).
+    const inBrowser = useInBrowser();
+    const sol = useMemo(() => (inBrowser ? solveBelay(input) : WAITING), [inBrowser, input]);
 
     // --- Drawing ---
-    const k = 110 / Math.max(barWeight, 1); // px per newton
-    const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
-    const tag = (name: string, f: Vector2) => (f.len() * k > MAX_ARROW ? `${name} ≫` : name);
+    const k = 110 / Math.max(input.barWeight, 1); // px per newton
+    const scale = forceScale(k, MAX_ARROW);
+    const { force, tag } = scale;
 
     // The wall is drawn just deep enough for the belayer to lean back on it (only its face and top matter to the
     // physics). The drawing spans from the back of the wall to just past the team, and from just below the
     // ground to above the belayer's head. It depends only on the setup, so it stays still as the stretcher moves.
-    const back = belayerBack + BEHIND_BELAYER;
-    const PPM = W / (back + teamDistance + PAST_TEAM); // SVG units per metre
-    const H = Math.round((wallHeight + BELAYER_HEIGHT + ABOVE_TOP + BELOW_GROUND) * PPM);
+    const back = input.belayerBack + BEHIND_BELAYER;
+    const PPM = W / (back + input.teamDistance + PAST_TEAM); // SVG units per metre
+    const H = Math.round((input.wallHeight + BELAYER_HEIGHT + ABOVE_TOP + BELOW_GROUND) * PPM);
     const origin = vec2(back * PPM, H - BELOW_GROUND * PPM); // the base of the wall's face
     /** World (metres, y up) → SVG (y down). */
     const toSvg = (p: Vector2): Vector2 => vec2(origin.x + p.x * PPM, origin.y - p.y * PPM);
 
     const O = toSvg(Vector2.ZERO);
-    const wallS = toSvg(vec2(0, wallHeight));
-    const teamFootS = toSvg(vec2(teamDistance, 0));
-    const teamS = toSvg(vec2(teamDistance, TEAM_HEIGHT));
+    const wallS = toSvg(vec2(0, input.wallHeight));
+    const teamFootS = toSvg(vec2(input.teamDistance, 0));
+    const teamS = toSvg(vec2(input.teamDistance, TEAM_HEIGHT));
 
     const scene = (
         <>
-            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="var(--line)" strokeWidth={1.5} />
             <rect
                 x={O.x - back * PPM}
                 y={wallS.y}
                 width={back * PPM}
-                height={wallHeight * PPM}
-                fill="#1e293b"
-                stroke="#475569"
+                height={input.wallHeight * PPM}
+                fill="var(--surface-raised)"
+                stroke="var(--line)"
             />
             {/* the ground team, holding the line at their hands */}
             <line
@@ -169,48 +166,24 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
     );
 
     const cableLine = (pts: Vector2[], taut: boolean) => (
-        <polyline
-            points={pts
-                .map(toSvg)
-                .map((p) => `${p.x},${p.y}`)
-                .join(" ")}
-            fill="none"
-            stroke={taut ? "#cbd5e1" : "#94a3b8"}
-            strokeWidth={1.5}
-            strokeDasharray={taut ? undefined : "5 5"}
-            strokeLinejoin="round"
-        />
+        <Cable points={pts.map(toSvg)} taut={taut} />
     );
     /** A pull on the stretcher, with its x/y components when they're shown. */
     const tensionArrow = (name: string, at: Vector2, t: Vector2, color: string) => (
-        <>
-            <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
-            {showComponents && (
-                <>
-                    <Arrow
-                        from={at}
-                        v={force(vec2(t.x, 0))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}x`}
-                    />
-                    <Arrow
-                        from={at}
-                        v={force(vec2(0, t.y))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}y`}
-                    />
-                </>
-            )}
-        </>
+        <Pull
+            name={name}
+            at={at}
+            t={t}
+            color={color}
+            scale={scale}
+            parts={showComponents}
+            partsColor={COLORS.component}
+        />
     );
 
     /** A belayer seen side on, leaning back from their feet (the other stands behind them, a mirror image). */
     const belayerFigure = (b: Pick<Belayer, "lean" | "facing">, color: string) => {
-        const feet = vec2(-belayerBack, wallHeight);
+        const feet = vec2(-input.belayerBack, input.wallHeight);
         // Their lean is partly sideways, away from the middle, which side on doesn't show.
         const up = vec2(-Math.sin(b.lean) * b.facing.x, Math.cos(b.lean));
         const along = (h: number) => toSvg(feet.add(up.scale(h)));
@@ -224,7 +197,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
             <g stroke={color} strokeWidth={4} strokeLinecap="round" fill="none">
                 <line x1={f.x} y1={f.y} x2={sh.x} y2={sh.y} />
                 <circle cx={head.x} cy={head.y} r={0.12 * PPM} fill={color} stroke="none" />
-                <circle cx={w.x} cy={w.y} r={3.5} fill="#cbd5e1" stroke="none" />
+                <circle cx={w.x} cy={w.y} r={3.5} fill="var(--ink-soft)" stroke="none" />
             </g>
         );
     };
@@ -250,7 +223,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 {scene}
                 {belayerFigure(b, belayerColor)}
                 <Label
-                    at={toSvg(vec2(-belayerBack, wallHeight)).add(vec2(0, 16))}
+                    at={toSvg(vec2(-input.belayerBack, input.wallHeight)).add(vec2(0, 16))}
                     color={belayerColor}
                 >
                     ×2
@@ -260,7 +233,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 {!l.ropeTaut && (
                     <Label
                         at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))}
-                        color="#94a3b8"
+                        color="var(--ink-muted)"
                     >
                         slack
                     </Label>
@@ -270,13 +243,13 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                     y1={end1S.y}
                     x2={end2S.x}
                     y2={end2S.y}
-                    stroke="#a16207"
+                    stroke="var(--timber)"
                     strokeWidth={BAR_THICKNESS * PPM}
                     strokeLinecap="round"
                 />
                 <Arrow
                     from={toSvg(l.barEnd1.add(l.barEnd2).scale(0.5))}
-                    v={force(vec2(0, -barWeight))}
+                    v={force(vec2(0, -input.barWeight))}
                     color={COLORS.bar}
                     label="W"
                 />
@@ -284,7 +257,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 {lineTaut && tensionArrow("T₂", end2S, l.t2, COLORS.line)}
                 <Arrow
                     from={waistS}
-                    v={force(vec2(0, -belayerWeight))}
+                    v={force(vec2(0, -input.belayerWeight))}
                     color={belayerColor}
                     label="Wb"
                 />
@@ -341,12 +314,12 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
     // Seen from above: x across exactly as in the side view, so the two line up, and z (along the wall) up the
     // page at the same scale. It's tall enough for the belayers however far apart they stand.
     const planPpm = PPM;
-    const planH = Math.round((gap + 2 * BESIDE_BELAYERS) * planPpm);
+    const planH = Math.round((input.gap + 2 * BESIDE_BELAYERS) * planPpm);
     const toPlan = (p: { x: number; z: number }): Vector2 =>
         vec2(origin.x + p.x * planPpm, planH / 2 - p.z * planPpm);
     const planView = (r: Belayed | null) => {
         const face = toPlan({ x: 0, z: 0 });
-        const team = toPlan({ x: teamDistance, z: 0 });
+        const team = toPlan({ x: input.teamDistance, z: 0 });
         const ropes = r
             ? [r.b, { ...r.b, feet: r.b.feet.mirrorZ(), waist: r.b.waist.mirrorZ() }].map(
                   (b, i) => {
@@ -365,7 +338,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                               <polyline
                                   points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
                                   fill="none"
-                                  stroke="#cbd5e1"
+                                  stroke="var(--ink-soft)"
                                   strokeWidth={1.5}
                               />
                               <line
@@ -387,16 +360,16 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
         const end2 = r && toPlan({ x: r.l.barEnd2.x, z: 0 });
         return (
             <>
-                <rect x={0} y={0} width={face.x} height={planH} fill="#1e293b" />
+                <rect x={0} y={0} width={face.x} height={planH} fill="var(--surface-raised)" />
                 <line
                     x1={face.x}
                     y1={0}
                     x2={face.x}
                     y2={planH}
-                    stroke="#475569"
+                    stroke="var(--line)"
                     strokeWidth={1.5}
                 />
-                <PlanText at={vec2(8, planH - 14)} color="#94a3b8" anchor="start">
+                <PlanText at={vec2(8, planH - 14)} color="var(--ink-muted)" anchor="start">
                     wall top
                 </PlanText>
                 {end1 && end2 && (
@@ -406,7 +379,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             y1={end2.y}
                             x2={team.x}
                             y2={team.y}
-                            stroke="#cbd5e1"
+                            stroke="var(--ink-soft)"
                             strokeWidth={1.5}
                         />
                         <line
@@ -414,7 +387,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             y1={end1.y}
                             x2={end2.x}
                             y2={end2.y}
-                            stroke="#a16207"
+                            stroke="var(--timber)"
                             strokeWidth={Math.max(BAR_THICKNESS * planPpm, 4)}
                             strokeLinecap="round"
                         />
@@ -449,7 +422,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
     // How far the stretcher hangs out from the wall's face, once it's over the edge and below the wall top.
     const nearest = view ? Math.min(view.barEnd1.x, view.barEnd2.x) : -1;
     const clearance =
-        view && nearest > -1e-6 && Math.min(view.barEnd1.y, view.barEnd2.y) < wallHeight
+        view && nearest > -1e-6 && Math.min(view.barEnd1.y, view.barEnd2.y) < input.wallHeight
             ? Math.max(0, nearest)
             : null;
     const notice = !inBrowser
@@ -459,7 +432,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
           : !sol.b.holds
             ? {
                   title: "The belayers would slide towards the edge",
-                  detail: `Their feet need a grip of ${sol.b.gripNeeded.toFixed(2)} to hold, more than the ${grip.toFixed(2)} of ${footingLabel}.`,
+                  detail: `Their feet need a grip of ${sol.b.gripNeeded.toFixed(2)} to hold, more than the ${input.grip.toFixed(2)} of ${footingLabel}.`,
               }
             : null;
 
@@ -491,22 +464,25 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
         <VisualisationLayout
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
-                    {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-                            <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
-                        </div>
-                    )}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                    {notice && <Notice title={notice.title} detail={notice.detail} />}
+                    <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="block h-auto w-full"
+                        role="img"
+                        aria-label="The stretcher lowered over the wall on two ropes round the belayers' waists, side on, with the forces on it and on a belayer"
+                    >
                         {inBrowser ? diagram : scene}
                     </svg>
                     <div className="flex flex-col gap-1">
-                        <h3 className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+                        <h3 className="text-xs font-medium tracking-wide text-ghost uppercase">
                             From above
                         </h3>
-                        <svg viewBox={`0 0 ${W} ${planH}`} className="block h-auto w-full">
+                        <svg
+                            viewBox={`0 0 ${W} ${planH}`}
+                            className="block h-auto w-full"
+                            role="img"
+                            aria-label="The belayers and ropes from above"
+                        >
                             {planView(belayed)}
                         </svg>
                     </div>
@@ -755,7 +731,7 @@ function PlanText(props: {
             textAnchor={props.anchor}
             dominantBaseline="middle"
             paintOrder="stroke"
-            stroke="#0f172a"
+            stroke="var(--halo)"
             strokeWidth={4}
         >
             {props.children}

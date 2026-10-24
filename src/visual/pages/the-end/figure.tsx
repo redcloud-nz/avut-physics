@@ -18,14 +18,18 @@ const IDEAS: { slug: string; color: string; idea: string }[] = [
         color: COLORS.pull,
         idea: "In a simple system, count the parts that get shorter; the T method works on any.",
     },
-    { slug: "friction", color: "#fb923c", idea: "Friction eats the advantage." },
+    { slug: "friction", color: "var(--friction)", idea: "Friction eats the advantage." },
     { slug: "inclines", color: COLORS.redirect, idea: "On a slope, the rope holds only part." },
     {
         slug: "safety-factors",
         color: COLORS.load,
         idea: "Aim for every part to hold ten times what it carries.",
     },
-    { slug: "shock-loading", color: "#fda4af", idea: "Falling doesn’t hurt; stopping does." },
+    {
+        slug: "shock-loading",
+        color: "var(--overload)",
+        idea: "Falling doesn’t hurt; stopping does.",
+    },
 ];
 
 export function EndFigure() {
@@ -35,14 +39,14 @@ export function EndFigure() {
                 <li key={i.slug}>
                     <Link
                         href={`/visual/${i.slug}`}
-                        className="flex items-center gap-3 rounded-lg bg-slate-900/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+                        className="flex items-center gap-3 rounded-lg bg-surface/60 px-3 py-2 text-sm text-ink hover:bg-surface-raised"
                     >
                         <span
                             className="size-2.5 shrink-0 rounded-full"
                             style={{ background: i.color }}
                         />
                         <span className="flex-1">{i.idea}</span>
-                        <ChevronRight className="size-4 shrink-0 text-slate-500" aria-hidden />
+                        <ChevronRight className="size-4 shrink-0 text-ghost" aria-hidden />
                     </Link>
                 </li>
             ))}

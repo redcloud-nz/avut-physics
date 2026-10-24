@@ -23,7 +23,7 @@ export function SafetyFactorsFigure() {
     const bars = [
         { name: "load", value: load, color: COLORS.load, y: 60 },
         { name: `${FACTOR} × load`, value: FACTOR * load, color: COLORS.redirect, y: 130 },
-        { name: "gear rated", value: RATED, color: "#cbd5e1", y: 200 },
+        { name: "gear rated", value: RATED, color: "var(--ink-soft)", y: 200 },
     ];
     const ticks = [0, 10, 20, 30, 40];
     return (
@@ -43,7 +43,7 @@ export function SafetyFactorsFigure() {
                                 y1={40}
                                 x2={LEFT + t * PER_KN}
                                 y2={232}
-                                stroke="#64748b"
+                                stroke="var(--ghost)"
                                 strokeDasharray="2 4"
                             />
                             <Note at={vec2(LEFT + t * PER_KN, 246)}>{`${t}`}</Note>
@@ -85,7 +85,7 @@ export function SafetyFactorsFigure() {
                     <Readout
                         label="safety factor"
                         value={`${factor < 10 ? factor.toFixed(1) : Math.round(factor)}:1`}
-                        color={factor < FACTOR ? "#fda4af" : COLORS.pull}
+                        color={factor < FACTOR ? "var(--overload)" : COLORS.pull}
                     />
                     <Readout
                         label="mass, at 10 N/kg"

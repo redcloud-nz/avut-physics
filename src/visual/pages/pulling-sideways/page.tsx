@@ -48,7 +48,7 @@ function SquaresDrawing() {
     return (
         <svg
             viewBox="-66 -28 284 260"
-            className="mx-auto w-full max-w-64 text-slate-400"
+            className="mx-auto w-full max-w-64 text-ink-muted"
             role="img"
             aria-label="A square on each side of the triangle: the squares on x and y, 3.24 and 5.76, together make the square on T, 9"
         >
@@ -117,6 +117,8 @@ const page: VisualPage = {
     slug: "pulling-sideways",
     name: "Pulling sideways",
     title: "Two parts make a slanting pull",
+    description:
+        "A tag line pulls the load sideways, so the rope holds a sideways part as well as the up part. Tip to tail, they make the rope’s pull, which is more than the load weighs once the tag line pulls.",
     text: (
         <>
             A tag line pulls the load sideways, so the rope holds a sideways part{" "}

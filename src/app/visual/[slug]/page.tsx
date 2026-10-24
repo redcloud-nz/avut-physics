@@ -13,17 +13,25 @@ export async function generateMetadata(props: PageProps<"/visual/[slug]">): Prom
     const { slug } = await props.params;
     const page = PAGES.find((p) => p.slug === slug);
     if (!page) return {};
+    // The page's own words where they're plain text; the root layout's template adds the site's name to the title.
+    const description =
+        page.description ?? (typeof page.text === "string" ? page.text : SERIES_DESCRIPTION);
     return {
-        title: `${page.title}, ${SERIES}`,
-        description: SERIES_DESCRIPTION,
+        title: page.title,
+        description,
         openGraph: {
             title: page.title,
-            description: `${SERIES}: ${SERIES_DESCRIPTION}`,
+            description: `${SERIES}: ${description}`,
             url: `/visual/${slug}`,
             type: "website",
         },
     };
 }
+
+// Every slug is prerendered, so a navigation between pages doesn't wait. Awaiting `params` outside a Suspense boundary
+// keeps the 404 for a slug that isn't a page (inside one, the page has started streaming before notFound()), so this
+// tells Next's instant-navigation check the wait is expected.
+export const instant = false;
 
 export default async function Page(props: PageProps<"/visual/[slug]">) {
     const { slug } = await props.params;

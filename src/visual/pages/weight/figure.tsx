@@ -7,10 +7,10 @@ import { Anchor, Rock, Rope, Tag } from "@/articles/gentle-introduction-figures"
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
+import { g } from "@/visual/common/mechanics";
 import { Layout, Readout, SVG } from "@/visual/frame";
 
 /** Gravity, rounded to 10 m/s² as on the page. */
-const g = 10;
 
 /** A load hanging on a rope, its weight drawn to scale. */
 export function WeightFigure() {

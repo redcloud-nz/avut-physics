@@ -6,7 +6,7 @@ import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
-import { DRAG_HINT, DragGrid, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 /** How big a part has to be, in kilonewtons, to have room for its letter. */
@@ -14,7 +14,7 @@ const NAMED = 0.4;
 
 /** One force, and its sideways and up-or-down parts drawn tip to tail. */
 export function SplitFigure() {
-    const [tips, setTips] = useState([vec2(2.4, -1.8).scale(KN).add(ORIGIN)]);
+    const [tips, setTips] = useState([vec2(1.8, -2.4).scale(KN).add(ORIGIN)]);
     const tip = tips[0];
     const f = kn(tip);
     const corner = vec2(tip.x, ORIGIN.y);
@@ -47,7 +47,7 @@ export function SplitFigure() {
                     )}
                 </DragGrid>
             }
-            slider={DRAG_HINT}
+            slider={dragHint()}
             readouts={
                 <>
                     <Readout

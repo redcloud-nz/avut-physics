@@ -5,12 +5,12 @@ import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { ink, Letter, r, Section, Var } from "@/visual/common/details";
 import { T, Y } from "@/visual/common/triangle";
+import { GHOST } from "@/visual/frame";
 import type { VisualPage } from "@/visual/pages";
 
 import { TwoAnchorsFigure } from "./figure";
 
 const W = ink(COLORS.load, "W");
-const FAINT = "#64748b";
 
 /**
  * The even rig, 90° between the ropes, with each rope's pull split into its parts tip to tail and the mirror line
@@ -34,7 +34,7 @@ function MirrorDrawing() {
     return (
         <svg
             viewBox="40 55 220 245"
-            className="mx-auto w-full max-w-64 text-slate-400"
+            className="mx-auto w-full max-w-64 text-ink-muted"
             role="img"
             aria-label="Two ropes from a master point up to two anchors, each pulling with T at θ from straight up, split into a sideways part x and an up part y. A mirror line runs straight up through the master point; the two x parts point opposite ways, and the two y parts together hold the load W."
         >
@@ -43,11 +43,11 @@ function MirrorDrawing() {
                 y1={70}
                 x2={m.x}
                 y2={300}
-                stroke={FAINT}
+                stroke={GHOST}
                 strokeDasharray="2 4"
                 strokeWidth={1.5}
             />
-            <Label at={vec2(m.x, 64)} color={FAINT}>
+            <Label at={vec2(m.x, 64)} color={GHOST}>
                 mirror
             </Label>
             {sides.map((side) => (
@@ -65,7 +65,7 @@ function MirrorDrawing() {
                     <AngleArc center={m} radius={34} startDeg={-90} sweepDeg={side.s * 45} />
                     <Letter
                         at={m.add(Vector2.fromAngle(rad(-90 + side.s * 22.5), 48))}
-                        color="#e2e8f0"
+                        color="var(--ink)"
                     >
                         θ
                     </Letter>
@@ -129,7 +129,7 @@ function CurvesDrawing() {
     return (
         <svg
             viewBox="0 5 300 210"
-            className="mx-auto w-full max-w-80 text-slate-400"
+            className="mx-auto w-full max-w-80 text-ink-muted"
             role="img"
             aria-label="The curves of cos θ and sin θ for θ from 0° to 90°. cos θ starts at 1 and falls to 0; sin θ does the opposite. At θ = 60°, which is ropes 120° apart, cos θ is exactly one half."
         >
@@ -159,15 +159,15 @@ function CurvesDrawing() {
                         y1={at(0, Number(v)).y}
                         x2={PLOT.right}
                         y2={at(0, Number(v)).y}
-                        stroke={FAINT}
+                        stroke={GHOST}
                         strokeDasharray="2 4"
                     />
-                    <Label at={vec2(PLOT.left - 14, at(0, Number(v)).y)} color="#94a3b8">
+                    <Label at={vec2(PLOT.left - 14, at(0, Number(v)).y)} color="var(--ink-muted)">
                         {name}
                     </Label>
                 </g>
             ))}
-            <Label at={vec2(PLOT.left - 14, PLOT.bottom)} color="#94a3b8">
+            <Label at={vec2(PLOT.left - 14, PLOT.bottom)} color="var(--ink-muted)">
                 0
             </Label>
             <line
@@ -181,10 +181,10 @@ function CurvesDrawing() {
             />
             {[0, 30, 60, 90].map((t) => (
                 <g key={t}>
-                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 14)} color="#94a3b8">
+                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 14)} color="var(--ink-muted)">
                         {`${t}°`}
                     </Label>
-                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 34)} color={FAINT}>
+                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 34)} color={GHOST}>
                         {`${2 * t}°`}
                     </Label>
                 </g>
@@ -193,7 +193,7 @@ function CurvesDrawing() {
                 x={160}
                 y={PLOT.bottom + 54}
                 fontSize={12}
-                fill={FAINT}
+                fill={GHOST}
                 textAnchor="middle"
                 dominantBaseline="middle"
             >
@@ -273,6 +273,8 @@ const page: VisualPage = {
     slug: "two-anchors",
     name: "Two anchors",
     title: "Spread anchors hold more",
+    description:
+        "Two anchors share a load through one master point, each rope’s up part holding half. Spread them and each rope leans, adding a sideways part, so each holds more than half. At 120° apart, each holds the whole load.",
     text: (
         <>
             Two anchors share a load through one master point, each rope’s up part{" "}

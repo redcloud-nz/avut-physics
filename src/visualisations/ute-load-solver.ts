@@ -77,6 +77,9 @@ export const CAB = {
     fuelTank: 2.5,
 } as const;
 
+/** A rating counts as nearly reached from this share of it. */
+export const NEAR = 0.9;
+
 /** Diesel's density (kg/L). */
 export const DIESEL = 0.84;
 /** Tare is weighed with about this much fuel in the tank (L). */
@@ -115,6 +118,18 @@ export const rearShare = (x: number, wheelbase: number) => x / wheelbase;
 export function solveLoads(s: Setup): LoadResult {
     if (!(s.wheelbase > 0))
         return { kind: "none", reason: "The wheelbase must be longer than zero." };
+    if (!(s.unladenFrontShare >= 0 && s.unladenFrontShare <= 1))
+        return {
+            kind: "none",
+            reason: "The empty ute's share on its front axle must be between 0 and 1.",
+        };
+    if (!(s.unladen >= 0 && s.trailer >= 0 && s.loads.every((l) => l.mass >= 0)))
+        return { kind: "none", reason: "Masses can't be less than zero." };
+    if (!(s.ballShare >= 0 && s.ballShare <= 1))
+        return {
+            kind: "none",
+            reason: "The tow ball's share of the trailer must be between 0 and 1.",
+        };
     const ball = s.trailer * s.ballShare;
     const ballX = s.wheelbase + s.ballBehindRearAxle;
     let rear = s.unladen * (1 - s.unladenFrontShare);

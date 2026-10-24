@@ -1,4 +1,6 @@
 import { liteAdaptor } from "@mathjax/src/js/adaptors/liteAdaptor.js";
+import { STATE } from "@mathjax/src/js/core/MathItem.js";
+import { SerializedMmlVisitor } from "@mathjax/src/js/core/MmlTree/SerializedMmlVisitor.js";
 import { RegisterHTMLHandler } from "@mathjax/src/js/handlers/html.js";
 import { TeX } from "@mathjax/src/js/input/tex.js";
 import { mathjax } from "@mathjax/src/js/mathjax.js";
@@ -15,7 +17,7 @@ import "@mathjax/mathjax-newcm-font/js/svg/dynamic/script.js"; // ℓ
 
 /*
  * TeX typeset by MathJax on the server, into SVG drawn in `currentColor`: the page gets finished maths, and the
- * browser never loads MathJax.
+ * browser never loads MathJax. Screen readers get the same maths as MathML, hidden from sight, in place of the SVG.
  */
 
 // MathJax still asks to load the ranges imported above; they're already in place.
@@ -31,6 +33,10 @@ const doc = mathjax.document("", {
     InputJax: new TeX({ packages: ["base", "ams", "color"] }),
     OutputJax: new SVG({ fontCache: "local", fontData: MathJaxNewcmFont }),
 });
+
+// Even with a range imported, MathJax only takes it up after asking for it, which it does asynchronously the first
+// time a character from it is typeset. Typeset one from each range now, so every typesetting after is synchronous.
+await mathjax.handleRetriesFor(() => doc.convert("\\ell", { display: false }));
 
 /** The SVG for some TeX. */
 function svgFor(tex: string, display: boolean): string {
@@ -48,24 +54,46 @@ function svgFor(tex: string, display: boolean): string {
     }
 }
 
+const mathml = new SerializedMmlVisitor();
+
+/** The MathML for some TeX, for screen readers. */
+function mathmlFor(tex: string, display: boolean): string {
+    // Less the TeX MathJax notes on each element, which no screen reader needs.
+    return mathml
+        .visitTree(doc.convert(tex, { display, end: STATE.CONVERT }))
+        .replace(/ data-[\w-]+="[^"]*"/g, "");
+}
+
 /** Inline maths, in a line of text. */
 export function M(props: { tex: string }) {
     return (
-        <span
-            aria-label={props.tex}
-            className="[&>svg]:inline"
-            dangerouslySetInnerHTML={{ __html: svgFor(props.tex, false) }}
-        />
+        <span>
+            <span
+                aria-hidden
+                className="[&>svg]:inline"
+                dangerouslySetInnerHTML={{ __html: svgFor(props.tex, false) }}
+            />
+            <span
+                className="sr-only"
+                dangerouslySetInnerHTML={{ __html: mathmlFor(props.tex, false) }}
+            />
+        </span>
     );
 }
 
 /** Displayed maths, on its own line(s), scrolling sideways if it's too wide. */
 export function Eq(props: { tex: string }) {
     return (
-        <div
-            aria-label={props.tex}
-            className="overflow-x-auto py-1 text-center text-slate-300 [&>svg]:inline-block"
-            dangerouslySetInnerHTML={{ __html: svgFor(props.tex, true) }}
-        />
+        <div className="overflow-x-auto py-1 text-center text-ink-soft">
+            <div
+                aria-hidden
+                className="[&>svg]:inline-block"
+                dangerouslySetInnerHTML={{ __html: svgFor(props.tex, true) }}
+            />
+            <div
+                className="sr-only"
+                dangerouslySetInnerHTML={{ __html: mathmlFor(props.tex, true) }}
+            />
+        </div>
     );
 }

@@ -1,7 +1,7 @@
 /** Small SVG primitives for physics diagrams. Coordinates are SVG user units (y points down). */
 
 import { rad } from "@/lib/math";
-import { Vector2 } from "@/lib/vector2";
+import { vec2, Vector2 } from "@/lib/vector2";
 
 /** An arrow from `from` along vector `v`, with an optional label just past the tip. */
 export function Arrow({
@@ -61,7 +61,7 @@ export function AngleArc({
     startDeg,
     sweepDeg,
     label,
-    color = "#94a3b8",
+    color = "var(--ink-muted)",
 }: {
     center: Vector2;
     radius: number;
@@ -98,7 +98,7 @@ export function AngleArc({
 
 export function Label({
     at,
-    color = "#e2e8f0",
+    color = "var(--ink)",
     children,
 }: {
     at: Vector2;
@@ -115,10 +115,79 @@ export function Label({
             textAnchor="middle"
             dominantBaseline="middle"
             paintOrder="stroke"
-            stroke="#0f172a"
+            stroke="var(--halo)"
             strokeWidth={4}
         >
             {children}
         </text>
+    );
+}
+
+/**
+ * How forces are drawn: `k` SVG units per newton, flipped so up is up, and cut short at `max`. `tag` marks the name of
+ * a force whose arrow is cut short with ≫.
+ */
+export function forceScale(k: number, max: number) {
+    return {
+        force: (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(max),
+        tag: (name: string, f: Vector2) => (f.len() * k > max ? `${name} ≫` : name),
+    };
+}
+
+/** A rope through `points` (SVG units): solid when taut, dashed when slack. */
+export function Cable(props: { points: Vector2[]; taut: boolean }) {
+    return (
+        <polyline
+            points={props.points.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="none"
+            stroke={props.taut ? "var(--ink-soft)" : "var(--ink-muted)"}
+            strokeWidth={1.5}
+            strokeDasharray={props.taut ? undefined : "5 5"}
+            strokeLinejoin="round"
+        />
+    );
+}
+
+/** A rope's pull `t` (newtons) at `at`, drawn by `scale`, with its x and y parts dashed when `parts` is on. */
+export function Pull(props: {
+    name: string;
+    at: Vector2;
+    t: Vector2;
+    color: string;
+    scale: ReturnType<typeof forceScale>;
+    parts: boolean;
+    partsColor: string;
+}) {
+    const { name, at, t, scale } = props;
+    return (
+        <>
+            <Arrow
+                from={at}
+                v={scale.force(t)}
+                color={props.color}
+                label={scale.tag(name, t)}
+                width={2}
+            />
+            {props.parts && (
+                <>
+                    <Arrow
+                        from={at}
+                        v={scale.force(vec2(t.x, 0))}
+                        color={props.partsColor}
+                        dashed
+                        width={1.5}
+                        label={`${name}x`}
+                    />
+                    <Arrow
+                        from={at}
+                        v={scale.force(vec2(0, t.y))}
+                        color={props.partsColor}
+                        dashed
+                        width={1.5}
+                        label={`${name}y`}
+                    />
+                </>
+            )}
+        </>
     );
 }

@@ -9,10 +9,10 @@ export default function VisualisationPage(props: {
 }) {
     return (
         <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-4 pb-10">
-            <Link href="/" className="text-sm text-sky-400 hover:text-sky-300">
+            <Link href="/" className="text-sm text-link hover:text-highlight">
                 ← Physics Visualisations
             </Link>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-50">
+            <h1 className="text-3xl font-semibold tracking-tight text-ink-bright">
                 {props.visualisation.title}
             </h1>
             {props.children}

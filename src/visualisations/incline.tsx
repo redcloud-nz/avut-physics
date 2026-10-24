@@ -8,12 +8,15 @@ import { G } from "@/lib/constants";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
+import { InclineNotes } from "./incline-notes";
+import { solveIncline } from "./incline-solver";
+
 const COLORS = {
-    weight: "#f97316",
-    normal: "#38bdf8",
-    friction: "#f472b6",
-    net: "#34d399",
-    component: "#94a3b8",
+    weight: "var(--weight)",
+    normal: "var(--normal)",
+    friction: "var(--incline-friction)",
+    net: "var(--net)",
+    component: "var(--ink-muted)",
 };
 
 const W = 640;
@@ -28,17 +31,12 @@ export default function Incline() {
     const [g, setG] = useState(G);
     const [showComponents, setShowComponents] = useState(true);
 
-    // --- Physics (SI units) ---
+    // The sliders keep the mass above zero and the coefficients positive, so there's always an answer.
+    const sol = solveIncline({ angle: rad(angle), mass, muS, muK, g });
+    if (sol.kind === "none") throw new Error(sol.reason);
+    const { weight, normal, along, friction, net, accel, slipsAbove } = sol.f;
+    const sliding = sol.kind === "sliding";
     const th = rad(angle);
-    const weight = mass * g;
-    const normal = weight * Math.cos(th);
-    const along = weight * Math.sin(th); // gravity component down the slope
-    const kinetic = Math.min(muK, muS);
-    const sliding = along > muS * normal;
-    const friction = sliding ? kinetic * normal : along;
-    const net = along - friction;
-    const accel = net / mass;
-    const criticalAngle = deg(Math.atan(muS));
 
     // --- Geometry (SVG units, y down). Slope descends to the right. ---
     const L = 460;
@@ -58,11 +56,16 @@ export default function Incline() {
     return (
         <VisualisationLayout
             diagram={
-                <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                <svg
+                    viewBox={`0 0 ${W} ${H}`}
+                    className="block h-auto w-full"
+                    role="img"
+                    aria-label="A block on a slope, with the forces on it"
+                >
                     <polygon
                         points={`${bottomLeft.x},${bottomLeft.y} ${top.x},${top.y} ${corner.x},${corner.y}`}
-                        fill="#1e293b"
-                        stroke="#475569"
+                        fill="var(--surface-raised)"
+                        stroke="var(--line)"
                         strokeWidth={1.5}
                     />
                     <line
@@ -70,7 +73,7 @@ export default function Incline() {
                         y1={corner.y}
                         x2={W - 20}
                         y2={corner.y}
-                        stroke="#475569"
+                        stroke="var(--line)"
                         strokeWidth={1.5}
                     />
                     <AngleArc
@@ -87,8 +90,8 @@ export default function Incline() {
                         width={blockW}
                         height={blockH}
                         rx={4}
-                        fill="#334155"
-                        stroke="#64748b"
+                        fill="var(--line-faint)"
+                        stroke="var(--ghost)"
                         transform={`rotate(${angle} ${centre.x} ${centre.y})`}
                     />
 
@@ -210,17 +213,18 @@ export default function Incline() {
                     />
                     <Readout label="Net force" value={`${net.toFixed(1)} N`} color={COLORS.net} />
                     <Readout label="Acceleration" value={`${accel.toFixed(2)} m/s²`} />
-                    <Readout label="Slips above" value={`${criticalAngle.toFixed(1)}°`} />
+                    <Readout label="Slips above" value={`${deg(slipsAbove).toFixed(1)}°`} />
                     <p
-                        className={`mt-1 text-sm font-medium ${sliding ? "text-emerald-400" : "text-slate-300"}`}
+                        className={`mt-1 text-sm font-medium ${sliding ? "text-sliding" : "text-ink-soft"}`}
                     >
                         {sliding
                             ? "Block is sliding down the slope."
                             : "Block is held in place by static friction."}
                     </p>
-                    {muK > muS && <p className="text-xs text-amber-400">μk is capped at μs.</p>}
+                    {muK > muS && <p className="text-xs text-warning">μk is capped at μs.</p>}
                 </>
             }
+            footer={<InclineNotes />}
         />
     );
 }

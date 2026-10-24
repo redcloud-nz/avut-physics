@@ -6,7 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { SITE } from "@/articles/prose";
 
 const BUTTON =
-    "flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500";
+    "flex items-center justify-center gap-1.5 rounded-xl border border-line-faint py-2 text-sm font-medium text-ink hover:border-action";
 
 const noSubscribe = () => () => {};
 
@@ -16,7 +16,7 @@ const noSubscribe = () => () => {};
  */
 export function Share(props: { title: string; text: string; path: string }) {
     const url = `https://${SITE}${props.path}`;
-    const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState<"no" | "yes" | "failed">("no");
 
     // Only known in the browser; the server's page goes without, so the first render matches it.
     const canShare = useSyncExternalStore(
@@ -38,13 +38,13 @@ export function Share(props: { title: string; text: string; path: string }) {
     ];
 
     return (
-        <section className="flex flex-col gap-3 border-t border-slate-800 pt-5">
-            <h2 className="text-sm font-medium text-slate-400">Share this series</h2>
+        <section className="flex flex-col gap-3 border-t border-border pt-5">
+            <h2 className="text-sm font-medium text-ink-muted">Share this series</h2>
             <div className="grid grid-cols-2 gap-2">
                 {canShare && (
                     <button
                         type="button"
-                        className={`${BUTTON} col-span-2 border-sky-500 text-sky-300`}
+                        className={`${BUTTON} col-span-2 border-action text-highlight`}
                         // Closing the share sheet without sharing rejects; there's nothing to do then.
                         onClick={() =>
                             navigator
@@ -59,19 +59,29 @@ export function Share(props: { title: string; text: string; path: string }) {
                 <button
                     type="button"
                     className={BUTTON}
-                    onClick={() =>
-                        navigator.clipboard.writeText(url).then(() => {
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                        })
-                    }
+                    // There's no clipboard away from https, and some apps' own browsers refuse to write to it.
+                    onClick={() => {
+                        const copy = navigator.clipboard
+                            ? navigator.clipboard.writeText(url)
+                            : Promise.reject(new Error("No clipboard"));
+                        copy.then(
+                            () => setCopied("yes"),
+                            () => setCopied("failed"),
+                        ).finally(() => setTimeout(() => setCopied("no"), 2000));
+                    }}
                 >
-                    {copied ? (
+                    {copied === "yes" ? (
                         <Check className="size-4" aria-hidden />
                     ) : (
                         <LinkIcon className="size-4" aria-hidden />
                     )}
-                    {copied ? "Copied" : "Copy link"}
+                    <span aria-live="polite">
+                        {copied === "yes"
+                            ? "Copied"
+                            : copied === "failed"
+                              ? "Couldn’t copy"
+                              : "Copy link"}
+                    </span>
                 </button>
                 <a
                     className={BUTTON}

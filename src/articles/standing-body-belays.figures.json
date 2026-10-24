@@ -1,5 +1,5 @@
 {
-  "hash": "762dd4f7296cda78",
+  "hash": "ea516e8b07890b0d",
   "figures": {
     "defaults": {
       "wallHeight": 2.89,
@@ -38,10 +38,7 @@
       "real": { "belayer": 70, "stretcher": 120, "safety": 0.9669087636054997 },
       "heavy": { "belayer": 100, "stretcher": 120, "safety": 1.3440003002210708 }
     },
-    "equal": [
-      { "mass": 40, "safety": 1.4081118073668668 },
-      { "mass": 150, "safety": 1.59263796325219 }
-    ],
+    "equal": { "from": 40, "to": 150, "least": 1.4081118073668668, "most": 1.59263796325219 },
     "training": { "from": 45, "to": 75, "safety": [2.4837152862583567, 1.6625555263147194] },
     "heaviest": { "reachesTwo": 60, "slides": 132, "wetHolds": 49 },
     "graph": [

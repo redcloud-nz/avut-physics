@@ -1,11 +1,11 @@
-import { HOLD_HEIGHT } from "./ladder-hinge-held";
+import { NotesCard, Part } from "@/components/notes";
+
+import { FOOT_FRICTION, HOLD_HEIGHT, MAX_TEAM_ANGLE, UNDERRUN_OVER } from "./ladder-hinge-held";
 
 /** How the ladder hinge page works out what it shows, and what it leaves out. */
 export function LadderHingeNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The setup">
                 <p>
                     Everything is in two dimensions, seen side on. The ladder’s foot sits in the
@@ -31,7 +31,11 @@ export function LadderHingeNotes() {
                 <p>
                     When the stretcher would cross the ladder, it rests on it instead, with its end
                     held against the ladder by the attachment. If the attachment would have to push
-                    to hold it there, the end slides along the ladder until it doesn’t.
+                    to hold it there, the end slides along the ladder until it doesn’t. Resting on
+                    the ladder, the stretcher is taken to come down onto it from above, so it rests
+                    at the lowest angle it reaches coming down. Where the wall’s face stops it,
+                    there can be a second resting place below, hanging steeply between the ladder
+                    and the wall, which the page doesn’t look for.
                 </p>
             </Part>
 
@@ -42,8 +46,8 @@ export function LadderHingeNotes() {
                     it rests on (N). Balancing the ladder then gives the force on its foot (R). The
                     foot isn’t fixed: the ground can push it up and the wall can push it out, but
                     nothing holds it down, and only the ground’s grip (a friction coefficient of
-                    0.5, for rubber feet) stops it sliding away from the wall. Where the balance
-                    would need more, the page warns that the foot would lift or slide.
+                    {FOOT_FRICTION}, for rubber feet) stops it sliding away from the wall. Where the
+                    balance would need more, the page warns that the foot would lift or slide.
                 </p>
             </Part>
 
@@ -53,22 +57,22 @@ export function LadderHingeNotes() {
                     whichever angle keeps the stretcher level. Level, resting on the ladder with the
                     attachment taut, the stretcher’s position follows from the ladder’s angle alone,
                     so the rope’s length fixes the angle. The team takes hold once that angle is
-                    below “Team Underruns below” in More settings (at most 60°); until then the
-                    ladder finds its own angle, as with “Auto”. They take hold where the ladder has
-                    settled by itself, then bring it round to level over the next 7.5°, holding it
-                    part of the way between the two angles. Where the stretcher can’t be held level
-                    (still up by the wall top), the page says why and shows it settled at the angle
-                    that would have levelled it. Once the ladder is down and the rope slack, the
-                    stretcher stays where it landed.
+                    below “Team underruns below” in More settings (at most {MAX_TEAM_ANGLE}°); until
+                    then the ladder finds its own angle, as with “Auto”. They take hold where the
+                    ladder has settled by itself, then bring it round to level over the next{" "}
+                    {UNDERRUN_OVER}°, holding it part of the way between the two angles. Where the
+                    stretcher can’t be held level (still up by the wall top), the page says why and
+                    shows it settled at the angle that would have levelled it. Once the ladder is
+                    down and the rope slack, the stretcher stays where it landed.
                 </p>
                 <p>
                     The team is assumed to push straight up (or pull straight down) at shoulder
                     height, {HOLD_HEIGHT} m up, or at the ladder’s tip if that’s lower, supplying
                     whatever torque the ladder needs to stay at its angle. Where and how they hold
                     it changes only how hard they push and the force on the foot, not the
-                    stretcher’s position. Steeper than 60° their grip is almost directly above the
-                    foot, so a vertical push barely turns the ladder and would lift its foot or drag
-                    it out first.
+                    stretcher’s position. Steeper than {MAX_TEAM_ANGLE}° their grip is almost
+                    directly above the foot, so a vertical push barely turns the ladder and would
+                    lift its foot or drag it out first.
                 </p>
             </Part>
 
@@ -110,16 +114,6 @@ export function LadderHingeNotes() {
                     </li>
                 </ul>
             </Part>
-        </section>
-    );
-}
-
-/** One titled part of a notes card. */
-export function Part(props: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="flex flex-col gap-2">
-            <h3 className="font-medium text-slate-300">{props.title}</h3>
-            {props.children}
-        </div>
+        </NotesCard>
     );
 }

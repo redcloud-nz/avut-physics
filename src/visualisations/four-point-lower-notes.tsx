@@ -1,11 +1,11 @@
-import { Part } from "./ladder-hinge-notes";
+import { NotesCard, Part } from "@/components/notes";
+
+import { SNUG, START_GAP } from "./four-point-lower-solver";
 
 /** How the four-point lower page works out what it shows, and what it leaves out. */
 export function FourPointLowerNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The setup">
                 <p>
                     A basket stretcher, 2 m long, 0.6 m wide and 0.2 m deep (about a Ferno Model
@@ -25,12 +25,13 @@ export function FourPointLowerNotes() {
 
             <Part title="The lower">
                 <p>
-                    The stretcher starts lying on the floor along the slot, 10 cm back from its
-                    edge, with every rope just snug. Each belayer has a slider, in their rope’s
-                    colour, reading how much rope they have out, from their belay to the stretcher’s
-                    corner; sliding it pays out or takes in. The sliders are laid out like the
-                    belays, head on top and near side on the left. “Start again” puts the stretcher
-                    back on the floor; changing the setup does too.
+                    The stretcher starts lying on the floor along the slot,{" "}
+                    {Math.round(START_GAP * 100)} cm back from its edge, with every rope just snug.
+                    Each belayer has a slider, in their rope’s colour, reading how much rope they
+                    have out, from their belay to the stretcher’s corner; sliding it pays out or
+                    takes in. The sliders are laid out like the belays, head on top and near side on
+                    the left. “Start again” puts the stretcher back on the floor; changing the setup
+                    does too.
                 </p>
                 <p>
                     Between each pair of neighbouring sliders is a link. Click it once to couple the
@@ -72,9 +73,9 @@ export function FourPointLowerNotes() {
                 </p>
                 <p>
                     The floor has no friction, so on its own nothing would keep the stretcher where
-                    it is on the floor. Instead each belayer keeps a light pull on their rope, 5% of
-                    the stretcher’s weight, taking up any slack. Those pulls hold it against the
-                    ropes’ lengths.
+                    it is on the floor. Instead each belayer keeps a light pull on their rope,{" "}
+                    {Math.round(SNUG * 100)}% of the stretcher’s weight, taking up any slack. Those
+                    pulls hold it against the ropes’ lengths.
                 </p>
                 <p>
                     Each move is worked out a couple of centimetres of rope at a time, each step
@@ -144,6 +145,6 @@ export function FourPointLowerNotes() {
                     </li>
                 </ul>
             </Part>
-        </section>
+        </NotesCard>
     );
 }

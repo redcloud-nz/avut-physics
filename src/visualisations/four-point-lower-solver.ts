@@ -1,3 +1,4 @@
+import { clamp } from "@/lib/math";
 import {
     centralDifferences,
     leastSquares,
@@ -7,8 +8,7 @@ import {
 } from "@/lib/numeric";
 import { vec2 } from "@/lib/vector2";
 import { vec3, Vector3 } from "@/lib/vector3";
-
-import { ropePathFor } from "./ladder-hinge-held";
+import { ropePathFor } from "@/lib/wall";
 
 /**
  * A four-point lower down a slot. The stretcher starts on the floor beside the slot, lying along it. Four ropes, one
@@ -133,7 +133,7 @@ export function planAt(s: Setup, progress: number): Plan {
     const edge = s.slotWidth / 2;
     const halfWidth = s.barWidth / 2;
     const halfLength = s.barLength / 2;
-    const p = Math.min(Math.max(progress, 0), STAGES.length);
+    const p = clamp(progress, 0, STAGES.length);
     const stage = Math.min(Math.floor(p), STAGES.length - 1);
     const t = p - stage;
     const lerp = (a: number, b: number) => a + (b - a) * t;
@@ -435,6 +435,8 @@ export function settle(s: Setup, out: number[], q0: number[], also?: number[]): 
     // Failing with every rope held to start with (which drags the stretcher about where a rope is well slack),
     // again with only those within a few centimetres of taut.
     let polished = polish(q0) ?? polish(q0, false);
+    // How far the best balance found misses by, where it came to that.
+    let missedBy: number | null = null;
     if (!polished) {
         // The stretcher's energy, with each overstep of a limit penalised as a stiff spring (angles scaled to
         // metres at its ends, so the search steps alike in each).
@@ -467,12 +469,18 @@ export function settle(s: Setup, out: number[], q0: number[], also?: number[]): 
             const { f, misfit } = share(q, held);
             if (misfit < 1e-4 * W)
                 polished = { q, lambda: new Map(held.map((p, k) => [p.key, f[k]])) };
+            missedBy = misfit;
         }
     }
     if (!polished)
         return {
             kind: "none",
-            reason: "The ropes may run too flat to hold the stretcher here. Try higher belays, or belays nearer the edge.",
+            // Nearly balancing, it's the search that failed, not the ropes; far off, no pulls the ropes can make
+            // hold the stretcher there.
+            reason:
+                missedBy !== null && missedBy < 0.01 * W
+                    ? "The search couldn't pin down where the stretcher rests here, though it came close. Try moving a little differently."
+                    : "The ropes may run too flat to hold the stretcher here. Try higher belays, or belays nearer the edge.",
         };
 
     const { q, lambda } = polished;
@@ -681,7 +689,8 @@ export function settle(s: Setup, out: number[], q0: number[], also?: number[]): 
                 : (leastSquares(
                       [0, 1, 2, 3, 4, 5].map((j) => cols.map((c) => c[j])),
                       load0,
-                      1e-9 * W,
+                      // The columns are per newton, so the damping has no units (as in the two-point solver).
+                      1e-9,
                   ) ?? keys.map(() => 0));
         const steps = [1e-7, 1e-7, 1e-7, 1e-7 / L, 1e-7 / L, 1e-7 / L];
         let damping = 1e-12 * W * W;

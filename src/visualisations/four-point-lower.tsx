@@ -1,14 +1,22 @@
 "use client";
 
 import { ArrowDownUp, Link2, Link2Off, RotateCcw } from "lucide-react";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { RawValues, Readout, Slider, VisualisationLayout } from "@/components/diagram/controls";
+import {
+    NONE,
+    Notice,
+    RawValues,
+    Readout,
+    Slider,
+    VisualisationLayout,
+} from "@/components/diagram/controls";
 import { Arrow, Label } from "@/components/diagram/svg";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useInBrowser } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
-import { deg } from "@/lib/math";
+import { clamp, deg } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -25,10 +33,10 @@ import {
 } from "./four-point-lower-solver";
 
 /** Each rope its own colour, in the ropes' order: red, green, blue, yellow. Head ropes solid, foot ropes dashed. */
-const ROPE_COLORS = ["#f2555a", "#23935a", "#3d83f0", "#d9a816"];
+const ROPE_COLORS = ["var(--strand-1)", "var(--strand-2)", "var(--strand-3)", "var(--strand-4)"];
 const ropeColor = (i: number) => ROPE_COLORS[i];
 const ropeDash = (i: number) => (ROPES[i].end < 0 ? "7 5" : undefined);
-const COLORS = { bar: "#e2e8f0", barFill: "#475569", push: "#c4b5fd" };
+const COLORS = { bar: "var(--ink)", barFill: "var(--line)", push: "var(--push)" };
 
 const MAX_ARROW = 160;
 const BAR_LENGTH = 2;
@@ -39,10 +47,14 @@ const BAR_DEPTH = 0.2;
 const MOST_IN = 1.5;
 /** The trace keeps this many of the latest steps. */
 const TRACE_LENGTH = 1500;
+/**
+ * The most rope (m) any belayer moves in one go. Working out a move takes about a second per metre, so a longer one
+ * (clicking along a slider's track, or pressing End) is made this much at a time, a frame apart, rather than all at
+ * once with the page frozen.
+ */
+const MOST_PER_FRAME = 0.04;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
 
 /** The drawings' width in SVG units; their heights follow from the setup. */
 const W = 800;
@@ -110,6 +122,8 @@ type Moves = {
     /** Why the latest move stopped short, if it did. */
     stopped: string | null;
     trace: Sample[];
+    /** The hardest any rope has pulled since the start, including steps the trace no longer keeps. */
+    hardest: number | null;
 };
 
 const pushOf = (p: Placed) => p.contacts.reduce((sum, c) => sum + c.force.len(), 0);
@@ -127,6 +141,53 @@ function startMoves(setup: Setup): Moves {
         result,
         stopped: null,
         trace: last ? [sampleOf(last)] : [],
+        hardest: last ? Math.max(...sampleOf(last).pulls) : null,
+    };
+}
+
+/**
+ * The belayers paying out or taking in from `moves` to `paidOut`, with the stretcher following. No belayer can take
+ * in against more than `holdLimit`: a rope already over it can't be taken in at all (nor, coupled, can the ropes
+ * moving with it), and a move stops once it takes one over.
+ */
+function moveTo(moves: Moves, paidOut: number[], holdLimit: number): Moves {
+    if (!moves.last) return { ...moves, paidOut };
+    const { setup } = moves;
+    const takingIn = [0, 1, 2, 3].filter((j) => paidOut[j] < moves.paidOut[j]);
+    const overLimit = (p: Placed) => takingIn.find((j) => p.ropes[j].tension > holdLimit);
+    const tooHard = (j: number, p: Placed) =>
+        `${ROPES[j].name} is pulling ${p.ropes[j].tension.toFixed(0)} N, more than its belayer can take in against (${holdLimit} N). Pay it out, or move the others, to ease it.`;
+    const already = overLimit(moves.last);
+    if (already !== undefined) return { ...moves, stopped: tooHard(already, moves.last) };
+    const start = startOf(setup).out;
+    const steps = follow(
+        setup,
+        moves.last,
+        start.map((l, j) => l + paidOut[j]),
+        { stopAfter: (p) => overLimit(p) !== undefined },
+    );
+    const settled = steps.flatMap((r) => (r.kind === "placed" ? [r.p] : []));
+    const last = settled.length ? settled[settled.length - 1] : moves.last;
+    const end = steps[steps.length - 1];
+    const over = end.kind === "placed" ? overLimit(end.p) : undefined;
+    // Where it can't settle, or a rope goes over the limit, the belayers stop at the last step where it settled.
+    const stoppedShort = end.kind === "none" || over !== undefined;
+    const samples = settled.map(sampleOf);
+    return {
+        setup,
+        paidOut: stoppedShort ? last.ropes.map((r, j) => r.out - start[j]) : paidOut,
+        last,
+        result: end,
+        stopped:
+            over !== undefined
+                ? tooHard(over, last)
+                : end.kind === "placed"
+                  ? null
+                  : takingIn.length
+                    ? "The ropes are as tight as they'll go: taking in any more would need them to stretch."
+                    : `It can't settle any further this way. ${end.reason}`,
+        trace: [...moves.trace, ...samples].slice(-TRACE_LENGTH),
+        hardest: Math.max(moves.hardest ?? 0, ...samples.flatMap((x) => x.pulls)),
     };
 }
 
@@ -161,19 +222,37 @@ export default function FourPointLower() {
         [slotDepth, slotWidth, anchorUp, anchorBack, belaySpacing, barWeight],
     );
 
-    // The solver's last few digits can differ between the server and the browser, which would make hydration
-    // fail, so results are only shown once running in the browser.
-    const inBrowser = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
-    );
+    const inBrowser = useInBrowser();
     // Changing the setup starts the lower again.
     const [saved, setSaved] = useState<Moves | null>(null);
     const fresh = useMemo(() => (inBrowser ? startMoves(setup) : null), [inBrowser, setup]);
     const moves = saved?.setup === setup ? saved : fresh;
     const mostOut = Math.ceil(payOutNeeded(setup) * 10) / 10 + 0.1;
     const startOut = useMemo(() => startOf(setup).out, [setup]);
+
+    // A long move is made a piece at a time, a frame apart: the frame waiting to make the next piece.
+    const moving = useRef<number | null>(null);
+    const stopMoving = () => {
+        if (moving.current !== null) cancelAnimationFrame(moving.current);
+        moving.current = null;
+    };
+    // Changing the setup, or leaving the page, stops a move part way.
+    useEffect(() => stopMoving, [setup]);
+
+    /** One piece of the move towards `target`, then the next a frame later, until it gets there or stops short. */
+    const step = (from: Moves, target: number[]) => {
+        const left = Math.max(...target.map((t, j) => Math.abs(t - from.paidOut[j])));
+        // With nowhere settled to work from, there's nothing to follow: the sliders just move.
+        const share = from.last ? Math.min(1, MOST_PER_FRAME / left) : 1;
+        const next = moveTo(
+            from,
+            from.paidOut.map((p, j) => (share === 1 ? target[j] : p + (target[j] - p) * share)),
+            holdLimit,
+        );
+        setSaved(next);
+        if (share === 1 || next.stopped || next.result.kind === "none") return stopMoving();
+        moving.current = requestAnimationFrame(() => step(next, target));
+    };
 
     /** Belayer i (and any moving with them) paying out or taking in to `value` paid out since the start. */
     const pay = (i: number, value: number) => {
@@ -184,47 +263,13 @@ export default function FourPointLower() {
         signs.forEach((sign, j) => {
             if (!sign) return;
             const [low, high] = [-MOST_IN - moves.paidOut[j], mostOut - moves.paidOut[j]];
-            change = Math.min(Math.max(change, sign > 0 ? low : -high), sign > 0 ? high : -low);
+            change = clamp(change, sign > 0 ? low : -high, sign > 0 ? high : -low);
         });
-        const paidOut = moves.paidOut.map((p, j) => p + signs[j] * change);
-        if (!moves.last) return setSaved({ ...moves, paidOut });
-        // No belayer can take in against more than the limit: a rope already over it can't be taken in at all
-        // (nor, coupled, can the ropes moving with it), and a move stops once it takes one over.
-        const takingIn = [0, 1, 2, 3].filter((j) => signs[j] * change < 0);
-        const overLimit = (p: Placed) => takingIn.find((j) => p.ropes[j].tension > holdLimit);
-        const tooHard = (j: number, p: Placed) =>
-            `${ROPES[j].name} is pulling ${p.ropes[j].tension.toFixed(0)} N, more than its belayer can take in against (${holdLimit} N). Pay it out, or move the others, to ease it.`;
-        const already = overLimit(moves.last);
-        if (already !== undefined)
-            return setSaved({ ...moves, stopped: tooHard(already, moves.last) });
-        const start = startOf(setup).out;
-        const steps = follow(
-            setup,
-            moves.last,
-            start.map((l, j) => l + paidOut[j]),
-            { stopAfter: (p) => overLimit(p) !== undefined },
+        stopMoving();
+        step(
+            moves,
+            moves.paidOut.map((p, j) => p + signs[j] * change),
         );
-        const settled = steps.flatMap((r) => (r.kind === "placed" ? [r.p] : []));
-        const last = settled.length ? settled[settled.length - 1] : moves.last;
-        const end = steps[steps.length - 1];
-        const over = end.kind === "placed" ? overLimit(end.p) : undefined;
-        // Where it can't settle, or a rope goes over the limit, the belayers stop at the last step where it settled.
-        const stoppedShort = end.kind === "none" || over !== undefined;
-        setSaved({
-            setup,
-            paidOut: stoppedShort ? last.ropes.map((r, j) => r.out - start[j]) : paidOut,
-            last,
-            result: end,
-            stopped:
-                over !== undefined
-                    ? tooHard(over, last)
-                    : end.kind === "placed"
-                      ? null
-                      : takingIn.length
-                        ? "The ropes are as tight as they'll go: taking in any more would need them to stretch."
-                        : `It can't settle any further this way. ${end.reason}`,
-            trace: [...moves.trace, ...settled.map(sampleOf)].slice(-TRACE_LENGTH),
-        });
     };
 
     const result = moves?.result ?? null;
@@ -277,15 +322,20 @@ export default function FourPointLower() {
         [-1, 1].map((end) => vec3(side * anchorX, slotDepth + anchorUp, (end * belaySpacing) / 2)),
     );
     const planView = (
-        <svg viewBox={`0 0 ${W} ${planH}`} className="block h-auto w-full">
-            <rect x={0} y={0} width={W} height={planH} fill="#1e293b" />
+        <svg
+            viewBox={`0 0 ${W} ${planH}`}
+            className="block h-auto w-full"
+            role="img"
+            aria-label="The stretcher, slot and four belays from above"
+        >
+            <rect x={0} y={0} width={W} height={planH} fill="var(--surface-raised)" />
             <rect
                 x={above(vec3(-edgeX, 0, 0)).x}
                 y={0}
                 width={slotWidth * PPM}
                 height={planH}
-                fill="#0f172a"
-                stroke="#475569"
+                fill="var(--surface)"
+                stroke="var(--line)"
             />
             {view && (
                 <polygon
@@ -302,7 +352,7 @@ export default function FourPointLower() {
                 <circle key={i} cx={above(c.at).x} cy={above(c.at).y} r={4} fill={COLORS.push} />
             ))}
             {belays.map((p, i) => (
-                <circle key={i} cx={above(p).x} cy={above(p).y} r={5} fill="#cbd5e1" />
+                <circle key={i} cx={above(p).x} cy={above(p).y} r={5} fill="var(--ink-soft)" />
             ))}
             {view && (
                 <Label
@@ -319,8 +369,13 @@ export default function FourPointLower() {
     const floorTop = endOn(vec3(0, slotDepth, 0)).y;
     const bottom = endOn(vec3(0, 0, 0)).y;
     const endOnView = (
-        <svg viewBox={`0 0 ${W} ${endH}`} className="block h-auto w-full">
-            <line x1={0} y1={bottom} x2={W} y2={bottom} stroke="#475569" strokeWidth={1.5} />
+        <svg
+            viewBox={`0 0 ${W} ${endH}`}
+            className="block h-auto w-full"
+            role="img"
+            aria-label="The stretcher in the slot end on, with its weight and the floor's and edges' push"
+        >
+            <line x1={0} y1={bottom} x2={W} y2={bottom} stroke="var(--line)" strokeWidth={1.5} />
             {[-1, 1].map((side) => {
                 const x0 = side < 0 ? 0 : endOn(vec3(edgeX, 0, 0)).x;
                 const x1 = side < 0 ? endOn(vec3(-edgeX, 0, 0)).x : W;
@@ -332,19 +387,19 @@ export default function FourPointLower() {
                             y={floorTop}
                             width={x1 - x0}
                             height={bottom - floorTop}
-                            fill="#1e293b"
-                            stroke="#475569"
+                            fill="var(--surface-raised)"
+                            stroke="var(--line)"
                         />
                         <line
                             x1={post.x}
                             y1={floorTop}
                             x2={post.x}
                             y2={post.y}
-                            stroke="#475569"
+                            stroke="var(--line)"
                             strokeWidth={4}
                             strokeLinecap="round"
                         />
-                        <circle cx={post.x} cy={post.y} r={3.5} fill="#cbd5e1" />
+                        <circle cx={post.x} cy={post.y} r={3.5} fill="var(--ink-soft)" />
                     </g>
                 );
             })}
@@ -380,7 +435,7 @@ export default function FourPointLower() {
     );
 
     const trace = moves?.trace ?? [];
-    const hardest = trace.length ? Math.max(...trace.flatMap((x) => x.pulls)) : null;
+    const hardest = moves?.hardest ?? null;
 
     const notice = moves?.stopped
         ? { title: "Stopped here", detail: moves.stopped }
@@ -457,22 +512,22 @@ export default function FourPointLower() {
         <VisualisationLayout
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
-                    {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-                            <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
-                        </div>
-                    )}
+                    {notice && <Notice title={notice.title} detail={notice.detail} />}
                     {planView}
                     {ropeSliders}
                     {endOnView}
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm text-slate-300">
+                        <p className="text-sm text-ink-soft">
                             The ropes&apos; pulls over the moves so far
                         </p>
-                        <Button variant="outline" size="sm" onClick={() => setSaved(null)}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                stopMoving();
+                                setSaved(null);
+                            }}
+                        >
                             <RotateCcw />
                             Start again
                         </Button>
@@ -572,7 +627,7 @@ export default function FourPointLower() {
                         value={view ? `${Math.abs(deg(view.pitch)).toFixed(1)}°` : NONE}
                     />
                     <Separator />
-                    <p className="text-xs text-slate-500">Each rope&apos;s pull</p>
+                    <p className="text-xs text-ghost">Each rope&apos;s pull</p>
                     {ROPES.map((r, i) => (
                         <Readout
                             key={r.name}
@@ -632,7 +687,7 @@ function RopeSlider(props: {
     const color = ropeColor(props.index);
     return (
         <label
-            className={`flex min-w-0 flex-col gap-1 text-sm text-slate-300 ${props.disabled ? "opacity-40" : ""}`}
+            className={`flex min-w-0 flex-col gap-1 text-sm text-ink-soft ${props.disabled ? "opacity-40" : ""}`}
         >
             <span className="flex flex-wrap items-center justify-between gap-x-2">
                 <span className="flex items-center gap-1.5">
@@ -649,11 +704,11 @@ function RopeSlider(props: {
                     </svg>
                     {rope.name}
                 </span>
-                <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
+                <span className="shrink-0 font-mono whitespace-nowrap text-ink-muted">
                     {props.ropeOut.toFixed(2)} m
                 </span>
                 {props.overLimit && (
-                    <span className="w-full text-xs text-amber-400">Too hard to take in</span>
+                    <span className="w-full text-xs text-warning">Too hard to take in</span>
                 )}
             </span>
             <input
@@ -704,7 +759,7 @@ function LinkButton(props: {
             : props.next === -1
               ? "couple them, moving opposite ways"
               : "uncouple them";
-    const line = coupling ? "bg-slate-300" : "bg-slate-700";
+    const line = coupling ? "bg-ink-soft" : "bg-line-faint";
     const dashed =
         coupling === -1
             ? "opacity-70 [mask-image:repeating-linear-gradient(90deg,#000_0_4px,transparent_4px_7px)]"
@@ -721,7 +776,7 @@ function LinkButton(props: {
                 title={`The ${props.name}: ${state.says}. Click to ${next}.`}
                 aria-label={`The ${props.name}: ${state.says}. Click to ${next}.`}
                 onClick={props.onClick}
-                className={coupling ? "" : "text-slate-500"}
+                className={coupling ? "" : "text-ghost"}
             >
                 <state.Icon />
             </Button>
@@ -765,7 +820,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
         text: string,
         at: Vector2,
         anchor: "start" | "middle" | "end",
-        color = "#94a3b8",
+        color = "var(--ink-muted)",
     ) => (
         <text
             x={at.x}
@@ -782,7 +837,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
 
     return (
         <div className="flex flex-col gap-2">
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
                 {series.map((s) => (
                     <li key={s.name} className="flex items-center gap-1.5">
                         <svg width="22" height="8" aria-hidden>
@@ -809,11 +864,17 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
                 {Array.from({ length: Math.round(yMax / tick) + 1 }, (_, i) => i * tick).map(
                     (v) => (
                         <g key={v}>
-                            <line x1={left} y1={y(v)} x2={W - right} y2={y(v)} stroke="#1e293b" />
+                            <line
+                                x1={left}
+                                y1={y(v)}
+                                x2={W - right}
+                                y2={y(v)}
+                                stroke="var(--surface-raised)"
+                            />
                             <text
                                 x={left - 8}
                                 y={y(v)}
-                                fill="#94a3b8"
+                                fill="var(--ink-muted)"
                                 fontSize={17}
                                 textAnchor="end"
                                 dominantBaseline="middle"
@@ -859,7 +920,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
                             cy={y(s.value(latest))}
                             r={4.5}
                             fill={s.color}
-                            stroke="#0f172a"
+                            stroke="var(--surface)"
                             strokeWidth={2}
                         />
                     ))}
@@ -904,7 +965,7 @@ function Caption({ children }: { children: React.ReactNode }) {
         <text
             x={12}
             y={22}
-            fill="#94a3b8"
+            fill="var(--ink-muted)"
             fontSize={14}
             fontFamily="var(--font-geist-mono), monospace"
         >

@@ -1,34 +1,43 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 
 import {
     Choice,
+    NONE,
+    Notice,
     RawValues,
     Readout,
     Slider,
     Toggle,
     VisualisationLayout,
 } from "@/components/diagram/controls";
-import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
+import { AngleArc, Arrow, Cable, forceScale, Label, Pull } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
+import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { clamp, deg } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
-import { solveHeld, solveLevel } from "./ladder-hinge-held";
+import {
+    FOOT_FRICTION,
+    MAX_TEAM_ANGLE,
+    solveHeld,
+    solveLevel,
+    UNDERRUN_OVER,
+} from "./ladder-hinge-held";
 import { LadderHingeNotes } from "./ladder-hinge-notes";
 import { minWallCable, phiMax, solve } from "./ladder-hinge-solver";
 
 const COLORS = {
-    tensionBeam: "#38bdf8",
-    tensionWall: "#818cf8",
-    weight: "#f97316",
-    bar: "#facc15",
-    hinge: "#f472b6",
-    component: "#94a3b8",
-    contact: "#34d399",
-    hold: "#a3e635",
+    tensionBeam: "var(--pull)",
+    tensionWall: "var(--rope-tension)",
+    weight: "var(--weight)",
+    bar: "var(--mass)",
+    hinge: "var(--hinge)",
+    component: "var(--ink-muted)",
+    contact: "var(--contact)",
+    hold: "var(--team)",
 };
 
 type LadderMode = "free" | "level";
@@ -46,14 +55,6 @@ const MAX_ANCHOR_UP = 2;
 const MAX_ANCHOR_BACK = 5;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
-/** Over how many degrees the team brings the ladder from where it settles by itself to level. */
-const UNDERRUN_OVER = 7.5;
-/** The steepest the ground team holds the ladder (degrees). */
-const MAX_TEAM_ANGLE = 60;
-/** How well the ladder's foot grips the ground (rubber feet on a hard surface). */
-const FOOT_FRICTION = 0.5;
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
 
 /** The drawing's width in SVG units; its height follows from the setup. */
 const W = 800;
@@ -147,9 +148,12 @@ export default function LadderHinge() {
         MAX_TEAM_ANGLE,
         Math.floor(deg(phiMax({ ...setup, wallCable: cable })) * 2) / 2,
     );
+    // Solved only in the browser (see useInBrowser).
+    const inBrowser = useInBrowser();
     const level = useMemo(
-        () => (ladderMode === "level" ? solveLevel({ ...setup, wallCable: cable }) : null),
-        [ladderMode, setup, cable],
+        () =>
+            inBrowser && ladderMode === "level" ? solveLevel({ ...setup, wallCable: cable }) : null,
+        [inBrowser, ladderMode, setup, cable],
     );
     // Until the angle that would level the stretcher is below the cutoff, the team leaves the ladder alone. Then
     // they take hold where it settles by itself and bring it round to level over the next few degrees.
@@ -158,7 +162,7 @@ export default function LadderHinge() {
         levelPhi === null
             ? 0
             : clamp((Math.min(takeHoldBelow, maxTakeHold) - deg(levelPhi)) / UNDERRUN_OVER, 0, 1);
-    const needFree = underrun < 1;
+    const needFree = inBrowser && underrun < 1;
     const free = useMemo(
         () => (needFree ? solve({ ...setup, wallCable: cable }) : null),
         [needFree, setup, cable],
@@ -175,20 +179,17 @@ export default function LadderHinge() {
                 : null,
         [underrun, freePhi, levelPhi, setup, cable],
     );
-    const sol = underrun >= 1 || (underrun > 0 && !easing) ? level!.result : (easing ?? free!);
+    const sol = !inBrowser
+        ? WAITING
+        : underrun >= 1 || (underrun > 0 && !easing)
+          ? level!.result
+          : (easing ?? free!);
     const levelled = underrun >= 1 ? level : null;
-    // The solver's last few digits differ between the server and the browser, which would make hydration
-    // fail, so results are only shown once running in the browser.
-    const inBrowser = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
-    );
 
     // --- Drawing ---
     const k = 110 / Math.max(beamWeight + barWeight, 1); // px per newton
-    const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
-    const tag = (name: string, f: Vector2) => (f.len() * k > MAX_ARROW ? `${name} ≫` : name);
+    const scale = forceScale(k, MAX_ARROW);
+    const { force, tag } = scale;
 
     // The wall is drawn just thick enough to carry the cable anchor on its back edge (only its face and top
     // matter to the physics). The drawing spans from the back of the wall to the tip of the beam lying flat,
@@ -208,14 +209,14 @@ export default function LadderHinge() {
 
     const ground = (
         <>
-            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="#475569" strokeWidth={1.5} />
+            <line x1={0} y1={O.y} x2={W} y2={O.y} stroke="var(--line)" strokeWidth={1.5} />
             <rect
                 x={O.x - anchorBack * PPM}
                 y={wallS.y}
                 width={anchorBack * PPM}
                 height={wallHeight * PPM}
-                fill="#1e293b"
-                stroke="#475569"
+                fill="var(--surface-raised)"
+                stroke="var(--line)"
             />
             {/* post holding the cable anchor */}
             <line
@@ -223,11 +224,11 @@ export default function LadderHinge() {
                 y1={wallS.y}
                 x2={anchorS.x}
                 y2={anchorS.y}
-                stroke="#475569"
+                stroke="var(--line)"
                 strokeWidth={4}
                 strokeLinecap="round"
             />
-            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="#cbd5e1" />
+            <circle cx={anchorS.x} cy={anchorS.y} r={3.5} fill="var(--ink-soft)" />
         </>
     );
 
@@ -246,11 +247,18 @@ export default function LadderHinge() {
                     y1={O.y}
                     x2={tipS.x}
                     y2={tipS.y}
-                    stroke="#64748b"
+                    stroke="var(--ghost)"
                     strokeWidth={BEAM_THICKNESS * PPM}
                     strokeLinecap="round"
                 />
-                <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
+                <circle
+                    cx={O.x}
+                    cy={O.y}
+                    r={7}
+                    fill="var(--surface)"
+                    stroke="var(--ink-soft)"
+                    strokeWidth={2}
+                />
                 {angle > 0.05 && (
                     <AngleArc
                         center={O}
@@ -269,7 +277,7 @@ export default function LadderHinge() {
             y1={a.y}
             x2={b.x}
             y2={b.y}
-            stroke="#a16207"
+            stroke="var(--timber)"
             strokeWidth={BAR_THICKNESS * PPM}
             strokeLinecap="round"
         />
@@ -321,29 +329,15 @@ export default function LadderHinge() {
     );
     /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
     const tensionArrow = (name: "T₁" | "T₂", at: Vector2, t: Vector2, color: string) => (
-        <>
-            <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
-            {showComponents && (
-                <>
-                    <Arrow
-                        from={at}
-                        v={force(vec2(t.x, 0))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}x`}
-                    />
-                    <Arrow
-                        from={at}
-                        v={force(vec2(0, t.y))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}y`}
-                    />
-                </>
-            )}
-        </>
+        <Pull
+            name={name}
+            at={at}
+            t={t}
+            color={color}
+            scale={scale}
+            parts={showComponents}
+            partsColor={COLORS.component}
+        />
     );
     /** `t` is null when there's no solution; `slack` when the cable carries nothing. */
     const tensionReadouts = (
@@ -397,7 +391,7 @@ export default function LadderHinge() {
                         eq.barEnd1,
                     ])}
                     fill="none"
-                    stroke="#cbd5e1"
+                    stroke="var(--ink-soft)"
                     strokeWidth={1.5}
                     strokeLinejoin="round"
                 />
@@ -406,7 +400,7 @@ export default function LadderHinge() {
                     y1={end2S.y}
                     x2={attachS.x}
                     y2={attachS.y}
-                    stroke="#cbd5e1"
+                    stroke="var(--ink-soft)"
                     strokeWidth={1.5}
                 />
 
@@ -452,7 +446,7 @@ export default function LadderHinge() {
                 <polyline
                     points={wallPath.map((p) => `${p.x},${p.y}`).join(" ")}
                     fill="none"
-                    stroke={h.cableTaut ? "#cbd5e1" : "#94a3b8"}
+                    stroke={h.cableTaut ? "var(--ink-soft)" : "var(--ink-muted)"}
                     strokeWidth={1.5}
                     strokeDasharray={h.cableTaut ? undefined : "5 5"}
                     strokeLinejoin="round"
@@ -460,7 +454,7 @@ export default function LadderHinge() {
                 {!h.cableTaut && (
                     <Label
                         at={wallPath[last - 1].add(wallPath[last]).scale(0.5).add(vec2(0, -14))}
-                        color="#94a3b8"
+                        color="var(--ink-muted)"
                     >
                         slack
                     </Label>
@@ -470,7 +464,7 @@ export default function LadderHinge() {
                     y1={end2S.y}
                     x2={attachS.x}
                     y2={attachS.y}
-                    stroke={h.beamCableTaut ? "#cbd5e1" : "#94a3b8"}
+                    stroke={h.beamCableTaut ? "var(--ink-soft)" : "var(--ink-muted)"}
                     strokeWidth={1.5}
                     strokeDasharray={h.beamCableTaut ? undefined : "5 5"}
                 />
@@ -512,14 +506,7 @@ export default function LadderHinge() {
         const end1S = toSvg(h.barEnd1);
         const end2S = toSvg(h.barEnd2);
         const cableLine = (pts: Vector2[], taut: boolean) => (
-            <polyline
-                points={cablePath(pts)}
-                fill="none"
-                stroke={taut ? "#cbd5e1" : "#94a3b8"}
-                strokeWidth={1.5}
-                strokeDasharray={taut ? undefined : "5 5"}
-                strokeLinejoin="round"
-            />
+            <Cable points={pts.map(toSvg)} taut={taut} />
         );
 
         diagram = (
@@ -578,7 +565,14 @@ export default function LadderHinge() {
         diagram = (
             <>
                 {ground}
-                <circle cx={O.x} cy={O.y} r={7} fill="#0f172a" stroke="#cbd5e1" strokeWidth={2} />
+                <circle
+                    cx={O.x}
+                    cy={O.y}
+                    r={7}
+                    fill="var(--surface)"
+                    stroke="var(--ink-soft)"
+                    strokeWidth={2}
+                />
             </>
         );
     }
@@ -654,15 +648,13 @@ export default function LadderHinge() {
         <VisualisationLayout
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
-                    {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-amber-400">
-                            <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-amber-400/80">
-                                {notice.detail}
-                            </p>
-                        </div>
-                    )}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                    {notice && <Notice title={notice.title} detail={notice.detail} />}
+                    <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="block h-auto w-full"
+                        role="img"
+                        aria-label="A ladder hinged at the base of the wall with the stretcher hanging from it, side on, with the rope, the attachment and the forces on them"
+                    >
                         {inBrowser ? diagram : ground}
                     </svg>
                     <Slider
@@ -680,7 +672,7 @@ export default function LadderHinge() {
             controls={(more) => (
                 <>
                     <Choice
-                        label="Ladder Angle"
+                        label="Ladder angle"
                         value={ladderMode}
                         options={[
                             { value: "free", label: "Auto" },
@@ -769,7 +761,7 @@ export default function LadderHinge() {
                                 onChange={setBeamMass}
                             />
                             <Slider
-                                label="Team Underruns below"
+                                label="Team underruns below"
                                 value={Math.min(takeHoldBelow, maxTakeHold)}
                                 min={0}
                                 max={maxTakeHold}

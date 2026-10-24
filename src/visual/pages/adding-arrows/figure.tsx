@@ -5,10 +5,10 @@ import { useState } from "react";
 import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
-import { DragGrid, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
-const TOGETHER = "#f1f5f9";
+const TOGETHER = "var(--ink-strong)";
 
 /** Two forces on one bolt, and the one force they make together: each drawn again from the other's tip, either order. */
 export function AddingFigure() {
@@ -36,7 +36,7 @@ export function AddingFigure() {
                     <Arrow from={ORIGIN} v={b} color={COLORS.redirect} width={3} />
                 </DragGrid>
             }
-            slider={<p className="text-center text-sm text-slate-400">Drag either arrow’s tip.</p>}
+            slider={dragHint(true)}
             readouts={
                 <>
                     <Readout label="one" value={kNText(a.len() / KN)} color={COLORS.pull} />

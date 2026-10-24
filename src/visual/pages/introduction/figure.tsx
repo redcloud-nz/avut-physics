@@ -7,13 +7,13 @@ function Control(props: {
     children: React.ReactNode;
 }) {
     return (
-        <li className="flex items-start gap-3 rounded-lg bg-slate-900/60 px-3 py-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sky-300">
+        <li className="flex items-start gap-3 rounded-lg bg-surface/60 px-3 py-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-raised text-highlight">
                 {props.icon}
             </span>
             <div className="flex flex-col">
-                <span className="font-medium text-slate-100">{props.action}</span>
-                <span className="text-sm text-slate-400">{props.children}</span>
+                <span className="font-medium text-ink-strong">{props.action}</span>
+                <span className="text-sm text-ink-muted">{props.children}</span>
             </div>
         </li>
     );
@@ -32,7 +32,7 @@ export function ControlsFigure() {
                 Each page’s picture changes as you move its slider, or drag its arrows.
             </Control>
             <Control
-                icon={<span className="h-1.5 w-5 rounded-full bg-sky-300" />}
+                icon={<span className="h-1.5 w-5 rounded-full bg-highlight" />}
                 action="Tap the pill"
             >
                 When the pill between the buttons is lit, there’s more on that page, like the maths.

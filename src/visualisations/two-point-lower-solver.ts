@@ -7,8 +7,8 @@ import {
     withColumns,
 } from "@/lib/numeric";
 import { vec2, Vector2 } from "@/lib/vector2";
+import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
 
-import { behindFaceFor, ropePathFor } from "./ladder-hinge-held";
 import type { Surface } from "./ladder-hinge-solver";
 
 /**
@@ -98,7 +98,7 @@ export function solveLower(s: Setup): LowerResult {
     const W = s.barWeight;
     const T = Math.max(0, s.teamPull);
     const half = s.barLength / 2;
-    const anchor = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+    const anchor = anchorOf(s);
     const edge = vec2(0, s.wallHeight);
     const team = vec2(s.teamDistance, TEAM_HEIGHT);
 
@@ -127,7 +127,8 @@ export function solveLower(s: Setup): LowerResult {
         out.push({
             key: "team",
             kind: "team",
-            g: TEAM_REACH - P2.distanceTo(team),
+            // Measured along the line, as the pull is, which runs over the wall's edge when the team is close to it.
+            g: TEAM_REACH - linePathFor(s, P2).length,
             at: P2,
             m: lineDir(P2).neg(),
         });

@@ -1,12 +1,11 @@
-import { Part } from "./ladder-hinge-notes";
+import { NotesCard, Part } from "@/components/notes";
+
 import { TEAM_HEIGHT, TEAM_REACH } from "./two-point-lower-solver";
 
 /** How the two-point lower page works out what it shows, and what it leaves out. */
 export function TwoPointLowerNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The setup">
                 <p>
                     Everything is in two dimensions, seen side on. The stretcher is a rigid 2 m bar.
@@ -91,6 +90,6 @@ export function TwoPointLowerNotes() {
                     </li>
                 </ul>
             </Part>
-        </section>
+        </NotesCard>
     );
 }

@@ -9,6 +9,10 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 
 import { SERIES } from "./series";
 
+/** Controls that use the arrow keys themselves. */
+const ARROW_KEYED =
+    "input, select, textarea, [contenteditable], [role=radio], [role=slider], [data-arrow-keys]";
+
 /** How far a swipe has to go before it counts, in pixels. */
 const SWIPE = 60;
 
@@ -50,8 +54,11 @@ export function Card(props: {
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            // Arrow keys on a focused slider move the slider, not the page. The drawers handle their own keys.
-            if (e.target instanceof HTMLInputElement || open || contents) return;
+            // Arrow keys on a focused slider or choice move it, not the page, and with a modifier they're the
+            // browser's (Alt+← is Back). The drawers handle their own keys.
+            if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.target instanceof Element && e.target.closest(ARROW_KEYED)) return;
+            if (open || contents) return;
             if (e.key === "ArrowLeft") router.push(prev);
             if (e.key === "ArrowRight") router.push(next);
             if (e.key === "ArrowUp" && hasDetails) setOpen(true);
@@ -80,12 +87,12 @@ export function Card(props: {
                     if (way === "right") router.push(prev);
                 }}
             >
-                <header className="flex items-center gap-3 text-xs text-slate-400">
+                <header className="flex items-center gap-3 text-xs text-ink-muted">
                     <button
                         type="button"
                         onClick={() => setContents(true)}
                         aria-label={`${SERIES}: contents`}
-                        className="flex min-w-0 items-center gap-1 hover:text-sky-300"
+                        className="flex min-w-0 items-center gap-1 hover:text-highlight"
                     >
                         <span className="truncate">{SERIES}</span>
                         <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -98,12 +105,14 @@ export function Card(props: {
                     {Array.from({ length: total }, (_, i) => (
                         <span
                             key={i}
-                            className={`h-1 flex-1 rounded-full ${i <= props.index ? "bg-sky-400" : "bg-slate-800"}`}
+                            className={`h-1 flex-1 rounded-full ${i <= props.index ? "bg-indicator" : "bg-surface-raised"}`}
                         />
                     ))}
                 </div>
-                <h1 className="text-xl leading-tight font-semibold text-slate-50">{props.title}</h1>
-                <p className="text-slate-300">{props.text}</p>
+                <h1 className="text-xl leading-tight font-semibold text-ink-bright">
+                    {props.title}
+                </h1>
+                <p className="text-ink-soft">{props.text}</p>
 
                 <div className="flex flex-1 flex-col">{props.children}</div>
 
@@ -113,7 +122,7 @@ export function Card(props: {
                     <Link
                         href={prev}
                         prefetch
-                        className="flex items-center justify-center gap-1 rounded-xl border border-slate-700 py-2 text-sm font-medium text-slate-200 hover:border-sky-500"
+                        className="flex items-center justify-center gap-1 rounded-xl border border-line-faint py-2 text-sm font-medium text-ink hover:border-action"
                     >
                         <ChevronLeft className="size-5" aria-hidden />
                         Back
@@ -127,14 +136,16 @@ export function Card(props: {
                     >
                         <Pill
                             className={
-                                hasDetails ? "bg-slate-400 group-hover:bg-sky-400" : "bg-slate-800"
+                                hasDetails
+                                    ? "bg-ink-muted group-hover:bg-indicator"
+                                    : "bg-surface-raised"
                             }
                         />
                     </button>
                     <Link
                         href={next}
                         prefetch
-                        className="flex items-center justify-center gap-1 rounded-xl bg-sky-500 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400"
+                        className="flex items-center justify-center gap-1 rounded-xl bg-action py-2 text-sm font-medium text-primary-foreground hover:bg-action-hover"
                     >
                         {props.index + 1 === total ? (
                             "Finish"
@@ -151,10 +162,16 @@ export function Card(props: {
             <Drawer open={open} onOpenChange={setOpen}>
                 <DrawerContent
                     aria-describedby={undefined}
-                    className="mx-auto max-h-[85dvh] max-w-md border-slate-700 bg-slate-900 text-base text-slate-300"
+                    className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface text-base text-ink-soft"
                 >
                     <DrawerTitle className="sr-only">More on: {props.title}</DrawerTitle>
-                    <div className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
+                    <div
+                        // As with the contents, a link followed from the details leaves them put away.
+                        onClickCapture={(e) => {
+                            if ((e.target as Element).closest("a")) setOpen(false);
+                        }}
+                        className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]"
+                    >
                         {props.details}
                     </div>
                 </DrawerContent>
@@ -163,10 +180,10 @@ export function Card(props: {
             <Drawer open={contents} onOpenChange={setContents} direction="top">
                 <DrawerContent
                     aria-describedby={undefined}
-                    className="mx-auto max-h-[85dvh] max-w-md border-slate-700 bg-slate-900 pt-[env(safe-area-inset-top)] text-base text-slate-300"
+                    className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface pt-[env(safe-area-inset-top)] text-base text-ink-soft"
                 >
                     <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-4 pb-2">
-                        <DrawerTitle className="text-base font-semibold text-slate-100">
+                        <DrawerTitle className="text-base font-semibold text-ink-strong">
                             {SERIES}
                         </DrawerTitle>
                         <ol className="flex flex-col">
@@ -178,11 +195,13 @@ export function Card(props: {
                                         // Next keeps the page being left, hidden, for coming back to: leave it
                                         // with its contents put away.
                                         onClick={() => setContents(false)}
-                                        className={`flex gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-800 ${
-                                            i === props.index ? "bg-slate-800 text-sky-300" : ""
+                                        className={`flex gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-raised ${
+                                            i === props.index
+                                                ? "bg-surface-raised text-highlight"
+                                                : ""
                                         }`}
                                     >
-                                        <span className="w-5 shrink-0 text-right text-slate-500 tabular-nums">
+                                        <span className="w-5 shrink-0 text-right text-ghost tabular-nums">
                                             {i + 1}
                                         </span>
                                         {page.name}
@@ -193,7 +212,7 @@ export function Card(props: {
                         <Link
                             href="/"
                             onClick={() => setContents(false)}
-                            className="px-2 text-sm text-sky-400 hover:text-sky-300"
+                            className="px-2 text-sm text-link hover:text-highlight"
                         >
                             ← Physics Visualisations
                         </Link>
@@ -204,7 +223,7 @@ export function Card(props: {
                         onClick={() => setContents(false)}
                         className="group flex h-7 w-full shrink-0 items-center justify-center"
                     >
-                        <Pill className="bg-slate-500 group-hover:bg-sky-400" />
+                        <Pill className="bg-ghost group-hover:bg-indicator" />
                     </button>
                 </DrawerContent>
             </Drawer>

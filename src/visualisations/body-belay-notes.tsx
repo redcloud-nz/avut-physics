@@ -1,13 +1,12 @@
+import { NotesCard, Part } from "@/components/notes";
+
 import { PAST_EDGE, WAIST_HEIGHT } from "./body-belay-solver";
-import { Part } from "./ladder-hinge-notes";
 import { TEAM_HEIGHT, TEAM_REACH } from "./two-point-lower-solver";
 
 /** How the body belay page works out what it shows, and what it leaves out. */
 export function BodyBelayNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm leading-relaxed text-slate-400 lg:p-6">
-            <h2 className="text-base font-medium text-slate-200">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The setup">
                 <p>
                     This is the two-point lower with the anchor taken away. Instead, two belayers
@@ -153,6 +152,6 @@ export function BodyBelayNotes() {
                     <li>The stretcher doesn’t sway sideways or twist.</li>
                 </ul>
             </Part>
-        </section>
+        </NotesCard>
     );
 }

@@ -126,7 +126,7 @@ export function TwoAnchorsFigure() {
                     <Readout
                         label="each anchor holds"
                         value={percent(share)}
-                        color={share > 1.0001 ? "#fda4af" : COLORS.pull}
+                        color={share > 1.0001 ? "var(--overload)" : COLORS.pull}
                     />
                 </>
             }

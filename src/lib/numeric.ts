@@ -118,10 +118,11 @@ export function centralDifferences(
 }
 
 /**
- * The cells of a grid of values lower than or equal to all eight neighbours, the grid wrapping round at its
- * edges, lowest first. Cells that aren't finite are skipped.
+ * The cells of a grid of values lower than or equal to all eight neighbours, lowest first. The grid wraps round at
+ * its edges unless `wrap` is false, when a cell at the edge has only the neighbours inside the grid. Cells that
+ * aren't finite are skipped.
  */
-export function gridMinima(grid: number[][]): { i: number; j: number; e: number }[] {
+export function gridMinima(grid: number[][], wrap = true): { i: number; j: number; e: number }[] {
     const ni = grid.length;
     const minima: { i: number; j: number; e: number }[] = [];
     for (let i = 0; i < ni; i++) {
@@ -132,7 +133,10 @@ export function gridMinima(grid: number[][]): { i: number; j: number; e: number 
             let isMin = true;
             for (let di = -1; di <= 1 && isMin; di++) {
                 for (let dj = -1; dj <= 1; dj++) {
-                    if ((di || dj) && grid[(i + di + ni) % ni][(j + dj + nj) % nj] < e) {
+                    const n = wrap
+                        ? grid[(i + di + ni) % ni][(j + dj + nj) % nj]
+                        : grid[i + di]?.[j + dj];
+                    if ((di || dj) && n !== undefined && n < e) {
                         isMin = false;
                         break;
                     }
@@ -196,4 +200,42 @@ export function nonNegativeLeastSquares(A: Matrix, b: number[], damping = 0): nu
         }
     }
     return x;
+}
+
+/**
+ * A golden-section search for the lowest point of f between lo and hi, taking it to have one there: the bracket left
+ * after `iterations` steps.
+ */
+export function goldenSection(
+    f: (x: number) => number,
+    lo: number,
+    hi: number,
+    iterations: number,
+): [number, number] {
+    const ratio = (Math.sqrt(5) - 1) / 2;
+    for (let k = 0; k < iterations; k++) {
+        const m1 = hi - ratio * (hi - lo);
+        const m2 = lo + ratio * (hi - lo);
+        if (f(m1) <= f(m2)) hi = m2;
+        else lo = m1;
+    }
+    return [lo, hi];
+}
+
+/**
+ * Bisection for where `before` stops holding, between a (where it holds) and b (where it doesn't): the bracket left
+ * after `iterations` halvings.
+ */
+export function bisect(
+    before: (x: number) => boolean,
+    a: number,
+    b: number,
+    iterations: number,
+): [number, number] {
+    for (let k = 0; k < iterations; k++) {
+        const m = (a + b) / 2;
+        if (before(m)) a = m;
+        else b = m;
+    }
+    return [a, b];
 }

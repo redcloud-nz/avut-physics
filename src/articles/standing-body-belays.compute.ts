@@ -37,8 +37,8 @@ const PAIRS = {
     heavy: { belayer: 100, stretcher: 120 },
 };
 
-/** Belayers and stretchers of equal weight (kg). */
-const EQUAL = [40, 150];
+/** Belayers and stretchers of equal weight, from and to (kg), worked through 10 kg at a time. */
+const EQUAL = { from: 40, to: 150, step: 10 };
 
 /** The training loads shaded on the stretcher weight graph (kg). */
 const TRAINING = { from: 45, to: 75 };
@@ -104,12 +104,19 @@ const holding = (c: Case = {}) => load(arrangement({ ...c, edgeFriction: 0 }));
  */
 function heaviestAt(safety: number, grip: number = DEFAULTS.grip) {
     const holds = (m: number) => grip / holding({ stretcherMass: m }).gripNeeded >= safety;
+    // The article reads "up to about m kg", which says nothing if even the lightest fails.
+    if (!holds(40))
+        throw new Error(`Even a 40 kg stretcher falls short of a safety factor of ${safety}`);
     // The safety factor only falls as the stretcher gets heavier, so step 10 kg at a time, then 1 kg.
-    let m = 39;
+    let m = 40;
     while (holds(m + 10)) m += 10;
     while (holds(m + 1)) m++;
     return m;
 }
+
+/** `from`, `from + step`, … up to `to`. */
+const range = (r: { from: number; to: number; step: number }) =>
+    Array.from({ length: Math.round((r.to - r.from) / r.step) + 1 }, (_, i) => r.from + i * r.step);
 
 const point = (p: { x: number; y: number }) => ({ x: p.x, y: p.y });
 
@@ -120,10 +127,7 @@ export function compute() {
         ...p,
         safety: holding({ belayerMass: p.belayer, stretcherMass: p.stretcher }).safety,
     });
-    const graphMasses = Array.from(
-        { length: (GRAPH.to - GRAPH.from) / GRAPH.step + 1 },
-        (_, i) => GRAPH.from + i * GRAPH.step,
-    );
+    const graphMasses = range(GRAPH);
     return {
         defaults: DEFAULTS,
         /** One belayer's load holding still in the common case. */
@@ -139,10 +143,18 @@ export function compute() {
             team: point(l.team),
         },
         pairs: { training: pair(PAIRS.training), real: pair(PAIRS.real), heavy: pair(PAIRS.heavy) },
-        equal: EQUAL.map((m) => ({
-            mass: m,
-            safety: holding({ belayerMass: m, stretcherMass: m }).safety,
-        })),
+        /** The least and most safety factor with belayers and stretcher of equal weight, over EQUAL's weights. */
+        equal: (() => {
+            const safety = range(EQUAL).map(
+                (m) => holding({ belayerMass: m, stretcherMass: m }).safety,
+            );
+            return {
+                from: EQUAL.from,
+                to: EQUAL.to,
+                least: Math.min(...safety),
+                most: Math.max(...safety),
+            };
+        })(),
         training: {
             ...TRAINING,
             safety: [TRAINING.from, TRAINING.to].map((m) => holding({ stretcherMass: m }).safety),

@@ -49,7 +49,7 @@ function RopeStretchMore() {
             <Section title="Static and dynamic rope">
                 <p>
                     Rescue ropes are low-stretch (often called static or semi-static): they stretch
-                    only a few percent, so the load doesn’t bounce and every metre hauled lifts the
+                    only a few per cent, so the load doesn’t bounce and every metre hauled lifts the
                     load. That’s why they catch falls hard. Climbing ropes are dynamic, made to
                     stretch much more to catch a climber’s fall softly.
                 </p>

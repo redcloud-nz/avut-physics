@@ -5,7 +5,14 @@ import { Fragment, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 
 export function Slider(props: {
     label: string;
@@ -20,11 +27,11 @@ export function Slider(props: {
 }) {
     return (
         <label
-            className={`flex flex-col gap-1 text-sm text-slate-300 ${props.disabled ? "opacity-40" : ""}`}
+            className={`flex flex-col gap-1 text-sm text-ink-soft ${props.disabled ? "opacity-40" : ""}`}
         >
             <span className="flex justify-between gap-2">
                 {props.label}
-                <span className="shrink-0 font-mono whitespace-nowrap text-slate-400">
+                <span className="shrink-0 font-mono whitespace-nowrap text-ink-muted">
                     {props.value.toFixed(props.digits ?? 1)}
                     {props.unit && ` ${props.unit}`}
                 </span>
@@ -37,7 +44,7 @@ export function Slider(props: {
                 value={props.value}
                 disabled={props.disabled}
                 onChange={(e) => props.onChange(Number(e.target.value))}
-                className="accent-sky-500"
+                className="accent-action"
             />
         </label>
     );
@@ -45,43 +52,64 @@ export function Slider(props: {
 
 export function Toggle(props: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
     return (
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-ink-soft">
             <input
                 type="checkbox"
                 checked={props.checked}
                 onChange={(e) => props.onChange(e.target.checked)}
-                className="accent-sky-500"
+                className="accent-action"
             />
             {props.label}
         </label>
     );
 }
 
-/** A small segmented control for picking one of a few options. */
+/**
+ * A small segmented control for picking one of a few options. Like any radio group it's one stop for Tab, and the
+ * arrow keys move between its options.
+ */
 export function Choice<T extends string>(props: {
     label: string;
     value: T;
     options: { value: T; label: string }[];
     onChange: (v: T) => void;
 }) {
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const step =
+            e.key === "ArrowRight" || e.key === "ArrowDown"
+                ? 1
+                : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                  ? -1
+                  : 0;
+        if (!step) return;
+        e.preventDefault();
+        const n = props.options.length;
+        const at = props.options.findIndex((o) => o.value === props.value);
+        const next = (at + step + n) % n;
+        props.onChange(props.options[next].value);
+        e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
+    };
     return (
-        <div className="flex flex-col gap-1 text-sm text-slate-300">
+        <div className="flex flex-col gap-1 text-sm text-ink-soft">
             {props.label}
             <div
-                className="flex rounded-lg bg-slate-800 p-0.5"
+                className="flex rounded-lg bg-surface-raised p-0.5"
                 role="radiogroup"
                 aria-label={props.label}
+                onKeyDown={onKeyDown}
             >
                 {props.options.map((o) => (
                     <button
                         key={o.value}
+                        type="button"
                         role="radio"
                         aria-checked={o.value === props.value}
+                        tabIndex={o.value === props.value ? 0 : -1}
                         onClick={() => props.onChange(o.value)}
                         className={`flex-1 rounded-md px-2 py-1 text-sm transition-colors ${
                             o.value === props.value
-                                ? "bg-sky-500 text-slate-950"
-                                : "text-slate-300 hover:bg-slate-700"
+                                ? "bg-action text-primary-foreground"
+                                : "text-ink-soft hover:bg-line-faint"
                         }`}
                     >
                         {o.label}
@@ -106,12 +134,12 @@ export function Select<T extends string>(props: {
             </option>
         ));
     return (
-        <label className="flex flex-col gap-1 text-sm text-slate-300">
+        <label className="flex flex-col gap-1 text-sm text-ink-soft">
             {props.label}
             <select
                 value={props.value}
                 onChange={(e) => props.onChange(e.target.value as T)}
-                className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="rounded-lg border border-line-faint bg-surface-raised px-2 py-1.5 text-sm text-ink focus:ring-2 focus:ring-action focus:outline-none"
             >
                 {props.groups.map((g, i) =>
                     g.label ? (
@@ -127,12 +155,15 @@ export function Select<T extends string>(props: {
     );
 }
 
+/** Shown in a readout in place of a value that doesn't apply. */
+export const NONE = "—";
+
 /** A labelled read-only value, e.g. a computed force. */
 export function Readout(props: { label: string; value: string; color?: string }) {
     return (
         <div className="flex justify-between text-sm">
-            <span className="text-slate-400">{props.label}</span>
-            <span className="font-mono" style={{ color: props.color ?? "#e2e8f0" }}>
+            <span className="whitespace-pre-wrap text-ink-muted">{props.label}</span>
+            <span className="font-mono" style={{ color: props.color ?? "var(--ink)" }}>
                 {props.value}
             </span>
         </div>
@@ -148,7 +179,7 @@ const collapsed: More = (children) => (
             <Button
                 variant="ghost"
                 size="sm"
-                className="group h-auto justify-between px-0 text-sm font-normal text-slate-300 hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-slate-300"
+                className="group h-auto justify-between px-0 text-sm font-normal text-ink-soft hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-ink-soft"
             >
                 More settings
                 <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
@@ -161,8 +192,10 @@ const expanded: More = (children) => children;
 
 /**
  * Standard layout: diagram on the left, controls and readouts on the right. Below the `lg` breakpoint the
- * controls move into a sheet, opened by a button in the diagram's corner. `controls` can be a function that
- * passes its less-used controls through `more`, which collapses them on desktop.
+ * controls move into a sheet along the bottom, opened by a button in the diagram's corner: it covers at most
+ * the lower part of the screen and doesn't dim the page, so the diagram stays in view as the sliders move.
+ * `controls` can be a function that passes its less-used controls through `more`, which collapses them on
+ * desktop.
  */
 export function VisualisationLayout(props: {
     diagram: React.ReactNode;
@@ -174,9 +207,9 @@ export function VisualisationLayout(props: {
         typeof props.controls === "function" ? props.controls(more) : props.controls;
     return (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+            <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
                 {props.diagram}
-                <Sheet>
+                <Sheet modal={false}>
                     <SheetTrigger asChild>
                         <Button
                             variant="outline"
@@ -187,20 +220,26 @@ export function VisualisationLayout(props: {
                             <SlidersHorizontal />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="overflow-y-auto">
-                        <SheetHeader>
+                    <SheetContent
+                        side="bottom"
+                        className="max-h-[45dvh] gap-0 overflow-y-auto overscroll-contain"
+                    >
+                        <SheetHeader className="pb-2">
                             <SheetTitle>Settings</SheetTitle>
+                            <SheetDescription className="sr-only">
+                                Change the setup. The diagram follows as you go.
+                            </SheetDescription>
                         </SheetHeader>
                         <div className="flex flex-col gap-4 px-4 pb-4">{controls(expanded)}</div>
                     </SheetContent>
                 </Sheet>
             </div>
             <div className="flex flex-col gap-4">
-                <section className="hidden flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/50 p-4 lg:flex">
+                <section className="hidden flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 lg:flex">
                     {controls(collapsed)}
                 </section>
                 {props.readouts && (
-                    <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                    <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
                         {props.readouts}
                     </section>
                 )}
@@ -224,19 +263,35 @@ export function RawValues(props: { title: string; data: unknown }) {
         setTimeout(() => setCopied(false), 1500);
     };
     return (
-        <section className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-slate-300">{props.title}</h3>
+                <h3 className="text-sm font-medium text-ink-soft">{props.title}</h3>
                 <button
                     onClick={copy}
-                    className="rounded-md bg-slate-800 px-3 py-1 text-sm text-slate-300 transition-colors hover:bg-slate-700"
+                    className="rounded-md bg-surface-raised px-3 py-1 text-sm text-ink-soft transition-colors hover:bg-line-faint"
                 >
                     {copied ? "Copied" : "Copy"}
                 </button>
             </div>
-            <pre className="max-h-80 overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-xs text-slate-400">
+            <pre className="max-h-80 overflow-auto rounded-lg bg-background p-3 font-mono text-xs text-ink-muted">
                 {text}
             </pre>
         </section>
+    );
+}
+
+/**
+ * Why the drawing has no answer, or what stopped. Over the top of the drawing where there's room; above it on
+ * narrow screens, where a long reason would cover a third of the drawing.
+ */
+export function Notice(props: { title: string; detail: string }) {
+    return (
+        <div
+            role="status"
+            className="px-10 text-center text-sm text-warning lg:absolute lg:inset-x-4 lg:top-6 lg:px-0"
+        >
+            <p className="font-medium">{props.title}</p>
+            <p className="mx-auto mt-1 max-w-md text-warning/80">{props.detail}</p>
+        </div>
     );
 }
