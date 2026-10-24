@@ -1,0 +1,89 @@
+{
+  "steps": [
+    {
+      "caption": "Form a bight: take the rope up and over, so the end comes back down on the right.",
+      "pins": [
+        { "x": 0, "y": 20, "angle": -90 },
+        { "x": 0, "y": 9, "angle": -90 },
+        { "x": 0, "y": 6, "angle": -90 },
+        { "x": -3.5, "y": -4, "angle": -90 },
+        { "x": 3.5, "y": -4, "angle": 90 },
+        { "x": 3.5, "y": 4, "angle": 90 },
+        { "x": 6, "y": 12, "angle": 63.44 }
+      ],
+      "lengths": [11, 3, 10.7, 11, 8, 8.47],
+      "tail": 0,
+      "over": []
+    },
+    {
+      "caption": "Bring the end round behind the standing part, making a loop.",
+      "pins": [
+        { "x": 0, "y": 20, "angle": -90 },
+        { "x": 0, "y": 9, "angle": -90 },
+        { "x": 0, "y": 6, "angle": -90 },
+        { "x": -3.5, "y": -4, "angle": -90 },
+        { "x": 3.5, "y": -4, "angle": 90 },
+        { "x": 3.5, "y": 4, "angle": 90 },
+        { "x": -7, "y": -2, "angle": -110 }
+      ],
+      "lengths": [11, 3, 10.7, 11, 8, 28],
+      "tail": 2,
+      "over": [7.98]
+    },
+    {
+      "caption": "Twist the top of the loop half a turn, so it crosses itself and makes an 8.",
+      "pins": [
+        { "x": 0, "y": 20, "angle": -90 },
+        { "x": 0, "y": 9, "angle": -90 },
+        { "x": 0, "y": 6, "angle": -90 },
+        { "x": 3.5, "y": -4, "angle": -90 },
+        { "x": 1.75, "y": -7.03, "angle": -150 },
+        { "x": -1.75, "y": -7.03, "angle": 150 },
+        { "x": -3.5, "y": -4, "angle": 90 },
+        { "x": 0, "y": 0 },
+        { "x": 3.7, "y": 4, "angle": 64.5 },
+        { "x": -7.04, "y": -2, "angle": -110 }
+      ],
+      "lengths": [11, 3, 10.7, 3.66, 3.67, 3.66, 5.52, 5.52, 28.7],
+      "tail": 2,
+      "over": [7.5, 43.24]
+    },
+    {
+      "caption": "Bring the end round and up in front of the 8, so it lies over the top loop.",
+      "pins": [
+        { "x": 0, "y": 20, "angle": -90 },
+        { "x": 0, "y": 9, "angle": -90 },
+        { "x": 0, "y": 6, "angle": -90 },
+        { "x": 3.5, "y": -4, "angle": -90 },
+        { "x": 1.75, "y": -7.03, "angle": -150 },
+        { "x": -1.75, "y": -7.03, "angle": 150 },
+        { "x": -3.5, "y": -4, "angle": 90 },
+        { "x": 0, "y": 0 },
+        { "x": 3.7, "y": 4, "angle": 64.5 },
+        { "x": 0, "y": -2.5, "angle": -90 }
+      ],
+      "lengths": [11, 3, 10.7, 3.66, 3.67, 3.66, 5.52, 5.52, 28.7],
+      "tail": 2,
+      "over": [7.48, 43.24, 73.12]
+    },
+    {
+      "caption": "Pull the end through.",
+      "pins": [
+        { "x": 0, "y": 20, "angle": -90 },
+        { "x": 0, "y": 9, "angle": -90 },
+        { "x": 0, "y": 6, "angle": -90 },
+        { "x": 3.5, "y": -4, "angle": -90 },
+        { "x": 1.75, "y": -7.03, "angle": -150 },
+        { "x": -1.75, "y": -7.03, "angle": 150 },
+        { "x": -3.5, "y": -4, "angle": 90 },
+        { "x": 0, "y": 0, "angle": 35 },
+        { "x": 3.5, "y": 4, "angle": 90 },
+        { "x": -3.5, "y": 4, "angle": -90 },
+        { "x": 0, "y": -6, "angle": -90 }
+      ],
+      "lengths": [11, 3, 10.7, 3.66, 3.67, 3.66, 5.52, 5.52, 11, 10.7],
+      "tail": 9,
+      "over": [12.5, 43.24, 30.2, 63.28]
+    }
+  ]
+}

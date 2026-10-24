@@ -6,6 +6,7 @@ import type { Vector2 } from "@/lib/vector2";
 import { FIGURE_EIGHT } from "./figure-eight";
 import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
 import { knotDeterminant, type Pass } from "./invariants";
+import { solveRope } from "./pinned-rope";
 import {
     centreline,
     crossings,
@@ -161,8 +162,8 @@ describe("firstPart", () => {
 });
 
 describe("FIGURE_EIGHT_TYING", () => {
-    it("ends at the figure-8, with longer ends", () => {
-        expect(FIGURE_EIGHT_TYING.at(-1)!.path.slice(1, -1)).toEqual(FIGURE_EIGHT.slice(1, -1));
+    it("solves every step, meeting all its pins", () => {
+        for (const step of FIGURE_EIGHT_TYING) expect(solveRope(step.rope).converged).toBe(true);
     });
 
     it("adds crossings as it goes, each with one strand over", () => {

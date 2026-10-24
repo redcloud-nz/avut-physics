@@ -1,92 +1,45 @@
 /**
  * Tying a figure-8 by twisting a loop: form a bight, bring the end round behind the standing part to make a
- * loop, twist the top of the loop into an 8, then poke the end into the top loop and pull it through. Each step
- * is the rope as it lies once that step is done, written like `FIGURE_EIGHT` (rope diameters, y down) and
- * finishing at it with longer ends. The end is longish at every step, but not the same length throughout.
+ * loop, twist the top of the loop into an 8, bring the end round in front so its tip lies over the top loop, then
+ * pull it through. Each step is the rope as it lies once that step is done, given by where it's pinned (see
+ * `pinned-rope.ts`) in `figure-eight-tying.json`, which the rope editor at /knots/edit reads and writes. The file
+ * also keeps the editor's drafts: steps changed since they were last saved there, which nothing else uses.
  */
 
-import { findRoot } from "@/lib/numeric";
+import type { Vector2 } from "@/lib/vector2";
 
-import { FIGURE_EIGHT } from "./figure-eight";
-import { crossings, firstPart, over, plain, ropeEnd, ropeLength, type RopePath } from "./rope-path";
+import data from "./figure-eight-tying.json";
+import { ropePathOf, solveRope, type PinnedRope } from "./pinned-rope";
+import type { RopePath } from "./rope-path";
 
-export type TyingStep = { caption: string; path: RopePath };
+export type TyingStepData = PinnedRope & { caption: string };
+export type TyingStep = { caption: string; rope: PinnedRope; path: RopePath };
 
-/** The standing part, coming up from well below the knot, to where `FIGURE_EIGHT`'s goes over. */
-const STANDING = plain("M 0 20 L 0 9");
+type TyingFile = { steps: TyingStepData[]; drafts?: (TyingStepData | null)[] };
+const file: TyingFile = data;
 
-/** The 8 before the end goes anywhere: from the standing part round to the bottom of the lower loop. */
-const EIGHT = [STANDING, ...FIGURE_EIGHT.slice(1, 9)];
+/** The steps as saved in the rope editor. */
+export const TYING_DATA: TyingStepData[] = file.steps;
 
-/** Up the left, over the top and down the right: the bight, before the end goes round. */
-const BIGHT = [
-    STANDING,
-    over("L 0 6"),
-    plain("C 0 2.7, -3.5 -0.7, -3.5 -4"),
-    plain("A 3.5 3.5 0 0 1 3.5 -4"),
-    plain("L 3.5 4"),
-];
+/** For each step, the editor's draft of it if it's been changed since it was saved, or else null. */
+export const TYING_DRAFTS: (TyingStepData | null)[] = TYING_DATA.map(
+    (_, i) => file.drafts?.[i] ?? null,
+);
+
+/** A step's rope solved and ready to draw. */
+export function tyingStep({ caption, ...rope }: TyingStepData): TyingStep {
+    return { caption, rope, path: ropePathOf(rope, solveRope(rope)) };
+}
+
+export const FIGURE_EIGHT_TYING: TyingStep[] = TYING_DATA.map(tyingStep);
 
 /**
- * The end, come round behind the standing part from the right and lying loose up the left of the loop. It
- * leaves the bottom of the loop partway up (at 45° from the bottom), so it doesn't bend back on itself.
+ * The view every step shares: centred on the finished knot (at the origin), with room for each step's rope above
+ * it and to each side. The standing part runs on out of the bottom, so the only end in view is the running end.
  */
-const FREE_END = [
-    plain("A 3.5 3.5 0 0 1 -2.475 6.475"),
-    plain("C -5.3 3.6, -8 1, -8 -3"),
-    plain("L -8 -10"),
-];
-
-/** The 8 made, with the end come round under the standing part and lying loose up the left. */
-const TWISTED = [...EIGHT.slice(0, -1), ...FREE_END];
-
-/**
- * Where the rope's held for the next step: a diameter on from where the long diagonal crosses over the standing
- * part, in the middle of the 8. Everything from there to the end is free to move.
- */
-const PIN = crossings(TWISTED).find((c) => c.at.y > 0 && c.at.y < 5)!.s[1] + 1;
-const TO_PIN = firstPart(TWISTED, PIN);
-const END_LENGTH = ropeLength(TWISTED) - PIN;
-
-/**
- * The end, from the pin, brought round under the standing part again and up in front of the 8: out to the left
- * `width` from the middle, then back in across the upper loop's lower left side, its tip pointing straight up
- * over the middle of the loop.
- */
-const overTheLoop = (width: number): RopePath => {
-    const { at, heading } = ropeEnd(TO_PIN);
-    const c = at.add(heading.scale(3.5));
-    return [
-        ...TO_PIN,
-        plain(`C ${c.x} ${c.y}, 2.5 7.6, -1 7.6`),
-        plain(`C ${-1 - 0.55 * (width - 1)} 7.6, ${-width} 5.5, ${-width} 2`),
-        over(`C ${-width} -0.8, 0 -1.5, 0 -4.5`),
-    ];
-};
-
-/** As far out to the left as uses up the end's length. */
-const WIDTH = findRoot((w) => ropeLength(overTheLoop(w)) - PIN - END_LENGTH, 2, 20);
-
-export const FIGURE_EIGHT_TYING: TyingStep[] = [
-    {
-        caption:
-            "Form a bight: take the rope up and over, so the end comes back down on the right.",
-        path: [...BIGHT, plain("C 3.5 7, 4.5 9, 6 12")],
-    },
-    {
-        caption: "Bring the end round behind the standing part, making a loop.",
-        path: [...BIGHT, ...FREE_END],
-    },
-    {
-        caption: "Twist the top of the loop half a turn, so it crosses itself and makes an 8.",
-        path: TWISTED,
-    },
-    {
-        caption: "Bring the end round and up in front of the 8, so it lies over the top loop.",
-        path: overTheLoop(WIDTH),
-    },
-    {
-        caption: "Pull the end through.",
-        path: [...EIGHT, FIGURE_EIGHT[9], plain("L 0 -15")],
-    },
-];
+export function tyingView(ropes: Vector2[][], margin = 1.5) {
+    const all = ropes.flat();
+    const w = 2 * (Math.max(...all.map((p) => Math.abs(p.x))) + margin);
+    const h = 2 * (Math.max(...all.map((p) => -p.y)) + margin);
+    return { x: -w / 2, y: -h / 2, w, h };
+}

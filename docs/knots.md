@@ -38,9 +38,13 @@ knot but not a tight one.
 
 ## Next
 
-- **Tying.** Shown as people tie it, by twisting a loop: `figure-eight-tying.ts` has the steps as still
-  frames (a bight, the end round behind into a loop, the loop given half a turn into an 8, the end poked into
-  the top loop, the end pulled through), stepped through one at a time. Animating between them is left for later; the likely way is to
+- **Tying.** Shown as people tie it, by twisting a loop: still frames (a bight, the end round behind into a
+  loop, the loop given half a turn into an 8, the end round in front over the top loop, the end pulled
+  through), stepped through one at a time. Each step is a pinned rope (`pinned-rope.ts`): pins along it, the
+  rope between them and any direction a pin holds, with the rope between the pins solved as the smoothest
+  curve of that length. They're kept in `figure-eight-tying.json` and laid out in the rope editor at
+  `/knots/edit` (development only), which saves every change straight into that file and picks up changes
+  made to it elsewhere. Animating between them is left for later; the likely way is to
   match steps by distance along the rope (which needs every step to be the same length of rope). `firstPart` (the rope cut at a length along it) is kept for
   retracing a follow-through and for cutting blended frames to the rope's length. Hands and a bar as SVG props
   come after that.

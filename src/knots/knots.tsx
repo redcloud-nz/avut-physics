@@ -6,12 +6,9 @@ import { useState } from "react";
 import { Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { Button } from "@/components/ui/button";
 
-import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
+import { FIGURE_EIGHT_TYING, tyingView } from "./figure-eight-tying";
 import { RopeDrawing } from "./rope-drawing";
 import { centreline, crossings } from "./rope-path";
-
-/** Room round the knot (rope diameters). */
-const MARGIN = 1.5;
 
 const STEPS = FIGURE_EIGHT_TYING.map((step) => ({
     ...step,
@@ -19,14 +16,7 @@ const STEPS = FIGURE_EIGHT_TYING.map((step) => ({
     crossings: crossings(step.path),
 }));
 
-/**
- * The same view for every step, centred on the knot (at the origin) and with room for every step's rope above
- * it and to each side. The standing part runs on out of the bottom, so the only end in view is the running end.
- */
-const ALL = STEPS.flatMap((step) => step.points);
-const W = 2 * (Math.max(...ALL.map((p) => Math.abs(p.x))) + MARGIN);
-const H = 2 * (Math.max(...ALL.map((p) => -p.y)) + MARGIN);
-const [X0, Y0] = [-W / 2, -H / 2];
+const { x: X0, y: Y0, w: W, h: H } = tyingView(STEPS.map((step) => step.points));
 
 /** Tying a figure-8, a step at a time, ending loose. */
 export default function Knots() {
