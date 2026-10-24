@@ -4,7 +4,21 @@ Exploring knots drawn in 2D SVG: how they look, how they're tied (with props lik
 they tighten. Work in progress, not listed on the home page: `/knots` lists the knots (`src/knots/index.ts`), and
 each has a page at `/knots/<slug>`: the knot finished and how it's used (`knot-page.tsx`), with a button that
 brings up tying it over the page, a figure at a time, laid out like a page of the visual introduction
-(`tying-steps.tsx`).
+(`tying-steps.tsx`). Knots without steps, like the figure-8 on a bight, show only the finished knot. Finished knots
+are drawn on their pages at a fixed size per rope diameter (`PAGE_SCALE` in `tying-drawing.tsx`), so the rope looks
+as thick in every illustration and a bigger knot takes more room. The list of knots draws them all smaller, but again at
+one size per rope diameter: the most that still fits the biggest in its box.
+
+Knots with two strands through them (`doubled.ts`) are drawn from the same knot tied in a single strand: its
+centreline scaled (by 1 for the figure-8, the same size as the single one) and two strands laid side by side along it.
+Where the strands cross, the one standing for the single strand's over pass is marked over. On the bight, the two
+strands part a little before the single strand's end leaves the knot and join round a loop as wide as the knot. Joined,
+they're two ropes, the second following the first back through the knot, so each rope's end comes out beside the
+other's standing part. `figure-eight-doubled.ts` builds the figure-8 on a bight and the joining-8 this way from the
+finished figure-8 of the tying steps. The figure-8 rethreaded comes out the same as the figure-8 on a bight, so it's
+drawn the same way, with its loop reaching a little further and a short tail, so its taped running end shows below the knot, and tied round a bar (`bar.tsx`) seen end on, the loop wrapped
+round it. A knot joining two ropes draws the second in green, and its view stops as far past
+the knot at the top as at the bottom, where the ropes run on out both ways.
 
 ## Stages
 

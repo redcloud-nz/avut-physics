@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { KNOTS, KNOTS_TITLE } from "@/knots";
+import { fullName, KNOTS, KNOTS_TITLE } from "@/knots";
 import { KnotPage } from "@/knots/knot-page";
 
 export function generateStaticParams() {
@@ -13,10 +13,10 @@ export async function generateMetadata(props: PageProps<"/knots/[slug]">): Promi
     const knot = KNOTS.find((k) => k.slug === slug);
     if (!knot) return {};
     return {
-        title: `${knot.name}, ${KNOTS_TITLE}`,
+        title: `${fullName(knot)}, ${KNOTS_TITLE}`,
         description: knot.description,
         openGraph: {
-            title: knot.name,
+            title: fullName(knot),
             description: knot.description,
             url: `/knots/${slug}`,
             type: "website",

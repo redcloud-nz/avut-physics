@@ -451,7 +451,7 @@ function Editor() {
 
                     {/* Arrows go behind the rope unless they're marked in front, as on the knots page. */}
                     {arrows.map((arrow, a) => !arrow.front && drawArrow(arrow, a))}
-                    <RopeDrawing path={path} />
+                    <RopeDrawing ropes={[path]} />
                     {arrows.map((arrow, a) => arrow.front && drawArrow(arrow, a))}
                     {/* Clicking the rope pins it there. */}
                     <polyline

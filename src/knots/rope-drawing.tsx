@@ -1,6 +1,8 @@
 /**
  * Draws a rope written as SVG path data (see `rope-path.ts`) as a tube with an outline, its sheath's weave and a
- * highlight along the top. The whole rope is drawn once, then each segment marked `over` again on top of it.
+ * highlight along the top. The whole rope is drawn once, then each segment marked `over` again on top of it. Two ropes
+ * (a bend joining them) are each drawn whole before either's `over` segments, so each goes over the other where it's
+ * marked to.
  * The segments have square ends, pick up the weave where the rope underneath has it, and stop their outlines
  * just short of their ends, so they join it without a seam. The end is taped, so it's plain which end it is.
  *
@@ -15,6 +17,14 @@ export const ROPE_COLORS: RopeColors = {
     body: "#f97316",
     weave: "#9a3412",
     highlight: "#fed7aa",
+    outline: "#0f172a",
+};
+
+/** The second rope, where a knot joins two, in another colour so they're told apart. */
+export const SECOND_ROPE_COLORS: RopeColors = {
+    body: "#16a34a",
+    weave: "#14532d",
+    highlight: "#bbf7d0",
     outline: "#0f172a",
 };
 
@@ -68,33 +78,44 @@ function Stretch(props: { d: string; offset: number; length?: number; colors: Ro
     );
 }
 
-export function RopeDrawing(props: { path: RopePath; colors?: RopeColors }) {
-    const { path, colors = ROPE_COLORS } = props;
-    const laid = laySegments(path);
-    const whole = path.map((s) => s.d).join(" ");
-    const end = ropeEnd(path);
-    const tapeFrom = end.at.sub(end.heading.scale(TAPE_LENGTH));
+export function RopeDrawing(props: { ropes: RopePath[] }) {
+    const ropes = props.ropes.map((path, r) => ({
+        path,
+        laid: laySegments(path),
+        colors: r === 0 ? ROPE_COLORS : SECOND_ROPE_COLORS,
+    }));
     return (
         <g>
-            <Stretch d={whole} offset={0} colors={colors} />
-            {laid.map(
-                (seg, k) =>
-                    seg.over && (
-                        <Stretch
-                            key={k}
-                            d={`M ${seg.from.x} ${seg.from.y} ${seg.d}`}
-                            offset={seg.start}
-                            length={seg.length}
-                            colors={colors}
-                        />
-                    ),
+            {ropes.map(({ path, colors }, r) => (
+                <Stretch key={r} d={path.map((s) => s.d).join(" ")} offset={0} colors={colors} />
+            ))}
+            {ropes.map(({ laid, colors }, r) =>
+                laid.map(
+                    (seg, k) =>
+                        seg.over && (
+                            <Stretch
+                                key={`${r}-${k}`}
+                                d={`M ${seg.from.x} ${seg.from.y} ${seg.d}`}
+                                offset={seg.start}
+                                length={seg.length}
+                                colors={colors}
+                            />
+                        ),
+                ),
             )}
-            <Stretch
-                d={`M ${tapeFrom.x} ${tapeFrom.y} L ${end.at.x} ${end.at.y}`}
-                offset={0}
-                length={TAPE_LENGTH}
-                colors={TAPE_COLORS}
-            />
+            {ropes.map(({ path }, r) => {
+                const end = ropeEnd(path);
+                const tapeFrom = end.at.sub(end.heading.scale(TAPE_LENGTH));
+                return (
+                    <Stretch
+                        key={r}
+                        d={`M ${tapeFrom.x} ${tapeFrom.y} L ${end.at.x} ${end.at.y}`}
+                        offset={0}
+                        length={TAPE_LENGTH}
+                        colors={TAPE_COLORS}
+                    />
+                );
+            })}
         </g>
     );
 }

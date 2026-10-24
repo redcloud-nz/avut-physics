@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { arcLengths } from "@/lib/curve";
+import { segmentIntersection } from "@/lib/geometry";
 import type { Vector2 } from "@/lib/vector2";
 
 import { FIGURE_EIGHT } from "./figure-eight";
+import {
+    FIGURE_EIGHT_JOINED,
+    FIGURE_EIGHT_ON_A_BIGHT,
+    FIGURE_EIGHT_RETHREADED,
+} from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
 import { knotDeterminant, type Pass } from "./invariants";
 import { solveRope } from "./pinned-rope";
@@ -179,5 +185,86 @@ describe("FIGURE_EIGHT_TYING", () => {
     it("bends smoothly at every step", () => {
         for (const step of FIGURE_EIGHT_TYING)
             expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_ON_A_BIGHT", () => {
+    const { points, over: isOver } = centreline(FIGURE_EIGHT_ON_A_BIGHT);
+    const s = arcLengths(points);
+    const found = crossings(FIGURE_EIGHT_ON_A_BIGHT);
+
+    it("crosses itself four times at each of the figure-8's crossings, one pair always over", () => {
+        expect(found).toHaveLength(16);
+        for (const c of found) expect(c.over).not.toBeNull();
+    });
+
+    it("marks the strand going over for a diameter either side of each crossing", () => {
+        for (const c of found) {
+            const at = c.s[c.over!];
+            points.forEach((_, i) => {
+                if (Math.abs(s[i] - at) <= 1) expect(isOver[i]).toBe(true);
+            });
+        }
+    });
+
+    it("bends smoothly, with no corners", () => {
+        expect(tightestBend(points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_RETHREADED", () => {
+    it("crosses itself as the figure-8 on a bight does, and bends smoothly round its longer loop", () => {
+        const found = crossings(FIGURE_EIGHT_RETHREADED);
+        expect(found).toHaveLength(16);
+        for (const c of found) expect(c.over).not.toBeNull();
+        expect(tightestBend(centreline(FIGURE_EIGHT_RETHREADED).points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_JOINED", () => {
+    const ropes = FIGURE_EIGHT_JOINED.map((path) => {
+        const { points, over: isOver } = centreline(path);
+        return { points, isOver, s: arcLengths(points) };
+    });
+
+    /** Where a strand of one rope crosses a strand of the other, how far along each, and whether each is marked over. */
+    const between = () => {
+        const [a, b] = ropes;
+        const found: { s: [number, number]; over: [boolean, boolean] }[] = [];
+        for (let i = 0; i < a.points.length - 1; i++)
+            for (let j = 0; j < b.points.length - 1; j++) {
+                const hit = segmentIntersection(
+                    a.points[i],
+                    a.points[i + 1],
+                    b.points[j],
+                    b.points[j + 1],
+                );
+                if (!hit) continue;
+                found.push({
+                    s: [
+                        a.s[i] + (a.s[i + 1] - a.s[i]) * hit.t,
+                        b.s[j] + (b.s[j + 1] - b.s[j]) * hit.u,
+                    ],
+                    over: [a.isOver[i] && a.isOver[i + 1], b.isOver[j] && b.isOver[j + 1]],
+                });
+            }
+        return found;
+    };
+
+    it("is a figure-8 in each rope, crossing the other at each of its crossings, one pair always over", () => {
+        for (const path of FIGURE_EIGHT_JOINED) {
+            const found = crossings(path);
+            expect(found).toHaveLength(4);
+            for (const c of found) expect(c.over).not.toBeNull();
+            expect(knotDeterminant(passesOf(path))).toBe(5);
+        }
+        // Each of the figure-8's four crossings, a strand of each rope crossing one of the other's both ways.
+        const found = between();
+        expect(found).toHaveLength(8);
+        for (const c of found) expect(c.over[0]).not.toBe(c.over[1]);
+    });
+
+    it("bends smoothly, with no corners", () => {
+        for (const { points } of ropes) expect(tightestBend(points)).toBeGreaterThan(1.75);
     });
 });

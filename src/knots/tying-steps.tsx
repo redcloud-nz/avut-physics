@@ -86,7 +86,12 @@ export function TyingSteps(props: { name: string; steps: TyingStep[]; onClose: (
             {/* Sized by the room it's given, not by its drawing, so a short screen squeezes it no smaller than its
                 minimum. */}
             <div className="relative flex min-h-48 flex-1 items-center justify-center contain-size">
-                <TyingDrawing step={step} view={view} className="absolute inset-0 h-full w-full" />
+                <TyingDrawing
+                    step={step}
+                    view={view}
+                    label={`${step.label}: ${step.caption}`}
+                    className="absolute inset-0 h-full w-full"
+                />
             </div>
 
             <nav className="grid grid-cols-2 gap-2">

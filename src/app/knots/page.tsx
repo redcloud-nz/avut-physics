@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { KNOTS_DESCRIPTION as DESCRIPTION, KNOTS, KNOTS_TITLE as TITLE } from "@/knots";
-import { finished, TyingDrawing } from "@/knots/tying-drawing";
+import { ropeView, TyingDrawing } from "@/knots/tying-drawing";
 
 export const metadata: Metadata = {
     title: TITLE,
@@ -10,7 +10,26 @@ export const metadata: Metadata = {
     openGraph: { title: TITLE, description: DESCRIPTION, url: "/knots", type: "website" },
 };
 
-/** The list of knots, each linking to its page, with a small drawing of it finished. */
+/** The box each knot's small drawing sits in (pixels). */
+const BOX = { w: 144, h: 48 };
+
+const VIEWS = new Map(
+    KNOTS.map((knot) => [knot.slug, ropeView(knot.drawing, knot.drawing.length > 1, knot.bar)]),
+);
+
+/** Pixels per rope diameter for every knot in the list: the most that still fits the biggest one in the box. */
+const LIST_SCALE = Math.min(
+    ...KNOTS.map((knot) => {
+        const view = VIEWS.get(knot.slug)!;
+        const [w, h] = knot.turned ? [view.h, view.w] : [view.w, view.h];
+        return Math.min(BOX.w / w, BOX.h / h);
+    }),
+);
+
+/**
+ * The list of knots, each linking to its page, with a small drawing of it finished. The drawings are all at the same
+ * size per rope diameter, so their ropes look as thick, each starting at the box's left so the knots line up.
+ */
 export default function Page() {
     return (
         <main className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 pt-4 pb-10">
@@ -21,7 +40,6 @@ export default function Page() {
             <p className="text-ink-soft">{DESCRIPTION}</p>
             <ul className="flex flex-col gap-2">
                 {KNOTS.map((knot) => {
-                    const { step, view } = finished(knot.steps);
                     return (
                         <li key={knot.slug}>
                             <Link
@@ -30,14 +48,28 @@ export default function Page() {
                             >
                                 <span className="flex-1 font-medium text-ink-strong">
                                     {knot.name}
+                                    {knot.variant && (
+                                        <>
+                                            {" "}
+                                            <span className="block text-sm font-normal text-ink-muted">
+                                                {knot.variant}
+                                            </span>
+                                        </>
+                                    )}
                                 </span>
-                                <TyingDrawing
-                                    step={step}
-                                    view={view}
-                                    turned={knot.turned}
-                                    label={null}
-                                    className="h-12 w-36 shrink-0"
-                                />
+                                <div
+                                    className="flex shrink-0 items-center"
+                                    style={{ width: BOX.w, height: BOX.h }}
+                                >
+                                    <TyingDrawing
+                                        step={{ ropes: knot.drawing }}
+                                        bar={knot.bar}
+                                        view={VIEWS.get(knot.slug)!}
+                                        turned={knot.turned}
+                                        label={null}
+                                        scale={LIST_SCALE}
+                                    />
+                                </div>
                             </Link>
                         </li>
                     );
