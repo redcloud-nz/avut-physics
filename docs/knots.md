@@ -1,7 +1,10 @@
 # Knots
 
 Exploring knots drawn in 2D SVG: how they look, how they're tied (with props like a bar and hands), and how
-they tighten. Work in progress at `/knots`, not listed on the home page.
+they tighten. Work in progress, not listed on the home page: `/knots` lists the knots (`src/knots/index.ts`), and
+each has a page at `/knots/<slug>`: the knot finished and how it's used (`knot-page.tsx`), with a button that
+brings up tying it over the page, a figure at a time, laid out like a page of the visual introduction
+(`tying-steps.tsx`).
 
 ## Stages
 

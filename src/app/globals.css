@@ -111,6 +111,12 @@ html {
   color-scheme: dark;
 }
 
+/* The scrollbar's room is kept whether or not the page scrolls, so pages don't shift sideways going from a short one
+   to a long one. */
+.page-scroll {
+  scrollbar-gutter: stable;
+}
+
 /* The page's scrollbar, in the page's own colours. Firefox uses the standard properties; Chrome and
    Safari use the -webkit- pseudo-elements, which Chrome ignores if scrollbar-color is also set. */
 @supports (-moz-appearance: none) {

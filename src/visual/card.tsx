@@ -10,14 +10,14 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { SERIES } from "./series";
 
 /** Controls that use the arrow keys themselves. */
-const ARROW_KEYED =
+export const ARROW_KEYED =
     "input, select, textarea, [contenteditable], [role=radio], [role=slider], [data-arrow-keys]";
 
 /** How far a swipe has to go before it counts, in pixels. */
 const SWIPE = 60;
 
 /** Which way a touch went, if far enough and clearly enough sideways to count as a swipe. */
-function swipe(start: { x: number; y: number }, end: { clientX: number; clientY: number }) {
+export function swipe(start: { x: number; y: number }, end: { clientX: number; clientY: number }) {
     const dx = end.clientX - start.x;
     const dy = end.clientY - start.y;
     if (Math.abs(dx) >= SWIPE && Math.abs(dx) >= 2 * Math.abs(dy)) return dx < 0 ? "left" : "right";

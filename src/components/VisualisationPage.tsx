@@ -4,7 +4,7 @@ import type { Visualisation } from "@/visualisations";
 
 /** The frame around one visualisation's page: a link home and its title. */
 export default function VisualisationPage(props: {
-    visualisation: Visualisation;
+    visualisation: Pick<Visualisation, "title">;
     children: React.ReactNode;
 }) {
     return (
