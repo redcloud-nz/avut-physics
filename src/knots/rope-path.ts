@@ -85,6 +85,12 @@ export function ropeLength(path: RopePath): number {
     return laySegments(path).reduce((sum, seg) => sum + seg.length, 0);
 }
 
+/** Where the rope ends, and the way it's heading there. */
+export function ropeEnd(path: RopePath): { at: Vector2; heading: Vector2 } {
+    const [a, b] = centreline(path).points.slice(-2);
+    return { at: b, heading: b.sub(a).unit() };
+}
+
 /**
  * The rope from its start to `length` along it. Whole segments are kept as written, and the one it ends partway
  * through becomes a line through its points up to there, keeping its over or under.

@@ -262,3 +262,16 @@ export function determinant(A: Matrix): number {
     }
     return det;
 }
+
+/** Where f crosses zero between lo and hi, by bisection, to within `tol`. f(lo) and f(hi) must differ in sign. */
+export function findRoot(f: (x: number) => number, lo: number, hi: number, tol = 1e-12): number {
+    let [a, b, fa] = [lo, hi, f(lo)];
+    if (fa * f(hi) > 0) throw new Error("findRoot: f has the same sign at both ends");
+    while (b - a > tol) {
+        const m = (a + b) / 2;
+        const fm = f(m);
+        if (fa * fm <= 0) b = m;
+        else [a, fa] = [m, fm];
+    }
+    return (a + b) / 2;
+}

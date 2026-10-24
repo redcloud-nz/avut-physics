@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     centralDifferences,
+    findRoot,
     gridMinima,
     leastSquares,
     nelderMead,
@@ -458,5 +459,16 @@ describe("nonNegativeLeastSquares", () => {
 
     it("is zero when every column points away from b", () => {
         expect(nonNegativeLeastSquares([[1], [1]], [-1, -2])).toEqual([0]);
+    });
+});
+
+describe("findRoot", () => {
+    it("finds where a function crosses zero", () => {
+        expect(findRoot((x) => x * x - 2, 0, 2)).toBeCloseTo(Math.SQRT2, 10);
+        expect(findRoot((x) => 1 - x, 0, 5)).toBeCloseTo(1, 10);
+    });
+
+    it("refuses a range it can't be sure of", () => {
+        expect(() => findRoot((x) => x * x + 1, -1, 1)).toThrow(/same sign/);
     });
 });

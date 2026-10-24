@@ -39,8 +39,8 @@ knot but not a tight one.
 ## Next
 
 - **Tying.** Shown as people tie it, by twisting a loop: `figure-eight-tying.ts` has the steps as still
-  frames (a straight rope, a loop, the loop given half a turn into an 8, the end up in front, the end through
-  the top), stepped through one at a time. Animating between them is left for later; the likely way is to
+  frames (a bight, the end round behind into a loop, the loop given half a turn into an 8, the end poked into
+  the top loop, the end pulled through), stepped through one at a time. Animating between them is left for later; the likely way is to
   match steps by distance along the rope (which needs every step to be the same length of rope). `firstPart` (the rope cut at a length along it) is kept for
   retracing a follow-through and for cutting blended frames to the rope's length. Hands and a bar as SVG props
   come after that.

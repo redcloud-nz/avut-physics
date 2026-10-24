@@ -19,16 +19,14 @@ const STEPS = FIGURE_EIGHT_TYING.map((step) => ({
     crossings: crossings(step.path),
 }));
 
-/** The same view for every step: room for all of them. */
+/**
+ * The same view for every step, centred on the knot (at the origin) and with room for every step's rope above
+ * it and to each side. The standing part runs on out of the bottom, so the only end in view is the running end.
+ */
 const ALL = STEPS.flatMap((step) => step.points);
-const [X0, Y0] = [
-    Math.min(...ALL.map((p) => p.x)) - MARGIN,
-    Math.min(...ALL.map((p) => p.y)) - MARGIN,
-];
-const [W, H] = [
-    Math.max(...ALL.map((p) => p.x)) + MARGIN - X0,
-    Math.max(...ALL.map((p) => p.y)) + MARGIN - Y0,
-];
+const W = 2 * (Math.max(...ALL.map((p) => Math.abs(p.x))) + MARGIN);
+const H = 2 * (Math.max(...ALL.map((p) => -p.y)) + MARGIN);
+const [X0, Y0] = [-W / 2, -H / 2];
 
 /** Tying a figure-8, a step at a time, ending loose. */
 export default function Knots() {

@@ -161,8 +161,8 @@ describe("firstPart", () => {
 });
 
 describe("FIGURE_EIGHT_TYING", () => {
-    it("ends at the figure-8", () => {
-        expect(FIGURE_EIGHT_TYING.at(-1)!.path).toEqual(FIGURE_EIGHT);
+    it("ends at the figure-8, with longer ends", () => {
+        expect(FIGURE_EIGHT_TYING.at(-1)!.path.slice(1, -1)).toEqual(FIGURE_EIGHT.slice(1, -1));
     });
 
     it("adds crossings as it goes, each with one strand over", () => {
