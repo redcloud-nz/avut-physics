@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { SITE } from "@/articles/prose";
+import { ScrollMemory } from "@/components/scroll-memory";
 import { SiteFooter } from "@/components/SiteFooter";
 
 import "./globals.css";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     {children}
                     <SiteFooter />
                 </div>
+                <ScrollMemory />
             </body>
         </html>
     );

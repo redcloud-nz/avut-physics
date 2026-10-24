@@ -6,7 +6,7 @@ import { COLORS } from "@/articles/colors";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
 import { deg } from "@/lib/math";
 import { vec2 } from "@/lib/vector2";
-import { DRAG_HINT, DragGrid, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 /** One force on a bolt as an arrow: how big, and which way. */
@@ -37,7 +37,7 @@ export function ArrowsFigure() {
                     <Arrow from={ORIGIN} v={tips[0].sub(ORIGIN)} color={COLORS.pull} width={3} />
                 </DragGrid>
             }
-            slider={DRAG_HINT}
+            slider={dragHint()}
             readouts={
                 <>
                     <Readout label="how big" value={kNText(f.len())} color={COLORS.pull} />

@@ -36,7 +36,10 @@ export function Layout(props: {
                 {props.drawing}
             </div>
             {props.slider}
-            <div className="flex gap-2">{props.readouts}</div>
+            {/* Read out as they change, so moving a slider by keyboard says what it did. */}
+            <div className="flex gap-2" aria-live="polite">
+                {props.readouts}
+            </div>
         </div>
     );
 }

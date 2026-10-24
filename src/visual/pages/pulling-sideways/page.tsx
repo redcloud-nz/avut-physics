@@ -117,6 +117,8 @@ const page: VisualPage = {
     slug: "pulling-sideways",
     name: "Pulling sideways",
     title: "Two parts make a slanting pull",
+    description:
+        "A tag line pulls the load sideways, so the rope holds a sideways part as well as the up part. Tip to tail, they make the rope’s pull, which is more than the load weighs once the tag line pulls.",
     text: (
         <>
             A tag line pulls the load sideways, so the rope holds a sideways part{" "}

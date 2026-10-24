@@ -8,10 +8,10 @@ function CompoundMore() {
         <Section title="More isn’t always better">
             <p>
                 A big advantage makes it easy to pull far harder than you mean to. On a 6:1, three
-                people pulling 0.3 kN each put over 5 kN on the load (about 4 kN once friction takes
-                its share), and hardly feel it. If the load snags on an edge, that’s what the system
-                and the patient take. Use the least advantage that does the job, and stop if hauling
-                suddenly gets hard.
+                people pulling 0.3 kN each put over 5 kN on the load (about 4.5 kN once friction
+                takes its share), and hardly feel it. If the load snags on an edge, that’s what the
+                system and the patient take. Use the least advantage that does the job, and stop if
+                hauling suddenly gets hard.
             </p>
         </Section>
     );

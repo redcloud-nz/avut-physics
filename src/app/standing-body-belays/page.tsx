@@ -30,7 +30,7 @@ const listed = (items: string[]) =>
 export default function Page() {
     const { hold, pairs, training, heaviest, weightTable, placingTable } = FIGURES;
     const { training: trainingPair, real, heavy } = pairs;
-    const [equalLight, equalHeavy] = FIGURES.equal;
+    const { equal } = FIGURES;
     const bestPlacing = Math.max(...placingTable.safety.flat());
     const backup = 1.5;
     const wetSteel = SURFACES.find((s) => s.key === "painted-steel")!.wet;
@@ -295,9 +295,9 @@ export default function Page() {
                 </p>
                 <p>
                     When the belayers and stretcher weigh the same, the safety factor stays between
-                    about {sf(equalLight.safety)} and {sf(equalHeavy.safety)}, from{" "}
-                    {equalLight.mass} kg to {equalHeavy.mass} kg. A team that has only ever held
-                    light mock casualties has trained with a margin a real casualty won’t give them.
+                    about {sf(equal.least)} and {sf(equal.most)}, from {equal.from} kg to {equal.to}{" "}
+                    kg. A team that has only ever held light mock casualties has trained with a
+                    margin a real casualty won’t give them.
                 </p>
                 <p>
                     For other weights, the table below gives the safety factor on dry painted steel,

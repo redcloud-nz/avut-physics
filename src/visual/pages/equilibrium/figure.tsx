@@ -5,7 +5,7 @@ import { useState } from "react";
 import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
 import { vec2 } from "@/lib/vector2";
-import { DragGrid, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 /**
@@ -40,7 +40,7 @@ export function EquilibriumFigure() {
                     <Arrow from={ORIGIN} v={b} color={COLORS.redirect} width={3} />
                 </DragGrid>
             }
-            slider={<p className="text-center text-sm text-ink-muted">Drag either arrow’s tip.</p>}
+            slider={dragHint(true)}
             readouts={
                 <>
                     <Readout label="one" value={kNText(a.len() / KN)} color={COLORS.pull} />

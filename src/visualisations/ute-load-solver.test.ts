@@ -76,7 +76,25 @@ describe("ute axle loads", () => {
 
     it("reports the front wheels lifting when the ball outweighs the front", () => {
         const r = solveLoads({ ...BASE, trailer: 20000, ballShare: 0.5 });
-        expect(r.kind).toBe("none");
+        expect(r.kind === "none" && r.reason).toMatch(/front wheels/);
+    });
+
+    it("reports the rear wheels lifting when a load ahead of the front axle outweighs the rear", () => {
+        // 882 kg on the rear axle empty; 3000 kg 1 m ahead of the front axle takes about 968 kg off it.
+        const r = solveLoads({ ...BASE, loads: [{ label: "a", mass: 3000, x: -1 }] });
+        expect(r.kind === "none" && r.reason).toMatch(/rear wheels/);
+    });
+
+    it("refuses shares outside 0 to 1 and masses below zero", () => {
+        for (const s of [
+            { ...BASE, unladenFrontShare: 1.2 },
+            { ...BASE, unladenFrontShare: -0.1 },
+            { ...BASE, ballShare: 2 },
+            { ...BASE, unladen: -1 },
+            { ...BASE, trailer: -1 },
+            { ...BASE, loads: [{ label: "a", mass: -5, x: 1 }] },
+        ])
+            expect(solveLoads(s).kind).toBe("none");
     });
 
     it("checks each rating against what it limits", () => {

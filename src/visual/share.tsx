@@ -16,7 +16,7 @@ const noSubscribe = () => () => {};
  */
 export function Share(props: { title: string; text: string; path: string }) {
     const url = `https://${SITE}${props.path}`;
-    const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState<"no" | "yes" | "failed">("no");
 
     // Only known in the browser; the server's page goes without, so the first render matches it.
     const canShare = useSyncExternalStore(
@@ -59,19 +59,29 @@ export function Share(props: { title: string; text: string; path: string }) {
                 <button
                     type="button"
                     className={BUTTON}
-                    onClick={() =>
-                        navigator.clipboard.writeText(url).then(() => {
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                        })
-                    }
+                    // There's no clipboard away from https, and some apps' own browsers refuse to write to it.
+                    onClick={() => {
+                        const copy = navigator.clipboard
+                            ? navigator.clipboard.writeText(url)
+                            : Promise.reject(new Error("No clipboard"));
+                        copy.then(
+                            () => setCopied("yes"),
+                            () => setCopied("failed"),
+                        ).finally(() => setTimeout(() => setCopied("no"), 2000));
+                    }}
                 >
-                    {copied ? (
+                    {copied === "yes" ? (
                         <Check className="size-4" aria-hidden />
                     ) : (
                         <LinkIcon className="size-4" aria-hidden />
                     )}
-                    {copied ? "Copied" : "Copy link"}
+                    <span aria-live="polite">
+                        {copied === "yes"
+                            ? "Copied"
+                            : copied === "failed"
+                              ? "Couldn’t copy"
+                              : "Copy link"}
+                    </span>
                 </button>
                 <a
                     className={BUTTON}

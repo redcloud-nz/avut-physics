@@ -57,6 +57,23 @@ describe("physics rules", () => {
         expect(failures).toEqual([]);
     });
 
+    // The checks pass any "no answer", so test those another way: a real one holds over a range of setups, so a
+    // centimetre more or less rope shouldn't give an answer both ways.
+    it(
+        "gives no answer only where a slightly longer or shorter rope doesn't have one either",
+        { timeout: 60_000 },
+        () => {
+            const isolated = randomInputs(400)
+                .filter((i) => solve(setupFor(i)).kind === "none")
+                .filter((i) =>
+                    [-0.01, 0.01].every(
+                        (d) => solve(setupFor({ ...i, rope: i.rope + d })).kind !== "none",
+                    ),
+                );
+            expect(isolated).toEqual([]);
+        },
+    );
+
     for (const k of KNOWN_FAILURES) {
         it.fails(`known failure: ${k.why}`, () => {
             const s = setupFor(k.inputs);

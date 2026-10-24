@@ -132,6 +132,9 @@ export function violations(s: Setup, r: Result): string[] {
     const W = s.barWeight;
     const forceTol = 1e-3 * (s.beamWeight + W);
     const torqueTol = forceTol * s.beamLength;
+    // The stretcher's own forces are checked against its own weight, so a light stretcher on a heavy ladder
+    // can't go far out of balance unnoticed.
+    const barTol = 1e-3 * W;
     const gapTol = 1e-4;
 
     const raised = r.kind === "raised";
@@ -203,17 +206,17 @@ export function violations(s: Setup, r: Result): string[] {
                           c.force.dot(P2.sub(P1).unit()),
                           c.point.distanceTo(vec2(0, s.wallHeight)),
                       ];
-        if (push < -forceTol) fail(`${c.surface} pulls the stretcher`, push);
-        if (Math.abs(sideways) > forceTol) fail(`${c.surface} pushes sideways`, sideways);
+        if (push < -barTol) fail(`${c.surface} pulls the stretcher`, push);
+        if (Math.abs(sideways) > barTol) fail(`${c.surface} pushes sideways`, sideways);
         if (Math.abs(off) > 1e-3) fail(`${c.surface} contact off its surface`, off);
     }
     if (!raised) {
         const h = r.h;
-        if (h.beamPush.dot(normal) < -forceTol)
+        if (h.beamPush.dot(normal) < -barTol)
             fail("ladder pulls the stretcher", h.beamPush.dot(normal));
-        if (Math.abs(h.beamPush.cross(normal)) > forceTol)
+        if (Math.abs(h.beamPush.cross(normal)) > barTol)
             fail("ladder pushes along itself", h.beamPush.cross(normal));
-        if (h.support.distanceTo(h.t2.add(h.beamPush)) > forceTol)
+        if (h.support.distanceTo(h.t2.add(h.beamPush)) > barTol)
             fail("support isn't T₂ + N", h.support.len());
     }
 
@@ -226,8 +229,8 @@ export function violations(s: Setup, r: Result): string[] {
     const centre = P1.add(P2).scale(0.5);
     const net = onBar.reduce((sum, l) => sum.add(l.f), vec2(0, -W));
     const turn = onBar.reduce((sum, l) => sum + l.at.sub(centre).cross(l.f), 0);
-    if (net.len() > forceTol) fail("stretcher's forces don't balance", net.len());
-    if (Math.abs(turn) > forceTol * s.barLength) fail("stretcher's torques don't balance", turn);
+    if (net.len() > barTol) fail("stretcher's forces don't balance", net.len());
+    if (Math.abs(turn) > barTol * s.barLength) fail("stretcher's torques don't balance", turn);
 
     // The ladder balances: the hinge takes what's left, or lying down, the ground shares it (pushing only).
     const onLadder = [
@@ -278,6 +281,9 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
     const W = s.barWeight;
     const forceTol = 1e-3 * (s.beamWeight + W);
     const torqueTol = forceTol * s.beamLength;
+    // The stretcher's own forces are checked against its own weight, so a light stretcher on a heavy ladder
+    // can't go far out of balance unnoticed.
+    const barTol = 1e-3 * W;
     const gapTol = 1e-4;
     const { barEnd1: P1, barEnd2: P2, beamAttach: B } = h;
     const along = Vector2.fromAngle(phi);
@@ -335,8 +341,21 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
                   : c.surface === "edge" || (lp && lp.distanceTo(tip) < 1e-9)
                     ? barDir
                     : along;
-        if (Math.abs(c.force.dot(surfaceDir)) > forceTol)
+        if (Math.abs(c.force.dot(surfaceDir)) > barTol)
             fail(`${c.surface} pushes sideways`, c.force.dot(surfaceDir));
+        // Surfaces only push: away from the ground, wall or wall top, off the wall's edge to the stretcher's side
+        // (as in `violations`), and from the ladder across the gap to the stretcher.
+        const push =
+            c.surface === "ground" || c.surface === "top"
+                ? c.force.y
+                : c.surface === "wall"
+                  ? c.force.x
+                  : c.surface === "edge"
+                    ? P2.sub(P1).cross(c.force) / s.barLength
+                    : lp
+                      ? c.force.dot(c.point.sub(lp).unit())
+                      : 0;
+        if (push < -barTol) fail(`${c.surface} pulls the stretcher`, push);
         const touchingAt =
             c.surface === "ladder" ? c.point.distanceTo(lp ?? c.point) - s.touchGap : 0;
         const off =
@@ -361,8 +380,8 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
     const centre = P1.add(P2).scale(0.5);
     const net = onBar.reduce((sum, l) => sum.add(l.f), vec2(0, -W));
     const turn = onBar.reduce((sum, l) => sum + l.at.sub(centre).cross(l.f), 0);
-    if (net.len() > forceTol) fail("stretcher's forces don't balance", net.len());
-    if (Math.abs(turn) > forceTol * s.barLength) fail("stretcher's torques don't balance", turn);
+    if (net.len() > barTol) fail("stretcher's forces don't balance", net.len());
+    if (Math.abs(turn) > barTol * s.barLength) fail("stretcher's torques don't balance", turn);
 
     const onLadder = [{ at: h.attachVia ?? B, f: h.t2.neg() }];
     h.contacts.forEach((c, i) => {
@@ -384,7 +403,9 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
         );
         if (ladderNet.len() > forceTol) fail("ladder's forces don't balance", ladderNet.len());
         if (Math.abs(ladderTurn) > torqueTol) fail("ladder's torques don't balance", ladderTurn);
-    } else if (ladderTurn > torqueTol)
-        fail("ground would have to hold the ladder down", ladderTurn);
+    } else {
+        if (phi > (0.05 * Math.PI) / 180) fail("raised ladder without a hinge force", phi);
+        if (ladderTurn > torqueTol) fail("ground would have to hold the ladder down", ladderTurn);
+    }
     return out;
 }

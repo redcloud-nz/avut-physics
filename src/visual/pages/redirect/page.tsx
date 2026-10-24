@@ -9,10 +9,10 @@ function RedirectMore() {
             <Section title="Running freely">
                 <p>
                     This takes the rope as running freely, as round a good pulley, so both parts
-                    pull equally hard. Round a karabiner, friction makes the load side pull harder
-                    than the team side while the rope runs (Pulley friction comes back to this), but
-                    the redirect still feels both together. Use a pulley for a redirect where you
-                    can: a karabiner adds a lot of friction and wears the rope.
+                    pull equally hard. Round a karabiner, friction makes the side the rope runs
+                    towards pull harder than the other while the rope runs (Pulley friction comes
+                    back to this), but the redirect still feels both together. Use a pulley for a
+                    redirect where you can: a karabiner adds a lot of friction and wears the rope.
                 </p>
             </Section>
             <Section title="Build the redirect’s anchor for it">

@@ -1,6 +1,6 @@
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { ropePathFor } from "@/lib/wall";
 
-import { ropePathFor } from "./ladder-hinge-held";
 import { solveLower, type Lowered, type Setup as LowerSetup } from "./two-point-lower-solver";
 
 /**
@@ -210,6 +210,15 @@ export function solveBelay(s: Setup): BelayResult {
         if (!hi) lean += x.more;
         else if (hiLean - loLean < LEAN_TOLERANCE) break;
         else lean = loLean + ((hiLean - loLean) * lo.more) / (lo.more - hi.more);
+    }
+    // Settled, or closed in on a jump in the lean needed; otherwise the search ran out of tries.
+    const settled =
+        Math.abs(best.more) <= LEAN_TOLERANCE || (hi && hiLean - loLean < LEAN_TOLERANCE);
+    if (!settled) {
+        return {
+            kind: "none",
+            reason: "The page couldn’t find how far the belayers lean here. Try a slightly different setup.",
+        };
     }
     return best.result;
 }

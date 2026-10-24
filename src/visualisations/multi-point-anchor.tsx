@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 
 import {
     Choice,
+    NONE,
+    Notice,
     RawValues,
     Readout,
     Slider,
@@ -11,6 +13,7 @@ import {
 } from "@/components/diagram/controls";
 import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
+import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
@@ -48,8 +51,6 @@ const DEFAULTS = {
 };
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
 
 /** The drawing's width in SVG units; its height follows from the setup, up to MAX_H. */
 const W = 800;
@@ -101,22 +102,19 @@ export default function MultiPointAnchor() {
         [count, gaps, heights, drop, tieDirection],
     );
     const layout = layouts[rig];
+    // Solved only in the browser (see useInBrowser).
+    const inBrowser = useInBrowser();
     const results = useMemo(
         () =>
             Object.fromEntries(
                 RIGS.map((r) => [
                     r,
-                    solveAnchor({ ...layouts[r], load, direction: rad(direction), rig: r }),
+                    inBrowser
+                        ? solveAnchor({ ...layouts[r], load, direction: rad(direction), rig: r })
+                        : WAITING,
                 ]),
             ) as Record<Rig, AnchorResult>,
-        [layouts, load, direction],
-    );
-    // The solver's last few digits differ between the server and the browser, which would make hydration
-    // fail, so results are only shown once running in the browser.
-    const inBrowser = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
+        [inBrowser, layouts, load, direction],
     );
 
     // --- Drawing ---
@@ -124,7 +122,7 @@ export default function MultiPointAnchor() {
     // still while the direction slider moves.
     const frame = useMemo(() => {
         const points = [...layouts.sliding.anchors, ...RIGS.map((r) => layouts[r].tiedAt)];
-        for (const r of RIGS)
+        for (const r of inBrowser ? RIGS : [])
             for (let d = -MAX_DIRECTION; d <= MAX_DIRECTION; d += 15) {
                 const res = solveAnchor({ ...layouts[r], load, direction: rad(d), rig: r });
                 if (res.kind === "settled") points.push(res.s.master);
@@ -137,7 +135,7 @@ export default function MultiPointAnchor() {
             minY: Math.min(...ys),
             maxY: Math.max(...ys),
         };
-    }, [layouts, load]);
+    }, [inBrowser, layouts, load]);
     const PPM = Math.min(
         (W - 2 * (MARGIN + LOAD_ARROW)) / Math.max(frame.maxX - frame.minX, 0.1),
         (MAX_H - ABOVE - LOAD_ARROW - MARGIN) / Math.max(frame.maxY - frame.minY, 0.1),
@@ -302,13 +300,13 @@ export default function MultiPointAnchor() {
         <VisualisationLayout
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
-                    {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
-                            <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
-                        </div>
-                    )}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                    {notice && <Notice title={notice.title} detail={notice.detail} />}
+                    <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="block h-auto w-full"
+                        role="img"
+                        aria-label="The anchors, slings, master point and load face on, with each sling's pull"
+                    >
                         {diagram}
                     </svg>
                     <Slider

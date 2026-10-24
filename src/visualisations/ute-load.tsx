@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 
 import {
     Choice,
+    NONE,
+    Notice,
     Readout,
     Select,
     Slider,
@@ -13,12 +15,13 @@ import { Arrow, Label } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { vec2 } from "@/lib/vector2";
 
-import { NEAR, UteLoadNotes } from "./ute-load-notes";
+import { UteLoadNotes } from "./ute-load-notes";
 import {
     CAB,
     checksFor,
     DIESEL,
     layoutFor,
+    NEAR,
     solveLoads,
     TARE_FUEL,
     type Check,
@@ -36,11 +39,11 @@ const COLORS = {
     outline: "var(--ghost)",
 };
 
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
-
-const statusColor = (c: Check) =>
-    c.value > c.limit ? COLORS.over : c.value >= NEAR * c.limit ? COLORS.near : COLORS.ok;
+const statusOf = (c: Check) =>
+    c.value > c.limit ? "over" : c.value >= NEAR * c.limit ? "near" : "ok";
+const statusColor = (c: Check) => COLORS[statusOf(c)];
+/** The status in words, so it isn't shown by colour alone; nothing while within the rating. */
+const STATUS_WORDS = { over: "over", near: "nearly at", ok: null };
 
 const CHECK_LABELS: Record<Check["key"], string> = {
     gvm: "Gross vehicle mass (GVM)",
@@ -373,6 +376,9 @@ export default function UteLoad() {
                             className="font-mono whitespace-nowrap"
                             style={{ color: statusColor(c) }}
                         >
+                            {STATUS_WORDS[statusOf(c)] && (
+                                <span className="font-sans">{STATUS_WORDS[statusOf(c)]} </span>
+                            )}
                             {Math.round(c.value)} / {c.limit} kg
                         </span>
                     </div>
@@ -399,12 +405,14 @@ export default function UteLoad() {
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
                     {sol.kind === "none" && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
-                            <p className="font-medium">No balance for these settings</p>
-                            <p className="mx-auto mt-1 max-w-md text-warning/80">{sol.reason}</p>
-                        </div>
+                        <Notice title="No balance for these settings" detail={sol.reason} />
                     )}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                    <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="block h-auto w-full"
+                        role="img"
+                        aria-label="The ute side on, with its loads and the weight on each axle"
+                    >
                         {diagram}
                     </svg>
                     {gauges}

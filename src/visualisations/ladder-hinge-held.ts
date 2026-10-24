@@ -10,6 +10,7 @@ import {
     withColumns,
 } from "@/lib/numeric";
 import { vec2, Vector2 } from "@/lib/vector2";
+import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
 
 import { phiMax, wallPush, type Setup, type Surface } from "./ladder-hinge-solver";
 
@@ -25,6 +26,12 @@ import { phiMax, wallPush, type Setup, type Surface } from "./ladder-hinge-solve
 
 /** The team holds the ladder at about shoulder height (or at its tip, when that's lower), pushing straight up. */
 export const HOLD_HEIGHT = 1.5;
+/** Over how many degrees the team brings the ladder from where it settles by itself to level. */
+export const UNDERRUN_OVER = 7.5;
+/** The steepest the ground team holds the ladder (degrees). */
+export const MAX_TEAM_ANGLE = 60;
+/** How well the ladder's foot grips the ground (rubber feet on a hard surface). */
+export const FOOT_FRICTION = 0.5;
 
 export type HeldContact = { surface: Surface | "ladder"; point: Vector2; force: Vector2 };
 
@@ -57,33 +64,10 @@ export type Held = {
 export type HeldResult = { kind: "held"; h: Held } | { kind: "none"; reason: string };
 
 /** The parts of the setup the wall and the rope's anchor need. */
-type WallSetup = Pick<Setup, "wallHeight" | "anchorUp" | "anchorBack">;
-
 type Kind = "rope" | "attachment" | Surface | "ladder";
 
 /** One constraint, g ≤ 0, whose force on the stretcher pushes along m at the stretcher's point `at`. */
 type Piece = { key: string; kind: Kind; g: number; at: Vector2; m: Vector2; ladderAt?: Vector2 };
-
-/** Behind the wall's face: on the wall top, or inside the wall nearer the top than the face. */
-export function behindFaceFor(s: WallSetup, p: Vector2) {
-    return p.x < 0 && (p.y >= s.wallHeight || s.wallHeight - p.y < -p.x);
-}
-
-/**
- * The rope's path to p, over the wall's edge when the straight line would cut through the wall. Unlike the
- * free solver's, it carries on smoothly into the wall, where the minimiser may briefly push an end: as if
- * from the face or the top, whichever is nearer.
- */
-export function ropePathFor(
-    s: WallSetup,
-    p: Vector2,
-): { length: number; wrapEdge: Vector2 | null } {
-    const anchor = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
-    const edge = vec2(0, s.wallHeight);
-    return !behindFaceFor(s, p) && edge.sub(anchor).cross(p.sub(anchor)) < 0
-        ? { length: edge.distanceTo(anchor) + p.distanceTo(edge), wrapEdge: edge }
-        : { length: p.distanceTo(anchor), wrapEdge: null };
-}
 
 /** The stretcher with the ladder held at angle phi. */
 export function solveHeld(s: Setup, phi: number): HeldResult {
@@ -91,7 +75,7 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
     phi = clamp(phi, 0, phiMax(s));
     const W = s.barWeight;
     const half = s.barLength / 2;
-    const anchor = vec2(-s.anchorBack, s.wallHeight + s.anchorUp);
+    const anchor = anchorOf(s);
     const edge = vec2(0, s.wallHeight);
     const along = Vector2.fromAngle(phi);
     const normal = along.perp();
@@ -403,7 +387,7 @@ function settleLadder(
     const net = [...onLadder.map((l) => l.f), ...extra].reduce((a, b) => a.add(b), Vector2.ZERO);
     return {
         phi,
-        anchor: vec2(-s.anchorBack, s.wallHeight + s.anchorUp),
+        anchor: anchorOf(s),
         wrapEdge: ropePathFor(s, P1).wrapEdge,
         beamAttach: B,
         attachVia,
@@ -501,9 +485,7 @@ function levelAt(s: Setup, phi: number): LevelResult {
         return notLevel("Level, the stretcher would pass through the wall.");
 
     // The stretcher's balance: the rope's pull at end 1, the attachment's and the ladder's push at end 2.
-    const u1 = (ropePathFor(s, P1).wrapEdge ?? vec2(-s.anchorBack, s.wallHeight + s.anchorUp))
-        .sub(P1)
-        .unit();
+    const u1 = (ropePathFor(s, P1).wrapEdge ?? anchorOf(s)).sub(P1).unit();
     const along = Vector2.fromAngle(phi);
     const u2 = along.scale(s.attachDistance).sub(P2).unit();
     const n = along.perp();

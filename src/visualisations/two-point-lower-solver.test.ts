@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { G } from "@/lib/constants";
 import { seededPicker } from "@/lib/random";
 import { vec2, Vector2 } from "@/lib/vector2";
+import { ropePathFor } from "@/lib/wall";
 
-import { ropePathFor } from "./ladder-hinge-held";
 import {
     linePathFor,
     maxRope,

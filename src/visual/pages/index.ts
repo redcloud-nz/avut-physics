@@ -43,6 +43,8 @@ export type VisualPage = {
     name: string;
     title: string;
     text: React.ReactNode;
+    /** The text as plain words, for search results and links, where `text` isn't plain already. */
+    description?: string;
     Figure: () => React.ReactNode;
     /** Further reading, such as the maths, in a drawer that the pill between the buttons brings up. */
     More?: () => React.ReactNode;

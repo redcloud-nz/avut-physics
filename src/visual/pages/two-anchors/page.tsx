@@ -5,12 +5,12 @@ import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { ink, Letter, r, Section, Var } from "@/visual/common/details";
 import { T, Y } from "@/visual/common/triangle";
+import { GHOST } from "@/visual/frame";
 import type { VisualPage } from "@/visual/pages";
 
 import { TwoAnchorsFigure } from "./figure";
 
 const W = ink(COLORS.load, "W");
-const FAINT = "var(--ghost)";
 
 /**
  * The even rig, 90° between the ropes, with each rope's pull split into its parts tip to tail and the mirror line
@@ -43,11 +43,11 @@ function MirrorDrawing() {
                 y1={70}
                 x2={m.x}
                 y2={300}
-                stroke={FAINT}
+                stroke={GHOST}
                 strokeDasharray="2 4"
                 strokeWidth={1.5}
             />
-            <Label at={vec2(m.x, 64)} color={FAINT}>
+            <Label at={vec2(m.x, 64)} color={GHOST}>
                 mirror
             </Label>
             {sides.map((side) => (
@@ -159,7 +159,7 @@ function CurvesDrawing() {
                         y1={at(0, Number(v)).y}
                         x2={PLOT.right}
                         y2={at(0, Number(v)).y}
-                        stroke={FAINT}
+                        stroke={GHOST}
                         strokeDasharray="2 4"
                     />
                     <Label at={vec2(PLOT.left - 14, at(0, Number(v)).y)} color="var(--ink-muted)">
@@ -184,7 +184,7 @@ function CurvesDrawing() {
                     <Label at={vec2(at(t, 0).x, PLOT.bottom + 14)} color="var(--ink-muted)">
                         {`${t}°`}
                     </Label>
-                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 34)} color={FAINT}>
+                    <Label at={vec2(at(t, 0).x, PLOT.bottom + 34)} color={GHOST}>
                         {`${2 * t}°`}
                     </Label>
                 </g>
@@ -193,7 +193,7 @@ function CurvesDrawing() {
                 x={160}
                 y={PLOT.bottom + 54}
                 fontSize={12}
-                fill={FAINT}
+                fill={GHOST}
                 textAnchor="middle"
                 dominantBaseline="middle"
             >
@@ -273,6 +273,8 @@ const page: VisualPage = {
     slug: "two-anchors",
     name: "Two anchors",
     title: "Spread anchors hold more",
+    description:
+        "Two anchors share a load through one master point, each rope’s up part holding half. Spread them and each rope leans, adding a sideways part, so each holds more than half. At 120° apart, each holds the whole load.",
     text: (
         <>
             Two anchors share a load through one master point, each rope’s up part{" "}

@@ -125,8 +125,11 @@ export function solveAnchor(s: Setup): AnchorResult {
 
     // The energy: the load's (it pulls with a steady force, like a weight), plus each sling's stretch. It's
     // convex in the master point's position, so Newton's method from where the rig was tied finds its one minimum.
+    // On an anchor the slings' directions aren't defined, so a step landing there counts as going uphill.
     const energy = (m: Vector2) =>
-        -F.dot(m) + slings.reduce((sum, sl) => sum + (k(sl) / 2) * stretch(sl, m) ** 2, 0);
+        s.anchors.some((a) => a.distanceTo(m) < 1e-9)
+            ? Infinity
+            : -F.dot(m) + slings.reduce((sum, sl) => sum + (k(sl) / 2) * stretch(sl, m) ** 2, 0);
     /** The energy's gradient and Hessian at m. */
     const derivatives = (m: Vector2) => {
         const g = [-F.x, -F.y];
@@ -201,7 +204,8 @@ export function solveAnchor(s: Setup): AnchorResult {
         e = eNext;
     }
     const { g } = derivatives(m);
-    if (Math.hypot(g[0], g[1]) > 1e-6 * s.load) {
+    // Written so a NaN fails too.
+    if (!(Math.hypot(g[0], g[1]) <= 1e-6 * s.load)) {
         return { kind: "none", reason: "The master point couldn't find where it settles." };
     }
 

@@ -2,3 +2,6 @@ package-lock.json
 
 # Solver snapshots: compared byte for byte by the sweep test.
 src/visualisations/__snapshots__
+
+# Git worktrees of this same repo, made by Claude Code.
+.claude/worktrees

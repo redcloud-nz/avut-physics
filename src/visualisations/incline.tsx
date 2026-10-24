@@ -8,6 +8,9 @@ import { G } from "@/lib/constants";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
+import { InclineNotes } from "./incline-notes";
+import { solveIncline } from "./incline-solver";
+
 const COLORS = {
     weight: "var(--weight)",
     normal: "var(--normal)",
@@ -28,17 +31,12 @@ export default function Incline() {
     const [g, setG] = useState(G);
     const [showComponents, setShowComponents] = useState(true);
 
-    // --- Physics (SI units) ---
+    // The sliders keep the mass above zero and the coefficients positive, so there's always an answer.
+    const sol = solveIncline({ angle: rad(angle), mass, muS, muK, g });
+    if (sol.kind === "none") throw new Error(sol.reason);
+    const { weight, normal, along, friction, net, accel, slipsAbove } = sol.f;
+    const sliding = sol.kind === "sliding";
     const th = rad(angle);
-    const weight = mass * g;
-    const normal = weight * Math.cos(th);
-    const along = weight * Math.sin(th); // gravity component down the slope
-    const kinetic = Math.min(muK, muS);
-    const sliding = along > muS * normal;
-    const friction = sliding ? kinetic * normal : along;
-    const net = along - friction;
-    const accel = net / mass;
-    const criticalAngle = deg(Math.atan(muS));
 
     // --- Geometry (SVG units, y down). Slope descends to the right. ---
     const L = 460;
@@ -58,7 +56,12 @@ export default function Incline() {
     return (
         <VisualisationLayout
             diagram={
-                <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                <svg
+                    viewBox={`0 0 ${W} ${H}`}
+                    className="block h-auto w-full"
+                    role="img"
+                    aria-label="A block on a slope, with the forces on it"
+                >
                     <polygon
                         points={`${bottomLeft.x},${bottomLeft.y} ${top.x},${top.y} ${corner.x},${corner.y}`}
                         fill="var(--surface-raised)"
@@ -210,7 +213,7 @@ export default function Incline() {
                     />
                     <Readout label="Net force" value={`${net.toFixed(1)} N`} color={COLORS.net} />
                     <Readout label="Acceleration" value={`${accel.toFixed(2)} m/s²`} />
-                    <Readout label="Slips above" value={`${criticalAngle.toFixed(1)}°`} />
+                    <Readout label="Slips above" value={`${deg(slipsAbove).toFixed(1)}°`} />
                     <p
                         className={`mt-1 text-sm font-medium ${sliding ? "text-sliding" : "text-ink-soft"}`}
                     >
@@ -221,6 +224,7 @@ export default function Incline() {
                     {muK > muS && <p className="text-xs text-warning">μk is capped at μs.</p>}
                 </>
             }
+            footer={<InclineNotes />}
         />
     );
 }

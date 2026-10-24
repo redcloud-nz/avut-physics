@@ -5,7 +5,14 @@ import { Fragment, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 
 export function Slider(props: {
     label: string;
@@ -57,13 +64,31 @@ export function Toggle(props: { label: string; checked: boolean; onChange: (v: b
     );
 }
 
-/** A small segmented control for picking one of a few options. */
+/**
+ * A small segmented control for picking one of a few options. Like any radio group it's one stop for Tab, and the
+ * arrow keys move between its options.
+ */
 export function Choice<T extends string>(props: {
     label: string;
     value: T;
     options: { value: T; label: string }[];
     onChange: (v: T) => void;
 }) {
+    const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        const step =
+            e.key === "ArrowRight" || e.key === "ArrowDown"
+                ? 1
+                : e.key === "ArrowLeft" || e.key === "ArrowUp"
+                  ? -1
+                  : 0;
+        if (!step) return;
+        e.preventDefault();
+        const n = props.options.length;
+        const at = props.options.findIndex((o) => o.value === props.value);
+        const next = (at + step + n) % n;
+        props.onChange(props.options[next].value);
+        e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next]?.focus();
+    };
     return (
         <div className="flex flex-col gap-1 text-sm text-ink-soft">
             {props.label}
@@ -71,12 +96,15 @@ export function Choice<T extends string>(props: {
                 className="flex rounded-lg bg-surface-raised p-0.5"
                 role="radiogroup"
                 aria-label={props.label}
+                onKeyDown={onKeyDown}
             >
                 {props.options.map((o) => (
                     <button
                         key={o.value}
+                        type="button"
                         role="radio"
                         aria-checked={o.value === props.value}
+                        tabIndex={o.value === props.value ? 0 : -1}
                         onClick={() => props.onChange(o.value)}
                         className={`flex-1 rounded-md px-2 py-1 text-sm transition-colors ${
                             o.value === props.value
@@ -127,11 +155,14 @@ export function Select<T extends string>(props: {
     );
 }
 
+/** Shown in a readout in place of a value that doesn't apply. */
+export const NONE = "—";
+
 /** A labelled read-only value, e.g. a computed force. */
 export function Readout(props: { label: string; value: string; color?: string }) {
     return (
         <div className="flex justify-between text-sm">
-            <span className="text-ink-muted">{props.label}</span>
+            <span className="whitespace-pre-wrap text-ink-muted">{props.label}</span>
             <span className="font-mono" style={{ color: props.color ?? "var(--ink)" }}>
                 {props.value}
             </span>
@@ -161,8 +192,10 @@ const expanded: More = (children) => children;
 
 /**
  * Standard layout: diagram on the left, controls and readouts on the right. Below the `lg` breakpoint the
- * controls move into a sheet, opened by a button in the diagram's corner. `controls` can be a function that
- * passes its less-used controls through `more`, which collapses them on desktop.
+ * controls move into a sheet along the bottom, opened by a button in the diagram's corner: it covers at most
+ * the lower part of the screen and doesn't dim the page, so the diagram stays in view as the sliders move.
+ * `controls` can be a function that passes its less-used controls through `more`, which collapses them on
+ * desktop.
  */
 export function VisualisationLayout(props: {
     diagram: React.ReactNode;
@@ -176,7 +209,7 @@ export function VisualisationLayout(props: {
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
                 {props.diagram}
-                <Sheet>
+                <Sheet modal={false}>
                     <SheetTrigger asChild>
                         <Button
                             variant="outline"
@@ -187,9 +220,15 @@ export function VisualisationLayout(props: {
                             <SlidersHorizontal />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="overflow-y-auto">
-                        <SheetHeader>
+                    <SheetContent
+                        side="bottom"
+                        className="max-h-[45dvh] gap-0 overflow-y-auto overscroll-contain"
+                    >
+                        <SheetHeader className="pb-2">
                             <SheetTitle>Settings</SheetTitle>
+                            <SheetDescription className="sr-only">
+                                Change the setup. The diagram follows as you go.
+                            </SheetDescription>
                         </SheetHeader>
                         <div className="flex flex-col gap-4 px-4 pb-4">{controls(expanded)}</div>
                     </SheetContent>
@@ -238,5 +277,21 @@ export function RawValues(props: { title: string; data: unknown }) {
                 {text}
             </pre>
         </section>
+    );
+}
+
+/**
+ * Why the drawing has no answer, or what stopped. Over the top of the drawing where there's room; above it on
+ * narrow screens, where a long reason would cover a third of the drawing.
+ */
+export function Notice(props: { title: string; detail: string }) {
+    return (
+        <div
+            role="status"
+            className="px-10 text-center text-sm text-warning lg:absolute lg:inset-x-4 lg:top-6 lg:px-0"
+        >
+            <p className="font-medium">{props.title}</p>
+            <p className="mx-auto mt-1 max-w-md text-warning/80">{props.detail}</p>
+        </div>
     );
 }

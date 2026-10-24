@@ -1,2 +1,2 @@
 npx lint-staged
-node scripts/figures.mjs --check
+node scripts/figures.mjs --check --staged

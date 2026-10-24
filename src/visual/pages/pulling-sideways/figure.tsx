@@ -9,6 +9,7 @@ import { AngleArc, Arrow } from "@/components/diagram/svg";
 import { deg } from "@/lib/math";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
+import { kNText } from "@/visual/common/grid";
 import { Layout, Readout, SVG } from "@/visual/frame";
 
 /** The load's weight, in kilonewtons: about 240 kg. */
@@ -16,8 +17,6 @@ const WEIGHT = 2.4;
 /** Drawing units to the kilonewton. */
 const PER_KN = 36;
 const ROPE = 140;
-
-const kNText = (v: number) => `${v.toFixed(1)} kN`;
 
 /**
  * A load on a rope, pulled sideways by a level tag line. The rope's pull on the load, T, is drawn with its parts tip to

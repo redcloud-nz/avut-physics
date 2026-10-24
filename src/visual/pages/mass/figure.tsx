@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Rock, Tag } from "@/articles/gentle-introduction-figures";
+import { Choice } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
 import { vec2 } from "@/lib/vector2";
@@ -99,23 +100,12 @@ export function MassFigure() {
                 </svg>
             }
             slider={
-                <div className="grid grid-cols-3 gap-1.5">
-                    {PLACES.map((p, i) => (
-                        <button
-                            key={p.name}
-                            type="button"
-                            aria-pressed={place === i}
-                            onClick={() => setPlace(i)}
-                            className={`rounded-lg border py-1.5 text-sm ${
-                                place === i
-                                    ? "border-action bg-action/15 text-ink-strong"
-                                    : "border-line-faint text-ink-muted"
-                            }`}
-                        >
-                            {p.name}
-                        </button>
-                    ))}
-                </div>
+                <Choice
+                    label="Where"
+                    value={PLACES[place].name}
+                    options={PLACES.map((x) => ({ value: x.name, label: x.name }))}
+                    onChange={(v) => setPlace(PLACES.findIndex((x) => x.name === v))}
+                />
             }
             readouts={
                 <>

@@ -1,12 +1,11 @@
-import { Part } from "./ladder-hinge-notes";
+import { NotesCard, Part } from "@/components/notes";
+
 import { SLING_STIFFNESS } from "./multi-point-anchor-solver";
 
 /** How the multi-point anchor page works out what it shows, and what it leaves out. */
 export function MultiPointAnchorNotes() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
-            <h2 className="text-base font-medium text-ink">How this is calculated</h2>
-
+        <NotesCard>
             <Part title="The setup">
                 <p>
                     Everything is in two dimensions, seen face on: the anchors are points on a rock
@@ -102,6 +101,6 @@ export function MultiPointAnchorNotes() {
                     </li>
                 </ul>
             </Part>
-        </section>
+        </NotesCard>
     );
 }

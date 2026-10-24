@@ -28,6 +28,24 @@ describe("held ladder: physics rules", () => {
             .filter((f) => f.problems.length > 0);
         expect(failures).toEqual([]);
     });
+
+    // The checks pass any "no answer", so test those another way: a real one holds over a range of setups, so
+    // holding the ladder a little higher or lower shouldn't give an answer both ways.
+    it(
+        "gives no answer only where a slightly different angle doesn't have one either",
+        { timeout: 60_000 },
+        () => {
+            const isolated = randomInputs(300, 3)
+                .map((i, k) => ({ inputs: i, phi: ((k * 0.618034) % 1) * rad(89) }))
+                .filter(({ inputs, phi }) => solveHeld(setupFor(inputs), phi).kind === "none")
+                .filter(({ inputs, phi }) =>
+                    [-rad(0.2), rad(0.2)].every(
+                        (d) => solveHeld(setupFor(inputs), phi + d).kind !== "none",
+                    ),
+                );
+            expect(isolated).toEqual([]);
+        },
+    );
 });
 
 describe("held ladder", () => {

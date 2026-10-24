@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 
 import {
+    NONE,
+    Notice,
     RawValues,
     Readout,
     Slider,
     Toggle,
     VisualisationLayout,
 } from "@/components/diagram/controls";
-import { Arrow, Label } from "@/components/diagram/svg";
+import { Arrow, Cable, forceScale, Label, Pull } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
+import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { deg } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
@@ -33,8 +36,6 @@ const BAR_THICKNESS = 0.08;
 const MAX_ANCHOR_UP = 2;
 /** Turn on to show a card of the inputs and solver output, for copying problem cases. */
 const SHOW_RAW_VALUES = false;
-/** Shown in place of a value that doesn't apply. */
-const NONE = "—";
 
 /** The drawing's width in SVG units; its height follows from the setup. */
 const W = 800;
@@ -77,19 +78,17 @@ export default function TwoPointLower() {
     const ropeMin = Math.ceil(minRope(setup) * 100) / 100;
     const ropeMax = Math.floor(maxRope({ ...setup, rope: 0 }) * 100) / 100;
     const ropeLength = Math.min(Math.max(rope, ropeMin), ropeMax);
-    const sol = useMemo(() => solveLower({ ...setup, rope: ropeLength }), [setup, ropeLength]);
-    // The solver's last few digits differ between the server and the browser, which would make hydration
-    // fail, so results are only shown once running in the browser.
-    const inBrowser = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
+    // Solved only in the browser (see useInBrowser).
+    const inBrowser = useInBrowser();
+    const sol = useMemo(
+        () => (inBrowser ? solveLower({ ...setup, rope: ropeLength }) : WAITING),
+        [inBrowser, setup, ropeLength],
     );
 
     // --- Drawing ---
     const k = 110 / Math.max(barWeight, 1); // px per newton
-    const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
-    const tag = (name: string, f: Vector2) => (f.len() * k > MAX_ARROW ? `${name} ≫` : name);
+    const scale = forceScale(k, MAX_ARROW);
+    const { force, tag } = scale;
 
     // The wall is drawn just thick enough to carry the rope's anchor on its back edge (only its face and top
     // matter to the physics). The drawing spans from the back of the wall to just past the team, and from just
@@ -147,43 +146,19 @@ export default function TwoPointLower() {
     );
 
     const cableLine = (pts: Vector2[], taut: boolean) => (
-        <polyline
-            points={pts
-                .map(toSvg)
-                .map((p) => `${p.x},${p.y}`)
-                .join(" ")}
-            fill="none"
-            stroke={taut ? "var(--ink-soft)" : "var(--ink-muted)"}
-            strokeWidth={1.5}
-            strokeDasharray={taut ? undefined : "5 5"}
-            strokeLinejoin="round"
-        />
+        <Cable points={pts.map(toSvg)} taut={taut} />
     );
     /** A pull on the stretcher, with its x/y components when they're shown. */
     const tensionArrow = (name: "T₁" | "T₂", at: Vector2, t: Vector2, color: string) => (
-        <>
-            <Arrow from={at} v={force(t)} color={color} label={tag(name, t)} width={2} />
-            {showComponents && (
-                <>
-                    <Arrow
-                        from={at}
-                        v={force(vec2(t.x, 0))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}x`}
-                    />
-                    <Arrow
-                        from={at}
-                        v={force(vec2(0, t.y))}
-                        color={COLORS.component}
-                        dashed
-                        width={1.5}
-                        label={`${name}y`}
-                    />
-                </>
-            )}
-        </>
+        <Pull
+            name={name}
+            at={at}
+            t={t}
+            color={color}
+            scale={scale}
+            parts={showComponents}
+            partsColor={COLORS.component}
+        />
     );
 
     let diagram: React.ReactNode = scene;
@@ -285,13 +260,13 @@ export default function TwoPointLower() {
         <VisualisationLayout
             diagram={
                 <div className="relative flex flex-col gap-4 p-4">
-                    {notice && (
-                        <div className="absolute inset-x-4 top-6 text-center text-sm text-warning">
-                            <p className="font-medium">{notice.title}</p>
-                            <p className="mx-auto mt-1 max-w-md text-warning/80">{notice.detail}</p>
-                        </div>
-                    )}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
+                    {notice && <Notice title={notice.title} detail={notice.detail} />}
+                    <svg
+                        viewBox={`0 0 ${W} ${H}`}
+                        className="block h-auto w-full"
+                        role="img"
+                        aria-label="The stretcher lowered over the wall's edge on two ropes, side on, with the forces on it"
+                    >
                         {inBrowser ? diagram : scene}
                     </svg>
                     <Slider

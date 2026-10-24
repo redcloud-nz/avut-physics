@@ -5,6 +5,7 @@ import { Eq } from "@/components/tex";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { ink, Letter, r, Section } from "@/visual/common/details";
+import { GHOST } from "@/visual/frame";
 import type { VisualPage } from "@/visual/pages";
 
 import { PullingOffCentreFigure } from "./figure";
@@ -13,7 +14,6 @@ import { ANCHORS, DEPTH, OFFSET, SWING } from "./rig";
 /** The worked example. The left rope is 30° from the load's line, α, and the right one about 49°, β. */
 const EXAMPLE = tiedOff(ANCHORS, vec2(OFFSET, -DEPTH), rad(SWING));
 
-const FAINT = "var(--ghost)";
 const TL = ink(COLORS.pull, r`T_\text{left}`);
 const TR = ink(COLORS.pull, r`T_\text{right}`);
 const W = ink(COLORS.load, "W");
@@ -58,7 +58,7 @@ function RigDrawing() {
                 y1={m.y}
                 x2={m.x - pull.x * 150}
                 y2={m.y - pull.y * 150}
-                stroke={FAINT}
+                stroke={GHOST}
                 strokeDasharray="2 4"
                 strokeWidth={1.5}
             />

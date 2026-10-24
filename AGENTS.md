@@ -44,20 +44,25 @@ compiles for around 20 seconds.
 - `src/visualisations/<name>-notes.tsx` (and `-maths.tsx`): the "How this is calculated" section.
 - `src/visualisations/index.ts`: the registry of visualisations listed on the home page.
 - `src/articles/`: article figures. Article pages themselves are in `src/app`. Articles never run
-  solvers as they render: the solvers are too slow, and a page taking over a minute to build fails
-  the Vercel build. Instead `<name>.compute.ts` holds an article's inputs and works out its figures,
-  `npm run figures` saves them in `<name>.figures.json` (with a hash of the compute module and every
-  local file it imports), and `<name>-figures.ts` gives the article them typed.
-  `scripts/figures.mjs --check` runs before every build and commit, and fails when a hash no longer
-  matches. After changing a solver, its shared maths or an article's inputs, run `npm run figures`
-  and commit the JSON with the change. The hash is of the raw source, so a Prettier reformat counts
-  as a change too.
+  the visualisations' solvers as they render (small sums like the pulley systems' are fine): those
+  solvers are too slow, and a page taking over a minute to build fails the Vercel build. Instead
+  `<name>.compute.ts` holds an article's inputs and works out its figures, `npm run figures` saves
+  them in `<name>.figures.json` (with a hash of the compute module and every local file it
+  imports), and `<name>-figures.ts` gives the article them typed. `scripts/figures.mjs --check`
+  runs before every build, and before every commit on what's staged, and fails when a hash no
+  longer matches. After changing a solver, its shared maths or an article's inputs, run
+  `npm run figures` and commit the JSON with the change. The hash is of the raw source, so
+  `npm run figures` runs Prettier over those files first. Compute modules and what they import
+  must use static imports only: the hash can't follow `import()`, `require()` or files read with
+  `fs`, and the check fails on them.
 - `src/visual/`: A Visual Introduction to Rescue Physics, served at `/visual/<slug>`. Each page is a
   folder in `pages/`: `page.tsx` (server) holds its name, headline, text and any details, and
   `figure.tsx` (client) its figure. `pages/index.ts` sets the order. Pieces several pages share
   are in `common/`, and `card.tsx` and `frame.tsx` are the chrome around every page and figure.
-- `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`) and slider controls.
-  Drawing only, no maths.
+- `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`), slider
+  controls, `Notice` and `NONE`. Drawing only, no maths. `src/components/notes.tsx` has the notes card
+  (`NotesCard`, `Part`), and `use-in-browser.ts` the hook pages wait on before running a solver, since
+  solvers' last digits can differ between the server and the browser.
 - Colours come from the tokens in `src/app/globals.css`, named for what they show (`ink-muted`, `pull`, `mass`,
   `warning`): token classes (`text-ink-muted`, `fill-surface`) in `className`, and `var(--pull)` in SVG attributes and
   styles (the base name: a `--color-*` variable exists only once a class uses it). No hex values or Tailwind palette
@@ -68,7 +73,9 @@ compiles for around 20 seconds.
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
     `a.distanceTo(b)`); every operation returns a new vector.
   - `geometry.ts`: segment geometry. `numeric.ts`: Nelder–Mead, linear and least-squares solves,
-    central differences, grid minima, and the `Matrix` alias (row-major `number[][]`).
+    central differences, grid minima, golden-section search, bisection, and the `Matrix` alias
+    (row-major `number[][]`). `wall.ts`: the wall the lowers share, its anchor and the rope's path
+    over its edge.
   - `math.ts` (`clamp`, `deg`, `rad`, `linearScale`), `constants.ts` (`G`), `format.ts` (units
     for display), `random.ts` (the seeded picker tests use for random setups).
 

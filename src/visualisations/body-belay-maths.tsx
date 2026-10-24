@@ -1,7 +1,7 @@
+import { NotesCard, Part } from "@/components/notes";
 import { Eq, M } from "@/components/tex";
 
 import { PAST_EDGE, WAIST_HEIGHT } from "./body-belay-solver";
-import { Part } from "./ladder-hinge-notes";
 import { TEAM_REACH } from "./two-point-lower-solver";
 
 const r = String.raw;
@@ -9,8 +9,7 @@ const r = String.raw;
 /** The body belay page's maths, step by step, as the solver works it out. Rendered on the server. */
 export function BodyBelayMaths() {
     return (
-        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4 text-sm leading-relaxed text-ink-muted lg:p-6">
-            <h2 className="text-base font-medium text-ink">The maths</h2>
+        <NotesCard title="The maths">
             <p>
                 Coordinates: <M tex="x" /> out from the wall’s face, <M tex="y" /> up from the
                 ground, <M tex="z" /> sideways along the wall, with the stretcher in the plane{" "}
@@ -128,6 +127,6 @@ export function BodyBelayMaths() {
                     tex={r`\mu_{\text{req}} = \frac{F}{N} = \tan\lambda \qquad \text{holds if } \mu_{\text{req}} \le \mu_f \qquad \text{SF} = \frac{\mu_f N}{F} = \frac{\mu_f}{\mu_{\text{req}}}`}
                 />
             </Part>
-        </section>
+        </NotesCard>
     );
 }

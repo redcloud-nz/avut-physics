@@ -22,6 +22,9 @@ settles and the forces through it, and lets you change the setup with sliders to
 - **Multi-Point Anchor** (`/multi-point-anchor`): two or three anchors joined to a master point,
   pre-equalised or sliding. Swing the load to one side and see how each rig shares it between the
   anchors and how far the master point moves.
+- **Loading a Ute** (`/ute-load`): a dual-cab ute, side on, loaded with crew, fit-out, cargo and a
+  trailer. Shows how the weight shares between the axles, how a tow ball lifts weight off the
+  front wheels, and how close each total comes to the ute's ratings.
 - **Block on an Incline** (`/block-on-an-incline`): a free-body diagram with static and kinetic
   friction. Not listed on the home page.
 
@@ -77,7 +80,9 @@ src/
   app/                  One folder per page; each page is a thin wrapper
   visualisations/       Each visualisation's component, solver, notes and tests
   articles/             The articles' figures
+  visual/               A Visual Introduction to Rescue Physics: one folder per page, and its shared parts
   components/diagram/   SVG primitives (arrows, labels, angle arcs) and slider controls
+  components/ui/        shadcn/ui pieces (sheet, drawer and the like)
   lib/                  Shared maths: Vector2/Vector3, segment geometry, numerical methods
 ```
 

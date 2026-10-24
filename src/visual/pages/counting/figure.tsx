@@ -41,7 +41,7 @@ export function CountingFigure() {
             drawing={
                 <SystemDrawing
                     sys={sys}
-                    pulled={Math.min(pulled, max)}
+                    pulled={pulled}
                     upright
                     haulLabel="Pull"
                     className={SVG}

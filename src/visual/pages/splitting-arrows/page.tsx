@@ -91,6 +91,8 @@ const page: VisualPage = {
     slug: "splitting-arrows",
     name: "Splitting arrows",
     title: "Any arrow splits into two",
+    description:
+        "Any force splits into a sideways part and an up part. They’re easier to work with than a slanting force, and tip to tail they add back up to it.",
     text: (
         <>
             Any force splits into a sideways part <Var color={COLORS.sideways}>x</Var> and an up

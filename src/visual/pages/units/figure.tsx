@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Choice } from "@/components/diagram/controls";
 import { Layout } from "@/visual/frame";
 
 /** One rung of a ladder of units: the unit, what it is in the one below, and something that size. */
@@ -71,23 +72,12 @@ export function UnitsFigure() {
                 </ol>
             }
             slider={
-                <div className="grid grid-cols-3 gap-1.5">
-                    {LADDERS.map((l, i) => (
-                        <button
-                            key={l.name}
-                            type="button"
-                            aria-pressed={chosen === i}
-                            onClick={() => setChosen(i)}
-                            className={`rounded-lg border py-1.5 text-sm ${
-                                chosen === i
-                                    ? "border-action bg-action/15 text-ink-strong"
-                                    : "border-line-faint text-ink-muted"
-                            }`}
-                        >
-                            {l.name}
-                        </button>
-                    ))}
-                </div>
+                <Choice
+                    label="Measuring"
+                    value={LADDERS[chosen].name}
+                    options={LADDERS.map((x) => ({ value: x.name, label: x.name }))}
+                    onChange={(v) => setChosen(LADDERS.findIndex((x) => x.name === v))}
+                />
             }
             readouts={null}
         />

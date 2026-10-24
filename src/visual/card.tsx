@@ -9,6 +9,10 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 
 import { SERIES } from "./series";
 
+/** Controls that use the arrow keys themselves. */
+const ARROW_KEYED =
+    "input, select, textarea, [contenteditable], [role=radio], [role=slider], [data-arrow-keys]";
+
 /** How far a swipe has to go before it counts, in pixels. */
 const SWIPE = 60;
 
@@ -50,8 +54,11 @@ export function Card(props: {
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            // Arrow keys on a focused slider move the slider, not the page. The drawers handle their own keys.
-            if (e.target instanceof HTMLInputElement || open || contents) return;
+            // Arrow keys on a focused slider or choice move it, not the page, and with a modifier they're the
+            // browser's (Alt+← is Back). The drawers handle their own keys.
+            if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.target instanceof Element && e.target.closest(ARROW_KEYED)) return;
+            if (open || contents) return;
             if (e.key === "ArrowLeft") router.push(prev);
             if (e.key === "ArrowRight") router.push(next);
             if (e.key === "ArrowUp" && hasDetails) setOpen(true);
@@ -158,7 +165,13 @@ export function Card(props: {
                     className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface text-base text-ink-soft"
                 >
                     <DrawerTitle className="sr-only">More on: {props.title}</DrawerTitle>
-                    <div className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]">
+                    <div
+                        // As with the contents, a link followed from the details leaves them put away.
+                        onClickCapture={(e) => {
+                            if ((e.target as Element).closest("a")) setOpen(false);
+                        }}
+                        className="flex min-h-0 flex-col gap-5 overflow-y-auto overscroll-contain px-4 pt-3 pb-[max(env(safe-area-inset-bottom),1rem)]"
+                    >
                         {props.details}
                     </div>
                 </DrawerContent>
