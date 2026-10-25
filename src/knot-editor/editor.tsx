@@ -30,6 +30,7 @@ import {
     insertStep,
     NEW_ROPE_DIAMETER,
     setDetails,
+    setFrame,
 } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
 import type { KnotFile, PinRef } from "./format";
@@ -96,6 +97,8 @@ export default function KnotEditor() {
         handles: true,
         crossings: false,
         bendWarnings: true,
+        grid: true,
+        snap: false,
     });
     const [readouts] = useState(createReadouts);
     const [helpOpen, setHelpOpen] = useState(false);
@@ -172,6 +175,8 @@ export default function KnotEditor() {
         handles: true,
         crossings: true,
         bendWarnings: true,
+        grid: true,
+        snap: true,
         shortcuts: true,
     };
     const checked: Partial<Record<CommandId, boolean>> = show;
@@ -294,7 +299,9 @@ export default function KnotEditor() {
             id === "pinNumbers" ||
             id === "handles" ||
             id === "crossings" ||
-            id === "bendWarnings"
+            id === "bendWarnings" ||
+            id === "grid" ||
+            id === "snap"
         )
             setShow((s) => ({ ...s, [id]: !s[id] }));
         else if (id === "shortcuts") setHelpOpen(true);
@@ -317,6 +324,7 @@ export default function KnotEditor() {
                         key={state.loads}
                         ref={canvas}
                         picture={picture}
+                        frame={state.file.frame}
                         geometry={geometry}
                         crossings={crossings}
                         drawn={drawn}
@@ -351,10 +359,14 @@ export default function KnotEditor() {
             <DetailsDialog
                 open={detailsOpen}
                 details={state.file}
-                onDone={(details) => {
+                frame={state.file.frame}
+                onDone={(done) => {
                     setDetailsOpen(false);
-                    if (details)
-                        dispatch({ type: "edit-file", edit: (f) => setDetails(f, details) });
+                    if (done)
+                        dispatch({
+                            type: "edit-file",
+                            edit: (f) => setFrame(setDetails(f, done.details), done.frame),
+                        });
                 }}
             />
             <Dialog open={message !== null} onOpenChange={(open) => !open && setMessage(null)}>

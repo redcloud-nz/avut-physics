@@ -65,6 +65,8 @@ const BASE_COMMANDS = {
         shortcut: { code: "Digit4", label: "4" },
         toggle: true,
     },
+    grid: { label: "Grid", shortcut: { code: "Digit5", label: "5" }, toggle: true },
+    snap: { label: "Snap to Grid", shortcut: { code: "Digit6", label: "6" }, toggle: true },
     shortcuts: { label: "Shortcuts", shortcut: { code: "Slash", label: "?", shift: true } },
 } satisfies Record<string, Command>;
 
@@ -113,6 +115,9 @@ export const MENUS: { name: string; items: MenuItem[] }[] = [
             "handles",
             "crossings",
             "bendWarnings",
+            null,
+            "grid",
+            "snap",
         ],
     },
     { name: "Help", items: ["shortcuts"] },

@@ -48,7 +48,10 @@ export type EditorAction =
     | { type: "saved"; file: KnotFile; handle: FileSystemFileHandle; fileName: string }
     /** An edit to the picture being edited. */
     | { type: "edit"; edit: (picture: Picture) => Picture | Edited }
-    /** An edit to the file as a whole (its steps or details), showing `show` after it where given. */
+    /**
+     * An edit to the file as a whole (its steps, details or frame), showing `show` after it where given. During a drag
+     * it goes into the drag's entry, as `edit` does.
+     */
     | { type: "edit-file"; edit: (file: KnotFile) => KnotFile; show?: PictureId }
     | { type: "begin-drag" }
     | { type: "end-drag" }
@@ -156,8 +159,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
                 file,
                 picture,
                 selection: picture === state.picture ? state.selection : NOTHING,
-                undo: [...state.undo, snapshot(state)],
-                redo: [],
+                undo: state.dragging ? state.undo : [...state.undo, snapshot(state)],
+                redo: state.dragging ? state.redo : [],
             };
         }
         case "begin-drag":

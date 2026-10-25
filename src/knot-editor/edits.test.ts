@@ -16,6 +16,7 @@ import {
     deleteProp,
     deleteStep,
     deleteStrand,
+    draggedFrame,
     duplicateStep,
     insertPin,
     insertStep,
@@ -25,6 +26,7 @@ import {
     NEW_ROPE_DIAMETER,
     setCrossing,
     setDetails,
+    setFrame,
     setPass,
     setPinAngle,
     setRopeColour,
@@ -710,6 +712,49 @@ describe("steps and details", () => {
     });
 });
 
+describe("the frame", () => {
+    const f: KnotFile = {
+        name: "Test",
+        frame: { x: -20, y: -10, w: 40, h: 20 },
+        knot: picture([LINE]),
+        steps: [],
+    };
+
+    it("sets the frame, refusing a width or height not above 0", () => {
+        expect(setFrame(f, { x: 0, y: 0, w: 300, h: 200 }).frame).toEqual({
+            x: 0,
+            y: 0,
+            w: 300,
+            h: 200,
+        });
+        expect(setFrame(f, { ...f.frame })).toBe(f);
+        for (const bad of [{ w: 0 }, { h: -5 }, { x: NaN }, { w: Infinity }])
+            expect(setFrame(f, { ...f.frame, ...bad })).toBe(f);
+    });
+
+    it("drags an edge or a corner, stopping a millimetre short of the opposite edge", () => {
+        expect(draggedFrame(f.frame, [-1, 0], new Vector2(5, 9))).toEqual({
+            x: -15,
+            y: -10,
+            w: 35,
+            h: 20,
+        });
+        expect(draggedFrame(f.frame, [0, 1], new Vector2(9, 5))).toEqual({
+            x: -20,
+            y: -10,
+            w: 40,
+            h: 25,
+        });
+        expect(draggedFrame(f.frame, [1, -1], new Vector2(-100, 100))).toEqual({
+            x: -20,
+            y: 9,
+            w: 1,
+            h: 1,
+        });
+        expect(draggedFrame(f.frame, [-1, 0], new Vector2(100, 0))).toMatchObject({ x: 19, w: 1 });
+    });
+});
+
 describe("state", () => {
     const file = (knot: Picture, steps: Picture[] = []): KnotFile => ({
         name: "Test",
@@ -796,6 +841,26 @@ describe("state", () => {
         expect(redone.file).toBe(dragged.file);
         // A drag that moves nothing leaves nothing to undo.
         expect(run(s0, { type: "begin-drag" }, { type: "end-drag" }).undo).toEqual([]);
+    });
+
+    it("drags the frame as one entry, the same for every step", () => {
+        const s0 = run(start(file(picture([LINE]), [picture([WIGGLE])])), {
+            type: "show",
+            picture: 0,
+        });
+        const moves = [5, 10, 15].map(
+            (x) =>
+                ({
+                    type: "edit-file",
+                    edit: (f: KnotFile) =>
+                        setFrame(f, draggedFrame(s0.file.frame, [1, 1], new Vector2(x, x))),
+                }) as const,
+        );
+        const dragged = run(s0, { type: "begin-drag" }, ...moves, { type: "end-drag" });
+        expect(dragged.file.frame).toEqual({ x: -20, y: -20, w: 55, h: 55 });
+        expect(dragged.undo).toHaveLength(1);
+        expect(dragged.picture).toBe(0);
+        expect(run(dragged, { type: "undo" }).file).toBe(s0.file);
     });
 
     it("shows the picture an undo changes, with the selection it had", () => {

@@ -20,6 +20,7 @@ import {
     sameSegment,
     segmentBefore,
     type CrossingEntry,
+    type Frame,
     type KnotFile,
     type PassEntry,
     type PassSide,
@@ -771,4 +772,31 @@ export function setDetails(file: KnotFile, details: KnotDetails): KnotFile {
         ...(description && { description }),
         ...(about && { about }),
     };
+}
+
+// The frame
+
+/** The knot's frame, refused unless every value is a number and its width and height are above 0. */
+export function setFrame(file: KnotFile, frame: Frame): KnotFile {
+    const { x, y, w, h } = frame;
+    if (![x, y, w, h].every(Number.isFinite) || !(w > 0) || !(h > 0)) return file;
+    const was = file.frame;
+    if (x === was.x && y === was.y && w === was.w && h === was.h) return file;
+    return { ...file, frame: { x, y, w, h } };
+}
+
+/** Which of the frame's edges a drag moves, across and down: -1 the left or top, 1 the right or bottom, 0 neither. */
+export type FrameSides = [-1 | 0 | 1, -1 | 0 | 1];
+
+/** How close a dragged edge comes to the opposite one (millimetres). */
+const NARROWEST_FRAME = 1;
+
+/** The frame with the edges `sides` names moved by `by`, each stopping a millimetre short of the opposite edge. */
+export function draggedFrame(frame: Frame, [across, down]: FrameSides, by: Vector2): Frame {
+    let [x0, x1, y0, y1] = [frame.x, frame.x + frame.w, frame.y, frame.y + frame.h];
+    if (across < 0) x0 = Math.min(x0 + by.x, x1 - NARROWEST_FRAME);
+    if (across > 0) x1 = Math.max(x1 + by.x, x0 + NARROWEST_FRAME);
+    if (down < 0) y0 = Math.min(y0 + by.y, y1 - NARROWEST_FRAME);
+    if (down > 0) y1 = Math.max(y1 + by.y, y0 + NARROWEST_FRAME);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }

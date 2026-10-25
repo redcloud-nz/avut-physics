@@ -64,6 +64,15 @@ The design is in the spec. What it leaves to the build is settled here.
   at the strong lines. Where the lines would be under 8 pixels apart, only the strong ones are drawn; under 8 pixels
   for those too, none.
 - View > Grid (key 5, on by default) and View > Snap to Grid (key 6, off by default), both toggles.
+- Zoomed in, fine lines every 5 mm (four to each square, at half the grid lines' opacity) come in from 150%, and
+  millimetre lines (at a quarter) from 600%, where the 5 mm lines are as far apart as the 20 mm lines at 150%. Every
+  20 mm line is numbered from 200%, and every 5 mm line from 800% (the same ratio). The strong lines are 1.5 pixels
+  wide, and the numbers are outlined in `--background` so they read over the picture. Drags snap to the finest lines
+  drawn at the zoom: 1 mm from 600%, 5 mm from 150%, 20 mm below, and 100 mm where only the strong lines are left.
+  (The user's asks at the checkpoint; they replace the plain 20 mm snapping below.)
+- The numbers sit over the frame's dimming, so they stay readable outside the frame. Zoomed out, where the strong
+  lines' numbers would be under 48 pixels apart, only every second, fifth or tenth strong line is numbered. The drawing
+  is in `grid-drawing.tsx`, so that `./grid` names one file. (Settled in the build.)
 - Snapping rounds to the nearest grid line. A pin drag snaps the pin under the pointer and moves the others by the
   same amount. A prop drag snaps the middle of the prop's bounds. A frame drag snaps the edges being dragged.
 
@@ -143,7 +152,7 @@ Review group 1 ends here, with its visual checkpoint.
 
 ### Review group 2: the frame, the grid and snapping (visual checkpoint: the frame and a 20 mm grid)
 
-- [ ] **4. The frame** — Draw the knot's frame and change it by dragging or typing
+- [x] **4. The frame** — Draw the knot's frame and change it by dragging or typing
   - **Files:** `src/knot-editor/frame.tsx`, `src/knot-editor/canvas.tsx`, `src/knot-editor/handles.tsx`,
     `src/knot-editor/edits.ts`, `src/knot-editor/state.ts`, `src/knot-editor/details-dialog.tsx`,
     `src/knot-editor/edits.test.ts`
@@ -155,7 +164,7 @@ Review group 1 ends here, with its visual checkpoint.
     `npm test` pass.
   - `visual`
 
-- [ ] **5. The grid and snapping** — Draw a fixed grid and snap drags to it
+- [x] **5. The grid and snapping** — Draw a fixed grid and snap drags to it
   - **Files:** `src/knot-editor/grid.ts`, `src/knot-editor/grid.tsx`, `src/knot-editor/canvas.tsx`,
     `src/knot-editor/menus.tsx`, `src/knot-editor/editor.tsx`, `src/knot-editor/grid.test.ts`
   - **Do:** as in Decisions: `GRID`, the drawing with its numbers and its thinning when zoomed out, the two View

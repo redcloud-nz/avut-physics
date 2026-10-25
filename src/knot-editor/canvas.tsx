@@ -26,21 +26,27 @@ import type { PictureCrossings, StrandPaths } from "./crossing-geometry";
 import { crossingLetter, CrossingMarks, type Mark } from "./crossings";
 import {
     changeProp,
+    draggedFrame,
     insertPin,
     movePin,
     setCrossing,
+    setFrame,
     setPass,
     setPinAngle,
     setTensions,
+    type FrameSides,
 } from "./edits";
-import type { Picture, PinRef, Prop, SegmentRef } from "./format";
+import type { Frame, Picture, PinRef, Prop, SegmentRef } from "./format";
+import { FrameDrawing, FrameHandles } from "./frame";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
+import { snappedFrame, snappedMove, snapStep } from "./grid";
+import { GridDrawing, GridNumbers } from "./grid-drawing";
 import { hitAt, PinHandle, PinTools, SegmentHandle } from "./handles";
 import { PictureDrawing } from "./picture-drawing";
 import { kindOf } from "./props";
 import { NOTHING, type EditorAction, type Selection } from "./state";
 import type { ReadoutStore } from "./status-bar";
-import { BASE_SCALE, withinZoom } from "./zoom";
+import { withinZoom } from "./zoom";
 
 /** The picture's geometry, worked out from the last picture's where it can be. */
 export function useGeometry(picture: Picture): PictureGeometry {
@@ -111,13 +117,16 @@ const DRAG_STEP = 0.1;
 /** How far (pixels) the pointer moves before a press becomes a drag. */
 const DRAG = 3;
 
-/** The view taking in every strand and prop. */
-function fitted(picture: Picture, geometry: PictureGeometry, size: Size): View {
+/** The view taking in the frame and every strand and prop. */
+function fitted(picture: Picture, geometry: PictureGeometry, frame: Frame, size: Size): View {
     const boxes = [
+        {
+            min: new Vector2(frame.x, frame.y),
+            max: new Vector2(frame.x + frame.w, frame.y + frame.h),
+        },
         ...geometry.strands.flatMap((strand) => strand.segments.map((seg) => seg.box)),
         ...picture.props.map((prop) => kindOf(prop).bounds(prop)),
     ];
-    if (!boxes.length) return { cx: 0, cy: 0, scale: BASE_SCALE };
     const x0 = Math.min(...boxes.map((b) => b.min.x)) - MARGIN;
     const x1 = Math.max(...boxes.map((b) => b.max.x)) + MARGIN;
     const y0 = Math.min(...boxes.map((b) => b.min.y)) - MARGIN;
@@ -132,8 +141,10 @@ function fitted(picture: Picture, geometry: PictureGeometry, size: Size): View {
 /** A drag under way. `from` is where it began (client pixels), and `moved` whether it's become a drag yet. */
 type Gesture = { from: { x: number; y: number }; moved: boolean } & (
     | { kind: "pan"; view: View; additive: boolean }
-    | { kind: "pins"; refs: PinRef[]; origins: Vector2[]; start: Vector2 }
+    /** `anchor` is the pin picked up, which snapping puts on the grid. */
+    | { kind: "pins"; refs: PinRef[]; origins: Vector2[]; anchor: number; start: Vector2 }
     | { kind: "prop"; index: number; origin: Prop; start: Vector2 }
+    | { kind: "frame"; sides: FrameSides; origin: Frame; start: Vector2 }
     | { kind: "angle"; ref: PinRef; centre: Vector2 }
     | {
           kind: "tension";
@@ -152,18 +163,38 @@ const rounded = (v: number, step: number) => Math.round(v / step) / Math.round(1
 
 export function Canvas(props: {
     picture: Picture;
+    /** The knot's frame, the same for every picture. */
+    frame: Frame;
     geometry: PictureGeometry;
     crossings: PictureCrossings;
     /** Each strand's path, and which crossings and passes are too close, from `strandPaths`. */
     drawn: StrandPaths;
     selection: Selection;
     dispatch: Dispatch<EditorAction>;
-    show: { pinNumbers: boolean; handles: boolean; crossings: boolean; bendWarnings: boolean };
+    show: {
+        pinNumbers: boolean;
+        handles: boolean;
+        crossings: boolean;
+        bendWarnings: boolean;
+        grid: boolean;
+        /** Whether drags snap to the grid (whether or not it's shown). */
+        snap: boolean;
+    };
     /** Where the canvas puts the pointer's position and the zoom, for the status bar. */
     readouts: ReadoutStore;
     ref?: Ref<CanvasControls>;
 }) {
-    const { picture, geometry, crossings, drawn, selection, dispatch, show, readouts, ref } = props;
+    const {
+        picture,
+        frame: knotFrame,
+        geometry,
+        crossings,
+        drawn,
+        selection,
+        dispatch,
+        show,
+    } = props;
+    const { readouts, ref } = props;
     const svg = useRef<SVGSVGElement>(null);
     const [size, setSize] = useState<Size | null>(null);
     const [view, setView] = useState<View | null>(null);
@@ -171,9 +202,10 @@ export function Canvas(props: {
     const scale = view?.scale;
     useEffect(() => readouts.set({ scale }), [readouts, scale]);
 
-    const latest = useRef({ picture, geometry, crossings, selection, view, size });
+    const snap = show.snap;
+    const latest = useRef({ picture, knotFrame, geometry, crossings, selection, view, size, snap });
     useEffect(() => {
-        latest.current = { picture, geometry, crossings, selection, view, size };
+        latest.current = { picture, knotFrame, geometry, crossings, selection, view, size, snap };
     });
 
     // The panel's size, and the view fitted to the picture once it's known.
@@ -182,7 +214,11 @@ export function Canvas(props: {
         const observer = new ResizeObserver(() => {
             const next = { w: element.clientWidth, h: element.clientHeight };
             setSize(next);
-            setView((v) => v ?? fitted(latest.current.picture, latest.current.geometry, next));
+            setView((v) => {
+                if (v) return v;
+                const { picture, geometry, knotFrame } = latest.current;
+                return fitted(picture, geometry, knotFrame, next);
+            });
         });
         observer.observe(element);
         return () => observer.disconnect();
@@ -194,8 +230,8 @@ export function Canvas(props: {
             zoom: (factor) => setView((v) => v && { ...v, scale: withinZoom(v.scale * factor) }),
             setScale: (scale) => setView((v) => v && { ...v, scale: withinZoom(scale) }),
             fit: () => {
-                const { picture, geometry, size } = latest.current;
-                if (size) setView(fitted(picture, geometry, size));
+                const { picture, geometry, knotFrame, size } = latest.current;
+                if (size) setView(fitted(picture, geometry, knotFrame, size));
             },
             centre: () => {
                 const v = latest.current.view;
@@ -262,8 +298,12 @@ export function Canvas(props: {
             return;
         }
         const at = toPicture(p.x, p.y);
+        // Onto the finest lines drawn at the zoom the drag is made at.
+        const { snap } = latest.current;
+        const step = snapStep(latest.current.view!.scale);
         if (g.kind === "pins") {
-            const d = at.sub(g.start);
+            const pulled = at.sub(g.start);
+            const d = snap ? snappedMove(g.origins[g.anchor], pulled, step) : pulled;
             dispatch({
                 type: "edit",
                 edit: (q) =>
@@ -279,13 +319,28 @@ export function Canvas(props: {
                     ),
             });
         } else if (g.kind === "prop") {
-            const d = at.sub(g.start);
+            const pulled = at.sub(g.start);
+            const box = kindOf(g.origin).bounds(g.origin);
+            const d = snap ? snappedMove(box.min.add(box.max).scale(0.5), pulled, step) : pulled;
             const by = new Vector2(rounded(d.x, DRAG_STEP), rounded(d.y, DRAG_STEP));
             const { index, origin } = g;
             dispatch({
                 type: "edit",
                 edit: (q) => changeProp(q, index, () => kindOf(origin).moved(origin, by)),
             });
+        } else if (g.kind === "frame") {
+            const d = at.sub(g.start);
+            const by = new Vector2(rounded(d.x, DRAG_STEP), rounded(d.y, DRAG_STEP));
+            const { sides, origin } = g;
+            const dragged = draggedFrame(origin, sides, by);
+            const moved = snap ? snappedFrame(dragged, sides, step) : dragged;
+            const rect = {
+                x: rounded(moved.x, DRAG_STEP),
+                y: rounded(moved.y, DRAG_STEP),
+                w: rounded(moved.w, DRAG_STEP),
+                h: rounded(moved.h, DRAG_STEP),
+            };
+            dispatch({ type: "edit-file", edit: (f) => setFrame(f, rect) });
         } else if (g.kind === "angle") {
             const angle = rounded(deg(at.sub(g.centre).angle()), 0.1);
             dispatch({ type: "edit", edit: (q) => setPinAngle(q, g.ref, angle) });
@@ -327,6 +382,7 @@ export function Canvas(props: {
                 kind: "pins",
                 refs,
                 origins,
+                anchor: refs.findIndex((r) => same(r, hit.ref)),
                 start: toPicture(from.x, from.y),
                 from,
                 moved: false,
@@ -369,6 +425,15 @@ export function Canvas(props: {
                 kind: "prop",
                 index: hit.index,
                 origin,
+                start: toPicture(from.x, from.y),
+                from,
+                moved: false,
+            };
+        } else if (hit.kind === "frame") {
+            next = {
+                kind: "frame",
+                sides: hit.sides,
+                origin: latest.current.knotFrame,
                 start: toPicture(from.x, from.y),
                 from,
                 moved: false,
@@ -473,15 +538,19 @@ export function Canvas(props: {
 
     const ready = view && size;
     const px = view ? 1 / view.scale : 1;
+    const viewBox = ready
+        ? {
+              x: view.cx - size.w / 2 / view.scale,
+              y: view.cy - size.h / 2 / view.scale,
+              w: size.w / view.scale,
+              h: size.h / view.scale,
+          }
+        : { x: 0, y: 0, w: 0, h: 0 };
     return (
         <svg
             ref={svg}
             className="size-full touch-none select-none"
-            viewBox={
-                ready
-                    ? `${view.cx - size.w / 2 / view.scale} ${view.cy - size.h / 2 / view.scale} ${size.w / view.scale} ${size.h / view.scale}`
-                    : undefined
-            }
+            viewBox={ready ? `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}` : undefined}
             role="img"
             aria-label="The picture being edited"
             onPointerDown={onPointerDown}
@@ -493,10 +562,14 @@ export function Canvas(props: {
         >
             {ready && (
                 <>
+                    {show.grid && <GridDrawing view={viewBox} px={px} />}
                     <g pointerEvents="none">
                         <PictureDrawing picture={picture} geometry={geometry} paths={drawn.paths} />
                         <Warnings geometry={geometry} bends={show.bendWarnings} />
                     </g>
+                    <FrameDrawing frame={knotFrame} view={viewBox} px={px} />
+                    {show.grid && <GridNumbers view={viewBox} px={px} />}
+                    <FrameHandles frame={knotFrame} px={px} />
                     {picture.props.map((prop, p) => (
                         <path
                             key={p}

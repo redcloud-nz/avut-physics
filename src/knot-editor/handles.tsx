@@ -9,6 +9,8 @@
 
 import { memo } from "react";
 
+import type { FrameSides } from "./edits";
+
 const PIN = 5;
 const HIT = 12;
 const RING = 28;
@@ -24,6 +26,8 @@ export type Hit =
     /** A crossing or pass, by its place in `pictureCrossings`' list. */
     | { kind: "crossing" | "pass"; index: number }
     | { kind: "prop"; index: number }
+    /** The frame's edge or corner: which edges it moves, across and down. */
+    | { kind: "frame"; sides: FrameSides }
     | { kind: "background" };
 
 export function hitAt(target: EventTarget | null): Hit {
@@ -34,6 +38,7 @@ export function hitAt(target: EventTarget | null): Hit {
     if (kind === "tension") return { kind, ref: [a, b], end: c === 1 ? 1 : 0 };
     if (kind === "pin" || kind === "segment" || kind === "ring") return { kind, ref: [a, b] };
     if (kind === "crossing" || kind === "pass" || kind === "prop") return { kind, index: a };
+    if (kind === "frame") return { kind, sides: [Math.sign(a), Math.sign(b)] as FrameSides };
     return { kind: "background" };
 }
 
