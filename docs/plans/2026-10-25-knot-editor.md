@@ -294,7 +294,7 @@ Review group 1 ends here.
 
 ### Review group 2: the page, its menus and files (visual checkpoint: the empty editor opens and saves files)
 
-- [ ] **5. Site layout into a route group** — Move the site's pages into a `(site)` route group with their own
+- [x] **5. Site layout into a route group** — Move the site's pages into a `(site)` route group with their own
       layout
   - **Files:** `src/app/layout.tsx`, `src/app/(site)/layout.tsx` (new), `src/app/not-found.tsx` (new),
     `src/components/site-chrome.tsx` (new), every route folder and `page.tsx` in `src/app` moved into
@@ -318,7 +318,7 @@ Review group 1 ends here.
 
   - `visual`
 
-- [ ] **6. The editor's page and menu bar** — Add the knot editor's page, with its own layout, menu bar and panels
+- [x] **6. The editor's page and menu bar** — Add the knot editor's page, with its own layout, menu bar and panels
   - **Files:** `src/components/ui/menubar.tsx` (from `npx shadcn add menubar`, the repo's pinned version),
     `src/app/(editor)/layout.tsx`, `src/app/(editor)/knot-editor/page.tsx`, `src/knot-editor/editor.tsx`,
     `src/knot-editor/menus.tsx`, `src/app/globals.css` (only if the editor needs tokens the site doesn't have)
@@ -335,7 +335,7 @@ Review group 1 ends here.
     development. The browser console has no errors. Type check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **7. New, Open and Save** — Open and save knot files on your computer
+- [x] **7. New, Open and Save** — Open and save knot files on your computer
   - **Files:** `src/knot-editor/files.ts`, `src/knot-editor/file-system-access.d.ts` (the API's types, which the
     TypeScript DOM library lacks), `src/knot-editor/editor.tsx`, `src/knot-editor/menus.tsx`
   - **Do:**

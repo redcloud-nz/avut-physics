@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { SITE } from "@/articles/prose";
-import { ScrollMemory } from "@/components/scroll-memory";
-import { SiteFooter } from "@/components/SiteFooter";
 
 import "./globals.css";
 
@@ -33,14 +31,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             lang="en"
             className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
         >
-            <body className="h-dvh overflow-hidden font-sans">
-                {/* The page scrolls inside this box rather than the window, so its scrollbar can be styled everywhere. */}
-                <div className="page-scroll flex h-full flex-col overflow-y-auto">
-                    {children}
-                    <SiteFooter />
-                </div>
-                <ScrollMemory />
-            </body>
+            {/* The site's chrome is in `(site)/layout.tsx`; the knot editor, in `(editor)`, has its own. */}
+            <body className="h-dvh overflow-hidden font-sans">{children}</body>
         </html>
     );
 }

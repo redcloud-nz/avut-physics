@@ -1,0 +1,227 @@
+"use client";
+
+/**
+ * The editor's commands: one table of every menu item, its shortcut and whether it's a toggle, from which the menu bar,
+ * the shortcut handling and (later) the Help dialog are all drawn. Shortcuts are handled here and nowhere else.
+ */
+import { useEffect, useRef } from "react";
+
+import {
+    Menubar,
+    MenubarCheckboxItem,
+    MenubarContent,
+    MenubarItem,
+    MenubarLabel,
+    MenubarMenu,
+    MenubarSeparator,
+    MenubarShortcut,
+    MenubarSub,
+    MenubarSubContent,
+    MenubarSubTrigger,
+    MenubarTrigger,
+} from "@/components/ui/menubar";
+
+/**
+ * A key, with ⌘ (Ctrl off a Mac), Shift and Option (Alt) as needed. `code` is the physical key (`KeyboardEvent.code`),
+ * so Option doesn't turn the letter into another character.
+ */
+export type Shortcut = {
+    code: string;
+    label: string;
+    mod?: boolean;
+    shift?: boolean;
+    alt?: boolean;
+};
+
+export type Command = { label: string; shortcut?: Shortcut; toggle?: boolean };
+
+const letter = (l: string) => ({ code: `Key${l}`, label: l });
+
+/** Every command, with its shortcut. Chrome keeps ⌘N, ⌘T and ⌘W for itself, so New is ⌥⌘N. */
+export const COMMANDS = {
+    new: { label: "New", shortcut: { ...letter("N"), mod: true, alt: true } },
+    open: { label: "Open…", shortcut: { ...letter("O"), mod: true } },
+    save: { label: "Save", shortcut: { ...letter("S"), mod: true } },
+    saveAs: { label: "Save As…", shortcut: { ...letter("S"), mod: true, shift: true } },
+    details: { label: "Knot Details…", shortcut: { ...letter("I"), mod: true } },
+    undo: { label: "Undo", shortcut: { ...letter("Z"), mod: true } },
+    redo: { label: "Redo", shortcut: { ...letter("Z"), mod: true, shift: true } },
+    delete: { label: "Delete", shortcut: { code: "Backspace", label: "⌫" } },
+    selectAll: { label: "Select All", shortcut: { ...letter("A"), mod: true } },
+    insertPin: { label: "Pin", shortcut: letter("P") },
+    insertRope: { label: "Rope", shortcut: letter("R") },
+    insertArrow: { label: "Arrow", shortcut: letter("A") },
+    insertBar: { label: "Bar", shortcut: letter("B") },
+    insertStep: { label: "Step", shortcut: letter("S") },
+    zoomIn: { label: "Zoom In", shortcut: { code: "Equal", label: "=", mod: true } },
+    zoomOut: { label: "Zoom Out", shortcut: { code: "Minus", label: "−", mod: true } },
+    fit: { label: "Fit", shortcut: { code: "Digit0", label: "0", mod: true } },
+    pinNumbers: { label: "Pin Numbers", shortcut: { code: "Digit1", label: "1" }, toggle: true },
+    handles: { label: "Handles", shortcut: { code: "Digit2", label: "2" }, toggle: true },
+    crossings: { label: "Crossings", shortcut: { code: "Digit3", label: "3" }, toggle: true },
+    bendWarnings: {
+        label: "Bend Warnings",
+        shortcut: { code: "Digit4", label: "4" },
+        toggle: true,
+    },
+    shortcuts: { label: "Shortcuts", shortcut: { code: "Slash", label: "?", shift: true } },
+} satisfies Record<string, Command>;
+
+export type CommandId = keyof typeof COMMANDS;
+
+/** A menu's item: a command, a separator (`null`), or a submenu of commands. */
+export type MenuItem = CommandId | null | { submenu: string; items: CommandId[] };
+
+/** The menus, their items in order. */
+export const MENUS: { name: string; items: MenuItem[] }[] = [
+    { name: "File", items: ["new", "open", null, "save", "saveAs", null, "details"] },
+    { name: "Edit", items: ["undo", "redo", null, "delete", "selectAll"] },
+    {
+        name: "Insert",
+        items: [
+            "insertPin",
+            "insertRope",
+            "insertArrow",
+            { submenu: "Prop", items: ["insertBar"] },
+            null,
+            "insertStep",
+        ],
+    },
+    {
+        name: "View",
+        items: [
+            "zoomIn",
+            "zoomOut",
+            "fit",
+            null,
+            "pinNumbers",
+            "handles",
+            "crossings",
+            "bendWarnings",
+        ],
+    },
+    { name: "Help", items: ["shortcuts"] },
+];
+
+const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** A shortcut as shown beside its item: ⌥⇧⌘S on a Mac, Ctrl+Alt+Shift+S elsewhere. */
+export function shortcutLabel(s: Shortcut, mac = isMac()): string {
+    if (mac) return `${s.alt ? "⌥" : ""}${s.shift ? "⇧" : ""}${s.mod ? "⌘" : ""}${s.label}`;
+    return [s.mod && "Ctrl", s.alt && "Alt", s.shift && "Shift", s.label].filter(Boolean).join("+");
+}
+
+/** Whether a key press is this shortcut. */
+function matches(s: Shortcut, e: KeyboardEvent, mac: boolean): boolean {
+    const mod = mac ? e.metaKey : e.ctrlKey;
+    const other = mac ? e.ctrlKey : e.metaKey;
+    const code = s.code === "Backspace" && e.code === "Delete" ? "Backspace" : e.code;
+    return (
+        code === s.code &&
+        mod === !!s.mod &&
+        !other &&
+        e.altKey === !!s.alt &&
+        e.shiftKey === !!s.shift
+    );
+}
+
+/** Whether keys typed here belong to a field rather than the editor. */
+const typing = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+
+/**
+ * Runs each command's shortcut. The browser's own action for a shortcut the editor takes (⌘S, ⌘O) is always
+ * prevented, even while the command can't run, so ⌘S never saves the page itself. Plain keys are left to a field being
+ * typed in.
+ */
+export function useShortcuts(
+    enabled: Partial<Record<CommandId, boolean>>,
+    run: (id: CommandId) => void,
+) {
+    const latest = useRef({ enabled, run });
+    useEffect(() => {
+        latest.current = { enabled, run };
+    });
+    useEffect(() => {
+        const mac = isMac();
+        const onKey = (e: KeyboardEvent) => {
+            for (const [id, command] of Object.entries(COMMANDS) as [CommandId, Command][]) {
+                const s = command.shortcut;
+                if (!s || !matches(s, e, mac)) continue;
+                if (!s.mod && !s.alt && typing(e.target)) return;
+                e.preventDefault();
+                if (latest.current.enabled[id]) latest.current.run(id);
+                return;
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
+}
+
+/**
+ * The menu bar. Items not enabled are greyed out; toggles show a tick when checked. A menu's note, when it has one, is
+ * shown at its top (to say why its items can't be used).
+ */
+export function Menus(props: {
+    enabled: Partial<Record<CommandId, boolean>>;
+    checked: Partial<Record<CommandId, boolean>>;
+    run: (id: CommandId) => void;
+    notes?: Record<string, string>;
+}) {
+    const mac = isMac();
+    const item = (id: CommandId) => {
+        const command: Command = COMMANDS[id];
+        const shortcut = command.shortcut && (
+            <MenubarShortcut>{shortcutLabel(command.shortcut, mac)}</MenubarShortcut>
+        );
+        return command.toggle ? (
+            <MenubarCheckboxItem
+                key={id}
+                checked={!!props.checked[id]}
+                disabled={!props.enabled[id]}
+                onCheckedChange={() => props.run(id)}
+            >
+                {command.label}
+                {shortcut}
+            </MenubarCheckboxItem>
+        ) : (
+            <MenubarItem key={id} disabled={!props.enabled[id]} onSelect={() => props.run(id)}>
+                {command.label}
+                {shortcut}
+            </MenubarItem>
+        );
+    };
+    return (
+        <Menubar className="h-auto rounded-none border-0 bg-transparent p-0">
+            {MENUS.map((menu) => (
+                <MenubarMenu key={menu.name}>
+                    <MenubarTrigger className="px-2 py-1">{menu.name}</MenubarTrigger>
+                    <MenubarContent className="min-w-52">
+                        {props.notes?.[menu.name] && (
+                            <>
+                                <MenubarLabel className="max-w-52 font-normal text-ink-muted">
+                                    {props.notes[menu.name]}
+                                </MenubarLabel>
+                                <MenubarSeparator />
+                            </>
+                        )}
+                        {menu.items.map((entry, k) =>
+                            entry === null ? (
+                                <MenubarSeparator key={k} />
+                            ) : typeof entry === "string" ? (
+                                item(entry)
+                            ) : (
+                                <MenubarSub key={entry.submenu}>
+                                    <MenubarSubTrigger>{entry.submenu}</MenubarSubTrigger>
+                                    <MenubarSubContent>{entry.items.map(item)}</MenubarSubContent>
+                                </MenubarSub>
+                            ),
+                        )}
+                    </MenubarContent>
+                </MenubarMenu>
+            ))}
+        </Menubar>
+    );
+}

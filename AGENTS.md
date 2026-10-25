@@ -62,7 +62,10 @@ that a diagram draws correctly. The article's first load compiles for around 20 
 
 ## Code layout
 
-- `src/app/<route>/page.tsx`: thin pages. Visualisations render inside `VisualisationPage`.
+- `src/app/(site)/<route>/page.tsx`: thin pages. Visualisations render inside `VisualisationPage`. The `(site)`
+  route group's layout adds the site's chrome (the scroll box, footer and `ScrollMemory`, in `SiteChrome`); the root
+  layout holds only `<html>`, `<body>`, fonts and metadata, and `src/app/not-found.tsx` draws the chrome itself. The
+  knot editor is in `(editor)`, with a layout of its own.
 - `src/visualisations/<name>.tsx`: the interactive client component (sliders, SVG diagram,
   readouts).
 - `src/visualisations/<name>-solver.ts`: the physics, as pure functions of a setup with no React.
