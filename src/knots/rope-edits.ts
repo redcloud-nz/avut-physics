@@ -96,6 +96,21 @@ export function flipCrossing<R extends PinnedRope>(
     return { ...rope, over: [...over, r2(crossing.s[top])].sort((a, b) => a - b) };
 }
 
+/** Put a pass across a bar in front of the bar, or behind it where it's in front already. */
+export function flipFront<R extends PinnedRope>(
+    rope: R,
+    shape: RopeShape,
+    pass: { from: number; to: number },
+): R {
+    const [a, b] = [shape.s[pass.from], shape.s[pass.to]];
+    const front = (rope.front ?? []).filter((f) => f < a || f > b);
+    const inFront = front.length < (rope.front ?? []).length;
+    return {
+        ...rope,
+        front: inFront ? front : [...front, r2((a + b) / 2)].sort((x, y) => x - y),
+    };
+}
+
 /** A rope that may carry arrows. */
 type Arrowed = PinnedRope & { arrows?: Arrow[] };
 

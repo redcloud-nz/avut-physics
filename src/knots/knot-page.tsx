@@ -5,20 +5,20 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useState } from "react";
 
 import { fullName, KNOTS, KNOTS_TITLE } from ".";
-import { PAGE_SCALE, ropeView, TyingDrawing } from "./tying-drawing";
+import type { RopePath } from "./rope-path";
+import { PAGE_SCALE, TyingDrawing, type View } from "./tying-drawing";
 import { TyingSteps } from "./tying-steps";
-
-const VIEWS = new Map(
-    KNOTS.map((knot) => [knot.slug, ropeView(knot.drawing, knot.drawing.length > 1, knot.bar)]),
-);
 
 /**
  * A knot's page: what it's for, the knot finished, and more on how it's used. Where the knot has steps, an Instructions
  * button brings up tying it a step at a time over the page.
+ *
+ * The finished knot comes from the server, `drawing` and its `view`, worked out there: solving a pinned rope again in the
+ * browser can come out different in the last digits, and the page wouldn't then match as it hydrates.
  */
-export function KnotPage(props: { slug: string }) {
+export function KnotPage(props: { slug: string; drawing: RopePath[]; view: View }) {
     const knot = KNOTS.find((knot) => knot.slug === props.slug)!;
-    const view = VIEWS.get(props.slug)!;
+    const { drawing, view } = props;
     const { steps } = knot;
     const [tying, setTying] = useState(false);
 
@@ -59,7 +59,7 @@ export function KnotPage(props: { slug: string }) {
 
             {/* Drawn at the same size per rope diameter as every other knot, so their ropes all look as thick. */}
             <TyingDrawing
-                step={{ ropes: knot.drawing }}
+                step={{ ropes: drawing }}
                 bar={knot.bar}
                 view={view}
                 label={`${fullName(knot)}, finished`}

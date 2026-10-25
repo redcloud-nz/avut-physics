@@ -25,6 +25,7 @@ import {
     ropeLength,
     type RopePath,
 } from "./rope-path";
+import { ROUND_TURN, ROUND_TURN_BAR } from "./round-turn";
 
 /** The rope's passes in order along it, read off where its centreline crosses itself and which strand is marked over. */
 function passesOf(path: RopePath): Pass[] {
@@ -318,5 +319,45 @@ describe("FIGURE_EIGHT_JOINED_TYING", () => {
     it("bends smoothly at every step, the end pulled out to the side too", () => {
         for (const step of steps)
             expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("ROUND_TURN", () => {
+    const { points, over: isOver } = centreline(ROUND_TURN);
+    const s = arcLengths(points);
+    const found = crossings(ROUND_TURN);
+    const bar = ROUND_TURN_BAR;
+
+    it("crosses itself only in the half hitches, three times in each, one strand always over", () => {
+        expect(found).toHaveLength(6);
+        for (const c of found) {
+            expect(c.over).not.toBeNull();
+            expect(c.at.y).toBeGreaterThan(bar.y + bar.r);
+        }
+    });
+
+    it("marks the strand going over for a diameter either side of each crossing", () => {
+        for (const c of found) {
+            const at = c.s[c.over!];
+            points.forEach((_, i) => {
+                if (Math.abs(s[i] - at) <= 1) expect(isOver[i]).toBe(true);
+            });
+        }
+    });
+
+    it("goes round the bar's front marked over and round its back plain", () => {
+        // Its front and back are told apart by which way it's going: up the front, down the back.
+        points.forEach((p, i) => {
+            if (i === 0 || Math.abs(p.y - bar.y) > bar.r - 0.5) return;
+            if (Math.abs(p.x - bar.x) > 3) return;
+            expect(isOver[i]).toBe(p.y < points[i - 1].y);
+        });
+    });
+
+    it("bends smoothly in the half hitches", () => {
+        // Seen side on, the turns round the bar double back sharply over its top and bottom, as a helix does seen side
+        // on, so it's only the tail after it last leaves the bar that's checked, and the standing part's straight.
+        const left = points.findLastIndex((p) => p.y < bar.y);
+        expect(tightestBend(points.slice(left))).toBeGreaterThan(1.75);
     });
 });

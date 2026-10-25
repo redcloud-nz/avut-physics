@@ -6,7 +6,7 @@ import { RopeDrawing } from "./rope-drawing";
 import { centreline, crossings, type RopePath } from "./rope-path";
 import { TyingArrow, type Arrow } from "./tying-arrow";
 
-type View = { x: number; y: number; w: number; h: number };
+export type View = { x: number; y: number; w: number; h: number };
 
 /** The view every step of a knot's tying shares, so the rope stays put as the steps change. It takes in any bar. */
 export function stepsView(steps: TyingStep[], bar?: Bar): View {
@@ -21,13 +21,15 @@ export function stepsView(steps: TyingStep[], bar?: Bar): View {
 }
 
 /** The bar's edges as far as they reach each way. */
-const barEdges = (bar: Bar) =>
-    [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-    ].map(([dx, dy]) => new Vector2(bar.x + dx * bar.r, bar.y + dy * bar.r));
+const barEdges = (bar: Bar) => {
+    const half = bar.length ? bar.length / 2 : bar.r;
+    return [
+        [half, 0],
+        [-half, 0],
+        [0, bar.r],
+        [0, -bar.r],
+    ].map(([dx, dy]) => new Vector2(bar.x + dx, bar.y + dy));
+};
 
 /** How far below a finished knot's lowest crossing its view reaches, showing its ends leaving it (diameters). */
 const ENDS = 8;
@@ -66,7 +68,7 @@ export function TyingDrawing(props: {
     view: View;
     turned?: boolean;
     label: string | null;
-    /** Something the knot's tied round, drawn as a bar seen end on, under the rope. */
+    /** Something the knot's tied round, drawn as a bar: seen end on, under the rope; side on, across it. */
     bar?: Bar;
     scale?: number;
     className?: string;
@@ -98,8 +100,11 @@ export function TyingDrawing(props: {
                 {arrows.map(
                     (arrow, i) => !arrow.front && <TyingArrow key={i} points={arrow.points} />,
                 )}
-                {props.bar && <BarDrawing bar={props.bar} />}
-                <RopeDrawing ropes={ropes} />
+                {props.bar && !props.bar.length && <BarDrawing bar={props.bar} />}
+                <RopeDrawing
+                    ropes={ropes}
+                    between={props.bar?.length && <BarDrawing bar={props.bar} />}
+                />
                 {arrows.map(
                     (arrow, i) => arrow.front && <TyingArrow key={i} points={arrow.points} />,
                 )}

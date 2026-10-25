@@ -11,6 +11,7 @@
 import { findRoot, solveLinear } from "@/lib/numeric";
 import { vec2, Vector2 } from "@/lib/vector2";
 
+import type { Bar } from "./bar";
 import { crossings, over as overSegment, plain, type RopePath } from "./rope-path";
 
 export type Pin = { x: number; y: number; angle?: number };
@@ -24,6 +25,11 @@ export type PinnedRope = {
     tail: number;
     /** Where along the rope (from its start) it goes over at a crossing: one entry for each crossing. */
     over: number[];
+    /**
+     * For a rope round a bar seen side on, where along it the passes across the bar that go in front of it are: one
+     * entry for each. The other passes go behind it.
+     */
+    front?: number[];
 };
 
 /** About how far apart the solved rope's points are (diameters). */
@@ -264,15 +270,49 @@ export function ropeCrossings(rope: PinnedRope, shape: RopeShape) {
     });
 }
 
+/** How far a pass in front of a bar is marked over past the bar's edge, along the rope (diameters). */
+const PAST_BAR = 0.6;
+
+/**
+ * Each place the rope passes across a bar seen side on: the points from where it meets the bar's edge to where it
+ * leaves it, the point halfway along, and whether the rope's `front` list puts it in front of the bar. None for a bar
+ * seen end on.
+ */
+export function barPasses(rope: PinnedRope, shape: RopeShape, bar?: Bar) {
+    if (!bar?.length) return [];
+    const { points, s } = shape;
+    const on = points.map(
+        (p) => Math.abs(p.y - bar.y) < bar.r && Math.abs(p.x - bar.x) < bar.length! / 2,
+    );
+    const passes: { from: number; to: number; at: Vector2; front: boolean }[] = [];
+    for (let i = 0; i < points.length; i++) {
+        if (!on[i] || (i > 0 && on[i - 1])) continue;
+        let j = i;
+        while (j + 1 < points.length && on[j + 1]) j++;
+        const front = (rope.front ?? []).some((f) => f >= s[i] && f <= s[j]);
+        passes.push({ from: i, to: j, at: points[Math.round((i + j) / 2)], front });
+    }
+    return passes;
+}
+
 /**
  * The solved rope as a `RopePath` to draw and check: smooth curves through its points, with a stretch marked over
  * where it passes over at each crossing (long enough to cover the strand underneath, more so where they cross at
- * a shallow angle).
+ * a shallow angle), and, round a bar seen side on, where it passes in front of the bar.
  */
-export function ropePathOf(rope: PinnedRope, shape: RopeShape): RopePath {
+export function ropePathOf(rope: PinnedRope, shape: RopeShape, bar?: Bar): RopePath {
     const { points, s } = shape;
     const last = points.length - 1;
     const runs: [number, number][] = [];
+    for (const pass of barPasses(rope, shape, bar)) {
+        if (!pass.front) continue;
+        const i0 = Math.max(
+            0,
+            s.findLastIndex((v) => v <= s[pass.from] - PAST_BAR),
+        );
+        const found = s.findIndex((v) => v >= s[pass.to] + PAST_BAR);
+        runs.push([i0, found < 0 ? last : found]);
+    }
     for (const c of ropeCrossings(rope, shape)) {
         if (c.over === null) continue;
         const at = c.s[c.over];

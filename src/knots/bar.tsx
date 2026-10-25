@@ -1,18 +1,48 @@
 /**
- * A metal bar for a knot to be tied round, seen end on: a round tube the rope's loop wraps round. Seen that way the
- * rope lies across the bar's end rather than over or under it, so it's drawn before the rope.
+ * A metal bar for a knot to be tied round: a round tube the rope wraps round. Seen end on, the rope lies across the
+ * bar's end rather than over or under it, so it's drawn before the rope. Seen side on, running across, it's in front
+ * of the rope going round its back and behind the rope coming round its front, so it's drawn over the rope and under
+ * the stretches marked over.
  *
  * Coordinates are rope diameters, as for the rope.
  */
 
-/** Where the bar's centre is and its radius (diameters). */
-export type Bar = { x: number; y: number; r: number };
+/** Where the bar's centre is and its radius (diameters), and where it's seen side on, running across, how long it is. */
+export type Bar = { x: number; y: number; r: number; length?: number };
 
 const COLORS = { body: "#94a3b8", shade: "#475569", highlight: "#f1f5f9", outline: "#0f172a" };
 
-/** The bar's end: a disc, shaded round its edge, with a highlight on its upper left. */
+/**
+ * The bar's end: a disc, shaded round its edge, with a highlight on its upper left. Seen side on, a band, shaded along
+ * its bottom, with a highlight along its top, and cut off square at its ends.
+ */
 export function BarDrawing(props: { bar: Bar }) {
-    const { x, y, r } = props.bar;
+    const { x, y, r, length } = props.bar;
+    if (length) {
+        const left = x - length / 2;
+        return (
+            <g>
+                <rect x={left} y={y - r} width={length} height={2 * r} fill={COLORS.shade} />
+                <rect x={left} y={y - r} width={length} height={1.6 * r} fill={COLORS.body} />
+                <path
+                    d={`M ${left + 0.4} ${y - 0.55 * r} h ${length - 0.8}`}
+                    stroke={COLORS.highlight}
+                    strokeOpacity={0.8}
+                    strokeWidth={0.25}
+                    strokeLinecap="round"
+                />
+                <rect
+                    x={left}
+                    y={y - r}
+                    width={length}
+                    height={2 * r}
+                    fill="none"
+                    stroke={COLORS.outline}
+                    strokeWidth={0.25}
+                />
+            </g>
+        );
+    }
     const glint = (a: number) => `${x + 0.65 * r * Math.cos(a)} ${y + 0.65 * r * Math.sin(a)}`;
     return (
         <g>

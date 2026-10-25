@@ -29,6 +29,16 @@ while the first rope (a step's `first`) stays put: its second rope lies through 
 distance shorter. A knot joining two ropes draws the second in green, and its view stops as far past
 the knot at the top as at the bottom, where the ropes run on out both ways.
 
+The round turn and two half hitches (`round-turn.ts`) is tied round a bar seen side on (a `Bar` with a `length`),
+running across the drawing. The rope goes in front of the bar and behind it, so the bar is drawn over the whole rope and
+under the stretches marked over. It's a pinned rope like the tying steps, in `round-turn.json`, and its `front` list says
+which passes across the bar go in front of it (marked over, a little past the bar's edges); the rest go behind, where
+the bar hides them. Its turns go up the bar's front and down its back. Seen side on, they're a wave that doubles back
+sharply over the bar's top and bottom, as a helix does, so the pins there don't hold a direction (the rope turns at them),
+and only the half hitches below the bar are held to the smooth-bend test. Each half hitch goes down beside the standing
+part, round it in an oval, in front of it along the bottom and behind it along the top, then out over its own way down
+and on down outside it.
+
 ## Stages
 
 1. **A loose figure-8** (done). Written as SVG path segments, each plain or over.
@@ -70,7 +80,9 @@ knot but not a tight one.
   rope between them and any direction a pin holds, with the rope between the pins solved as the smoothest
   curve of that length. They're kept in `figure-eight-tying.json` and laid out in the rope editor at
   `/knots/edit` (development only), which saves every change straight into that file and picks up changes
-  made to it elsewhere. A step can carry arrows (smooth curves through a few points, with a head at the last)
+  made to it elsewhere. It works on any knot listed in `editable.ts`, each in its own file (`?knot=round-turn` for
+  the round turn), and where one's tied round a bar seen side on, clicking a pass across the bar puts it in front or
+  behind. A step can carry arrows (smooth curves through a few points, with a head at the last)
   showing where the rope goes next, and a step in between, the same rope as the one before with arrows on it,
   shows a move on its own; marked as continuing it, the step after keeps the same number ("Step 2 (cont.)"). Animating between them is left for later; the likely way is to
   match steps by distance along the rope (which needs every step to be the same length of rope). `firstPart` (the rope cut at a length along it) is kept for

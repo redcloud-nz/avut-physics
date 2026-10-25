@@ -9,6 +9,8 @@
  * Coordinates are rope diameters, so place it in an SVG whose viewBox is in diameters too.
  */
 
+import type { ReactNode } from "react";
+
 import { laySegments, ropeEnd, type RopePath } from "./rope-path";
 
 export type RopeColors = { body: string; weave: string; highlight: string; outline: string };
@@ -43,12 +45,19 @@ const TAPE_LENGTH = 1.2;
 const TRIM = 0.1;
 
 /**
+ * A length or coordinate rounded for drawing: worked out along arcs, its last digits can differ between the server and
+ * the browser, and the page wouldn't then match as it hydrates.
+ */
+const rounded = (value: number) => Math.round(value * 1e4) / 1e4;
+
+/**
  * One stretch of rope along path data `d`: outline, body, weave and highlight, the weave `offset` along. Given
  * its `length`, the outline stops a little short of each end: the rope underneath already has it there, and a
  * square end's anti-aliased edge would otherwise leave a faint dark line across the rope.
  */
 function Stretch(props: { d: string; offset: number; length?: number; colors: RopeColors }) {
-    const { d, offset, length, colors } = props;
+    const { d, colors } = props;
+    const [offset, length] = [rounded(props.offset), props.length && rounded(props.length)];
     const common = {
         d,
         fill: "none",
@@ -78,7 +87,8 @@ function Stretch(props: { d: string; offset: number; length?: number; colors: Ro
     );
 }
 
-export function RopeDrawing(props: { ropes: RopePath[] }) {
+/** The ropes, with anything `between` drawn over their whole length but under their stretches marked over. */
+export function RopeDrawing(props: { ropes: RopePath[]; between?: ReactNode }) {
     const ropes = props.ropes.map((path, r) => ({
         path,
         laid: laySegments(path),
@@ -89,13 +99,14 @@ export function RopeDrawing(props: { ropes: RopePath[] }) {
             {ropes.map(({ path, colors }, r) => (
                 <Stretch key={r} d={path.map((s) => s.d).join(" ")} offset={0} colors={colors} />
             ))}
+            {props.between}
             {ropes.map(({ laid, colors }, r) =>
                 laid.map(
                     (seg, k) =>
                         seg.over && (
                             <Stretch
                                 key={`${r}-${k}`}
-                                d={`M ${seg.from.x} ${seg.from.y} ${seg.d}`}
+                                d={`M ${rounded(seg.from.x)} ${rounded(seg.from.y)} ${seg.d}`}
                                 offset={seg.start}
                                 length={seg.length}
                                 colors={colors}
@@ -109,7 +120,7 @@ export function RopeDrawing(props: { ropes: RopePath[] }) {
                 return (
                     <Stretch
                         key={r}
-                        d={`M ${tapeFrom.x} ${tapeFrom.y} L ${end.at.x} ${end.at.y}`}
+                        d={`M ${rounded(tapeFrom.x)} ${rounded(tapeFrom.y)} L ${end.at.x} ${end.at.y}`}
                         offset={0}
                         length={TAPE_LENGTH}
                         colors={TAPE_COLORS}

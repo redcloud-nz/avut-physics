@@ -1,32 +1,30 @@
 "use client";
 
 /**
- * The rope editor: lay out the figure-8's tying steps by pinning the rope and dragging the pins, and the rope
- * settles between them (see `pinned-rope.ts`). Every change is kept straight away in `figure-eight-tying.json`
- * as a draft of its step, and the step itself only changes there (and on the knots page) once it's saved,
+ * The rope editor: lay out a knot's steps (the figure-8's tying steps, or a knot finished, as listed in `editable.ts`)
+ * by pinning the rope and dragging the pins, and the rope settles between them (see `pinned-rope.ts`). Every change
+ * is kept straight away in the knot's file as a draft of its step, and the step itself only changes there (and on the knots page) once it's saved,
  * and a change made to that file elsewhere shows here as soon as the dev server reloads it, so the steps can be
  * worked on from either side.
  */
 import { ChevronLeft, ChevronRight, CopyPlus, Save, Trash2, Undo2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { Button } from "@/components/ui/button";
 import { vec2, Vector2 } from "@/lib/vector2";
 
-import {
-    stepLabel,
-    TYING_DATA,
-    TYING_DRAFTS,
-    tyingView,
-    type TyingStepData,
-} from "./figure-eight-tying";
-import { ropeCrossings, ropePathOf, solveRope, type RopeShape } from "./pinned-rope";
+import { BarDrawing } from "./bar";
+import { EDITABLE, type EditableKnot } from "./editable";
+import { draftsOf, stepLabel, tyingView, type TyingStepData } from "./figure-eight-tying";
+import { barPasses, ropeCrossings, ropePathOf, solveRope, type RopeShape } from "./pinned-rope";
 import { RopeDrawing } from "./rope-drawing";
 import {
     addArrow,
     addPin,
     flipCrossing,
+    flipFront,
     moveArrowPoint,
     movePin,
     removeArrow,
@@ -38,9 +36,6 @@ import {
 } from "./rope-edits";
 import { ropeEnd } from "./rope-path";
 import { arrowShape, TyingArrow, type Arrow } from "./tying-arrow";
-
-/** The working area: the page's frame and room round it, down to where the standing part starts. */
-const VIEW = { x: -16, y: -19, w: 32, h: 41 };
 
 /** How far from its pin a held direction's handle sits (diameters). */
 const HANDLE = 2.5;
@@ -113,19 +108,29 @@ const fileText = (current: TyingStepData[], saved: TyingStepData[]) => {
  * The editor, once it's in the browser: the solver's last digits can differ between the server and the browser,
  * and the page has nothing to show without it.
  */
-export default function RopeEditor() {
+export default function RopeEditor(props: { knot: string }) {
     const inBrowser = useSyncExternalStore(
         () => () => {},
         () => true,
         () => false,
     );
-    return inBrowser ? <Editor /> : <p className="text-sm text-slate-400">Loading the rope…</p>;
+    // Taken afresh each time, so a change to a knot's file made elsewhere comes through.
+    const knot = EDITABLE.find((k) => k.slug === props.knot) ?? EDITABLE[0];
+    return inBrowser ? (
+        <Editor knot={knot} />
+    ) : (
+        <p className="text-sm text-slate-400">Loading the rope…</p>
+    );
 }
 
-function Editor() {
-    const [ed, setEd] = useState(() => editing(working(TYING_DATA, TYING_DRAFTS)));
+function Editor(props: { knot: EditableKnot }) {
+    const { knot } = props;
+    const area = knot.view;
+    const savedSteps = knot.file.steps;
+    const fileDrafts = draftsOf(knot.file);
+    const [ed, setEd] = useState(() => editing(working(savedSteps, fileDrafts)));
     /** The steps as saved: what the knots page shows. */
-    const [approved, setApproved] = useState(TYING_DATA);
+    const [approved, setApproved] = useState(savedSteps);
     const [history, setHistory] = useState<Snapshot[]>([]);
     const [wanted, setK] = useState(0);
     /** The step shown, kept in range as steps are removed. */
@@ -136,25 +141,23 @@ function Editor() {
     const [status, setStatus] = useState("");
     const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
     /** The file's text as last written, or read. */
-    const [saved, setSaved] = useState(() =>
-        fileText(working(TYING_DATA, TYING_DRAFTS), TYING_DATA),
-    );
-    const [seenImport, setSeenImport] = useState(TYING_DATA);
+    const [saved, setSaved] = useState(() => fileText(working(savedSteps, fileDrafts), savedSteps));
+    const [seenImport, setSeenImport] = useState(savedSteps);
 
     const svgRef = useRef<SVGSVGElement>(null);
     const drag = useRef<Drag | null>(null);
 
-    // When the dev server reloads the steps' file after it's been edited elsewhere, this module gets a new
-    // TYING_DATA: take it, unless it's what this page has just saved.
-    if (TYING_DATA !== seenImport) {
-        setSeenImport(TYING_DATA);
-        const current = working(TYING_DATA, TYING_DRAFTS);
-        const text = fileText(current, TYING_DATA);
+    // When the dev server reloads the steps' file after it's been edited elsewhere, its file gives new
+    // steps: take them, unless it's what this page has just saved.
+    if (savedSteps !== seenImport) {
+        setSeenImport(savedSteps);
+        const current = working(savedSteps, fileDrafts);
+        const text = fileText(current, savedSteps);
         if (text !== saved) {
             setSaved(text);
             setHistory([...history, { ed, approved }]);
             setEd(editing(current));
-            setApproved(TYING_DATA);
+            setApproved(savedSteps);
             setSelected(null);
             setSelectedArrow(null);
             setStatus("Reloaded from the file");
@@ -166,8 +169,9 @@ function Editor() {
     const arrows = step.arrows ?? [];
     const arrowIndex =
         selectedArrow !== null && selectedArrow < arrows.length ? selectedArrow : null;
-    const path = useMemo(() => ropePathOf(step, shape), [step, shape]);
+    const path = useMemo(() => ropePathOf(step, shape, knot.bar), [step, shape, knot.bar]);
     const crossingsHere = useMemo(() => ropeCrossings(step, shape), [step, shape]);
+    const passes = useMemo(() => barPasses(step, shape, knot.bar), [step, shape, knot.bar]);
     const frame = tyingView(ed.shapes.map((s) => s.points));
 
     /** Write the steps (as saved, and as drafts) into the file, unless that's what's there already. */
@@ -176,7 +180,7 @@ function Editor() {
         if (text === saved) return;
         setSaved(text);
         setStatus("Writing…");
-        const response = await fetch("/knots/edit/save", {
+        const response = await fetch(`/knots/edit/save?knot=${knot.slug}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: text,
@@ -388,7 +392,7 @@ function Editor() {
             diagram={
                 <svg
                     ref={svgRef}
-                    viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`}
+                    viewBox={`${area.x} ${area.y} ${area.w} ${area.h}`}
                     className="mx-auto block h-auto max-h-[85vh] w-full touch-none select-none"
                     onPointerMove={onMove}
                     onPointerUp={endDrag}
@@ -401,39 +405,39 @@ function Editor() {
                 >
                     {/* A grid a diameter apart, stronger every 5, with the numbers along the left and top. */}
                     <g stroke="#1e293b" strokeWidth={0.04}>
-                        {Array.from({ length: VIEW.w + 1 }, (_, i) => VIEW.x + i).map((x) => (
+                        {Array.from({ length: area.w + 1 }, (_, i) => area.x + i).map((x) => (
                             <line
                                 key={`x${x}`}
                                 x1={x}
                                 x2={x}
-                                y1={VIEW.y}
-                                y2={VIEW.y + VIEW.h}
+                                y1={area.y}
+                                y2={area.y + area.h}
                                 strokeWidth={x % 5 ? 0.03 : 0.08}
                             />
                         ))}
-                        {Array.from({ length: VIEW.h + 1 }, (_, i) => VIEW.y + i).map((y) => (
+                        {Array.from({ length: area.h + 1 }, (_, i) => area.y + i).map((y) => (
                             <line
                                 key={`y${y}`}
                                 y1={y}
                                 y2={y}
-                                x1={VIEW.x}
-                                x2={VIEW.x + VIEW.w}
+                                x1={area.x}
+                                x2={area.x + area.w}
                                 strokeWidth={y % 5 ? 0.03 : 0.08}
                             />
                         ))}
                     </g>
                     <g fontSize={0.7} fill="#64748b">
-                        {Array.from({ length: VIEW.w + 1 }, (_, i) => VIEW.x + i)
+                        {Array.from({ length: area.w + 1 }, (_, i) => area.x + i)
                             .filter((x) => x % 5 === 0)
                             .map((x) => (
-                                <text key={x} x={x + 0.15} y={VIEW.y + 0.8}>
+                                <text key={x} x={x + 0.15} y={area.y + 0.8}>
                                     {x}
                                 </text>
                             ))}
-                        {Array.from({ length: VIEW.h + 1 }, (_, i) => VIEW.y + i)
+                        {Array.from({ length: area.h + 1 }, (_, i) => area.y + i)
                             .filter((y) => y % 5 === 0)
                             .map((y) => (
-                                <text key={y} x={VIEW.x + 0.15} y={y - 0.15}>
+                                <text key={y} x={area.x + 0.15} y={y - 0.15}>
                                     {y}
                                 </text>
                             ))}
@@ -452,7 +456,11 @@ function Editor() {
 
                     {/* Arrows go behind the rope unless they're marked in front, as on the knots page. */}
                     {arrows.map((arrow, a) => !arrow.front && drawArrow(arrow, a))}
-                    <RopeDrawing ropes={[path]} />
+                    {knot.bar && !knot.bar.length && <BarDrawing bar={knot.bar} />}
+                    <RopeDrawing
+                        ropes={[path]}
+                        between={knot.bar?.length && <BarDrawing bar={knot.bar} />}
+                    />
                     {arrows.map((arrow, a) => arrow.front && drawArrow(arrow, a))}
                     {arrows.map(
                         (arrow, a) =>
@@ -501,6 +509,25 @@ function Editor() {
                         </text>
                     )}
 
+                    {/* Clicking a pass across a bar seen side on puts it in front of the bar or behind it. */}
+                    {passes.map((pass, i) => (
+                        <rect
+                            key={`b${i}`}
+                            x={pass.at.x - 0.4}
+                            y={pass.at.y - 0.4}
+                            width={0.8}
+                            height={0.8}
+                            fill={pass.front ? "#f59e0b" : "#64748b"}
+                            fillOpacity={0.85}
+                            style={{ cursor: "pointer" }}
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                                change(flipFront(step, shape, pass));
+                            }}
+                        >
+                            <title>{pass.front ? "In front of the bar" : "Behind the bar"}</title>
+                        </rect>
+                    ))}
                     {crossingsHere.map((c, i) => (
                         <g
                             key={`c${i}`}
@@ -624,6 +651,23 @@ function Editor() {
             }
             controls={
                 <>
+                    <nav className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                        {EDITABLE.map((k) =>
+                            k.slug === knot.slug ? (
+                                <span key={k.slug} className="text-slate-200">
+                                    {k.name}
+                                </span>
+                            ) : (
+                                <Link
+                                    key={k.slug}
+                                    href={`/knots/edit?knot=${k.slug}`}
+                                    className="text-sky-400 hover:text-sky-300"
+                                >
+                                    {k.name}
+                                </Link>
+                            ),
+                        )}
+                    </nav>
                     <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
@@ -832,8 +876,9 @@ function Editor() {
                         <p className="text-sm text-slate-400">
                             Click the rope to pin it there, and drag pins to move them. Select a pin
                             to hold its direction or change the rope either side. Click a crossing
-                            to swap which strand is on top. Add an arrow to show where the rope goes
-                            next, and add a step after this one to show it in a step of its own.
+                            to swap which strand is on top, or a square on a bar to put the rope in
+                            front of it or behind. Add an arrow to show where the rope goes next,
+                            and add a step after this one to show it in a step of its own.
                         </p>
                     )}
 

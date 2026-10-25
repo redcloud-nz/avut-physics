@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { fullName, KNOTS, KNOTS_TITLE } from "@/knots";
 import { KnotPage } from "@/knots/knot-page";
+import { ropeView } from "@/knots/tying-drawing";
 
 export function generateStaticParams() {
     return KNOTS.map((knot) => ({ slug: knot.slug }));
@@ -32,5 +33,7 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
     const { slug } = await props.params;
     const knot = KNOTS.find((k) => k.slug === slug);
     if (!knot) notFound();
-    return <KnotPage key={slug} slug={slug} />;
+    // The finished knot is worked out here and handed over, so the browser draws the same numbers (see `KnotPage`).
+    const view = ropeView(knot.drawing, knot.drawing.length > 1, knot.bar);
+    return <KnotPage key={slug} slug={slug} drawing={knot.drawing} view={view} />;
 }

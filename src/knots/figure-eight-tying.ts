@@ -7,6 +7,7 @@
  * also keeps the editor's drafts: steps changed since they were last saved there, which nothing else uses.
  */
 
+import type { Bar } from "./bar";
 import data from "./figure-eight-tying.json";
 import { ropePathOf, solveRope, type PinnedRope } from "./pinned-rope";
 import type { RopePath } from "./rope-path";
@@ -32,16 +33,17 @@ export type TyingStep = {
     arrows: Arrow[];
 };
 
-type TyingFile = { steps: TyingStepData[]; drafts?: (TyingStepData | null)[] };
-const file: TyingFile = data;
+/** A file of steps the rope editor reads and writes: the steps as saved, and its drafts of them. */
+export type TyingFile = { steps: TyingStepData[]; drafts?: (TyingStepData | null)[] };
+
+/** For each step in `file`, the editor's draft of it if it's been changed since it was saved, or else null. */
+export const draftsOf = (file: TyingFile): (TyingStepData | null)[] =>
+    file.steps.map((_, i) => file.drafts?.[i] ?? null);
+
+export const TYING_FILE: TyingFile = data;
 
 /** The steps as saved in the rope editor. */
-export const TYING_DATA: TyingStepData[] = file.steps;
-
-/** For each step, the editor's draft of it if it's been changed since it was saved, or else null. */
-export const TYING_DRAFTS: (TyingStepData | null)[] = TYING_DATA.map(
-    (_, i) => file.drafts?.[i] ?? null,
-);
+export const TYING_DATA: TyingStepData[] = TYING_FILE.steps;
 
 /** What step `i` is called: "Step 2 of 5", or "Step 2 (cont.)" where it continues the step before. */
 export function stepLabel(steps: Pick<TyingStepData, "continues">[], i: number): string {
@@ -52,12 +54,13 @@ export function stepLabel(steps: Pick<TyingStepData, "continues">[], i: number):
         : `Step ${n} of ${steps.filter(numbered).length}`;
 }
 
-/** A step's rope solved and ready to draw. */
+/** A step's rope solved and ready to draw, round `bar` where it's tied round one. */
 export function tyingStep(
     { caption, arrows = [], ...rope }: TyingStepData,
     label: string,
+    bar?: Bar,
 ): TyingStep {
-    return { caption, label, rope, path: ropePathOf(rope, solveRope(rope)), arrows };
+    return { caption, label, rope, path: ropePathOf(rope, solveRope(rope), bar), arrows };
 }
 
 export const FIGURE_EIGHT_TYING: TyingStep[] = TYING_DATA.map((step, i) =>

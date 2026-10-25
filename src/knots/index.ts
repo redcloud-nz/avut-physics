@@ -10,6 +10,7 @@ import {
 } from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING, type TyingStep } from "./figure-eight-tying";
 import type { RopePath } from "./rope-path";
+import { ROUND_TURN, ROUND_TURN_BAR } from "./round-turn";
 
 /*
  * The knots, in the order they're listed. Each has its own page at /knots/<slug>, showing it finished and, for knots
@@ -33,7 +34,7 @@ export type Knot = {
     about: string[];
     /** The knot finished: its rope, or for a knot joining two ropes, both. */
     drawing: RopePath[];
-    /** Something it's tied round, drawn as a bar through it, seen end on. */
+    /** Something it's tied round, drawn as a bar through it, seen end on or side on. */
     bar?: Bar;
     /** Tying it, a figure at a time, where it has steps. */
     steps?: TyingStep[];
@@ -85,6 +86,17 @@ export const KNOTS: Knot[] = [
         about: ["More on how the joining-8 is used goes here."],
         drawing: FIGURE_EIGHT_JOINED,
         steps: FIGURE_EIGHT_JOINED_TYING,
+        turned: true,
+    },
+    {
+        slug: "round-turn-and-two-half-hitches",
+        name: "Round turn",
+        variant: "and two half hitches",
+        description:
+            "The rope taken round something one and a half times, with its tail tied round the standing part in two half hitches.",
+        about: ["More on how the round turn and two half hitches is used goes here."],
+        drawing: [ROUND_TURN],
+        bar: ROUND_TURN_BAR,
         turned: true,
     },
 ];
