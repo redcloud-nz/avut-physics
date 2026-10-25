@@ -20,6 +20,7 @@ import {
     sameSegment,
     segmentBefore,
     type CrossingEntry,
+    type KnotFile,
     type PassEntry,
     type PassSide,
     type Picture,
@@ -28,6 +29,7 @@ import {
     type Prop,
     type RopeColour,
     type SegmentRef,
+    type Step,
     type Strand,
     type StrandSegment,
 } from "./format";
@@ -665,3 +667,87 @@ export const setRopeName = (picture: Picture, i: number, name: string | undefine
         delete unnamed.name;
         return unnamed;
     });
+
+// Steps and the knot's details
+
+/**
+ * A step added after the chosen picture: after a step, a copy of its picture numbered one more; with the knot chosen,
+ * after the last step, a copy of the knot numbered one more than the last. Its instructions start empty. Gives back
+ * where it went.
+ */
+export function insertStep(
+    file: KnotFile,
+    after: "knot" | number,
+): { file: KnotFile; index: number } {
+    const index = after === "knot" ? file.steps.length : after + 1;
+    const from = after === "knot" ? undefined : file.steps[after];
+    const last = file.steps[file.steps.length - 1];
+    const step: Step = {
+        number: (from ?? last ?? { number: 0 }).number + 1,
+        instructions: "",
+        picture: from ? from.picture : file.knot,
+    };
+    const steps = [...file.steps.slice(0, index), step, ...file.steps.slice(index)];
+    return { file: { ...file, steps }, index };
+}
+
+/** A step copied, with the same number, just after it: the same step shown in a second picture. */
+export function duplicateStep(file: KnotFile, k: number): KnotFile {
+    const step = file.steps[k];
+    if (!step) return file;
+    const steps = [...file.steps.slice(0, k + 1), { ...step }, ...file.steps.slice(k + 1)];
+    return { ...file, steps };
+}
+
+export const deleteStep = (file: KnotFile, k: number): KnotFile =>
+    file.steps[k] ? { ...file, steps: file.steps.filter((_, j) => j !== k) } : file;
+
+/** A step moved up (−1) or down (1) the list, keeping its number. Refused past either end. */
+export function moveStep(file: KnotFile, k: number, by: -1 | 1): KnotFile {
+    const to = k + by;
+    if (!file.steps[k] || !file.steps[to]) return file;
+    const steps = file.steps.slice();
+    [steps[k], steps[to]] = [steps[to], steps[k]];
+    return { ...file, steps };
+}
+
+function withStep(file: KnotFile, k: number, change: (step: Step) => Step): KnotFile {
+    const old = file.steps[k];
+    if (!old) return file;
+    const step = change(old);
+    return step === old ? file : { ...file, steps: replaced(file.steps, k, step) };
+}
+
+/** A step's number: a whole number from 1, or refused. Numbers are only ever typed, never counted. */
+export const setStepNumber = (file: KnotFile, k: number, number: number) =>
+    withStep(file, k, (step) =>
+        !Number.isInteger(number) || number < 1 || step.number === number
+            ? step
+            : { ...step, number },
+    );
+
+export const setStepInstructions = (file: KnotFile, k: number, instructions: string) =>
+    withStep(file, k, (step) =>
+        step.instructions === instructions ? step : { ...step, instructions },
+    );
+
+export type KnotDetails = Pick<KnotFile, "name" | "description" | "about">;
+
+/** The knot's name (refused blank), description and about text (left out when blank). */
+export function setDetails(file: KnotFile, details: KnotDetails): KnotFile {
+    const name = details.name.trim();
+    const [description, about] = [
+        details.description?.trim() || undefined,
+        details.about?.trim() || undefined,
+    ];
+    if (!name) return file;
+    if (name === file.name && description === file.description && about === file.about) return file;
+    const changed: KnotFile = { ...file, name };
+    delete changed.description;
+    delete changed.about;
+    return {
+        ...changed,
+        ...(description && { description }),
+        ...(about && { about }),
+    };
+}

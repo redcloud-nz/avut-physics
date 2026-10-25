@@ -48,6 +48,8 @@ export type EditorAction =
     | { type: "saved"; file: KnotFile; handle: FileSystemFileHandle; fileName: string }
     /** An edit to the picture being edited. */
     | { type: "edit"; edit: (picture: Picture) => Picture | Edited }
+    /** An edit to the file as a whole (its steps or details), showing `show` after it where given. */
+    | { type: "edit-file"; edit: (file: KnotFile) => KnotFile; show?: PictureId }
     | { type: "begin-drag" }
     | { type: "end-drag" }
     | { type: "undo" }
@@ -141,6 +143,21 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
                 // A drag's moves go into the entry it began with.
                 undo: state.dragging ? state.undo : [...state.undo, snapshot(state)],
                 redo: state.dragging ? state.redo : [],
+            };
+        }
+        case "edit-file": {
+            const file = action.edit(state.file);
+            if (file === state.file) return state;
+            const wanted = action.show ?? state.picture;
+            // A step that's gone can't be shown; the knot is instead.
+            const picture = wanted === "knot" || wanted < file.steps.length ? wanted : "knot";
+            return {
+                ...state,
+                file,
+                picture,
+                selection: picture === state.picture ? state.selection : NOTHING,
+                undo: [...state.undo, snapshot(state)],
+                redo: [],
             };
         }
         case "begin-drag":

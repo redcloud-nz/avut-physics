@@ -171,24 +171,27 @@ chrome for addresses that match no page.
 ├──────────┬──────────────────────────────────────┬─────────────┤
 │ Knot     │                                      │ Segment 4   │
 │ Steps    │                                      │ Length 5.31 │
-│  1       │             drawing                  │ [x] Locked  │
-│  1       │                                      │ Tension     │
-│  2       │                                      │  1.0   1.4  │
-│  + Add   │                                      │             │
+│  1 Make… │             drawing                  │ [x] Locked  │
+│  1 Seen… │                                      │ Tension     │
+│  2 Pass… │                                      │  1.0   1.4  │
+│ ⧉ ↑ ↓ ✕  │                                      │             │
 ├──────────┴──────────────────────────────────────┴─────────────┤
-│ x 3.25  y -1.50   Zoom 140%   2 bend warnings   1 crossing unset │
+│ x 3.25  y -1.50  140 px per diameter  1 crossing unset  Saved │
 └───────────────────────────────────────────────────────────────┘
 ```
 
 - **Menu bar** (shadcn's Menubar, on Radix), each item with its keyboard shortcut:
-  - File: New, Open…, Save, Save As…, Knot details… (name, description, about)
+  - File: New, Open…, Save, Save As…, Knot Details… (a dialog for the name, description and about text)
   - Edit: Undo, Redo, Delete, Select All
   - Insert: Pin, Rope, Arrow, Prop (each kind), Step
   - View: Zoom In, Zoom Out, Fit, Pin Numbers, Handles, Crossings, Bend Warnings
   - Help: Shortcuts
-- **Left:** the knot and its steps; choosing one puts its picture in the drawing.
+- **Left:** the knot, then each step as its number and the start of its instructions; choosing one puts its picture
+  in the drawing. Insert > Step adds a step after the one shown, a copy of its picture numbered one more (with the
+  knot shown, after the last step, a copy of the knot). The step shown can be duplicated (the copy keeps its number),
+  moved up or down, or deleted. The editor never numbers steps again: numbers are only typed.
 - **Drawing:**
-  - Click a pin, segment or prop to select it, shift-click for more.
+  - Click a pin, segment or prop to select it; shift-click pins and segments to select more.
   - Drag a pin or prop to move it; drag a pin's ring to turn its angle; drag a handle to change a tension.
   - Double-click a segment to add a pin there; click a crossing to swap which strand is on top, or a pass across a
     prop to move it in front or behind.
@@ -198,8 +201,11 @@ chrome for addresses that match no page.
   - segment: length, locked, both tensions;
   - a rope's pin or segment: also the rope's colour and name;
   - prop: its kind's fields;
-  - nothing: the step's number and instructions.
-- **Status bar:** the pointer's position, the zoom, warnings, and whether the file's saved.
+  - nothing: the step's number and instructions (on the knot, a hint);
+  - and below, whatever's selected: lost entries, each to delete, and crossings and passes to check, each to
+    confirm.
+- **Status bar:** the pointer's position, the zoom (pixels per rope diameter), each kind of warning counted, and
+  whether the file's saved.
 
 ## How it's built
 

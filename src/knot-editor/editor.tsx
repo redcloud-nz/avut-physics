@@ -20,15 +20,25 @@ import { Vector2 } from "@/lib/vector2";
 
 import { Canvas, useGeometry, type CanvasControls } from "./canvas";
 import { pictureCrossings, strandPaths } from "./crossing-geometry";
-import { addProp, addStrand, deletePins, deleteProp, insertPin } from "./edits";
+import { DetailsDialog } from "./details-dialog";
+import {
+    addProp,
+    addStrand,
+    deletePins,
+    deleteProp,
+    insertPin,
+    insertStep,
+    setDetails,
+} from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
 import type { KnotFile, PinRef } from "./format";
 import { Inspector } from "./inspector";
 import { Menus, propCommand, useShortcuts, type CommandId } from "./menus";
 import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
-import { editorReducer, isSaved, loaded, NOTHING, pictureOf, type PictureId } from "./state";
+import { editorReducer, isSaved, loaded, NOTHING, pictureOf } from "./state";
 import { createReadouts, StatusBar, type Warnings } from "./status-bar";
+import { StepsList } from "./steps-list";
 import { CURRENT_VERSION } from "./versions";
 
 /** A new knot: one orange rope of two pins. */
@@ -86,6 +96,7 @@ export default function KnotEditor() {
     });
     const [readouts] = useState(createReadouts);
     const [helpOpen, setHelpOpen] = useState(false);
+    const [detailsOpen, setDetailsOpen] = useState(false);
     const [message, setMessage] = useState<Message | null>(null);
     // Whether this browser can open and save files: the File menu explains, until it's known and where it can't.
     const files = useInBrowser() && canUseFiles();
@@ -141,6 +152,7 @@ export default function KnotEditor() {
         open: files,
         save: files,
         saveAs: files,
+        details: true,
         undo: state.undo.length > 0,
         redo: state.redo.length > 0,
         delete: pins.length > 0 || selection.kind === "prop",
@@ -148,6 +160,7 @@ export default function KnotEditor() {
         insertPin: segments.length > 0,
         insertRope: true,
         insertArrow: true,
+        insertStep: true,
         ...Object.fromEntries(PROP_KIND_NAMES.map((kind) => [propCommand(kind), true])),
         zoomIn: true,
         zoomOut: true,
@@ -238,6 +251,7 @@ export default function KnotEditor() {
         } else if (id === "open") void open();
         else if (id === "save") void save(false);
         else if (id === "saveAs") void save(true);
+        else if (id === "details") setDetailsOpen(true);
         else if (id === "undo" || id === "redo") dispatch({ type: id });
         else if (id === "delete") {
             if (selection.kind === "prop") {
@@ -256,7 +270,14 @@ export default function KnotEditor() {
             selectPins([[i, k + 1]]);
         } else if (id === "insertRope") insertStrand("rope");
         else if (id === "insertArrow") insertStrand("arrow");
-        else if (id.startsWith("prop:")) {
+        else if (id === "insertStep") {
+            const after = state.picture;
+            dispatch({
+                type: "edit-file",
+                edit: (f) => insertStep(f, after).file,
+                show: insertStep(state.file, after).index,
+            });
+        } else if (id.startsWith("prop:")) {
             const kind = PROP_KINDS[id.slice("prop:".length) as keyof typeof PROP_KINDS];
             const centre = canvas.current?.centre();
             if (!centre) return;
@@ -278,22 +299,6 @@ export default function KnotEditor() {
     useShortcuts(enabled, run);
     const notes = files ? undefined : { File: "Opening and saving files needs Chrome or Edge." };
 
-    /** The knot or a step in the list on the left: the one shown is marked, and choosing another shows it. */
-    const pictureButton = (id: PictureId, label: string) => (
-        <button
-            key={id}
-            type="button"
-            className={`block w-full rounded px-2 py-0.5 text-left ${
-                state.picture === id
-                    ? "bg-surface-raised text-highlight"
-                    : "text-ink hover:bg-surface"
-            }`}
-            onClick={() => dispatch({ type: "show", picture: id })}
-        >
-            {label}
-        </button>
-    );
-
     return (
         <div className="flex h-full flex-col bg-background text-sm text-ink">
             <header className="flex items-center gap-4 border-b border-line-faint px-2 py-1">
@@ -302,11 +307,7 @@ export default function KnotEditor() {
             </header>
             <div className="flex min-h-0 flex-1">
                 <aside className="w-48 shrink-0 overflow-y-auto border-r border-line-faint p-3">
-                    {pictureButton("knot", "Knot")}
-                    <div className="mt-3 mb-1 text-xs tracking-wide text-ink-muted uppercase">
-                        Steps
-                    </div>
-                    {state.file.steps.map((step, k) => pictureButton(k, `Step ${step.number}`))}
+                    <StepsList file={state.file} shown={state.picture} dispatch={dispatch} />
                 </aside>
                 <main className="min-w-0 flex-1 bg-surface" aria-label="Drawing">
                     <Canvas
@@ -328,12 +329,26 @@ export default function KnotEditor() {
                         geometry={geometry}
                         crossings={crossings}
                         selection={selection}
+                        step={
+                            state.picture === "knot"
+                                ? undefined
+                                : { index: state.picture, step: state.file.steps[state.picture] }
+                        }
                         dispatch={dispatch}
                     />
                 </aside>
             </div>
             <StatusBar readouts={readouts} warnings={warnings} saved={saved} />
             <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
+            <DetailsDialog
+                open={detailsOpen}
+                details={state.file}
+                onDone={(details) => {
+                    setDetailsOpen(false);
+                    if (details)
+                        dispatch({ type: "edit-file", edit: (f) => setDetails(f, details) });
+                }}
+            />
             <Dialog open={message !== null} onOpenChange={(open) => !open && setMessage(null)}>
                 <DialogContent>
                     <DialogHeader>

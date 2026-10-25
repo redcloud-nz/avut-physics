@@ -14,21 +14,36 @@ import {
     deletePin,
     deletePins,
     deleteProp,
+    deleteStep,
     deleteStrand,
+    duplicateStep,
     insertPin,
+    insertStep,
     lockSegment,
     movePin,
+    moveStep,
     setCrossing,
+    setDetails,
     setPass,
     setPinAngle,
     setRopeColour,
     setRopeName,
     setSegmentLength,
+    setStepInstructions,
+    setStepNumber,
     setTensions,
     shiftAt,
     unlockSegment,
 } from "./edits";
-import type { CrossingEntry, KnotFile, Picture, Pin, Strand } from "./format";
+import {
+    parseKnotFile,
+    writeKnotFile,
+    type CrossingEntry,
+    type KnotFile,
+    type Picture,
+    type Pin,
+    type Strand,
+} from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
 import { kindOf } from "./props";
 import { BAR, type BarProp } from "./props/bar";
@@ -608,6 +623,75 @@ describe("strands", () => {
     });
 });
 
+describe("steps and details", () => {
+    const knot = picture([LINE]);
+    const one = picture([WIGGLE]);
+    const base: KnotFile = {
+        name: "Test",
+        knot,
+        steps: [{ number: 1, instructions: "Make a bight.", picture: one }],
+    };
+
+    it("inserts a step after the one chosen, as a copy numbered one more", () => {
+        const { file, index } = insertStep(base, 0);
+        expect(index).toBe(1);
+        expect(file.steps[1]).toEqual({ number: 2, instructions: "", picture: one });
+        expect(file.steps[1].picture).toBe(one);
+        expect(file.steps[0]).toBe(base.steps[0]);
+    });
+
+    it("inserts after the last step, as a copy of the knot, with the knot chosen", () => {
+        const { file, index } = insertStep(base, "knot");
+        expect(index).toBe(1);
+        expect(file.steps[1]).toEqual({ number: 2, instructions: "", picture: knot });
+        const first = insertStep({ ...base, steps: [] }, "knot");
+        expect(first.file.steps).toEqual([{ number: 1, instructions: "", picture: knot }]);
+    });
+
+    it("duplicates a step with its number, moves steps and deletes them, never renumbering", () => {
+        const three = insertStep(duplicateStep(base, 0), 1).file;
+        expect(three.steps.map((s) => s.number)).toEqual([1, 1, 2]);
+        const moved = moveStep(three, 2, -1);
+        expect(moved.steps.map((s) => s.number)).toEqual([1, 2, 1]);
+        expect(moveStep(moved, 0, -1)).toBe(moved);
+        expect(moveStep(moved, 2, 1)).toBe(moved);
+        expect(deleteStep(moved, 0).steps.map((s) => s.number)).toEqual([2, 1]);
+        expect(deleteStep(moved, 3)).toBe(moved);
+    });
+
+    it("sets a step's number (a whole number from 1) and instructions", () => {
+        expect(setStepNumber(base, 0, 4).steps[0].number).toBe(4);
+        expect(setStepNumber(base, 0, 0)).toBe(base);
+        expect(setStepNumber(base, 0, 2.5)).toBe(base);
+        expect(setStepNumber(base, 0, 1)).toBe(base);
+        expect(setStepInstructions(base, 0, "Pass the end through.").steps[0].instructions).toBe(
+            "Pass the end through.",
+        );
+        expect(setStepInstructions(base, 0, "Make a bight.")).toBe(base);
+    });
+
+    it("sets the details, leaving blank ones out and refusing a blank name", () => {
+        const set = setDetails(base, { name: " Bowline ", description: "A loop.", about: "  " });
+        expect(set).toEqual({ ...base, name: "Bowline", description: "A loop." });
+        expect("about" in set).toBe(false);
+        expect(setDetails(set, { name: "Bowline", description: "A loop.", about: "" })).toBe(set);
+        expect(setDetails(set, { name: "  ", description: "", about: "" })).toBe(set);
+        const cleared = setDetails(set, { name: "Bowline", description: "", about: "" });
+        expect("description" in cleared).toBe(false);
+    });
+
+    it("saves three steps, two sharing a number, and reads them back the same", async () => {
+        const three = setStepInstructions(
+            insertStep(duplicateStep(base, 0), 1).file,
+            2,
+            "Dress it.",
+        );
+        const read = parseKnotFile(await writeKnotFile(three));
+        expect(read.kind).toBe("ok");
+        if (read.kind === "ok") expect(read.file.steps).toEqual(three.steps);
+    });
+});
+
 describe("state", () => {
     const file = (knot: Picture, steps: Picture[] = []): KnotFile => ({
         name: "Test",
@@ -618,6 +702,21 @@ describe("state", () => {
     const run = (state: EditorState, ...actions: Parameters<typeof editorReducer>[1][]) =>
         actions.reduce(editorReducer, state);
     const knotOf = (s: EditorState) => pictureOf(s.file, s.picture);
+
+    it("edits the file as one entry, showing the step it gives, and undoes back to the picture before", () => {
+        const s0 = start(file(picture([LINE]), [picture([WIGGLE])]));
+        const s1 = run(s0, { type: "edit-file", edit: (f) => insertStep(f, 0).file, show: 1 });
+        expect(s1.file.steps).toHaveLength(2);
+        expect(s1.picture).toBe(1);
+        const s2 = run(s1, { type: "edit-file", edit: (f) => deleteStep(f, 1) });
+        // The step shown has gone, so the knot is shown.
+        expect(s2.picture).toBe("knot");
+        const back = run(s2, { type: "undo" }, { type: "undo" });
+        expect(back.file).toBe(s0.file);
+        expect(back.picture).toBe("knot");
+        expect(run(s1, { type: "undo" }).picture).toBe("knot");
+        expect(run(s0, { type: "edit-file", edit: (f) => f })).toBe(s0);
+    });
 
     it("keeps a selected pin selected under its new number", () => {
         const p = picture([WIGGLE]);

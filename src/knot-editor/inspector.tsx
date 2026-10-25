@@ -24,6 +24,8 @@ import {
     setRopeColour,
     setRopeName,
     setSegmentLength,
+    setStepInstructions,
+    setStepNumber,
     setTensions,
     shiftAt,
     unlockSegment,
@@ -31,9 +33,11 @@ import {
 import {
     ROPE_COLOURS,
     sameSegment,
+    type KnotFile,
     type Picture,
     type RopeColour,
     type SegmentRef,
+    type Step,
     type Strand,
 } from "./format";
 import type { LockStatus, PictureGeometry } from "./geometry";
@@ -43,7 +47,7 @@ import type { EditorAction, Selection } from "./state";
 const shown = (value: number) => String(Math.round(value * 1000) / 1000);
 
 const FIELD =
-    "w-24 rounded border border-line-faint bg-surface px-1.5 py-0.5 text-right font-mono text-ink outline-none focus:border-highlight";
+    "w-24 rounded border border-line-faint bg-surface px-1.5 py-0.5 text-ink outline-none focus:border-highlight";
 
 /** A number typed in. Blank means none, where `blank` allows it; anything else that isn't a number is undone. */
 function NumberField(props: {
@@ -69,7 +73,7 @@ function NumberField(props: {
             <input
                 // A new key when the value changes elsewhere, so the field shows it.
                 key={text}
-                className={FIELD}
+                className={`${FIELD} text-right font-mono`}
                 defaultValue={text}
                 inputMode="decimal"
                 onBlur={(e) => commit(e.currentTarget)}
@@ -229,7 +233,7 @@ function RopeFields(props: {
             <label className="flex items-center justify-between gap-2 py-0.5">
                 <span>Colour</span>
                 <select
-                    className={`${FIELD} text-left`}
+                    className={FIELD}
                     value={rope.colour}
                     onChange={(e) => {
                         const colour = e.currentTarget.value as RopeColour;
@@ -247,7 +251,7 @@ function RopeFields(props: {
                 <span>Name</span>
                 <input
                     key={rope.name ?? ""}
-                    className={`${FIELD} w-32 text-left font-sans`}
+                    className={`${FIELD} w-32`}
                     defaultValue={rope.name ?? ""}
                     placeholder={`Rope ${i + 1}`}
                     onBlur={(e) => rename(e.currentTarget.value)}
@@ -265,6 +269,8 @@ export function Inspector(props: {
     geometry: PictureGeometry;
     crossings: PictureCrossings;
     selection: Selection;
+    /** The step shown, if it's a step rather than the knot. */
+    step?: { index: number; step: Step };
     dispatch: Dispatch<EditorAction>;
 }) {
     const { dispatch } = props;
@@ -285,11 +291,50 @@ export function Inspector(props: {
 
 const heading = (text: string) => <div className="mb-2 text-ink-strong">{text}</div>;
 
-/** The selected pin's, segment's or prop's values. */
+/** A step's number and instructions, typed in; each applies on leaving its field (the number on Enter too). */
+function StepFields(props: { index: number; step: Step; dispatch: Dispatch<EditorAction> }) {
+    const { index, step, dispatch } = props;
+    const editFile = (change: (file: KnotFile) => KnotFile) =>
+        dispatch({ type: "edit-file", edit: change });
+    return (
+        <div>
+            {heading(`Step ${step.number}`)}
+            <NumberField
+                label="Number"
+                value={step.number}
+                onChange={(n) => n !== undefined && editFile((f) => setStepNumber(f, index, n))}
+            />
+            <div className="text-xs text-ink-muted">
+                Typed, never counted: two pictures of one step share a number.
+            </div>
+            <label className="mt-3 grid gap-1">
+                <span>Instructions</span>
+                <textarea
+                    key={`${index}:${step.instructions}`}
+                    className="min-h-32 w-full rounded border border-line-faint bg-surface px-1.5 py-1 text-ink outline-none focus:border-highlight"
+                    defaultValue={step.instructions}
+                    onBlur={(e) => {
+                        const text = e.currentTarget.value;
+                        editFile((f) => setStepInstructions(f, index, text));
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                            e.currentTarget.value = step.instructions;
+                            e.currentTarget.blur();
+                        }
+                    }}
+                />
+            </label>
+        </div>
+    );
+}
+
+/** The selected pin's, segment's or prop's values, or with nothing selected, the step's. */
 function SelectionPanel(props: {
     picture: Picture;
     geometry: PictureGeometry;
     selection: Selection;
+    step?: { index: number; step: Step };
     dispatch: Dispatch<EditorAction>;
 }) {
     const { picture, geometry, selection, dispatch } = props;
@@ -324,7 +369,7 @@ function SelectionPanel(props: {
                             >
                                 <span>{field.label}</span>
                                 <select
-                                    className={`${FIELD} text-left`}
+                                    className={FIELD}
                                     value={field.value}
                                     onChange={(e) => {
                                         const value = e.currentTarget.value;
@@ -489,10 +534,17 @@ function SelectionPanel(props: {
         );
     }
 
-    return (
+    const hint = (
         <div className="text-ink-muted">
             Nothing selected. Click a pin or a segment to see its values; Help &gt; Shortcuts lists
             what else you can do.
         </div>
+    );
+    if (!props.step) return hint;
+    return (
+        <>
+            <StepFields index={props.step.index} step={props.step.step} dispatch={dispatch} />
+            <div className="mt-4 text-xs">{hint}</div>
+        </>
     );
 }

@@ -497,7 +497,7 @@ Review group 4 ends here, with its visual checkpoint.
 
 ### Review group 5: steps and the knot's details (visual checkpoint: a whole knot with steps)
 
-- [ ] **14. Steps and the knot's details** — Add steps with numbers and instructions, and the knot's name,
+- [x] **14. Steps and the knot's details** — Add steps with numbers and instructions, and the knot's name,
       description and about text
   - **Files:** `src/knot-editor/steps-list.tsx`, `src/knot-editor/details-dialog.tsx`, `src/knot-editor/edits.ts`,
     `src/knot-editor/edits.test.ts`, `src/knot-editor/inspector.tsx`, `src/knot-editor/editor.tsx`,
@@ -512,7 +512,7 @@ Review group 4 ends here, with its visual checkpoint.
     opens again and comes back the same. The visual checkpoint covers task 14. Type check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **15. Docs** — Point the knots' docs at the new editor
+- [x] **15. Docs** — Point the knots' docs at the new editor
   - **Files:** `docs/knots.md`, `docs/knot-editor.md`
   - **Do:** `knots.md`'s editor paragraph names `/knot-editor` as the editor being built, and the old one as kept
     until the knots are ported. `knot-editor.md` is brought into line with anything the build settled differently.
