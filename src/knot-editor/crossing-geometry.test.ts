@@ -1,0 +1,441 @@
+import { readFileSync } from "fs";
+import { join } from "path";
+import { describe, expect, it } from "vitest";
+
+import { centreline, crossings, laySegments, type RopePath } from "@/knots/rope-path";
+import { arcLengths } from "@/lib/curve";
+import { segmentIntersection } from "@/lib/geometry";
+
+import {
+    clearance,
+    overReach,
+    pictureCrossings,
+    strandPaths,
+    type PictureCrossings,
+} from "./crossing-geometry";
+import { parseKnotFile, type CrossingEntry, type Picture, type Pin, type Strand } from "./format";
+import { pictureGeometry } from "./geometry";
+import type { BarProp } from "./props/bar";
+
+const strand = (pins: Pin[], kind: "rope" | "arrow" = "rope"): Strand => {
+    const segments = pins.slice(1).map(() => ({ tension: [1, 1] as [number, number] }));
+    return kind === "rope" ? { kind, colour: "orange", pins, segments } : { kind, pins, segments };
+};
+
+/** A straight rope along the x axis. */
+const LINE = strand([
+    { x: -10, y: 0 },
+    { x: 10, y: 0 },
+]);
+
+/** One segment arching up across the x axis twice, from (-5, 3) to (5, 3). */
+const ARCH = strand([
+    { x: -5, y: 3, angle: -70 },
+    { x: 5, y: 3, angle: 70 },
+]);
+
+/** The arch with its end lifted above the axis, so it crosses it once. */
+const LIFTED = strand([
+    { x: -5, y: 3, angle: -70 },
+    { x: 5, y: -3, angle: 70 },
+]);
+
+const picture = (
+    strands: Strand[],
+    crossings: CrossingEntry[] = [],
+    props: BarProp[] = [],
+): Picture => ({
+    strands,
+    crossings,
+    props,
+});
+
+function found(p: Picture) {
+    const geometry = pictureGeometry(p);
+    const c = pictureCrossings(p, geometry);
+    return { geometry, crossings: c, paths: strandPaths(p, geometry, c) };
+}
+
+/** The stretches of a path marked over, as distances along it. */
+const overStretches = (path: RopePath) =>
+    laySegments(path)
+        .filter((s) => s.over)
+        .map((s) => [s.start, s.start + s.length]);
+
+/** Where two ropes cross each other, and whether each is marked over there (as `rope-path.test.ts` checks). */
+function between(first: RopePath, second: RopePath) {
+    const [a, b] = [first, second].map((path) => {
+        const { points, over } = centreline(path);
+        return { points, over, s: arcLengths(points) };
+    });
+    const hits: { over: [boolean, boolean] }[] = [];
+    for (let i = 0; i < a.points.length - 1; i++)
+        for (let j = 0; j < b.points.length - 1; j++)
+            if (segmentIntersection(a.points[i], a.points[i + 1], b.points[j], b.points[j + 1]))
+                hits.push({ over: [a.over[i] && a.over[i + 1], b.over[j] && b.over[j + 1]] });
+    return hits;
+}
+
+const statuses = (c: PictureCrossings) => c.crossings.map((x) => x.status);
+
+describe("pictureCrossings", () => {
+    it("matches a pair crossing twice to its two entries", () => {
+        const { crossings: c } = found(
+            picture(
+                [LINE, ARCH],
+                [
+                    { over: [0, 0], under: [1, 0], n: 1 },
+                    { over: [1, 0], under: [0, 0], n: 2 },
+                ],
+            ),
+        );
+        expect(c.crossings).toHaveLength(2);
+        expect(statuses(c)).toEqual(["set", "set"]);
+        // n counts along the line, the pair's first segment, from left to right.
+        expect(c.crossings[0].at.x).toBeLessThan(c.crossings[1].at.x);
+        expect(c.crossings.map((x) => x.over)).toEqual([0, 1]);
+        expect(c.lost).toEqual([]);
+        expect(c.toCheck).toEqual([]);
+    });
+
+    it("leaves a crossing with no entry unset", () => {
+        const { crossings: c } = found(
+            picture([LINE, ARCH], [{ over: [0, 0], under: [1, 0], n: 1 }]),
+        );
+        // One entry for two crossings: to check, the first still drawn as its entry says.
+        expect(statuses(c)).toEqual(["to-check", "to-check"]);
+        expect(c.crossings.map((x) => x.over)).toEqual([0, undefined]);
+        const none = found(picture([LINE, ARCH])).crossings;
+        expect(statuses(none)).toEqual(["unset", "unset"]);
+        expect(none.toCheck).toEqual([]);
+    });
+
+    it("shows both entries to check when a pair crossing twice loses one", () => {
+        const entries: CrossingEntry[] = [
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [1, 0], under: [0, 0], n: 2 },
+        ];
+        const { crossings: c } = found(picture([LINE, LIFTED], entries));
+        expect(c.crossings).toHaveLength(1);
+        expect(statuses(c)).toEqual(["to-check"]);
+        expect(c.toCheck).toEqual([
+            {
+                pair: [
+                    [0, 0],
+                    [1, 0],
+                ],
+                entries,
+                found: 1,
+            },
+        ]);
+        expect(c.lost).toEqual([]);
+    });
+
+    it("lists an entry whose segments no longer cross as lost", () => {
+        const apart = strand([
+            { x: -5, y: 3 },
+            { x: 5, y: 3 },
+        ]);
+        const entry: CrossingEntry = { over: [0, 0], under: [1, 0], n: 1 };
+        const { crossings: c } = found(picture([LINE, apart], [entry]));
+        expect(c.crossings).toEqual([]);
+        expect(c.lost).toEqual([entry]);
+    });
+
+    it("finds an arrow crossing a rope", () => {
+        const arrow = strand(
+            [
+                { x: 1, y: 5 },
+                { x: 2, y: -5 },
+            ],
+            "arrow",
+        );
+        const { crossings: c } = found(
+            picture([LINE, arrow], [{ over: [1, 0], under: [0, 0], n: 1 }]),
+        );
+        expect(c.crossings).toHaveLength(1);
+        expect(c.crossings[0]).toMatchObject({
+            status: "set",
+            over: 1,
+            pair: [
+                [0, 0],
+                [1, 0],
+            ],
+        });
+    });
+
+    it("finds no crossings along a smooth strand, where its segments meet at their pins", () => {
+        const wavy = strand(
+            Array.from({ length: 30 }, (_, k) => ({ x: 2 * k, y: 3 * Math.sin(k * 0.7) })),
+        );
+        const tight = strand(
+            Array.from({ length: 12 }, (_, k) => ({ x: 0.7 * k, y: k % 2 ? 0.4 : -0.4 })),
+        );
+        for (const s of [wavy, tight]) expect(found(picture([s])).crossings.crossings).toEqual([]);
+    });
+
+    it("finds and matches passes across a bar seen side on", () => {
+        // Down in front of the bar, then back up behind it.
+        const round = strand([
+            { x: -2, y: -6 },
+            { x: 0, y: 4 },
+            { x: 2, y: -6 },
+        ]);
+        const bar = (passes: BarProp["passes"]): BarProp => ({
+            kind: "bar",
+            x: 0,
+            y: 0,
+            r: 1.6,
+            length: 20,
+            passes,
+        });
+        const { crossings: c } = found(
+            picture(
+                [round],
+                [],
+                [
+                    bar([
+                        [0, 0, 1, "front"],
+                        [0, 1, 1, "behind"],
+                    ]),
+                ],
+            ),
+        );
+        expect(c.passes.map((p) => [p.segment, p.status, p.side])).toEqual([
+            [0, "set", "front"],
+            [1, "set", "behind"],
+        ]);
+        const unset = found(picture([round], [], [bar([[0, 0, 1, "front"]])])).crossings;
+        expect(unset.passes.map((p) => [p.status, p.side])).toEqual([
+            ["set", "front"],
+            ["unset", undefined],
+        ]);
+        // An end-on bar has no passes.
+        const end: BarProp = { kind: "bar", x: 0, y: 0, r: 1.6, passes: [] };
+        expect(found(picture([round], [], [end])).crossings.passes).toEqual([]);
+    });
+
+    it("shows a segment's passes to check when it passes a bar twice and loses one", () => {
+        // One segment dipping down across the bar's middle line and back.
+        const dip = (lift: number) =>
+            strand([
+                { x: -5, y: -3, angle: 70 },
+                { x: 5, y: -3 - lift, angle: -70 },
+            ]);
+        const bar: BarProp = {
+            kind: "bar",
+            x: 0,
+            y: 0,
+            r: 1,
+            length: 20,
+            passes: [
+                [0, 0, 1, "front"],
+                [0, 0, 2, "behind"],
+            ],
+        };
+        expect(found(picture([dip(0)], [], [bar])).crossings.passes.map((p) => p.status)).toEqual([
+            "set",
+            "set",
+        ]);
+        // Its end brought down below the bar, it crosses the middle line once.
+        const { crossings: c } = found(picture([dip(-6)], [], [bar]));
+        expect(c.passes.map((p) => p.status)).toEqual(["to-check"]);
+        expect(c.passesToCheck).toEqual([
+            { prop: 0, strand: 0, segment: 0, entries: bar.passes, found: 1 },
+        ]);
+        expect(c.lostPasses).toEqual([]);
+        // Moved clear of the bar, its entries are lost.
+        const clear = found(
+            picture(
+                [
+                    strand([
+                        { x: -5, y: -5 },
+                        { x: 5, y: -5 },
+                    ]),
+                ],
+                [],
+                [bar],
+            ),
+        ).crossings;
+        expect(clear.lostPasses).toHaveLength(2);
+    });
+});
+
+describe("strandPaths", () => {
+    /** A rope looping across itself: along, round and back across its own start. */
+    const LOOP = strand([
+        { x: -6, y: 2 },
+        { x: 0, y: 0 },
+        { x: 5, y: -3 },
+        { x: 3, y: -7 },
+        { x: -1, y: -5 },
+        { x: 1, y: 1 },
+        { x: 3, y: 6 },
+    ]);
+
+    it("marks one strand over at each of a rope's own crossings", () => {
+        const p = picture([LOOP]);
+        const { crossings: c } = found(p);
+        expect(c.crossings).toHaveLength(1);
+        for (const [a, b] of [c.crossings[0].pair, [...c.crossings[0].pair].reverse()]) {
+            const { paths } = found(picture([LOOP], [{ over: a, under: b, n: 1 }]));
+            const hits = crossings(paths.paths[0]);
+            expect(paths.tooClose).toEqual([]);
+            expect(hits).toHaveLength(1);
+            expect(hits[0].over).not.toBeNull();
+        }
+    });
+
+    it("marks one of two ropes over at each place they cross", () => {
+        // Across the loop, through both its sides.
+        const second = {
+            ...strand([
+                { x: -8, y: -4 },
+                { x: 0, y: -4.5 },
+                { x: 8, y: -4 },
+            ]),
+            colour: "green",
+        } as Strand;
+        const p = picture([LOOP, second]);
+        const { crossings: c } = found(p);
+        const between_ = c.crossings.filter((x) => x.pair[0][0] !== x.pair[1][0]);
+        expect(between_.length).toBeGreaterThanOrEqual(2);
+        // Alternate which is on top.
+        const entries: CrossingEntry[] = c.crossings.map((x, k) => ({
+            over: x.pair[k % 2],
+            under: x.pair[1 - (k % 2)],
+            n: x.n,
+        }));
+        const { paths, crossings: matched } = found(picture([LOOP, second], entries));
+        expect(statuses(matched).every((s) => s === "set")).toBe(true);
+        const hits = between(paths.paths[0], paths.paths[1]);
+        expect(hits).toHaveLength(between_.length);
+        for (const h of hits) expect(h.over[0]).not.toBe(h.over[1]);
+        for (const h of crossings(paths.paths[0])) expect(h.over).not.toBeNull();
+    });
+
+    it("reaches the angle-dependent length past each crossing, stopping short of where its strand goes under", () => {
+        // Three ropes across one, far apart, the middle one under it.
+        const across = (x: number, lean: number) =>
+            strand([
+                { x: x - lean, y: -6 },
+                { x: x + lean, y: 6 },
+            ]);
+        const strands = [LINE, across(-6, 0), across(0, 3), across(6, 1)];
+        const entries: CrossingEntry[] = [
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [2, 0], under: [0, 0], n: 1 },
+            { over: [0, 0], under: [3, 0], n: 1 },
+        ];
+        const { paths, crossings: c } = found(picture(strands, entries));
+        expect(paths.tooClose).toEqual([]);
+        const stretches = overStretches(paths.paths[0]);
+        expect(stretches).toHaveLength(2);
+        for (const x of c.crossings.filter((x) => x.over === 0)) {
+            const s = x.s[0];
+            const reach = overReach(x.sin);
+            const stretch = stretches.find(([a, b]) => a <= s && s <= b)!;
+            expect(stretch[0]).toBeCloseTo(s - reach, 2);
+            expect(stretch[1]).toBeCloseTo(s + reach, 2);
+        }
+        const under = c.crossings.find((x) => x.over === 1)!;
+        for (const [a, b] of stretches) expect(under.s[0] < a || under.s[0] > b).toBe(true);
+    });
+
+    it("clips a stretch short of a crossing where its strand goes under, warning when they're too close", () => {
+        const across = (x: number) =>
+            strand([
+                { x, y: -6 },
+                { x, y: 6 },
+            ]);
+        // Over at x = 0 and under at x = gap: clipped at the clearance short of it.
+        for (const gap of [2, 3.5]) {
+            const entries: CrossingEntry[] = [
+                { over: [0, 0], under: [1, 0], n: 1 },
+                { over: [2, 0], under: [0, 0], n: 1 },
+            ];
+            const { paths, crossings: c } = found(picture([LINE, across(0), across(gap)], entries));
+            const [stretch, ...rest] = overStretches(paths.paths[0]);
+            expect(rest).toEqual([]);
+            const under = c.crossings.find((x) => x.over === 1)!;
+            expect(stretch[1]).toBeCloseTo(
+                Math.min(10 + overReach(1), under.s[0] - clearance(1)),
+                2,
+            );
+            // It must reach the clearance past its own crossing at 10; with the under crossing 2 away, it can't.
+            expect(paths.tooClose.length > 0).toBe(gap < 2 * clearance(1));
+        }
+    });
+
+    it("merges stretches that overlap", () => {
+        const across = (x: number) =>
+            strand([
+                { x, y: -6 },
+                { x, y: 6 },
+            ]);
+        const entries: CrossingEntry[] = [
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [0, 0], under: [2, 0], n: 1 },
+        ];
+        const { paths } = found(picture([LINE, across(0), across(2)], entries));
+        const stretches = overStretches(paths.paths[0]);
+        expect(stretches).toHaveLength(1);
+        expect(stretches[0][0]).toBeCloseTo(10 - overReach(1), 2);
+        expect(stretches[0][1]).toBeCloseTo(12 + overReach(1), 2);
+    });
+
+    it("covers a bar's whole height where a strand passes in front of it, and stops short where it's behind", () => {
+        const round = strand([
+            { x: -2, y: -6 },
+            { x: 0, y: 4 },
+            { x: 2, y: -6 },
+        ]);
+        const bar: BarProp = {
+            kind: "bar",
+            x: 0,
+            y: 0,
+            r: 1.6,
+            length: 20,
+            passes: [
+                [0, 0, 1, "front"],
+                [0, 1, 1, "behind"],
+            ],
+        };
+        const { paths, crossings: c } = found(picture([round], [], [bar]));
+        const { points, over } = centreline(paths.paths[0]);
+        const front = c.passes[0];
+        const behind = c.passes[1];
+        const s = arcLengths(points);
+        points.forEach((p, i) => {
+            const inBand = Math.abs(p.y) <= bar.r;
+            if (inBand && s[i] < (front.s + behind.s) / 2) expect(over[i]).toBe(true);
+            if (s[i] > behind.cover[0] && s[i] < behind.cover[1]) expect(over[i]).toBe(false);
+        });
+    });
+});
+
+describe("samples/v1.json", () => {
+    it("has every crossing and pass set, and room for every over stretch", () => {
+        const read = parseKnotFile(
+            readFileSync(join(import.meta.dirname, "samples", "v1.json"), "utf8"),
+        );
+        if (read.kind !== "ok") throw new Error(read.reason);
+        for (const p of [read.file.knot, ...read.file.steps.map((s) => s.picture)]) {
+            const { crossings: c, paths } = found(p);
+            expect(c.crossings.every((x) => x.status === "set")).toBe(true);
+            expect(c.passes.every((x) => x.status === "set")).toBe(true);
+            expect([c.lost, c.toCheck, c.lostPasses, c.passesToCheck]).toEqual([[], [], [], []]);
+            expect(c.crossings.length).toBe(p.crossings.length);
+            expect([paths.tooClose, paths.tooClosePasses]).toEqual([[], []]);
+        }
+        const knot = found(read.file.knot);
+        // Crossings between all three strands, and passes in front and behind.
+        const pairs = new Set(
+            knot.crossings.crossings.map((x) => `${x.pair[0][0]}-${x.pair[1][0]}`),
+        );
+        expect([...pairs].sort()).toEqual(["0-1", "0-2", "1-2"]);
+        expect(new Set(knot.crossings.passes.map((p) => p.side))).toEqual(
+            new Set(["front", "behind"]),
+        );
+    });
+});

@@ -1,0 +1,44 @@
+/**
+ * The kinds of prop a picture can hold. Each kind is kept in its own file here, with its type, how it's read from a
+ * file and written to one, and its passes; adding a kind means adding its file and listing it below, and nothing else.
+ */
+
+import type { Cubic } from "@/lib/bezier";
+import type { Vector2 } from "@/lib/vector2";
+
+import type { JsonObject, JsonValue } from "../versions";
+
+import { BAR, type BarProp } from "./bar";
+import type { PassEntry } from "./passes";
+
+export type { PassEntry, PassSide } from "./passes";
+export { PASS_SIDES } from "./passes";
+
+/** A prop of any kind. */
+export type Prop = BarProp;
+export type PropKindName = Prop["kind"];
+
+/** What every kind of prop gives the editor. */
+export type PropKind<P extends Prop> = {
+    kind: P["kind"];
+    /** The prop read from a file (its `kind` already known to be this one), throwing a `FileError` if it's wrong. */
+    read(value: JsonValue, at: string): P;
+    /** The prop as it's written to a file: its fields in order, defaults left out. */
+    write(prop: P): JsonObject;
+    /** Its passes, for a kind strands pass in front of and behind; none for one always drawn behind them. */
+    passes(prop: P): PassEntry[];
+    /** Where a segment's curve passes across it (t along the segment, in order), given points along the curve. */
+    passesAcross(prop: P, cubic: Cubic, samples: Vector2[]): number[];
+    /** Whether a strand passing in front must be drawn over at this point, to cover the prop. */
+    covers(prop: P, point: Vector2): boolean;
+};
+
+/** Every kind, by name. */
+export const PROP_KINDS: { [K in PropKindName]: PropKind<Extract<Prop, { kind: K }>> } = {
+    bar: BAR,
+};
+
+export const PROP_KIND_NAMES = Object.keys(PROP_KINDS) as PropKindName[];
+
+/** The kind of a prop, typed loosely enough to call with the prop. */
+export const kindOf = (prop: Prop) => PROP_KINDS[prop.kind] as PropKind<Prop>;

@@ -1,0 +1,173 @@
+{
+  "format": "avut-knot",
+  "version": 1,
+  "name": "Sample knot",
+  "description": "A rope round a bar, crossed by a second rope and an arrow.",
+  "about": "The sample file for version 1 of the knot file format. Never edit it: the tests open it.",
+  "knot": {
+    "strands": [
+      {
+        "kind": "rope",
+        "colour": "orange",
+        "name": "Working end",
+        "pins": [
+          { "x": -6, "y": -9, "angle": 90 },
+          { "x": -4, "y": 0.3 },
+          { "x": 0, "y": 14 },
+          { "x": 4, "y": 0.3 },
+          { "x": 6, "y": -9, "angle": -90 }
+        ],
+        "segments": [
+          {},
+          { "length": 15.6307, "tension": [1, 1.2] },
+          { "length": 15.6307, "tension": [1.2, 1] },
+          {}
+        ]
+      },
+      {
+        "kind": "rope",
+        "colour": "green",
+        "pins": [
+          { "x": -10, "y": 3 },
+          { "x": 0, "y": 7.5 },
+          { "x": 10, "y": 11 }
+        ],
+        "segments": [{}, {}]
+      },
+      {
+        "kind": "arrow",
+        "pins": [
+          { "x": -10, "y": 10 },
+          { "x": 10, "y": 4 }
+        ],
+        "segments": [{}]
+      }
+    ],
+    "crossings": [
+      { "over": [1, 0], "under": [0, 1] },
+      { "over": [2, 0], "under": [0, 1] },
+      { "over": [1, 1], "under": [0, 2] },
+      { "over": [0, 2], "under": [2, 0] },
+      { "over": [2, 0], "under": [1, 0] }
+    ],
+    "props": [
+      {
+        "kind": "bar",
+        "x": 0,
+        "y": 0,
+        "r": 1.6,
+        "length": 20,
+        "passes": [
+          [0, 0, 1, "front"],
+          [0, 3, 1, "behind"]
+        ]
+      }
+    ]
+  },
+  "steps": [
+    {
+      "number": 1,
+      "instructions": "Bring the end down in front of the bar and back up behind it.",
+      "picture": {
+        "strands": [
+          {
+            "kind": "rope",
+            "colour": "orange",
+            "name": "Working end",
+            "pins": [
+              { "x": -6, "y": -9, "angle": 90 },
+              { "x": -4, "y": 0.3 },
+              { "x": 0, "y": 14 },
+              { "x": 4, "y": 0.3 },
+              { "x": 6, "y": -9, "angle": -90 }
+            ],
+            "segments": [
+              {},
+              { "length": 15.6307, "tension": [1, 1.2] },
+              { "length": 15.6307, "tension": [1.2, 1] },
+              {}
+            ]
+          }
+        ],
+        "crossings": [],
+        "props": [
+          {
+            "kind": "bar",
+            "x": 0,
+            "y": 0,
+            "r": 1.6,
+            "length": 20,
+            "passes": [
+              [0, 0, 1, "front"],
+              [0, 3, 1, "behind"]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "number": 1,
+      "instructions": "Lay the second rope across, and follow the arrow.",
+      "picture": {
+        "strands": [
+          {
+            "kind": "rope",
+            "colour": "orange",
+            "name": "Working end",
+            "pins": [
+              { "x": -6, "y": -9, "angle": 90 },
+              { "x": -4, "y": 0.3 },
+              { "x": 0, "y": 14 },
+              { "x": 4, "y": 0.3 },
+              { "x": 6, "y": -9, "angle": -90 }
+            ],
+            "segments": [
+              {},
+              { "length": 15.6307, "tension": [1, 1.2] },
+              { "length": 15.6307, "tension": [1.2, 1] },
+              {}
+            ]
+          },
+          {
+            "kind": "rope",
+            "colour": "green",
+            "pins": [
+              { "x": -10, "y": 3 },
+              { "x": 0, "y": 7.5 },
+              { "x": 10, "y": 11 }
+            ],
+            "segments": [{}, {}]
+          },
+          {
+            "kind": "arrow",
+            "pins": [
+              { "x": -10, "y": 10 },
+              { "x": 10, "y": 4 }
+            ],
+            "segments": [{}]
+          }
+        ],
+        "crossings": [
+          { "over": [1, 0], "under": [0, 1] },
+          { "over": [2, 0], "under": [0, 1] },
+          { "over": [1, 1], "under": [0, 2] },
+          { "over": [0, 2], "under": [2, 0] },
+          { "over": [2, 0], "under": [1, 0] }
+        ],
+        "props": [
+          {
+            "kind": "bar",
+            "x": 0,
+            "y": 0,
+            "r": 1.6,
+            "length": 20,
+            "passes": [
+              [0, 0, 1, "front"],
+              [0, 3, 1, "behind"]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

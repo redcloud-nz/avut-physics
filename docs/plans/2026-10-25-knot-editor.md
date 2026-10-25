@@ -186,7 +186,7 @@ files, and props beyond the bar come after, once the editor has proved itself.
 
 ### Review group 1: the curves and the file (no UI)
 
-- [ ] **1. Bézier and Hobby maths** — Add cubic Bézier and Hobby's curve maths to `src/lib`
+- [x] **1. Bézier and Hobby maths** — Add cubic Bézier and Hobby's curve maths to `src/lib`
   - **Files:** `src/lib/bezier.ts`, `src/lib/hobby.ts`, `src/lib/bezier.test.ts`, `src/lib/hobby.test.ts`
   - **Do:**
     - `bezier.ts`, on `Vector2` (`src/lib/vector2.ts`): a `Cubic` type (four points); its point and first and second
@@ -205,7 +205,7 @@ files, and props beyond the bar come after, once the editor has proved itself.
     points on a line come out along it; tensions to control points and back give the same tensions; two cubics
     crossing once, twice and not at all. Type check, lint and `npm test` pass.
 
-- [ ] **2. The knot file and its versions** — Add the knot editor's versioned file format, with checks, upgrades and
+- [x] **2. The knot file and its versions** — Add the knot editor's versioned file format, with checks, upgrades and
       a writer that leaves out defaults
   - **Files:** `src/knot-editor/format.ts`, `src/knot-editor/versions.ts`, `src/knot-editor/props/index.ts`,
     `src/knot-editor/props/bar.tsx`, `src/knot-editor/samples/v1.json`, `src/knot-editor/format.test.ts`
@@ -241,7 +241,7 @@ files, and props beyond the bar come after, once the editor has proved itself.
 
     Type check, lint and `npm test` pass.
 
-- [ ] **3. Curves and lengths** — Work out a picture's curves, locked lengths and bends, keeping what didn't change
+- [x] **3. Curves and lengths** — Work out a picture's curves, locked lengths and bends, keeping what didn't change
   - **Files:** `src/knot-editor/geometry.ts`, `src/knot-editor/geometry.test.ts`
   - **Do:**
     - `pictureGeometry(picture, previous?)`: per strand, each pin's direction (held or from Hobby's run) and each
@@ -259,7 +259,7 @@ files, and props beyond the bar come after, once the editor has proved itself.
 
     Type check, lint and `npm test` pass.
 
-- [ ] **4. Crossings, passes and strand paths** — Find and match a picture's crossings and passes, and make each
+- [x] **4. Crossings, passes and strand paths** — Find and match a picture's crossings and passes, and make each
       strand's path with its over stretches
   - **Files:** `src/knot-editor/crossing-geometry.ts`, `src/knot-editor/crossing-geometry.test.ts`,
     `src/knot-editor/props/index.ts`, `src/knot-editor/props/bar.tsx`, `src/knot-editor/samples/v1.json` (corrected if
