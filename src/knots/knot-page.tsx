@@ -83,6 +83,7 @@ export function KnotPage(props: { slug: string }) {
                             <TyingSteps
                                 name={fullName(knot)}
                                 steps={steps}
+                                bar={knot.bar}
                                 onClose={() => setTying(false)}
                             />
                         </DialogPrimitive.Content>

@@ -24,7 +24,8 @@ export type TyingStepData = PinnedRope & {
 export type TyingStep = {
     caption: string;
     label: string;
-    rope: PinnedRope;
+    /** Where it's pinned, for a step laid out in the rope editor. */
+    rope?: PinnedRope;
     path: RopePath;
     arrows: Arrow[];
 };

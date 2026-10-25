@@ -10,6 +10,7 @@ import {
     FIGURE_EIGHT_ON_A_BIGHT,
     FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
+    FIGURE_EIGHT_RETHREADED_TYING,
 } from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
 import { knotDeterminant, type Pass } from "./invariants";
@@ -170,7 +171,7 @@ describe("firstPart", () => {
 
 describe("FIGURE_EIGHT_TYING", () => {
     it("solves every step, meeting all its pins", () => {
-        for (const step of FIGURE_EIGHT_TYING) expect(solveRope(step.rope).converged).toBe(true);
+        for (const step of FIGURE_EIGHT_TYING) expect(solveRope(step.rope!).converged).toBe(true);
     });
 
     it("adds crossings as it goes, each with one strand over", () => {
@@ -238,6 +239,20 @@ describe("FIGURE_EIGHT_RETHREADED", () => {
         expect(found).toHaveLength(16);
         for (const c of found) expect(c.over).not.toBeNull();
         expect(tightestBend(centreline(FIGURE_EIGHT_RETHREADED).points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_RETHREADED_TYING", () => {
+    it("keeps a figure-8 in the rope and adds crossings as the end follows it back, each with one strand over", () => {
+        const found = FIGURE_EIGHT_RETHREADED_TYING.map((step) => crossings(step.path));
+        expect(knotDeterminant(passesOf(FIGURE_EIGHT_RETHREADED_TYING[1].path))).toBe(5);
+        expect(found.at(-1)).toHaveLength(16);
+        for (const c of found.flat()) expect(c.over).not.toBeNull();
+    });
+
+    it("bends smoothly at every step, the end pulled out to the side too", () => {
+        for (const step of FIGURE_EIGHT_RETHREADED_TYING)
+            expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
     });
 });
 

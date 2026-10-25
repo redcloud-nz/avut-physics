@@ -5,6 +5,7 @@ import {
     FIGURE_EIGHT_ON_A_BIGHT,
     FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
+    FIGURE_EIGHT_RETHREADED_TYING,
 } from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING, type TyingStep } from "./figure-eight-tying";
 import type { RopePath } from "./rope-path";
@@ -72,6 +73,7 @@ export const KNOTS: Knot[] = [
         // Finished, it's the same knot as the figure-8 on a bight, but tied round something.
         drawing: [FIGURE_EIGHT_RETHREADED],
         bar: FIGURE_EIGHT_BAR,
+        steps: FIGURE_EIGHT_RETHREADED_TYING,
         turned: true,
     },
     {

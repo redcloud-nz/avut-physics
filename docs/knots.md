@@ -21,7 +21,10 @@ round it. The figure-8 on a bight's tying steps are the figure-8's, the rope dou
 strands parting near the single strand's end and coming round in a little loop, the fold, whose tip is where the end was.
 Its step 4 has no room to show the fold passing over the 8 and up through the top loop, so the fold sits below the 8 and an
 arrow shows the way (`frontTo`: in front of the rope as far as one of its points, behind it after). Its last step is the
-knot finished. A knot joining two ropes draws the second in green, and its view stops as far past
+knot finished. The figure-8 rethreaded's steps are cut from its finished drawing: the rope as far along it as the end has
+reached, so the end follows the rope back exactly where it lies finished, with a free end (a curve from the cut, marked over
+where it's pulled across the knot) where the slack is pulled out to the side. Each move of the rethread is the end lined up
+at a place it goes under a strand, with an arrow along its way through, then (cont.) pushed through and pulled out. A knot joining two ropes draws the second in green, and its view stops as far past
 the knot at the top as at the bottom, where the ropes run on out both ways.
 
 ## Stages

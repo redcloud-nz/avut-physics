@@ -8,15 +8,25 @@ import { TyingArrow, type Arrow } from "./tying-arrow";
 
 type View = { x: number; y: number; w: number; h: number };
 
-/** The view every step of a knot's tying shares, so the rope stays put as the steps change. */
-export function stepsView(steps: TyingStep[]): View {
-    return tyingView(
-        steps.flatMap((step) => [
+/** The view every step of a knot's tying shares, so the rope stays put as the steps change. It takes in any bar. */
+export function stepsView(steps: TyingStep[], bar?: Bar): View {
+    return tyingView([
+        ...steps.flatMap((step) => [
             centreline(step.path).points,
             ...step.arrows.map((arrow) => arrow.points),
         ]),
-    );
+        bar ? barEdges(bar) : [],
+    ]);
 }
+
+/** The bar's edges as far as they reach each way. */
+const barEdges = (bar: Bar) =>
+    [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+    ].map(([dx, dy]) => new Vector2(bar.x + dx * bar.r, bar.y + dy * bar.r));
 
 /** How far below a finished knot's lowest crossing its view reaches, showing its ends leaving it (diameters). */
 const ENDS = 8;
@@ -29,15 +39,7 @@ const ENDS = 8;
  */
 export function ropeView(ropes: RopePath[], bothWays = false, bar?: Bar, margin = 1.5): View {
     const points = ropes.flatMap((path) => centreline(path).points);
-    // The bar's edges as far as they reach each way.
-    if (bar)
-        for (const [dx, dy] of [
-            [1, 0],
-            [-1, 0],
-            [0, 1],
-            [0, -1],
-        ])
-            points.push(new Vector2(bar.x + dx * bar.r, bar.y + dy * bar.r));
+    if (bar) points.push(...barEdges(bar));
     const ys = ropes.flatMap((path) => crossings(path).map((c) => c.at.y));
     const lowest = Math.max(...ys);
     const x = Math.max(...points.map((p) => Math.abs(p.x))) + margin;

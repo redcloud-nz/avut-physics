@@ -9,10 +9,21 @@
  *   of the bottom beside the first's.
  */
 
+import { arcLengths } from "@/lib/curve";
+import { rad } from "@/lib/math";
+import { vec2 } from "@/lib/vector2";
+
 import type { Bar } from "./bar";
 import { folded, joined, onTheBight } from "./doubled";
-import { FIGURE_EIGHT_TYING, TYING_DATA, tyingStep, type TyingStep } from "./figure-eight-tying";
-import { centreline } from "./rope-path";
+import {
+    FIGURE_EIGHT_TYING,
+    stepLabel,
+    TYING_DATA,
+    tyingStep,
+    type TyingStep,
+} from "./figure-eight-tying";
+import { centreline, firstPart, over, plain, ropeEnd, type RopePath } from "./rope-path";
+import type { ArrowPoint } from "./tying-arrow";
 
 const SINGLE = FIGURE_EIGHT_TYING[FIGURE_EIGHT_TYING.length - 1].path;
 
@@ -126,3 +137,132 @@ export const FIGURE_EIGHT_ON_A_BIGHT_TYING: TyingStep[] = FIGURE_EIGHT_TYING.map
         };
     },
 );
+
+/**
+ * A free end added to `path`: a smooth curve from its end, carrying on the way it heads, to `to`, arriving at `angle`
+ * (degrees from +x towards +y). Marked over where it's pulled out across the knot.
+ */
+type FreeEnd = { to: ArrowPoint; angle: number; over?: boolean };
+
+function withFreeEnd(path: RopePath, end: FreeEnd): RopePath {
+    const { at, heading } = ropeEnd(path);
+    const to = vec2(end.to.x, end.to.y);
+    const way = vec2(Math.cos(rad(end.angle)), Math.sin(rad(end.angle)));
+    const handle = at.distanceTo(to) * 0.4;
+    const [c1, c2] = [at.add(heading.scale(handle)), to.sub(way.scale(handle))];
+    const d = `C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${to.x} ${to.y}`;
+    return [...path, end.over ? over(d) : plain(d)];
+}
+
+/** Points along the finished rethreaded rope from `from` to `to` along it, about every 1.5 diameters, for an arrow. */
+function alongRethreaded(from: number, to: number): ArrowPoint[] {
+    const { points } = centreline(FIGURE_EIGHT_RETHREADED);
+    const s = arcLengths(points);
+    const n = Math.max(2, Math.round((to - from) / 1.5));
+    return Array.from({ length: n + 1 }, (_, k) => {
+        const at = from + ((to - from) * k) / n;
+        const i = Math.max(
+            1,
+            s.findIndex((x) => x >= at),
+        );
+        const p = points[i - 1].add(
+            points[i].sub(points[i - 1]).scale((at - s[i - 1]) / (s[i] - s[i - 1])),
+        );
+        return { x: p.x, y: p.y };
+    });
+}
+
+/**
+ * A frame of tying the figure-8 rethreaded: the finished rope as far as `at` along it (so the end follows the rope back
+ * through the knot exactly where it lies finished), with a free end on past that where the end's pulled out to the
+ * side, and an arrow along the finished rope from `arrow[0]` to `arrow[1]` showing where it goes next.
+ */
+type RethreadFrame = {
+    caption: string;
+    at: number;
+    end?: FreeEnd;
+    arrow?: [number, number];
+    continues?: boolean;
+};
+
+/**
+ * Where the rethread's end goes under a strand, along the finished rope, splits it into moves: the end lined up at the
+ * way in with an arrow through, then pulled through and out to the side. In between, it lies over the strands it
+ * crosses, so lining up for the next move lays it along the finished rope to the next way in.
+ */
+const RETHREAD_FRAMES: RethreadFrame[] = [
+    {
+        caption: "Tie a loose figure-8, leaving a long tail.",
+        at: 72,
+        end: { to: { x: 8, y: -18 }, angle: -60 },
+    },
+    {
+        caption: "Take the tail round the bar.",
+        at: 90,
+        end: { to: { x: -10, y: -7 }, angle: 120 },
+    },
+    {
+        caption:
+            "Line the end up beside the rope where it leaves the top of the knot. It goes in under the top of the loop.",
+        at: 96.3,
+        arrow: [96.8, 102.6],
+    },
+    {
+        caption: "Push the end through and pull the slack out to the side.",
+        at: 102.3,
+        end: { to: { x: -10, y: 0 }, angle: 180, over: true },
+        continues: true,
+    },
+    {
+        caption:
+            "Lay the end beside the rope round the left of the 8, down to the bottom. It goes under the standing part.",
+        at: 116,
+        arrow: [116.5, 125.5],
+    },
+    {
+        caption: "Push it under and up the right side, and pull the slack out to the side.",
+        at: 123.5,
+        end: { to: { x: 11, y: -3 }, angle: -20 },
+        continues: true,
+    },
+    {
+        caption:
+            "Lay it beside the rope across the middle of the 8. It goes under into the top loop.",
+        at: 129.9,
+        arrow: [130.4, 136.6],
+    },
+    {
+        caption: "Push it through and pull the slack out to the side.",
+        at: 136,
+        end: { to: { x: 11, y: -2 }, angle: 15, over: true },
+        continues: true,
+    },
+    {
+        caption:
+            "Lay it beside the rope round the top loop and down. It goes under in the middle of the 8.",
+        at: 147,
+        arrow: [147.5, 153.8],
+    },
+    {
+        caption: "Push it through and pull the slack out to the side.",
+        at: 153.3,
+        end: { to: { x: -10, y: 10 }, angle: 180, over: true },
+        continues: true,
+    },
+    {
+        caption:
+            "Lay the end down beside the standing part, and pull each strand snug so the pairs lie side by side.",
+        at: Infinity,
+    },
+];
+
+/** Tying the figure-8 rethreaded round the bar, the end followed back through the knot a move at a time. */
+export const FIGURE_EIGHT_RETHREADED_TYING: TyingStep[] = RETHREAD_FRAMES.map((frame, i) => {
+    const part = firstPart(FIGURE_EIGHT_RETHREADED, frame.at);
+    return {
+        caption: frame.caption,
+        label: stepLabel(RETHREAD_FRAMES, i),
+        path: frame.end ? withFreeEnd(part, frame.end) : part,
+        arrows: frame.arrow ? [{ points: alongRethreaded(...frame.arrow) }] : [],
+    };
+});
