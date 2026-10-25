@@ -15,8 +15,11 @@ import { Vector2 } from "@/lib/vector2";
 
 import type { Picture, Pin, Strand, StrandSegment } from "./format";
 
-/** Bends tighter than this radius (diameters) are shaded on ropes as a warning. */
-export const TIGHTEST_BEND = 1.75;
+/**
+ * Bends tighter than this radius (diameters, to the rope's centre line) are shaded on ropes as a warning: about as
+ * tight as a rope pulled snug round another of its size. To be made a setting later.
+ */
+export const TIGHTEST_BEND = 1;
 
 /** How well a locked segment meets its length, against its reach: the shortest and longest it can be. */
 export type LockStatus = { reach: [number, number] } & (

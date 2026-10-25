@@ -338,7 +338,12 @@ export default function KnotEditor() {
                     />
                 </aside>
             </div>
-            <StatusBar readouts={readouts} warnings={warnings} saved={saved} />
+            <StatusBar
+                readouts={readouts}
+                warnings={warnings}
+                saved={saved}
+                onZoom={(scale) => canvas.current?.setScale(scale)}
+            />
             <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
             <DetailsDialog
                 open={detailsOpen}

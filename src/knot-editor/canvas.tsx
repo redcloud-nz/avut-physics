@@ -19,7 +19,7 @@ import {
 } from "react";
 
 import type { Cubic } from "@/lib/bezier";
-import { clamp, deg } from "@/lib/math";
+import { deg } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
 import type { PictureCrossings, StrandPaths } from "./crossing-geometry";
@@ -40,6 +40,7 @@ import { PictureDrawing } from "./picture-drawing";
 import { kindOf } from "./props";
 import { NOTHING, type EditorAction, type Selection } from "./state";
 import type { ReadoutStore } from "./status-bar";
+import { BASE_SCALE, withinZoom } from "./zoom";
 
 /** The picture's geometry, worked out from the last picture's where it can be. */
 export function useGeometry(picture: Picture): PictureGeometry {
@@ -88,9 +89,13 @@ function Warnings(props: { geometry: PictureGeometry; bends: boolean }) {
     );
 }
 
-/** What the editor can ask of the canvas: the View menu's zooms, and where the middle of the view is. */
+/**
+ * What the editor can ask of the canvas: the View menu's zooms, the status bar's (to a scale, in pixels per
+ * diameter), and where the middle of the view is. Both zoom about the middle.
+ */
 export type CanvasControls = {
     zoom(factor: number): void;
+    setScale(scale: number): void;
     fit(): void;
     centre(): Vector2;
 };
@@ -99,9 +104,8 @@ export type CanvasControls = {
 type View = { cx: number; cy: number; scale: number };
 type Size = { w: number; h: number };
 
-/** How far round the picture the fitted view leaves (diameters), and how far the view zooms each way. */
+/** How far round the picture the fitted view leaves (diameters). */
 const MARGIN = 3;
-const [LEAST_SCALE, MOST_SCALE] = [1, 400];
 /** How far (pixels) the pointer moves before a press becomes a drag. */
 const DRAG = 3;
 
@@ -111,7 +115,7 @@ function fitted(picture: Picture, geometry: PictureGeometry, size: Size): View {
         ...geometry.strands.flatMap((strand) => strand.segments.map((seg) => seg.box)),
         ...picture.props.map((prop) => kindOf(prop).bounds(prop)),
     ];
-    if (!boxes.length) return { cx: 0, cy: 0, scale: 20 };
+    if (!boxes.length) return { cx: 0, cy: 0, scale: BASE_SCALE };
     const x0 = Math.min(...boxes.map((b) => b.min.x)) - MARGIN;
     const x1 = Math.max(...boxes.map((b) => b.max.x)) + MARGIN;
     const y0 = Math.min(...boxes.map((b) => b.min.y)) - MARGIN;
@@ -119,7 +123,7 @@ function fitted(picture: Picture, geometry: PictureGeometry, size: Size): View {
     return {
         cx: (x0 + x1) / 2,
         cy: (y0 + y1) / 2,
-        scale: clamp(Math.min(size.w / (x1 - x0), size.h / (y1 - y0)), LEAST_SCALE, MOST_SCALE),
+        scale: withinZoom(Math.min(size.w / (x1 - x0), size.h / (y1 - y0))),
     };
 }
 
@@ -184,10 +188,8 @@ export function Canvas(props: {
     useImperativeHandle(
         ref,
         () => ({
-            zoom: (factor) =>
-                setView(
-                    (v) => v && { ...v, scale: clamp(v.scale * factor, LEAST_SCALE, MOST_SCALE) },
-                ),
+            zoom: (factor) => setView((v) => v && { ...v, scale: withinZoom(v.scale * factor) }),
+            setScale: (scale) => setView((v) => v && { ...v, scale: withinZoom(scale) }),
             fit: () => {
                 const { picture, geometry, size } = latest.current;
                 if (size) setView(fitted(picture, geometry, size));
@@ -214,7 +216,7 @@ export function Canvas(props: {
             const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002));
             setView((v) => {
                 if (!v) return v;
-                const scale = clamp(v.scale * factor, LEAST_SCALE, MOST_SCALE);
+                const scale = withinZoom(v.scale * factor);
                 const [x, y] = [v.cx + dx / v.scale, v.cy + dy / v.scale];
                 return { scale, cx: x - dx / scale, cy: y - dy / scale };
             });

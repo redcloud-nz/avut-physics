@@ -140,9 +140,13 @@ function matches(s: Shortcut, e: KeyboardEvent, mac: boolean): boolean {
     );
 }
 
+/** Inputs that take no typing (a slider, a checkbox), so the editor's keys still work with one focused. */
+const NOT_TYPED = ["range", "checkbox", "radio", "button"];
+
 /** Whether keys typed here belong to a field rather than the editor. */
 const typing = (target: EventTarget | null) =>
     target instanceof HTMLElement &&
+    !(target instanceof HTMLInputElement && NOT_TYPED.includes(target.type)) &&
     (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
 /** Shortcuts a field being typed in keeps for itself: undoing and selecting its own text. */

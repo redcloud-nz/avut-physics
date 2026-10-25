@@ -38,7 +38,8 @@ Each strand is a row of pins with a segment between each pair, and each segment 
 - **Shifting at a pin** slides rope through it: the segment before gets shorter by some amount and the one after
   longer, or the reverse, with the pin where it was. It needs both segments locked; with either free, the length just
   follows the curve.
-- **Bends** tighter than 1.75 diameters are shaded on ropes as a warning, not stopped.
+- **Bends** tighter than a radius of 1 diameter (to the centre line: about as tight as a rope pulled snug round
+  another of its size) are shaded on ropes as a warning, not stopped. The limit is to be made a setting later.
 
 There's no physics in the curves: they're smooth by construction, and the bend warning is the only check that they
 look like rope. Drawing one takes microseconds, so every change shows as soon as it's made.
@@ -176,7 +177,7 @@ chrome for addresses that match no page.
 │  2 Pass… │                                      │  1.0   1.4  │
 │ ⧉ ↑ ↓ ✕  │                                      │             │
 ├──────────┴──────────────────────────────────────┴─────────────┤
-│ x 3.25  y -1.50  140 px per diameter  1 crossing unset  Saved │
+│ x 3.25  y -1.50   1 crossing unset   Saved  − ───●──── + 140% │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -204,8 +205,10 @@ chrome for addresses that match no page.
   - nothing: the step's number and instructions (on the knot, a hint);
   - and below, whatever's selected: lost entries, each to delete, and crossings and passes to check, each to
     confirm.
-- **Status bar:** the pointer's position, the zoom (pixels per rope diameter), each kind of warning counted, and
-  whether the file's saved.
+- **Status bar:** the pointer's position, each kind of warning counted, whether the file's saved, and the zoom, as in
+  Excel: − and + step to the next round level (… 75%, 100%, 125% …), the slider between runs on a log scale with 100%
+  in its middle, and clicking the percentage goes back to 100%. 100% is 20 pixels per rope diameter, and the zoom runs
+  from 5% to 2000%.
 
 ## How it's built
 
