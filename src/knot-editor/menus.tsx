@@ -21,6 +21,8 @@ import {
     MenubarTrigger,
 } from "@/components/ui/menubar";
 
+import { PROP_KIND_NAMES, PROP_KINDS, type PropKindName } from "./props";
+
 /**
  * A key, with ⌘ (Ctrl off a Mac), Shift and Option (Alt) as needed. `code` is the physical key (`KeyboardEvent.code`),
  * so Option doesn't turn the letter into another character.
@@ -37,8 +39,8 @@ export type Command = { label: string; shortcut?: Shortcut; toggle?: boolean };
 
 const letter = (l: string) => ({ code: `Key${l}`, label: l });
 
-/** Every command, with its shortcut. Chrome keeps ⌘N, ⌘T and ⌘W for itself, so New is ⌥⌘N. */
-export const COMMANDS = {
+/** Every command but the props', with its shortcut. Chrome keeps ⌘N, ⌘T and ⌘W for itself, so New is ⌥⌘N. */
+const BASE_COMMANDS = {
     new: { label: "New", shortcut: { ...letter("N"), mod: true, alt: true } },
     open: { label: "Open…", shortcut: { ...letter("O"), mod: true } },
     save: { label: "Save", shortcut: { ...letter("S"), mod: true } },
@@ -51,7 +53,6 @@ export const COMMANDS = {
     insertPin: { label: "Pin", shortcut: letter("P") },
     insertRope: { label: "Rope", shortcut: letter("R") },
     insertArrow: { label: "Arrow", shortcut: letter("A") },
-    insertBar: { label: "Bar", shortcut: letter("B") },
     insertStep: { label: "Step", shortcut: letter("S") },
     zoomIn: { label: "Zoom In", shortcut: { code: "Equal", label: "=", mod: true } },
     zoomOut: { label: "Zoom Out", shortcut: { code: "Minus", label: "−", mod: true } },
@@ -67,7 +68,21 @@ export const COMMANDS = {
     shortcuts: { label: "Shortcuts", shortcut: { code: "Slash", label: "?", shift: true } },
 } satisfies Record<string, Command>;
 
-export type CommandId = keyof typeof COMMANDS;
+/** Inserting a prop of a kind, as Insert > Prop lists them from the registry. */
+export type PropCommandId = `prop:${PropKindName}`;
+export const propCommand = (kind: PropKindName): PropCommandId => `prop:${kind}`;
+
+export type CommandId = keyof typeof BASE_COMMANDS | PropCommandId;
+
+export const COMMANDS: Record<CommandId, Command> = {
+    ...BASE_COMMANDS,
+    ...(Object.fromEntries(
+        PROP_KIND_NAMES.map((kind) => [
+            propCommand(kind),
+            { label: PROP_KINDS[kind].label, shortcut: letter(PROP_KINDS[kind].key) },
+        ]),
+    ) as Record<PropCommandId, Command>),
+};
 
 /** A menu's item: a command, a separator (`null`), or a submenu of commands. */
 export type MenuItem = CommandId | null | { submenu: string; items: CommandId[] };
@@ -82,7 +97,7 @@ export const MENUS: { name: string; items: MenuItem[] }[] = [
             "insertPin",
             "insertRope",
             "insertArrow",
-            { submenu: "Prop", items: ["insertBar"] },
+            { submenu: "Prop", items: PROP_KIND_NAMES.map(propCommand) },
             null,
             "insertStep",
         ],

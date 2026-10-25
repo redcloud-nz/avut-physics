@@ -123,10 +123,15 @@ When two segments cross more than once, `n` (from 1) says which crossing, counti
 first in the picture's order, so it doesn't depend on which is on top. The editor finds where segments cross from the
 curves and matches them to this list:
 
-- A crossing with no entry is drawn with a marker until you choose.
-- An entry whose segments no longer cross is listed in the panel as lost, not dropped.
+- A crossing with no entry is drawn with a red marker until you choose. Clicking it puts the pair's first segment on
+  top; clicking again swaps them.
+- An entry whose segments no longer cross is listed in the panel as lost, not dropped, with a button to delete it.
 - When two segments cross a different number of times than they have entries, their entries are shown "to check"
-  until you confirm them, since `n` may no longer name the same crossing.
+  (an amber ring) until you confirm them, since `n` may no longer name the same crossing. That includes a pair
+  crossing twice with only one of them set so far. Confirming replaces the pair's entries with its crossings as
+  they're drawn now, numbered afresh; one drawn with no side yet gets the pair's first segment on top.
+- Crossings too close for both over stretches to fit get the amber ring too. View > Crossings letters every crossing
+  (A, B…), so the panel can name them.
 - Adding a pin moves the entries on the segment it splits to the half their crossing is on. Deleting one moves the
   entries of the two segments it joins onto the joined one. Either way the entries are counted again and the later
   segments' numbers move up or down. An entry between the two segments a delete joins is left naming one segment
@@ -148,7 +153,7 @@ curves and matches them to this list:
 }
 ```
 
-A prop's `passes` lists every pass across it as `[strand, segment, n, side]`, `n` counting that segment's passes across it. They're matched and kept up as crossings are: a pass with no entry is unset (drawn behind, with a marker), an entry with no pass is lost, and when a segment's count of passes changes its entries are shown to check.
+A prop's `passes` lists every pass across it as `[strand, segment, n, side]`, `n` counting that segment's passes across it. They're matched and kept up as crossings are: a pass with no entry is unset (drawn behind, with a marker), an entry with no pass is lost, and when a segment's count of passes changes its entries are shown to check. Clicking an unset pass puts it in front, and clicking again swaps it; confirming a segment's passes enters each as it's drawn now, so one unset is entered behind.
 
 The file is laid out exactly as Prettier would format it, since the commit hook runs Prettier on JSON too: the editor formats it with Prettier itself.
 

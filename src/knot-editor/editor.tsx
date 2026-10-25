@@ -4,7 +4,7 @@
  * The knot editor: the menu bar, the knot and its steps on the left, the drawing in the middle, what's selected on the
  * right, and the status bar along the bottom. It fills the window; it's a desktop tool, with no phone layout.
  */
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +19,13 @@ import { useInBrowser } from "@/components/use-in-browser";
 import { Vector2 } from "@/lib/vector2";
 
 import { Canvas, useGeometry, type CanvasControls } from "./canvas";
-import { addStrand, deletePins, insertPin } from "./edits";
+import { pictureCrossings, strandPaths } from "./crossing-geometry";
+import { addProp, addStrand, deletePins, deleteProp, insertPin } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
 import type { KnotFile, PinRef } from "./format";
 import { Inspector } from "./inspector";
-import { Menus, useShortcuts, type CommandId } from "./menus";
+import { Menus, propCommand, useShortcuts, type CommandId } from "./menus";
+import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
 import { editorReducer, isSaved, loaded, NOTHING, pictureOf, type PictureId } from "./state";
 import { createReadouts, StatusBar, type Warnings } from "./status-bar";
@@ -66,12 +68,22 @@ export default function KnotEditor() {
     const saved = isSaved(state);
     const picture = pictureOf(state.file, state.picture);
     const geometry = useGeometry(picture);
+    const crossings = useMemo(() => pictureCrossings(picture, geometry), [picture, geometry]);
+    const drawn = useMemo(
+        () => strandPaths(picture, geometry, crossings),
+        [picture, geometry, crossings],
+    );
     const { selection } = state;
     const parts = selection.kind === "parts" ? selection : NOTHING;
     const pins = parts.kind === "parts" ? parts.pins : [];
     const segments = parts.kind === "parts" ? parts.segments : [];
     const canvas = useRef<CanvasControls>(null);
-    const [show, setShow] = useState({ pinNumbers: false, handles: true, bendWarnings: true });
+    const [show, setShow] = useState({
+        pinNumbers: false,
+        handles: true,
+        crossings: false,
+        bendWarnings: true,
+    });
     const [readouts] = useState(createReadouts);
     const [helpOpen, setHelpOpen] = useState(false);
     const [message, setMessage] = useState<Message | null>(null);
@@ -131,16 +143,18 @@ export default function KnotEditor() {
         saveAs: files,
         undo: state.undo.length > 0,
         redo: state.redo.length > 0,
-        delete: pins.length > 0,
+        delete: pins.length > 0 || selection.kind === "prop",
         selectAll: picture.strands.length > 0,
         insertPin: segments.length > 0,
         insertRope: true,
         insertArrow: true,
+        ...Object.fromEntries(PROP_KIND_NAMES.map((kind) => [propCommand(kind), true])),
         zoomIn: true,
         zoomOut: true,
         fit: true,
         pinNumbers: true,
         handles: true,
+        crossings: true,
         bendWarnings: true,
         shortcuts: true,
     };
@@ -157,6 +171,39 @@ export default function KnotEditor() {
             count: segmentsDrawn.filter((seg) => seg.lock && seg.lock.kind !== "ok").length,
             one: "locked length not met",
             many: "locked lengths not met",
+        },
+        {
+            count: crossings.crossings.filter((c) => c.status === "unset").length,
+            one: "crossing unset",
+            many: "crossings unset",
+        },
+        {
+            // A pair crossing nowhere (one segment listed as crossing itself) still has its entries to check.
+            count: crossings.toCheck.reduce((n, pair) => n + Math.max(pair.found, 1), 0),
+            one: "crossing to check",
+            many: "crossings to check",
+        },
+        { count: crossings.lost.length, one: "crossing lost", many: "crossings lost" },
+        {
+            count: drawn.tooClose.length,
+            one: "crossing too close",
+            many: "crossings too close",
+        },
+        {
+            count: crossings.passes.filter((p) => p.status === "unset").length,
+            one: "pass unset",
+            many: "passes unset",
+        },
+        {
+            count: crossings.passesToCheck.reduce((n, segment) => n + segment.found, 0),
+            one: "pass to check",
+            many: "passes to check",
+        },
+        { count: crossings.lostPasses.length, one: "pass lost", many: "passes lost" },
+        {
+            count: drawn.tooClosePasses.length,
+            one: "pass too close",
+            many: "passes too close",
         },
     ];
 
@@ -192,8 +239,13 @@ export default function KnotEditor() {
         else if (id === "save") void save(false);
         else if (id === "saveAs") void save(true);
         else if (id === "undo" || id === "redo") dispatch({ type: id });
-        else if (id === "delete") dispatch({ type: "edit", edit: (q) => deletePins(q, pins) });
-        else if (id === "selectAll")
+        else if (id === "delete") {
+            if (selection.kind === "prop") {
+                const p = selection.prop;
+                dispatch({ type: "edit", edit: (q) => deleteProp(q, p) });
+                dispatch({ type: "select", selection: NOTHING });
+            } else dispatch({ type: "edit", edit: (q) => deletePins(q, pins) });
+        } else if (id === "selectAll")
             selectPins(picture.strands.flatMap((s, i) => s.pins.map((_, k): PinRef => [i, k])));
         else if (id === "insertPin") {
             // At the middle (by length) of the first segment selected.
@@ -204,10 +256,22 @@ export default function KnotEditor() {
             selectPins([[i, k + 1]]);
         } else if (id === "insertRope") insertStrand("rope");
         else if (id === "insertArrow") insertStrand("arrow");
-        else if (id === "zoomIn") canvas.current?.zoom(1.25);
+        else if (id.startsWith("prop:")) {
+            const kind = PROP_KINDS[id.slice("prop:".length) as keyof typeof PROP_KINDS];
+            const centre = canvas.current?.centre();
+            if (!centre) return;
+            const n = picture.props.length;
+            dispatch({ type: "edit", edit: (q) => addProp(q, kind.create(centre)) });
+            dispatch({ type: "select", selection: { kind: "prop", prop: n } });
+        } else if (id === "zoomIn") canvas.current?.zoom(1.25);
         else if (id === "zoomOut") canvas.current?.zoom(0.8);
         else if (id === "fit") canvas.current?.fit();
-        else if (id === "pinNumbers" || id === "handles" || id === "bendWarnings")
+        else if (
+            id === "pinNumbers" ||
+            id === "handles" ||
+            id === "crossings" ||
+            id === "bendWarnings"
+        )
             setShow((s) => ({ ...s, [id]: !s[id] }));
         else if (id === "shortcuts") setHelpOpen(true);
     };
@@ -250,6 +314,8 @@ export default function KnotEditor() {
                         ref={canvas}
                         picture={picture}
                         geometry={geometry}
+                        crossings={crossings}
+                        drawn={drawn}
                         selection={selection}
                         dispatch={dispatch}
                         show={show}
@@ -260,6 +326,7 @@ export default function KnotEditor() {
                     <Inspector
                         picture={picture}
                         geometry={geometry}
+                        crossings={crossings}
                         selection={selection}
                         dispatch={dispatch}
                     />

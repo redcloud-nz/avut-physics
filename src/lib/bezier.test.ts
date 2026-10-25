@@ -203,6 +203,16 @@ describe("Cubic crossings", () => {
         expect(arch.crossings(Cubic.line(vec2(-1, 0), vec2(1, 0)))).toEqual([]);
     });
 
+    it("finds a crossing at one of both polylines' points, which rounding leaves between pieces", () => {
+        // Sampled, the line along y = 4 has a point at x ≈ 2e-16 and the one before it at y just under 4, so the
+        // crossing falls just past one piece's end and just before the next's start.
+        const along = Cubic.line(vec2(-10, 4), vec2(10, 4));
+        const down = Cubic.line(vec2(0, -6), vec2(0, 8));
+        const hits = along.crossings(down);
+        expect(hits).toHaveLength(1);
+        close(hits[0].at, vec2(0, 4), 10);
+    });
+
     it("doesn't find two curves meeting end to start", () => {
         const a = new Cubic(vec2(0, 0), vec2(1, 1), vec2(2, 1), vec2(3, 0));
         const b = new Cubic(vec2(3, 0), vec2(4, -1), vec2(5, -1), vec2(6, 0));

@@ -21,9 +21,11 @@ import {
     segmentBefore,
     type CrossingEntry,
     type PassEntry,
+    type PassSide,
     type Picture,
     type Pin,
     type PinRef,
+    type Prop,
     type RopeColour,
     type SegmentRef,
     type Strand,
@@ -289,6 +291,144 @@ function followEntries(
     });
 
     return { crossings, props };
+}
+
+// Crossings
+
+const samePair = (a: [SegmentRef, SegmentRef], b: [SegmentRef, SegmentRef]) =>
+    sameSegment(a[0], b[0]) && sameSegment(a[1], b[1]);
+
+/**
+ * Which of a crossing's pair is on top (0 for the pair's first segment, 1 for its second): its entry changed, or
+ * added after the others.
+ */
+export function setCrossing(
+    picture: Picture,
+    pair: [SegmentRef, SegmentRef],
+    n: number,
+    over: 0 | 1,
+): Picture {
+    const entry: CrossingEntry = { over: pair[over], under: pair[1 - over], n };
+    const k = picture.crossings.findIndex((e) => e.n === n && samePair(crossingPair(e), pair));
+    if (k < 0) return { ...picture, crossings: [...picture.crossings, entry] };
+    if (sameSegment(picture.crossings[k].over, entry.over)) return picture;
+    return { ...picture, crossings: replaced(picture.crossings, k, entry) };
+}
+
+/** An entry deleted (one that's lost, its segments no longer crossing there). */
+export function deleteCrossing(picture: Picture, entry: CrossingEntry): Picture {
+    const crossings = picture.crossings.filter(
+        (e) =>
+            !(
+                e.n === entry.n &&
+                sameSegment(e.over, entry.over) &&
+                sameSegment(e.under, entry.under)
+            ),
+    );
+    return crossings.length === picture.crossings.length ? picture : { ...picture, crossings };
+}
+
+/**
+ * A pair's entries, when they're to check, replaced by its crossings as they're drawn now, numbered afresh along the
+ * pair's first segment. A crossing drawn with no side yet gets the pair's first segment on top, as a click would give
+ * it. The new entries go where the pair's first one was.
+ */
+export function confirmCrossings(
+    picture: Picture,
+    geometry: PictureGeometry,
+    pair: [SegmentRef, SegmentRef],
+): Picture {
+    const found = pictureCrossings(picture, geometry).crossings.filter((c) =>
+        samePair(c.pair, pair),
+    );
+    const entries = found.map((c): CrossingEntry => {
+        const over = c.over ?? 0;
+        return { over: pair[over], under: pair[1 - over], n: c.n };
+    });
+    const at = picture.crossings.findIndex((e) => samePair(crossingPair(e), pair));
+    if (at < 0) return picture;
+    // None of the entries before `at` are the pair's, so they keep their places.
+    const others = picture.crossings.filter((e) => !samePair(crossingPair(e), pair));
+    return { ...picture, crossings: [...others.slice(0, at), ...entries, ...others.slice(at)] };
+}
+
+// Props and their passes
+
+export const addProp = (picture: Picture, prop: Prop): Picture => ({
+    ...picture,
+    props: [...picture.props, prop],
+});
+
+/** A prop changed (moved, or a field set), or the picture itself where the change gives back the same prop. */
+export function changeProp(picture: Picture, p: number, change: (prop: Prop) => Prop): Picture {
+    const old = picture.props[p];
+    if (!old) return picture;
+    const prop = change(old);
+    return prop === old ? picture : { ...picture, props: replaced(picture.props, p, prop) };
+}
+
+export const deleteProp = (picture: Picture, p: number): Picture =>
+    picture.props[p] ? { ...picture, props: picture.props.filter((_, q) => q !== p) } : picture;
+
+/** A prop's passes changed, where it has a kind with passes. */
+function withPasses(
+    picture: Picture,
+    p: number,
+    change: (passes: PassEntry[]) => PassEntry[],
+): Picture {
+    return changeProp(picture, p, (prop) => {
+        const kind = kindOf(prop);
+        const old = kind.passes(prop);
+        const passes = change(old);
+        return passes === old ? prop : kind.withPasses(prop, passes);
+    });
+}
+
+const onSegment = (entry: PassEntry, [i, k]: SegmentRef) => entry[0] === i && entry[1] === k;
+
+/** Which side of a prop a segment's nth pass across it goes: its entry changed, or added after the others. */
+export const setPass = (
+    picture: Picture,
+    p: number,
+    ref: SegmentRef,
+    n: number,
+    side: PassSide,
+): Picture =>
+    withPasses(picture, p, (passes) => {
+        const entry: PassEntry = [ref[0], ref[1], n, side];
+        const k = passes.findIndex((e) => onSegment(e, ref) && e[2] === n);
+        if (k < 0) return [...passes, entry];
+        return passes[k][3] === side ? passes : replaced(passes, k, entry);
+    });
+
+/** A pass's entry deleted (one that's lost, its segment no longer passing there). */
+export const deletePass = (picture: Picture, p: number, entry: PassEntry): Picture =>
+    withPasses(picture, p, (passes) => {
+        const kept = passes.filter((e) => !e.every((v, j) => v === entry[j]));
+        return kept.length === passes.length ? passes : kept;
+    });
+
+/**
+ * A segment's passes across a prop, when they're to check, replaced by its passes as they're drawn now, numbered
+ * afresh along it. One drawn with no side yet is drawn behind, and is entered behind. The new entries go where the
+ * segment's first one was.
+ */
+export function confirmPasses(
+    picture: Picture,
+    geometry: PictureGeometry,
+    p: number,
+    ref: SegmentRef,
+): Picture {
+    const found = pictureCrossings(picture, geometry).passes.filter(
+        (q) => q.prop === p && q.strand === ref[0] && q.segment === ref[1],
+    );
+    const entries = found.map((q): PassEntry => [ref[0], ref[1], q.n, q.side ?? "behind"]);
+    return withPasses(picture, p, (passes) => {
+        const at = passes.findIndex((e) => onSegment(e, ref));
+        if (at < 0) return passes;
+        const others = passes.filter((e) => !onSegment(e, ref));
+        return [...others.slice(0, at), ...entries, ...others.slice(at)];
+    });
 }
 
 // Adding and deleting pins

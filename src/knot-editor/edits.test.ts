@@ -4,13 +4,22 @@ import { Vector2 } from "@/lib/vector2";
 
 import { pictureCrossings } from "./crossing-geometry";
 import {
+    addProp,
     addStrand,
+    changeProp,
+    confirmCrossings,
+    confirmPasses,
+    deleteCrossing,
+    deletePass,
     deletePin,
     deletePins,
+    deleteProp,
     deleteStrand,
     insertPin,
     lockSegment,
     movePin,
+    setCrossing,
+    setPass,
     setPinAngle,
     setRopeColour,
     setRopeName,
@@ -21,7 +30,8 @@ import {
 } from "./edits";
 import type { CrossingEntry, KnotFile, Picture, Pin, Strand } from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
-import type { BarProp } from "./props/bar";
+import { kindOf } from "./props";
+import { BAR, type BarProp } from "./props/bar";
 import {
     editorReducer,
     isSaved,
@@ -339,6 +349,176 @@ describe("crossings and passes follow inserts and deletes", () => {
         expect(check.passes.map((q) => q.status)).toEqual(["set", "set"]);
         const { picture: joined } = deletePin(after, pictureGeometry(after), [0, 1]);
         expect(joined.props[0].passes).toEqual(bar.passes);
+    });
+});
+
+describe("setting crossings", () => {
+    // The line (strand 0) and the arch (strand 1) cross twice, with no entries yet.
+    const bare = picture([LINE, ARCH]);
+    const pair = pictureCrossings(bare, pictureGeometry(bare)).crossings[0].pair;
+    const statuses = (p: Picture) =>
+        pictureCrossings(p, pictureGeometry(p)).crossings.map((c) => c.status);
+
+    it("sets each crossing, then swaps one in place", () => {
+        expect(statuses(bare)).toEqual(["unset", "unset"]);
+        const one = setCrossing(bare, pair, 1, 0);
+        expect(one.crossings).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
+        // One entry for a pair crossing twice can't be trusted to name the same crossing.
+        expect(statuses(one)).toEqual(["to-check", "to-check"]);
+        const both = setCrossing(one, pair, 2, 1);
+        expect(statuses(both)).toEqual(["set", "set"]);
+        const swapped = setCrossing(both, pair, 1, 1);
+        expect(swapped.crossings).toEqual([
+            { over: [1, 0], under: [0, 0], n: 1 },
+            { over: [1, 0], under: [0, 0], n: 2 },
+        ]);
+        expect(swapped.crossings[1]).toBe(both.crossings[1]);
+        expect(setCrossing(swapped, pair, 1, 1)).toBe(swapped);
+    });
+
+    it("puts an arrow over one strand and under another", () => {
+        const arrow: Strand = {
+            ...rope([
+                { x: 0, y: -6 },
+                { x: 0, y: 8 },
+            ]),
+            kind: "arrow",
+        } as Strand;
+        const p = picture([
+            LINE,
+            rope(
+                [
+                    { x: -10, y: 4 },
+                    { x: 10, y: 4 },
+                ],
+                "green",
+            ),
+            arrow,
+        ]);
+        const found = pictureCrossings(p, pictureGeometry(p)).crossings;
+        expect(found.map((c) => c.pair[1][0])).toEqual([2, 2]);
+        const set = setCrossing(setCrossing(p, found[0].pair, 1, 1), found[1].pair, 1, 0);
+        expect(overs(set).map((c) => [c.status, c.over])).toEqual([
+            ["set", 2],
+            ["set", 1],
+        ]);
+    });
+
+    const set = setCrossing(setCrossing(bare, pair, 1, 0), pair, 2, 1);
+
+    it("lists an entry as lost once its crossing goes, and deletes it", () => {
+        const apart = movePin(movePin(set, [0, 0], -10, 9), [0, 1], 10, 9);
+        const found = pictureCrossings(apart, pictureGeometry(apart));
+        expect(found.crossings).toEqual([]);
+        expect(found.lost).toEqual(set.crossings);
+        const cleared = deleteCrossing(apart, found.lost[0]);
+        expect(cleared.crossings).toEqual([set.crossings[1]]);
+        expect(deleteCrossing(cleared, found.lost[0])).toBe(cleared);
+    });
+
+    it("shows a pair that goes from two crossings to one as to check, until confirmed", () => {
+        const once = movePin(set, [0, 1], 0, 0);
+        const found = pictureCrossings(once, pictureGeometry(once));
+        expect(found.crossings.map((c) => [c.status, c.over])).toEqual([["to-check", 0]]);
+        expect(found.toCheck).toHaveLength(1);
+        const confirmed = confirmCrossings(once, pictureGeometry(once), pair);
+        expect(confirmed.crossings).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
+        expect(statuses(confirmed)).toEqual(["set"]);
+    });
+
+    it("confirms a pair with no side yet with its first segment on top", () => {
+        const one = setCrossing(bare, pair, 2, 1);
+        const confirmed = confirmCrossings(one, pictureGeometry(one), pair);
+        expect(confirmed.crossings).toEqual([
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [1, 0], under: [0, 0], n: 2 },
+        ]);
+    });
+
+    it("removes an entry naming one segment twice on confirming it", () => {
+        const self = picture([LINE], [{ over: [0, 0], under: [0, 0], n: 1 }]);
+        const confirmed = confirmCrossings(self, pictureGeometry(self), [
+            [0, 0],
+            [0, 0],
+        ]);
+        expect(confirmed.crossings).toEqual([]);
+    });
+});
+
+describe("props", () => {
+    const at = (x: number, y: number) => new Vector2(x, y);
+
+    it("adds a bar, moves it, sets its fields and deletes it", () => {
+        const p = addProp(picture([LINE]), BAR.create(at(2, 3)));
+        expect(p.props).toEqual([{ kind: "bar", x: 2, y: 3, r: 1.6, length: 20, passes: [] }]);
+        const bar = p.props[0];
+        const moved = changeProp(p, 0, (q) => kindOf(q).moved(q, at(1, -1)));
+        expect([moved.props[0].x, moved.props[0].y]).toEqual([3, 2]);
+        expect(moved.strands).toBe(p.strands);
+        const field = (q: BarProp, label: string) => BAR.fields(q).find((f) => f.label === label)!;
+        const radius = field(bar, "Radius");
+        if (radius.kind !== "number") throw new Error("Radius should be a number");
+        expect(changeProp(p, 0, (q) => radius.set(q, 2)).props[0].r).toBe(2);
+        expect(changeProp(p, 0, (q) => radius.set(q, 0))).toBe(p);
+        expect(changeProp(p, 0, (q) => q)).toBe(p);
+        expect(deleteProp(p, 0).props).toEqual([]);
+        expect(deleteProp(p, 1)).toBe(p);
+    });
+
+    it("drops a bar's length and passes when it's seen end on, and gives it a length back", () => {
+        const bar: BarProp = { ...BAR.create(at(0, 0)), passes: [[0, 0, 1, "front"]] };
+        const seen = BAR.fields(bar).find((f) => f.label === "Seen")!;
+        if (seen.kind !== "choice") throw new Error("Seen should be a choice");
+        const endOn = seen.set(bar, "end");
+        expect(endOn).toEqual({ kind: "bar", x: 0, y: 0, r: 1.6, passes: [] });
+        expect(BAR.fields(endOn).map((f) => f.label)).not.toContain("Length");
+        expect(seen.set(endOn, "side").length).toBe(20);
+        expect(seen.set(bar, "side")).toBe(bar);
+        // Seen end on, it's drawn behind every strand.
+        expect([BAR.between(bar), BAR.between(endOn)]).toEqual([true, false]);
+    });
+
+    // The arch crosses the x axis twice, about 2.3 either side of the middle, so a short bar there has two passes.
+    const short: BarProp = { kind: "bar", x: 0, y: 0, r: 1, length: 6, passes: [] };
+    const bare = picture([ARCH], [], [short]);
+    const found = (p: Picture) => pictureCrossings(p, pictureGeometry(p));
+
+    it("sets each pass's side, then swaps one in place", () => {
+        expect(found(bare).passes.map((q) => q.status)).toEqual(["unset", "unset"]);
+        const both = setPass(setPass(bare, 0, [0, 0], 1, "front"), 0, [0, 0], 2, "behind");
+        expect(both.props[0].passes).toEqual([
+            [0, 0, 1, "front"],
+            [0, 0, 2, "behind"],
+        ]);
+        expect(found(both).passes.map((q) => [q.status, q.side])).toEqual([
+            ["set", "front"],
+            ["set", "behind"],
+        ]);
+        const swapped = setPass(both, 0, [0, 0], 2, "front");
+        expect(swapped.props[0].passes[1]).toEqual([0, 0, 2, "front"]);
+        expect(setPass(swapped, 0, [0, 0], 2, "front")).toBe(swapped);
+    });
+
+    const set = setPass(setPass(bare, 0, [0, 0], 1, "front"), 0, [0, 0], 2, "behind");
+
+    it("shows a segment's passes as to check when the bar moves off one, until confirmed", () => {
+        const shifted = changeProp(set, 0, (q) => kindOf(q).moved(q, at(4, 0)));
+        const now = found(shifted);
+        expect(now.passes.map((q) => [q.status, q.side])).toEqual([["to-check", "front"]]);
+        expect(now.passesToCheck).toHaveLength(1);
+        const confirmed = confirmPasses(shifted, pictureGeometry(shifted), 0, [0, 0]);
+        expect(confirmed.props[0].passes).toEqual([[0, 0, 1, "front"]]);
+        expect(found(confirmed).passes.map((q) => q.status)).toEqual(["set"]);
+    });
+
+    it("lists passes as lost once the bar is clear of the strand, and deletes them", () => {
+        const away = changeProp(set, 0, (q) => kindOf(q).moved(q, at(30, 0)));
+        const now = found(away);
+        expect(now.passes).toEqual([]);
+        expect(now.lostPasses.map((q) => q.entry)).toEqual(set.props[0].passes);
+        const cleared = deletePass(away, 0, now.lostPasses[0].entry);
+        expect(cleared.props[0].passes).toEqual([set.props[0].passes[1]]);
+        expect(deletePass(cleared, 0, now.lostPasses[0].entry)).toBe(cleared);
     });
 });
 

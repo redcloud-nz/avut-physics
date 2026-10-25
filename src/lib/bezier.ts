@@ -4,6 +4,7 @@
  */
 
 import { segmentIntersection } from "./geometry";
+import { clamp } from "./math";
 import { bisect, goldenSection } from "./numeric";
 import { Vector2 } from "./vector2";
 
@@ -35,6 +36,9 @@ const LENGTH_PIECES = 4;
 
 /** How many places curvature is sampled at before the tightest is refined. */
 const CURVATURE_SAMPLES = 32;
+
+/** How far past each end (along it, 0 to 1) a polyline's piece is looked along for crossings. */
+export const POLYLINE_TOLERANCE = 1e-9;
 
 /** The real roots of a t² + b t + c in (0, 1). */
 function rootsInUnit(a: number, b: number, c: number): number[] {
@@ -254,6 +258,7 @@ export class Cubic {
      * Where this curve and `other` cross. Each is sampled as a polyline (or given its samples, evenly spaced in t,
      * from `points`), the polylines' crossings found with `segmentIntersection`, and each refined to t and u by
      * Newton's method on the two curves meeting. A crossing at this curve's end, or at `other`'s end, isn't found.
+     * The polylines' crossings are looked for with a little tolerance, so one at a shared point isn't lost to rounding.
      */
     crossings(
         other: Cubic,
@@ -264,9 +269,19 @@ export class Cubic {
         const [m, n] = [mine.length - 1, theirs.length - 1];
         for (let i = 0; i < m; i++)
             for (let j = 0; j < n; j++) {
-                const hit = segmentIntersection(mine[i], mine[i + 1], theirs[j], theirs[j + 1]);
+                const hit = segmentIntersection(
+                    mine[i],
+                    mine[i + 1],
+                    theirs[j],
+                    theirs[j + 1],
+                    POLYLINE_TOLERANCE,
+                );
                 if (!hit) continue;
-                const refined = this.refineCrossing(other, (i + hit.t) / m, (j + hit.u) / n);
+                const refined = this.refineCrossing(
+                    other,
+                    clamp((i + hit.t) / m, 0, 1),
+                    clamp((j + hit.u) / n, 0, 1),
+                );
                 if (!refined) continue;
                 if (found.some((f) => Math.abs(f.t - refined.t) + Math.abs(f.u - refined.u) < 1e-7))
                     continue;

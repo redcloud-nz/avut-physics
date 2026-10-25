@@ -457,7 +457,7 @@ Review group 3 ends here, with its visual checkpoint.
 
 ### Review group 4: crossings and props (visual checkpoint: a knot round a bar, with an arrow)
 
-- [ ] **12. Crossings** — Choose which strand is on top at each crossing
+- [x] **12. Crossings** — Choose which strand is on top at each crossing
   - **Files:** `src/knot-editor/crossings.tsx`, `src/knot-editor/edits.ts`, `src/knot-editor/edits.test.ts`,
     `src/knot-editor/canvas.tsx`, `src/knot-editor/inspector.tsx`, `src/knot-editor/status-bar.tsx`
   - **Do:**
@@ -472,9 +472,12 @@ Review group 3 ends here, with its visual checkpoint.
     swapped, an arrow can be put over one strand and under another, moving a pin until a crossing disappears lists
     it as lost, and a pair that goes from two crossings to one shows as to check until confirmed. Type check, lint
     and `npm test` pass.
+  - **Found while building:** a crossing exactly at a sample point of both curves could be missed, rounding leaving it
+    just past one polyline piece's end and just before the next's start. `segmentIntersection` takes an optional
+    tolerance (0 by default, so the solvers are unchanged), which `Cubic.crossings` and the bar's passes use.
   - `visual`
 
-- [ ] **13. Props** — Add, move and remove props, and choose which passes go in front of them
+- [x] **13. Props** — Add, move and remove props, and choose which passes go in front of them
   - **Files:** `src/knot-editor/props/index.ts`, `src/knot-editor/props/bar.tsx`, `src/knot-editor/edits.ts`,
     `src/knot-editor/edits.test.ts`, `src/knot-editor/canvas.tsx`, `src/knot-editor/inspector.tsx`,
     `src/knot-editor/menus.tsx`, `src/knot-editor/status-bar.tsx`

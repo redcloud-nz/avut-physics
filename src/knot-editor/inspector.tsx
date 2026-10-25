@@ -3,12 +3,21 @@
 /**
  * The panel on the right: the selected pin's or segment's values, to read and type. A typed value applies on Enter or
  * on leaving the field, as one history entry; Escape puts back what it was. Numbers are shown to three places.
+ * A selected prop shows its kind's fields. Below them, whatever the selection, are the crossings and passes needing
+ * attention: entries that are lost, to delete, and those to check, to confirm.
  */
 import { useState, type Dispatch } from "react";
 
 import { Button } from "@/components/ui/button";
 
+import type { PictureCrossings } from "./crossing-geometry";
+import { crossingLetter } from "./crossings";
 import {
+    changeProp,
+    confirmCrossings,
+    confirmPasses,
+    deleteCrossing,
+    deletePass,
     lockSegment,
     movePin,
     setPinAngle,
@@ -19,8 +28,16 @@ import {
     shiftAt,
     unlockSegment,
 } from "./edits";
-import { ROPE_COLOURS, type Picture, type RopeColour, type Strand } from "./format";
+import {
+    ROPE_COLOURS,
+    sameSegment,
+    type Picture,
+    type RopeColour,
+    type SegmentRef,
+    type Strand,
+} from "./format";
 import type { LockStatus, PictureGeometry } from "./geometry";
+import { kindOf, type Prop } from "./props";
 import type { EditorAction, Selection } from "./state";
 
 const shown = (value: number) => String(Math.round(value * 1000) / 1000);
@@ -81,6 +98,112 @@ function Shown(props: { label: string; value: string }) {
 const strandName = (strand: Strand, i: number) =>
     strand.kind === "rope" ? (strand.name ?? `Rope ${i + 1}`) : `Arrow ${i + 1}`;
 
+const segmentName = (picture: Picture, [i, k]: SegmentRef) => {
+    const strand = picture.strands[i];
+    return strand
+        ? `${strandName(strand, i)}, segment ${k + 1}`
+        : `Strand ${i + 1}, segment ${k + 1}`;
+};
+
+/** Where on the drawing, by the crossings' letters. */
+const atLetters = (letters: string[]) =>
+    letters.length ? ` (at ${letters.join(letters.length === 2 ? " and " : ", ")})` : "";
+
+const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
+
+const propName = (prop: Prop, p: number) => `${kindOf(prop).label} ${p + 1}`;
+
+/** Lost crossing entries and passes, each to delete, and pairs and segments to check, each to confirm. */
+function CrossingProblems(props: {
+    picture: Picture;
+    geometry: PictureGeometry;
+    crossings: PictureCrossings;
+    edit: (change: (picture: Picture) => Picture) => void;
+}) {
+    const { picture, geometry, crossings, edit } = props;
+    const { lostPasses, passesToCheck } = crossings;
+    if (
+        !crossings.lost.length &&
+        !crossings.toCheck.length &&
+        !lostPasses.length &&
+        !passesToCheck.length
+    )
+        return null;
+    const letters = (pair: [SegmentRef, SegmentRef]) =>
+        crossings.crossings.flatMap((c, k) =>
+            sameSegment(c.pair[0], pair[0]) && sameSegment(c.pair[1], pair[1])
+                ? [crossingLetter(k)]
+                : [],
+        );
+    const item = (key: string, text: string, action: string, run: () => void) => (
+        <li key={key} className="py-1">
+            <p>{text}</p>
+            <Button size="sm" variant="secondary" className="mt-1" onClick={run}>
+                {action}
+            </Button>
+        </li>
+    );
+    const prop = (p: number) => {
+        const it = picture.props[p];
+        return it ? propName(it, p) : `Prop ${p + 1}`;
+    };
+    return (
+        <div className="mt-4 border-t border-line-faint pt-2">
+            <div className="mb-1 text-ink-strong">Crossings and passes</div>
+            <ul>
+                {crossings.toCheck.map(({ pair, entries, found }) => {
+                    const key = `check-${pair.flat().join(".")}`;
+                    const confirm = () => edit((q) => confirmCrossings(q, geometry, pair));
+                    if (sameSegment(pair[0], pair[1]))
+                        return item(
+                            key,
+                            `${segmentName(picture, pair[0])} is listed as crossing itself, left by deleting a pin.`,
+                            "Remove",
+                            confirm,
+                        );
+                    const at = letters(pair);
+                    return item(
+                        key,
+                        `${segmentName(picture, pair[0])} and ${segmentName(picture, pair[1])} have ${entries.length} ${
+                            entries.length === 1 ? "entry" : "entries"
+                        } but cross ${times(found)}${atLetters(at)}. Check how they're drawn, then confirm.`,
+                        "Confirm",
+                        confirm,
+                    );
+                })}
+                {crossings.lost.map((entry) =>
+                    item(
+                        `lost-${entry.over.join(".")}-${entry.under.join(".")}-${entry.n}`,
+                        `${segmentName(picture, entry.over)} over ${segmentName(picture, entry.under)} (their crossing ${entry.n}) is lost: they no longer cross there.`,
+                        "Delete",
+                        () => edit((q) => deleteCrossing(q, entry)),
+                    ),
+                )}
+                {passesToCheck.map(({ prop: p, strand, segment, entries, found }) =>
+                    item(
+                        `pass-check-${p}-${strand}-${segment}`,
+                        `${segmentName(picture, [strand, segment])} has ${entries.length} ${
+                            entries.length === 1 ? "pass" : "passes"
+                        } across ${prop(p)} entered but passes it ${times(found)}. Check how it's drawn, then confirm.`,
+                        "Confirm",
+                        () => edit((q) => confirmPasses(q, geometry, p, [strand, segment])),
+                    ),
+                )}
+                {lostPasses.map(({ prop: p, entry }) =>
+                    item(
+                        `pass-lost-${p}-${entry.join("-")}`,
+                        `${segmentName(picture, [entry[0], entry[1]])} passing ${
+                            entry[3] === "front" ? "in front of" : "behind"
+                        } ${prop(p)} (its pass ${entry[2]}) is lost: it no longer passes there.`,
+                        "Delete",
+                        () => edit((q) => deletePass(q, p, entry)),
+                    ),
+                )}
+            </ul>
+        </div>
+    );
+}
+
 /** Why a locked segment can't meet its length, and what would help. */
 function lockProblem(lock: LockStatus): string | null {
     if (lock.kind === "ok") return null;
@@ -140,6 +263,32 @@ function RopeFields(props: {
 export function Inspector(props: {
     picture: Picture;
     geometry: PictureGeometry;
+    crossings: PictureCrossings;
+    selection: Selection;
+    dispatch: Dispatch<EditorAction>;
+}) {
+    const { dispatch } = props;
+    const edit = (change: (picture: Picture) => Picture) =>
+        dispatch({ type: "edit", edit: change });
+    return (
+        <>
+            <SelectionPanel {...props} />
+            <CrossingProblems
+                picture={props.picture}
+                geometry={props.geometry}
+                crossings={props.crossings}
+                edit={edit}
+            />
+        </>
+    );
+}
+
+const heading = (text: string) => <div className="mb-2 text-ink-strong">{text}</div>;
+
+/** The selected pin's, segment's or prop's values. */
+function SelectionPanel(props: {
+    picture: Picture;
+    geometry: PictureGeometry;
     selection: Selection;
     dispatch: Dispatch<EditorAction>;
 }) {
@@ -148,9 +297,60 @@ export function Inspector(props: {
     const edit = (change: (picture: Picture) => Picture) =>
         dispatch({ type: "edit", edit: change });
 
+    if (selection.kind === "prop") {
+        const p = selection.prop;
+        const prop = picture.props[p];
+        if (!prop) return null;
+        const editProp = (change: (prop: Prop) => Prop) => edit((q) => changeProp(q, p, change));
+        return (
+            <div>
+                {heading(propName(prop, p))}
+                {kindOf(prop)
+                    .fields(prop)
+                    .map((field) =>
+                        field.kind === "number" ? (
+                            <NumberField
+                                key={field.label}
+                                label={field.label}
+                                value={field.value}
+                                onChange={(v) =>
+                                    v !== undefined && editProp((q) => field.set(q, v))
+                                }
+                            />
+                        ) : (
+                            <label
+                                key={field.label}
+                                className="flex items-center justify-between gap-2 py-0.5"
+                            >
+                                <span>{field.label}</span>
+                                <select
+                                    className={`${FIELD} text-left`}
+                                    value={field.value}
+                                    onChange={(e) => {
+                                        const value = e.currentTarget.value;
+                                        editProp((q) => field.set(q, value));
+                                    }}
+                                >
+                                    {field.options.map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        ),
+                    )}
+                <div className="mt-2 text-xs text-ink-muted">
+                    Drag it to move it.
+                    {kindOf(prop).between(prop) &&
+                        " Click where a strand passes across it to put the strand in front or behind."}
+                </div>
+            </div>
+        );
+    }
+
     const pins = selection.kind === "parts" ? selection.pins : [];
     const segments = selection.kind === "parts" ? selection.segments : [];
-    const heading = (text: string) => <div className="mb-2 text-ink-strong">{text}</div>;
 
     if (pins.length === 1 && segments.length === 0) {
         const [i, k] = pins[0];

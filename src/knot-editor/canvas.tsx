@@ -11,7 +11,6 @@
 import {
     useEffect,
     useImperativeHandle,
-    useMemo,
     useRef,
     useState,
     type Dispatch,
@@ -23,9 +22,18 @@ import type { Cubic } from "@/lib/bezier";
 import { clamp, deg } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
-import { pictureCrossings, strandPaths } from "./crossing-geometry";
-import { insertPin, movePin, setPinAngle, setTensions } from "./edits";
-import type { Picture, PinRef, SegmentRef } from "./format";
+import type { PictureCrossings, StrandPaths } from "./crossing-geometry";
+import { crossingLetter, CrossingMarks, type Mark } from "./crossings";
+import {
+    changeProp,
+    insertPin,
+    movePin,
+    setCrossing,
+    setPass,
+    setPinAngle,
+    setTensions,
+} from "./edits";
+import type { Picture, PinRef, Prop, SegmentRef } from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
 import { hitAt, PinHandle, PinTools, SegmentHandle } from "./handles";
 import { PictureDrawing } from "./picture-drawing";
@@ -119,6 +127,7 @@ function fitted(picture: Picture, geometry: PictureGeometry, size: Size): View {
 type Gesture = { from: { x: number; y: number }; moved: boolean } & (
     | { kind: "pan"; view: View; additive: boolean }
     | { kind: "pins"; refs: PinRef[]; origins: Vector2[]; start: Vector2 }
+    | { kind: "prop"; index: number; origin: Prop; start: Vector2 }
     | { kind: "angle"; ref: PinRef; centre: Vector2 }
     | {
           kind: "tension";
@@ -137,14 +146,17 @@ const rounded = (v: number, step: number) => Math.round(v / step) * step;
 export function Canvas(props: {
     picture: Picture;
     geometry: PictureGeometry;
+    crossings: PictureCrossings;
+    /** Each strand's path, and which crossings and passes are too close, from `strandPaths`. */
+    drawn: StrandPaths;
     selection: Selection;
     dispatch: Dispatch<EditorAction>;
-    show: { pinNumbers: boolean; handles: boolean; bendWarnings: boolean };
+    show: { pinNumbers: boolean; handles: boolean; crossings: boolean; bendWarnings: boolean };
     /** Where the canvas puts the pointer's position and the zoom, for the status bar. */
     readouts: ReadoutStore;
     ref?: Ref<CanvasControls>;
 }) {
-    const { picture, geometry, selection, dispatch, show, readouts, ref } = props;
+    const { picture, geometry, crossings, drawn, selection, dispatch, show, readouts, ref } = props;
     const svg = useRef<SVGSVGElement>(null);
     const [size, setSize] = useState<Size | null>(null);
     const [view, setView] = useState<View | null>(null);
@@ -152,9 +164,9 @@ export function Canvas(props: {
     const scale = view?.scale;
     useEffect(() => readouts.set({ scale }), [readouts, scale]);
 
-    const latest = useRef({ picture, geometry, selection, view, size });
+    const latest = useRef({ picture, geometry, crossings, selection, view, size });
     useEffect(() => {
-        latest.current = { picture, geometry, selection, view, size };
+        latest.current = { picture, geometry, crossings, selection, view, size };
     });
 
     // The panel's size, and the view fitted to the picture once it's known.
@@ -261,6 +273,14 @@ export function Canvas(props: {
                         q,
                     ),
             });
+        } else if (g.kind === "prop") {
+            const d = at.sub(g.start);
+            const by = new Vector2(rounded(d.x, 1e-3), rounded(d.y, 1e-3));
+            const { index, origin } = g;
+            dispatch({
+                type: "edit",
+                edit: (q) => changeProp(q, index, () => kindOf(origin).moved(origin, by)),
+            });
         } else if (g.kind === "angle") {
             const angle = rounded(deg(at.sub(g.centre).angle()), 0.1);
             dispatch({ type: "edit", edit: (q) => setPinAngle(q, g.ref, angle) });
@@ -317,6 +337,37 @@ export function Canvas(props: {
                 );
             else select([], [hit.ref]);
             return;
+        } else if (hit.kind === "crossing") {
+            // A click sets an unset crossing with the pair's first segment on top, and swaps a set one.
+            const c = latest.current.crossings.crossings[hit.index];
+            if (c) {
+                const over = c.over === undefined ? 0 : c.over === 0 ? 1 : 0;
+                dispatch({ type: "edit", edit: (q) => setCrossing(q, c.pair, c.n, over) });
+            }
+            return;
+        } else if (hit.kind === "pass") {
+            // A click puts an unset pass in front, and swaps a set one.
+            const pass = latest.current.crossings.passes[hit.index];
+            if (pass) {
+                const side = pass.side === "front" ? "behind" : "front";
+                dispatch({
+                    type: "edit",
+                    edit: (q) => setPass(q, pass.prop, [pass.strand, pass.segment], pass.n, side),
+                });
+            }
+            return;
+        } else if (hit.kind === "prop") {
+            const origin = picture.props[hit.index];
+            if (!origin) return;
+            dispatch({ type: "select", selection: { kind: "prop", prop: hit.index } });
+            next = {
+                kind: "prop",
+                index: hit.index,
+                origin,
+                start: toPicture(from.x, from.y),
+                from,
+                moved: false,
+            };
         } else if (hit.kind === "ring") {
             const pin = picture.strands[hit.ref[0]].pins[hit.ref[1]];
             next = {
@@ -398,10 +449,17 @@ export function Canvas(props: {
         }
     };
 
-    const paths = useMemo(
-        () => strandPaths(picture, geometry, pictureCrossings(picture, geometry)).paths,
-        [picture, geometry],
-    );
+    const crossingMarks: Mark[] = crossings.crossings.map((c, k) => ({
+        at: c.at,
+        status: c.status,
+        tooClose: drawn.tooClose.includes(k),
+        letter: crossingLetter(k),
+    }));
+    const passMarks: Mark[] = crossings.passes.map((p, k) => ({
+        at: p.at,
+        status: p.status,
+        tooClose: drawn.tooClosePasses.includes(k),
+    }));
 
     const parts = selection.kind === "parts" ? selection : { pins: [], segments: [] };
     const isPin = (i: number, k: number) => parts.pins.some((r) => r[0] === i && r[1] === k);
@@ -431,9 +489,31 @@ export function Canvas(props: {
             {ready && (
                 <>
                     <g pointerEvents="none">
-                        <PictureDrawing picture={picture} geometry={geometry} paths={paths} />
+                        <PictureDrawing picture={picture} geometry={geometry} paths={drawn.paths} />
                         <Warnings geometry={geometry} bends={show.bendWarnings} />
                     </g>
+                    {picture.props.map((prop, p) => (
+                        <path
+                            key={p}
+                            data-hit="prop"
+                            data-ref={p}
+                            className="cursor-move"
+                            d={kindOf(prop).outline(prop)}
+                            fill="transparent"
+                        />
+                    ))}
+                    {selection.kind === "prop" && picture.props[selection.prop] && (
+                        <path
+                            d={kindOf(picture.props[selection.prop]).outline(
+                                picture.props[selection.prop],
+                            )}
+                            fill="none"
+                            stroke="var(--highlight)"
+                            strokeWidth={2 * px}
+                            strokeDasharray={`${6 * px} ${4 * px}`}
+                            pointerEvents="none"
+                        />
+                    )}
                     {geometry.strands.map((strand, i) =>
                         strand.segments.map(({ cubic }, k) => (
                             <SegmentHandle
@@ -446,6 +526,12 @@ export function Canvas(props: {
                             />
                         )),
                     )}
+                    <CrossingMarks
+                        crossings={crossingMarks}
+                        passes={passMarks}
+                        shown={show.crossings}
+                        px={px}
+                    />
                     {picture.strands.map((strand, i) =>
                         strand.pins.map((pin, k) => (
                             <PinHandle

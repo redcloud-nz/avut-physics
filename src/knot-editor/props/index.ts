@@ -1,6 +1,7 @@
 /**
  * The kinds of prop a picture can hold. Each kind is kept in its own file here, with its type, how it's read from a
- * file and written to one, and its passes; adding a kind means adding its file and listing it below, and nothing else.
+ * file and written to one, its passes, its drawing, and how it's added, moved and edited in the panel; adding a kind
+ * means adding its file and listing it below, and nothing else.
  */
 
 import type { ReactNode } from "react";
@@ -20,9 +21,31 @@ export { PASS_SIDES } from "./passes";
 export type Prop = BarProp;
 export type PropKindName = Prop["kind"];
 
+/** A field of a prop in the panel: a number typed in, or a choice. `set` gives back the prop itself if it's refused. */
+export type PropField<P> = { label: string } & (
+    | { kind: "number"; value: number; set(prop: P, value: number): P }
+    | {
+          kind: "choice";
+          value: string;
+          options: { value: string; label: string }[];
+          set(prop: P, value: string): P;
+      }
+);
+
 /** What every kind of prop gives the editor. */
 export type PropKind<P extends Prop> = {
     kind: P["kind"];
+    /** Its name in Insert > Prop and the panel, and the letter that inserts one (the key, on a QWERTY keyboard). */
+    label: string;
+    key: string;
+    /** A new one, centred here. */
+    create(at: Vector2): P;
+    /** It moved by this much (diameters). */
+    moved(prop: P, by: Vector2): P;
+    /** Its outline, as path data: where it's picked up to drag, and drawn round when it's selected. */
+    outline(prop: P): string;
+    /** Its fields in the panel, in order. */
+    fields(prop: P): PropField<P>[];
     /** The prop read from a file (its `kind` already known to be this one), throwing a `FileError` if it's wrong. */
     read(value: JsonValue, at: string): P;
     /** The prop as it's written to a file: its fields in order, defaults left out. */

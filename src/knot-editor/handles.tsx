@@ -21,6 +21,9 @@ export type Hit =
     | { kind: "segment"; ref: [number, number] }
     | { kind: "ring"; ref: [number, number] }
     | { kind: "tension"; ref: [number, number]; end: 0 | 1 }
+    /** A crossing or pass, by its place in `pictureCrossings`' list. */
+    | { kind: "crossing" | "pass"; index: number }
+    | { kind: "prop"; index: number }
     | { kind: "background" };
 
 export function hitAt(target: EventTarget | null): Hit {
@@ -30,6 +33,7 @@ export function hitAt(target: EventTarget | null): Hit {
     const kind = el.getAttribute("data-hit");
     if (kind === "tension") return { kind, ref: [a, b], end: c === 1 ? 1 : 0 };
     if (kind === "pin" || kind === "segment" || kind === "ring") return { kind, ref: [a, b] };
+    if (kind === "crossing" || kind === "pass" || kind === "prop") return { kind, index: a };
     return { kind: "background" };
 }
 
