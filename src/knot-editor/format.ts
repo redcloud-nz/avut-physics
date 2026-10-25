@@ -68,9 +68,14 @@ export const STRAND_KINDS = ["rope", "arrow"] as const;
 /** A segment of a picture: its strand, and which segment of that strand. */
 export type SegmentRef = [strand: number, segment: number];
 
+/** A pin of a picture: its strand, and which pin of that strand. */
+export type PinRef = [strand: number, pin: number];
+
 /**
  * Which of two segments is on top where they cross. `n` (from 1) says which of their crossings it is, counting along
- * whichever of the two comes first in the picture (the lower strand, then the lower segment).
+ * whichever of the two comes first in the picture (the lower strand, then the lower segment). An entry naming one
+ * segment twice is left by deleting the pin between two segments that crossed: it can't be matched, and is shown as
+ * one to check until it's removed.
  */
 export type CrossingEntry = { over: SegmentRef; under: SegmentRef; n: number };
 
@@ -203,8 +208,6 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
             onlyFields(entry, where, ["over", "under", "n"]);
             const over = segmentAt(entry.over, below(where, "over"));
             const under = segmentAt(entry.under, below(where, "under"));
-            if (sameSegment(over, under))
-                throw new FileError(where, "a segment can't cross itself");
             const n = entry.n === undefined ? 1 : readCount(entry.n, below(where, "n"), 1);
             return { over, under, n };
         },

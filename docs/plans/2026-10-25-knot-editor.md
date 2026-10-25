@@ -57,10 +57,12 @@ files, and props beyond the bar come after, once the editor has proved itself.
   - **Unlock** writes the scaled tensions into `tension`, so nothing moves.
   - **Shifting** at a pin changes the lengths of the two locked segments either side by +Δ and −Δ, and is only
     offered when both are locked.
-  - **Adding a pin** on a segment at t gives the new pin the curve's direction there as its held angle, so the Hobby
-    run around it doesn't move. The two halves take their tensions from the curve split at t (de Casteljau), clamped
+  - **Adding a pin** on a segment at t gives the new pin the curve's direction there as its held angle, and the
+    segment's two end pins their present directions where they were free. (Holding only the new pin's angle splits
+    the Hobby run, which solves the free pins either side again and moves the curve by up to a twentieth of a
+    diameter; with both ends held too, the old directions still solve every run.) The two halves take their tensions from the curve split at t (de Casteljau), clamped
     to 0.75–4, so the shape stays put unless a clamp bites. A locked segment's halves are both locked, at the
-    curve's lengths up to and after the new pin. The angle can be cleared afterwards like any other.
+    curve's lengths up to and after the new pin. The angles can be cleared afterwards like any other.
   - **Deleting a pin** between two locked segments locks the joined one at the sum of their lengths; if either was
     unlocked, the joined one is unlocked.
 
@@ -357,7 +359,7 @@ Review group 2 ends here, with its visual checkpoint.
 
 ### Review group 3: drawing and editing strands (visual checkpoint: drawing and dragging a rope)
 
-- [ ] **8. Edits and undo** — Add the editor's state: the document, selection, edits and undo
+- [x] **8. Edits and undo** — Add the editor's state: the document, selection, edits and undo
   - **Files:** `src/knot-editor/state.ts`, `src/knot-editor/edits.ts`, `src/knot-editor/edits.test.ts`
   - **Do:**
     - `edits.ts`: pure functions from a picture to a new one, sharing what they don't change. Those that need curve
@@ -387,7 +389,7 @@ Review group 2 ends here, with its visual checkpoint.
 
     Type check, lint and `npm test` pass.
 
-- [ ] **9. Drawing a picture** — Draw a picture's strands and props in their layers
+- [x] **9. Drawing a picture** — Draw a picture's strands and props in their layers
   - **Files:** `src/knot-editor/picture-drawing.tsx`, `src/knot-editor/arrow-drawing.tsx`,
     `src/knot-editor/colours.ts`, `src/knot-editor/props/bar.tsx`, `src/knot-editor/props/index.ts`,
     `src/knots/rope-drawing.tsx`, `src/app/globals.css`
@@ -409,7 +411,7 @@ Review group 2 ends here, with its visual checkpoint.
     check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **10. Selecting and dragging** — Edit the picture with the pointer
+- [x] **10. Selecting and dragging** — Edit the picture with the pointer
   - **Files:** `src/knot-editor/canvas.tsx`, `src/knot-editor/handles.tsx`, `src/knot-editor/editor.tsx`,
     `src/knot-editor/menus.tsx`
   - **Do:**
@@ -429,7 +431,7 @@ Review group 2 ends here, with its visual checkpoint.
     ropes and arrows, and undoes in one step. The console has no errors. Type check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **11. The panel, warnings and status bar** — Show and type the selected pin's or segment's values, and the
+- [x] **11. The panel, warnings and status bar** — Show and type the selected pin's or segment's values, and the
       warnings
   - **Files:** `src/knot-editor/inspector.tsx`, `src/knot-editor/status-bar.tsx`, `src/knot-editor/shortcuts.tsx`,
     `src/knot-editor/canvas.tsx`, `src/knot-editor/editor.tsx`, `src/knot-editor/menus.tsx`

@@ -15,6 +15,7 @@ import type { Vector2 } from "@/lib/vector2";
 
 import {
     crossingPair,
+    sameSegment,
     segmentBefore,
     type CrossingEntry,
     type PassEntry,
@@ -156,7 +157,10 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
             entries.map((e) => e.n),
         );
         if (status === "lost") {
-            result.lost.push(...entries);
+            const [a, b] = crossingPair(entries[0]);
+            // One segment named twice (left by joining two that crossed) can't be lost or matched, only checked.
+            if (sameSegment(a, b)) result.toCheck.push({ pair: [a, b], entries, found: 0 });
+            else result.lost.push(...entries);
             continue;
         }
         if (status === "to-check")
@@ -329,6 +333,10 @@ function curvesBetween(strand: StrandGeometry, from: number, to: number): string
     }
     return commands.join(" ");
 }
+
+/** The strand from one distance along it to another, as path data from its `M`. */
+export const pathBetween = (strand: StrandGeometry, from: number, to: number) =>
+    `M ${pointText(pointAlong(strand, from))} ${curvesBetween(strand, from, to)}`;
 
 /**
  * Each strand as a `RopePath`: one `C` per Bézier, split where an over stretch starts and ends. A strand is marked

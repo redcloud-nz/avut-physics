@@ -197,10 +197,6 @@ describe("writeKnotFile and parseKnotFile", () => {
                 "knot.crossings[0].under: names segment 1 of strand 1",
             ],
             [
-                (j) => (j.knot.crossings[0].under = [0, 0]),
-                "knot.crossings[0]: a segment can't cross itself",
-            ],
-            [
                 (j) => (j.knot.crossings[2].n = 1),
                 "knot.crossings[2]: the same crossing as crossings[1]",
             ],

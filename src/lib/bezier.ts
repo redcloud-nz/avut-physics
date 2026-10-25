@@ -225,6 +225,24 @@ export class Cubic {
         );
     }
 
+    /** The place on the curve nearest a point: the nearest of its samples, then golden-section search round it. */
+    nearest(point: Vector2): { t: number; distance: number } {
+        const n = this.pieces();
+        const samples = this.points(n);
+        let best = 0;
+        samples.forEach((p, k) => {
+            if (p.distanceTo(point) < samples[best].distanceTo(point)) best = k;
+        });
+        const [lo, hi] = goldenSection(
+            (t) => this.pointAt(t).distanceTo(point),
+            Math.max(0, (best - 1) / n),
+            Math.min(1, (best + 1) / n),
+            40,
+        );
+        const t = (lo + hi) / 2;
+        return { t, distance: this.pointAt(t).distanceTo(point) };
+    }
+
     /** How many pieces to sample the curve in for finding crossings: about `spacing` long each, at least 8. */
     pieces(spacing = 0.25): number {
         const rough =

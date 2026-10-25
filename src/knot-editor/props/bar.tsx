@@ -4,7 +4,8 @@
  * strands pass in front of it and behind it.
  */
 
-import type { Cubic } from "@/lib/bezier";
+import { BarDrawing } from "@/knots/bar";
+import type { Box, Cubic } from "@/lib/bezier";
 import { segmentIntersection } from "@/lib/geometry";
 import { Vector2 } from "@/lib/vector2";
 
@@ -58,6 +59,8 @@ export const BAR = {
 
     passes: (bar: BarProp): PassEntry[] => bar.passes,
 
+    withPasses: (bar: BarProp, passes: PassEntry[]): BarProp => ({ ...bar, passes }),
+
     /**
      * Where a segment passes across the bar seen side on: where its curve crosses the bar's middle line within the
      * bar's length. None seen end on.
@@ -91,6 +94,19 @@ export const BAR = {
      * and a margin more so the rope's edges clear it.
      */
     covers: (bar: BarProp, point: Vector2) => Math.abs(point.y - bar.y) < bar.r + PASS_MARGIN,
+
+    /** Seen side on, strands pass in front of it and behind it; seen end on, they lie across it. */
+    between: (bar: BarProp) => bar.length !== undefined,
+
+    draw: (bar: BarProp) => <BarDrawing bar={bar} />,
+
+    bounds(bar: BarProp): Box {
+        const half = bar.length ? bar.length / 2 : bar.r;
+        return {
+            min: new Vector2(bar.x - half, bar.y - bar.r),
+            max: new Vector2(bar.x + half, bar.y + bar.r),
+        };
+    },
 };
 
 /** How far past the bar's edge (diameters, across it) a pass in front is drawn over. */

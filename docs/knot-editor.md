@@ -34,7 +34,7 @@ Each strand is a row of pins with a segment between each pair, and each segment 
   alone). The handles don't drag while it's locked. When no factor can (the tensions would have to go above 4 or below
   0.75), the segment shows red and the panel says why. The move still happens. Locking and unlocking never move the
   curve: lock takes the current length, and unlock keeps the scaled tensions.
-- **Adding a pin** keeps the curve where it was: the new pin holds the curve's direction there (you can clear it), and the two halves take their tensions from the curve split at that point.
+- **Adding a pin** keeps the curve where it was: the new pin holds the curve's direction there, the segment's two ends hold theirs where they were free (you can clear any of them), and the two halves take their tensions from the curve split at that point.
 - **Shifting at a pin** slides rope through it: the segment before gets shorter by some amount and the one after
   longer, or the reverse, with the pin where it was. It needs both segments locked; with either free, the length just
   follows the curve.
@@ -129,7 +129,8 @@ curves and matches them to this list:
   until you confirm them, since `n` may no longer name the same crossing.
 - Adding a pin moves the entries on the segment it splits to the half their crossing is on. Deleting one moves the
   entries of the two segments it joins onto the joined one. Either way the entries are counted again and the later
-  segments' numbers move up or down. Deleting a strand removes its entries.
+  segments' numbers move up or down. An entry between the two segments a delete joins is left naming one segment
+  twice, shown "to check" until you remove it. Deleting a strand removes its entries.
 
 ### Props
 

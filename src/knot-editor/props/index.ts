@@ -3,7 +3,9 @@
  * file and written to one, and its passes; adding a kind means adding its file and listing it below, and nothing else.
  */
 
-import type { Cubic } from "@/lib/bezier";
+import type { ReactNode } from "react";
+
+import type { Box, Cubic } from "@/lib/bezier";
 import type { Vector2 } from "@/lib/vector2";
 
 import type { JsonObject, JsonValue } from "../versions";
@@ -27,10 +29,21 @@ export type PropKind<P extends Prop> = {
     write(prop: P): JsonObject;
     /** Its passes, for a kind strands pass in front of and behind; none for one always drawn behind them. */
     passes(prop: P): PassEntry[];
+    /** The prop with these passes instead (renumbered by an edit); only called on a kind that has passes. */
+    withPasses(prop: P, passes: PassEntry[]): P;
     /** Where a segment's curve passes across it (t along the segment, in order), given points along the curve. */
     passesAcross(prop: P, cubic: Cubic, samples: Vector2[]): number[];
     /** Whether a strand passing in front must be drawn over at this point, to cover the prop. */
     covers(prop: P, point: Vector2): boolean;
+    /**
+     * Whether strands pass both in front of it and behind it, so it's drawn over the strands' whole length but under
+     * their over stretches; otherwise it's drawn behind every strand.
+     */
+    between(prop: P): boolean;
+    /** Its drawing, in diameters. */
+    draw(prop: P): ReactNode;
+    /** The box it's drawn in, for fitting the view to the picture. */
+    bounds(prop: P): Box;
 };
 
 /** Every kind, by name. */

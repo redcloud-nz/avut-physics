@@ -152,6 +152,19 @@ describe("Cubic", () => {
         expect(arch.bounds().max.y).toBeCloseTo(2.25, 12);
     });
 
+    it("finds the place on it nearest a point", () => {
+        // Points off the quarter circle along its radii are nearest where the radius meets it.
+        for (const angle of [0.1, 0.7, 1.3]) {
+            const on = QUARTER.pointAt(
+                QUARTER.nearest(vec2(Math.cos(angle), Math.sin(angle)).scale(1.5)).t,
+            );
+            expect(Math.atan2(on.y, on.x)).toBeCloseTo(angle, 3);
+        }
+        const beyond = S.nearest(vec2(3, 12));
+        expect(beyond.t).toBeCloseTo(1, 6);
+        expect(beyond.distance).toBeCloseTo(4, 6);
+    });
+
     it("samples points from its start to its end", () => {
         const points = S.points(4);
         expect(points).toHaveLength(5);

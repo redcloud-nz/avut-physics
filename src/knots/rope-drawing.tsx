@@ -55,7 +55,7 @@ const rounded = (value: number) => Math.round(value * 1e4) / 1e4;
  * its `length`, the outline stops a little short of each end: the rope underneath already has it there, and a
  * square end's anti-aliased edge would otherwise leave a faint dark line across the rope.
  */
-function Stretch(props: { d: string; offset: number; length?: number; colors: RopeColors }) {
+export function Stretch(props: { d: string; offset: number; length?: number; colors: RopeColors }) {
     const { d, colors } = props;
     const [offset, length] = [rounded(props.offset), props.length && rounded(props.length)];
     const common = {
@@ -114,19 +114,23 @@ export function RopeDrawing(props: { ropes: RopePath[]; between?: ReactNode }) {
                         ),
                 ),
             )}
-            {ropes.map(({ path }, r) => {
-                const end = ropeEnd(path);
-                const tapeFrom = end.at.sub(end.heading.scale(TAPE_LENGTH));
-                return (
-                    <Stretch
-                        key={r}
-                        d={`M ${rounded(tapeFrom.x)} ${rounded(tapeFrom.y)} L ${end.at.x} ${end.at.y}`}
-                        offset={0}
-                        length={TAPE_LENGTH}
-                        colors={TAPE_COLORS}
-                    />
-                );
-            })}
+            {ropes.map(({ path }, r) => (
+                <Tape key={r} path={path} colors={TAPE_COLORS} />
+            ))}
         </g>
+    );
+}
+
+/** The tape round a rope's end, drawn over the rope's last stretch. */
+export function Tape(props: { path: RopePath; colors: RopeColors }) {
+    const end = ropeEnd(props.path);
+    const tapeFrom = end.at.sub(end.heading.scale(TAPE_LENGTH));
+    return (
+        <Stretch
+            d={`M ${rounded(tapeFrom.x)} ${rounded(tapeFrom.y)} L ${end.at.x} ${end.at.y}`}
+            offset={0}
+            length={TAPE_LENGTH}
+            colors={props.colors}
+        />
     );
 }

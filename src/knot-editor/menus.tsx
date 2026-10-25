@@ -130,10 +130,13 @@ const typing = (target: EventTarget | null) =>
     target instanceof HTMLElement &&
     (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
+/** Shortcuts a field being typed in keeps for itself: undoing and selecting its own text. */
+const FIELD_COMMANDS: CommandId[] = ["undo", "redo", "selectAll"];
+
 /**
  * Runs each command's shortcut. The browser's own action for a shortcut the editor takes (⌘S, ⌘O) is always
- * prevented, even while the command can't run, so ⌘S never saves the page itself. Plain keys are left to a field being
- * typed in.
+ * prevented, even while the command can't run, so ⌘S never saves the page itself. Plain keys, and undo, redo and
+ * select all, are left to a field being typed in.
  */
 export function useShortcuts(
     enabled: Partial<Record<CommandId, boolean>>,
@@ -149,7 +152,7 @@ export function useShortcuts(
             for (const [id, command] of Object.entries(COMMANDS) as [CommandId, Command][]) {
                 const s = command.shortcut;
                 if (!s || !matches(s, e, mac)) continue;
-                if (!s.mod && !s.alt && typing(e.target)) return;
+                if (typing(e.target) && ((!s.mod && !s.alt) || FIELD_COMMANDS.includes(id))) return;
                 e.preventDefault();
                 if (latest.current.enabled[id]) latest.current.run(id);
                 return;
