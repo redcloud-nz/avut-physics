@@ -366,11 +366,12 @@ function Editor() {
         return deg(Math.atan2(b.y - a.y, b.x - a.x));
     };
 
-    const drawArrow = (arrow: Arrow, a: number) => (
+    const drawArrow = (arrow: Arrow, a: number, upTo?: number) => (
         <TyingArrow
-            key={`a${a}`}
+            key={`a${a}${upTo === undefined ? "" : "f"}`}
             points={arrow.points}
             color={a === arrowIndex ? "#0ea5e9" : undefined}
+            upTo={upTo}
         />
     );
 
@@ -453,6 +454,12 @@ function Editor() {
                     {arrows.map((arrow, a) => !arrow.front && drawArrow(arrow, a))}
                     <RopeDrawing ropes={[path]} />
                     {arrows.map((arrow, a) => arrow.front && drawArrow(arrow, a))}
+                    {arrows.map(
+                        (arrow, a) =>
+                            !arrow.front &&
+                            arrow.frontTo !== undefined &&
+                            drawArrow(arrow, a, arrow.frontTo),
+                    )}
                     {/* Clicking the rope pins it there. */}
                     <polyline
                         points={shape.points.map((p) => `${p.x},${p.y}`).join(" ")}

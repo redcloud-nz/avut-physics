@@ -3,6 +3,7 @@ import {
     FIGURE_EIGHT_BAR,
     FIGURE_EIGHT_JOINED,
     FIGURE_EIGHT_ON_A_BIGHT,
+    FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
 } from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING, type TyingStep } from "./figure-eight-tying";
@@ -58,6 +59,7 @@ export const KNOTS: Knot[] = [
         description: "A figure-8 tied in the rope doubled, leaving a loop.",
         about: ["More on how the figure-8 on a bight is used goes here."],
         drawing: [FIGURE_EIGHT_ON_A_BIGHT],
+        steps: FIGURE_EIGHT_ON_A_BIGHT_TYING,
         turned: true,
     },
     {

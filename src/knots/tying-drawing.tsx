@@ -52,7 +52,8 @@ export const PAGE_SCALE = 11;
 /**
  * One step of tying a knot: the rope (or a knot finished, two ropes where it joins them), with arrows where the step shows the next move. `turned` lays it on its side, a
  * quarter turn clockwise, so the end that was at the top is on the right. Given a `scale` (pixels per diameter) it's
- * drawn that size, shrinking only to fit the width it has; otherwise it fills whatever box its class gives it. It's
+ * drawn that size, shrinking only to fit the width it has (and the height, where its box has one); otherwise it fills
+ * whatever box its class gives it. It's
  * hidden from screen readers when its label is null (where it's only decoration).
  */
 export function TyingDrawing(props: {
@@ -79,7 +80,7 @@ export function TyingDrawing(props: {
             {...(scale && {
                 width: box[2] * scale,
                 height: box[3] * scale,
-                style: { maxWidth: "100%", height: "auto" },
+                style: { maxWidth: "100%", maxHeight: "100%", height: "auto" },
             })}
             {...(label === null ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
         >
@@ -93,6 +94,14 @@ export function TyingDrawing(props: {
                 <RopeDrawing ropes={ropes} />
                 {arrows.map(
                     (arrow, i) => arrow.front && <TyingArrow key={i} points={arrow.points} />,
+                )}
+                {/* Arrows that go over the rope and then under it: in front as far as their `frontTo` point. */}
+                {arrows.map(
+                    (arrow, i) =>
+                        !arrow.front &&
+                        arrow.frontTo !== undefined && (
+                            <TyingArrow key={i} points={arrow.points} upTo={arrow.frontTo} />
+                        ),
                 )}
             </g>
         </svg>

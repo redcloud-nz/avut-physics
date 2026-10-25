@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { ARROW_KEYED, swipe } from "@/visual/card";
 
 import type { TyingStep } from "./figure-eight-tying";
-import { stepsView, TyingDrawing } from "./tying-drawing";
+import { PAGE_SCALE, stepsView, TyingDrawing } from "./tying-drawing";
 
 export const BACK =
     "flex items-center justify-center gap-1 rounded-xl border border-line-faint py-2 text-sm font-medium text-ink hover:border-action disabled:opacity-40 disabled:hover:border-line-faint";
@@ -84,14 +84,16 @@ export function TyingSteps(props: { name: string; steps: TyingStep[]; onClose: (
             </p>
 
             {/* Sized by the room it's given, not by its drawing, so a short screen squeezes it no smaller than its
-                minimum. */}
-            <div className="relative flex min-h-48 flex-1 items-center justify-center contain-size">
-                <TyingDrawing
-                    step={step}
-                    view={view}
-                    label={`${step.label}: ${step.caption}`}
-                    className="absolute inset-0 h-full w-full"
-                />
+                minimum. The rope is drawn as thick as on the knots' pages, shrinking only where it doesn't fit. */}
+            <div className="relative min-h-48 flex-1 contain-size">
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <TyingDrawing
+                        step={step}
+                        view={view}
+                        label={`${step.label}: ${step.caption}`}
+                        scale={PAGE_SCALE}
+                    />
+                </div>
             </div>
 
             <nav className="grid grid-cols-2 gap-2">

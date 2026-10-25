@@ -8,6 +8,7 @@ import { FIGURE_EIGHT } from "./figure-eight";
 import {
     FIGURE_EIGHT_JOINED,
     FIGURE_EIGHT_ON_A_BIGHT,
+    FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
 } from "./figure-eight-doubled";
 import { FIGURE_EIGHT_TYING } from "./figure-eight-tying";
@@ -209,6 +210,25 @@ describe("FIGURE_EIGHT_ON_A_BIGHT", () => {
 
     it("bends smoothly, with no corners", () => {
         expect(tightestBend(points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_ON_A_BIGHT_TYING", () => {
+    it("crosses itself four times at each of the single figure-8's crossings, one pair always over", () => {
+        FIGURE_EIGHT_ON_A_BIGHT_TYING.forEach((step, i) => {
+            const found = crossings(step.path);
+            // In step 4 the fold sits below the 8, crossing nothing the single figure-8's end does there.
+            const single = crossings(FIGURE_EIGHT_TYING[i].path).length - (i === 5 ? 1 : 0);
+            // The last step is the knot finished, its loop opened out.
+            if (i < FIGURE_EIGHT_ON_A_BIGHT_TYING.length - 1)
+                expect(found).toHaveLength(4 * single);
+            for (const c of found) expect(c.over).not.toBeNull();
+        });
+    });
+
+    it("bends smoothly at every step, round the fold too", () => {
+        for (const step of FIGURE_EIGHT_ON_A_BIGHT_TYING)
+            expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
     });
 });
 

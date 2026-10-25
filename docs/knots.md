@@ -17,7 +17,11 @@ they're two ropes, the second following the first back through the knot, so each
 other's standing part. `figure-eight-doubled.ts` builds the figure-8 on a bight and the joining-8 this way from the
 finished figure-8 of the tying steps. The figure-8 rethreaded comes out the same as the figure-8 on a bight, so it's
 drawn the same way, with its loop reaching a little further and a short tail, so its taped running end shows below the knot, and tied round a bar (`bar.tsx`) seen end on, the loop wrapped
-round it. A knot joining two ropes draws the second in green, and its view stops as far past
+round it. The figure-8 on a bight's tying steps are the figure-8's, the rope doubled all the way (`folded`), with the
+strands parting near the single strand's end and coming round in a little loop, the fold, whose tip is where the end was.
+Its step 4 has no room to show the fold passing over the 8 and up through the top loop, so the fold sits below the 8 and an
+arrow shows the way (`frontTo`: in front of the rope as far as one of its points, behind it after). Its last step is the
+knot finished. A knot joining two ropes draws the second in green, and its view stops as far past
 the knot at the top as at the bottom, where the ropes run on out both ways.
 
 ## Stages

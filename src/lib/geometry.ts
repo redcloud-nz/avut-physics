@@ -35,7 +35,8 @@ export function segmentGap(a: Vector2, b: Vector2, c: Vector2, d: Vector2): numb
 
 /**
  * Where segments ab and cd cross, as how far along each (t on ab, u on cd, both 0 to 1), or null if they
- * don't (parallel segments never cross).
+ * don't (parallel segments never cross). A crossing at a segment's start counts and one at its end doesn't, so where
+ * a polyline crosses another at one of its points, it's found once, on the segment starting there.
  */
 export function segmentIntersection(
     a: Vector2,
@@ -50,5 +51,5 @@ export function segmentIntersection(
     const ac = c.sub(a);
     const t = ac.cross(s) / denom;
     const u = ac.cross(r) / denom;
-    return t > 0 && t < 1 && u > 0 && u < 1 ? { t, u } : null;
+    return t >= 0 && t < 1 && u >= 0 && u < 1 ? { t, u } : null;
 }
