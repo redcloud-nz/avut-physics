@@ -2,6 +2,7 @@ import type { Bar } from "./bar";
 import {
     FIGURE_EIGHT_BAR,
     FIGURE_EIGHT_JOINED,
+    FIGURE_EIGHT_JOINED_TYING,
     FIGURE_EIGHT_ON_A_BIGHT,
     FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
@@ -83,6 +84,7 @@ export const KNOTS: Knot[] = [
             "Two ropes joined by a figure-8 tied in one, with the other's end followed back through it.",
         about: ["More on how the joining-8 is used goes here."],
         drawing: FIGURE_EIGHT_JOINED,
+        steps: FIGURE_EIGHT_JOINED_TYING,
         turned: true,
     },
 ];

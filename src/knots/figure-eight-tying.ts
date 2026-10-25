@@ -27,6 +27,8 @@ export type TyingStep = {
     /** Where it's pinned, for a step laid out in the rope editor. */
     rope?: PinnedRope;
     path: RopePath;
+    /** For a knot joining two ropes, the first rope, which stays put while the second (`path`) is tied round it. */
+    first?: RopePath;
     arrows: Arrow[];
 };
 

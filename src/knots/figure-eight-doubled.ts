@@ -154,9 +154,9 @@ function withFreeEnd(path: RopePath, end: FreeEnd): RopePath {
     return [...path, end.over ? over(d) : plain(d)];
 }
 
-/** Points along the finished rethreaded rope from `from` to `to` along it, about every 1.5 diameters, for an arrow. */
-function alongRethreaded(from: number, to: number): ArrowPoint[] {
-    const { points } = centreline(FIGURE_EIGHT_RETHREADED);
+/** Points along the finished rope `path` from `from` to `to` along it, about every 1.5 diameters, for an arrow. */
+function alongRope(path: RopePath, from: number, to: number): ArrowPoint[] {
+    const { points } = centreline(path);
     const s = arcLengths(points);
     const n = Math.max(2, Math.round((to - from) / 1.5));
     return Array.from({ length: n + 1 }, (_, k) => {
@@ -173,7 +173,7 @@ function alongRethreaded(from: number, to: number): ArrowPoint[] {
 }
 
 /**
- * A frame of tying the figure-8 rethreaded: the finished rope as far as `at` along it (so the end follows the rope back
+ * A frame of following a figure-8 back through with an end: the finished rope as far as `at` along it (so the end follows the rope back
  * through the knot exactly where it lies finished), with a free end on past that where the end's pulled out to the
  * side, and an arrow along the finished rope from `arrow[0]` to `arrow[1]` showing where it goes next.
  */
@@ -256,13 +256,58 @@ const RETHREAD_FRAMES: RethreadFrame[] = [
     },
 ];
 
+/** The frames as steps, cut from the finished rope `path`. */
+const followedBack = (path: RopePath, frames: RethreadFrame[]): TyingStep[] =>
+    frames.map((frame, i) => {
+        const part = firstPart(path, frame.at);
+        return {
+            caption: frame.caption,
+            label: stepLabel(frames, i),
+            path: frame.end ? withFreeEnd(part, frame.end) : part,
+            arrows: frame.arrow ? [{ points: alongRope(path, ...frame.arrow) }] : [],
+        };
+    });
+
 /** Tying the figure-8 rethreaded round the bar, the end followed back through the knot a move at a time. */
-export const FIGURE_EIGHT_RETHREADED_TYING: TyingStep[] = RETHREAD_FRAMES.map((frame, i) => {
-    const part = firstPart(FIGURE_EIGHT_RETHREADED, frame.at);
-    return {
-        caption: frame.caption,
-        label: stepLabel(RETHREAD_FRAMES, i),
-        path: frame.end ? withFreeEnd(part, frame.end) : part,
-        arrows: frame.arrow ? [{ points: alongRethreaded(...frame.arrow) }] : [],
-    };
-});
+export const FIGURE_EIGHT_RETHREADED_TYING = followedBack(FIGURE_EIGHT_RETHREADED, RETHREAD_FRAMES);
+
+/**
+ * How much shorter the joining-8's second rope is than the rethreaded rope, to the same place in the knot (diameters).
+ * The second rope follows the first back through on the same side of the single strand as the rethread does, so it
+ * lies through the knot where the rethread does, and its moves are the rethread's.
+ */
+const SECOND_ROPE_OFFSET = 79.2;
+
+/**
+ * Tying the joining-8: a figure-8 in the first rope's end, then the second rope's end following it back through, a move
+ * at a time as in rethreading a figure-8 (`RETHREAD_FRAMES`, from its first move on), while the first rope stays put.
+ */
+export const FIGURE_EIGHT_JOINED_TYING: TyingStep[] = (() => {
+    const [first, second] = FIGURE_EIGHT_JOINED;
+    const captions = [
+        "Bring the end of the second rope in beside the first rope's tail, where it leaves the top of the knot. It goes in under the top of the loop.",
+        ...RETHREAD_FRAMES.slice(3, -1).map((frame) => frame.caption),
+        "Pull each strand snug so the pairs lie side by side, leaving a tail out of each end of the knot.",
+    ];
+    const frames = RETHREAD_FRAMES.slice(2).map((frame, i) => ({
+        ...frame,
+        caption: captions[i],
+        at: frame.at - SECOND_ROPE_OFFSET,
+        arrow: frame.arrow?.map((at) => at - SECOND_ROPE_OFFSET) as [number, number] | undefined,
+    }));
+    // Numbered with the figure-8 tied in the first rope as step 1.
+    const all = [{}, ...frames];
+    return [
+        {
+            caption: "Tie a loose figure-8 in the end of the first rope, leaving a tail.",
+            label: stepLabel(all, 0),
+            path: first,
+            arrows: [],
+        },
+        ...followedBack(second, frames).map((step, i) => ({
+            ...step,
+            label: stepLabel(all, i + 1),
+            first,
+        })),
+    ];
+})();

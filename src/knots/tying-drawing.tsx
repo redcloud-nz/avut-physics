@@ -13,6 +13,7 @@ export function stepsView(steps: TyingStep[], bar?: Bar): View {
     return tyingView([
         ...steps.flatMap((step) => [
             centreline(step.path).points,
+            ...(step.first ? [centreline(step.first).points] : []),
             ...step.arrows.map((arrow) => arrow.points),
         ]),
         bar ? barEdges(bar) : [],
@@ -59,7 +60,9 @@ export const PAGE_SCALE = 11;
  * hidden from screen readers when its label is null (where it's only decoration).
  */
 export function TyingDrawing(props: {
-    step: { path: RopePath; arrows?: Arrow[] } | { ropes: RopePath[]; arrows?: Arrow[] };
+    step:
+        | { path: RopePath; first?: RopePath; arrows?: Arrow[] }
+        | { ropes: RopePath[]; arrows?: Arrow[] };
     view: View;
     turned?: boolean;
     label: string | null;
@@ -70,7 +73,10 @@ export function TyingDrawing(props: {
 }) {
     const { view, turned, label, scale } = props;
     const { arrows = [] } = props.step;
-    const ropes = "ropes" in props.step ? props.step.ropes : [props.step.path];
+    const ropes =
+        "ropes" in props.step
+            ? props.step.ropes
+            : [...(props.step.first ? [props.step.first] : []), props.step.path];
     // Turning maps (x, y) to (-y, x), so the view's x span becomes its y span, and its y span its x span the other way.
     const box = turned
         ? [-(view.y + view.h), view.x, view.h, view.w]

@@ -7,6 +7,7 @@ import type { Vector2 } from "@/lib/vector2";
 import { FIGURE_EIGHT } from "./figure-eight";
 import {
     FIGURE_EIGHT_JOINED,
+    FIGURE_EIGHT_JOINED_TYING,
     FIGURE_EIGHT_ON_A_BIGHT,
     FIGURE_EIGHT_ON_A_BIGHT_TYING,
     FIGURE_EIGHT_RETHREADED,
@@ -256,36 +257,31 @@ describe("FIGURE_EIGHT_RETHREADED_TYING", () => {
     });
 });
 
-describe("FIGURE_EIGHT_JOINED", () => {
-    const ropes = FIGURE_EIGHT_JOINED.map((path) => {
+/** Where a strand of one rope crosses a strand of the other, how far along each, and whether each is marked over. */
+function between(first: RopePath, second: RopePath) {
+    const [a, b] = [first, second].map((path) => {
         const { points, over: isOver } = centreline(path);
         return { points, isOver, s: arcLengths(points) };
     });
+    const found: { s: [number, number]; over: [boolean, boolean] }[] = [];
+    for (let i = 0; i < a.points.length - 1; i++)
+        for (let j = 0; j < b.points.length - 1; j++) {
+            const hit = segmentIntersection(
+                a.points[i],
+                a.points[i + 1],
+                b.points[j],
+                b.points[j + 1],
+            );
+            if (!hit) continue;
+            found.push({
+                s: [a.s[i] + (a.s[i + 1] - a.s[i]) * hit.t, b.s[j] + (b.s[j + 1] - b.s[j]) * hit.u],
+                over: [a.isOver[i] && a.isOver[i + 1], b.isOver[j] && b.isOver[j + 1]],
+            });
+        }
+    return found;
+}
 
-    /** Where a strand of one rope crosses a strand of the other, how far along each, and whether each is marked over. */
-    const between = () => {
-        const [a, b] = ropes;
-        const found: { s: [number, number]; over: [boolean, boolean] }[] = [];
-        for (let i = 0; i < a.points.length - 1; i++)
-            for (let j = 0; j < b.points.length - 1; j++) {
-                const hit = segmentIntersection(
-                    a.points[i],
-                    a.points[i + 1],
-                    b.points[j],
-                    b.points[j + 1],
-                );
-                if (!hit) continue;
-                found.push({
-                    s: [
-                        a.s[i] + (a.s[i + 1] - a.s[i]) * hit.t,
-                        b.s[j] + (b.s[j + 1] - b.s[j]) * hit.u,
-                    ],
-                    over: [a.isOver[i] && a.isOver[i + 1], b.isOver[j] && b.isOver[j + 1]],
-                });
-            }
-        return found;
-    };
-
+describe("FIGURE_EIGHT_JOINED", () => {
     it("is a figure-8 in each rope, crossing the other at each of its crossings, one pair always over", () => {
         for (const path of FIGURE_EIGHT_JOINED) {
             const found = crossings(path);
@@ -294,12 +290,33 @@ describe("FIGURE_EIGHT_JOINED", () => {
             expect(knotDeterminant(passesOf(path))).toBe(5);
         }
         // Each of the figure-8's four crossings, a strand of each rope crossing one of the other's both ways.
-        const found = between();
+        const found = between(...FIGURE_EIGHT_JOINED);
         expect(found).toHaveLength(8);
         for (const c of found) expect(c.over[0]).not.toBe(c.over[1]);
     });
 
     it("bends smoothly, with no corners", () => {
-        for (const { points } of ropes) expect(tightestBend(points)).toBeGreaterThan(1.75);
+        for (const path of FIGURE_EIGHT_JOINED)
+            expect(tightestBend(centreline(path).points)).toBeGreaterThan(1.75);
+    });
+});
+
+describe("FIGURE_EIGHT_JOINED_TYING", () => {
+    const steps = FIGURE_EIGHT_JOINED_TYING;
+
+    it("keeps the first rope's figure-8 as the second's end follows it back, each crossing with one strand over", () => {
+        for (const step of steps) {
+            for (const c of crossings(step.path)) expect(c.over).not.toBeNull();
+            if (!step.first) continue;
+            expect(step.first).toEqual(FIGURE_EIGHT_JOINED[0]);
+            for (const c of between(step.first, step.path)) expect(c.over[0]).not.toBe(c.over[1]);
+        }
+        expect(knotDeterminant(passesOf(steps[0].path))).toBe(5);
+        expect(steps.at(-1)!.path).toEqual(FIGURE_EIGHT_JOINED[1]);
+    });
+
+    it("bends smoothly at every step, the end pulled out to the side too", () => {
+        for (const step of steps)
+            expect(tightestBend(centreline(step.path).points)).toBeGreaterThan(1.75);
     });
 });
