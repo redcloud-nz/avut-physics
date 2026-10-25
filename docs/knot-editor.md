@@ -234,3 +234,79 @@ chrome for addresses that match no page.
 
 Later: props beyond the bar, taped ends, exporting SVG, porting the existing knots, and the knot pages reading these
 files.
+
+## Version 2 (proposed)
+
+Not built yet; for review. Three changes to the file, made together as version 2 since each would bump the version on
+its own: millimetres instead of rope diameters, a diameter for each rope, and the knot's frame. Linked pins (for
+parallel ropes), the grid and snapping come with them.
+
+### Millimetres
+
+Every coordinate and length in the file and the editor is in millimetres (y down, as now): pins, locked lengths, props
+and the frame. Angles stay in degrees and tensions are unitless, so they don't change.
+
+- **Rounding.** The file rounds to 0.01 mm (about what 1e-4 diameters is now), and a drag to 0.1 mm.
+- **On screen.** The panel and status bar show millimetres. The zoom becomes pixels per millimetre, with 100% set so an
+  11 mm rope looks as it does now (20 pixels across), so the slider and its levels stay as they are.
+- **Upgrading a version 1 file** takes a rope diameter as 11 mm: every coordinate, locked length and prop size is
+  multiplied by 11, and every rope gets a diameter of 11.
+
+### Rope sizes
+
+Each rope has a `diameter` (millimetres), always written, like its colour. A new rope takes the diameter of the last
+rope added (11 mm in a new file); the panel sets it.
+
+Everything now sized in diameters is sized by each rope's own diameter instead:
+
+- **Drawing.** `Stretch` takes the rope's width and scales its outline, body, weave and highlight with it, and the tape
+  is 1.2 of the rope's diameters long. The existing knots pass a width of 1 (their units are diameters), so they draw
+  exactly as now.
+- **The bend warning** is in the rope's own diameters (1 for now, to become a setting).
+- **Over stretches.** How far one reaches past a crossing, and how far it must clear the strand under it, come from
+  both strands' widths, not one shared half-width.
+- **Props.** A bar's pass margin (how far past it a strand in front is drawn over) is in the passing rope's diameters.
+- **Arrows** are one fixed size for now, the size they are beside an 11 mm rope today, whatever the ropes' sizes. An
+  arrow may later get a width of its own, to show where ropes of different sizes go.
+
+### The frame
+
+The knot has one frame, `"frame": { "x": …, "y": …, "w": …, "h": … }` in millimetres, shared by the knot and every step:
+what the knot's page will show, so the steps line up as you step through them.
+
+- **Drawn** as a dashed rectangle, with everything outside it dimmed. View > Fit fits the frame and everything in it.
+- **Set** by dragging its edges or corners on the drawing, or typed in File > Knot Details…. It snaps to the grid when
+  snapping is on.
+- **A new knot** starts with a frame 300 mm wide and 200 mm high, centred on its first rope.
+- **Upgrading a version 1 file** fits one round every pin and prop of every picture, 30 mm clear, out to whole
+  centimetres.
+
+### Linked pins (parallel ropes)
+
+A pin can be linked to another, its leader, so it stays beside it: the two ropes then run side by side through there.
+
+- **Where it sits.** Beside the leader, square to the leader's direction, on its left or its right. By default the
+  ropes touch (half of each one's diameter apart, centre to centre); a `gap` (millimetres) adds space between them.
+- **Which way it runs.** The same way as the leader, or the reverse (`reverse`), as the two legs of a bight do.
+- **The leader holds an angle.** Linking holds the leader's direction as it is, as adding a pin does. Otherwise the
+  leader's direction would come from the curve, which in a bight would depend on the linked pin itself.
+- **Moving.** Dragging or turning the leader carries the linked pin. Dragging the linked pin moves the leader with it,
+  so either can be picked up. A pin can lead several, and a linked pin can lead another (three ropes side by side),
+  but links can't go round in a loop.
+- **Unlinking** leaves the pin where it is, holding its direction.
+- **In the file**, a linked pin holds only its link, `{ "link": { "pin": [strand, pin], "side": "left", "gap": 2,
+"reverse": true } }` (`gap` and `reverse` only when set), since its place and angle are worked out from the leader.
+- **Between linked pins** the two curves are close to parallel, not exactly: a Bézier moved sideways isn't another
+  Bézier, so on a tight bend the gap narrows or widens a little. Linking more pins along the way holds it closer. If
+  that isn't enough, a doubled strand (one strand drawn as two ropes, as the figure-8 on a bight is) is the stronger
+  way, left for later.
+
+### The grid and snapping
+
+- **View > Grid** draws a grid under the picture at one fixed spacing, with every fifth line stronger and the
+  numbers (millimetres) along the top and left of the view. The spacing is one constant, starting at 20 mm, to be
+  tried at different sizes once it's built. Zoomed far out, where the lines would be under 8 pixels apart, only the
+  stronger ones are drawn.
+- **View > Snap to Grid** snaps dragged pins, props and the frame's edges to the grid's lines. A drag of several pins
+  snaps the one under the pointer and moves the rest with it, keeping their shape. Angles and tensions aren't
+  snapped, and typed values never are.
