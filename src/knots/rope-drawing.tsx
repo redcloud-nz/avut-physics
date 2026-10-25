@@ -11,7 +11,9 @@
 
 import type { ReactNode } from "react";
 
-import { laySegments, ropeEnd, type RopePath } from "./rope-path";
+import type { Vector2 } from "@/lib/vector2";
+
+import { centreline, laySegments, type RopePath } from "./rope-path";
 
 export type RopeColors = { body: string; weave: string; highlight: string; outline: string };
 
@@ -121,15 +123,35 @@ export function RopeDrawing(props: { ropes: RopePath[]; between?: ReactNode }) {
     );
 }
 
-/** The tape round a rope's end, drawn over the rope's last stretch. */
+/**
+ * The tape round a rope's end, drawn over the rope's last stretch: along its centreline, back from the end, so it
+ * bends with the rope where the end's curved rather than standing off it in a straight line.
+ */
 export function Tape(props: { path: RopePath; colors: RopeColors }) {
-    const end = ropeEnd(props.path);
-    const tapeFrom = end.at.sub(end.heading.scale(TAPE_LENGTH));
+    const { points } = centreline(props.path);
+    const along = [points[points.length - 1]];
+    let left = TAPE_LENGTH;
+    for (let i = points.length - 1; i > 0 && left > 0; i--) {
+        const [a, b] = [points[i - 1], points[i]];
+        const step = a.distanceTo(b);
+        if (step >= left) {
+            along.push(b.add(a.sub(b).scale(left / step)));
+            left = 0;
+        } else {
+            along.push(a);
+            left -= step;
+        }
+    }
+    along.reverse();
+    const point = (p: Vector2) => `${rounded(p.x)} ${rounded(p.y)}`;
     return (
         <Stretch
-            d={`M ${rounded(tapeFrom.x)} ${rounded(tapeFrom.y)} L ${end.at.x} ${end.at.y}`}
+            d={`M ${point(along[0])} ${along
+                .slice(1)
+                .map((p) => `L ${point(p)}`)
+                .join(" ")}`}
             offset={0}
-            length={TAPE_LENGTH}
+            length={TAPE_LENGTH - left}
             colors={props.colors}
         />
     );
