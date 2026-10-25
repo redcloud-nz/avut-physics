@@ -63,6 +63,9 @@ export function readCount(value: JsonValue | undefined, at: string, least: numbe
     return n;
 }
 
+/** An id: a whole number from 1. */
+export const readId = (value: JsonValue | undefined, at: string) => readCount(value, at, 1);
+
 export function readString(value: JsonValue | undefined, at: string): string {
     if (typeof value !== "string")
         throw new FileError(at, `should be text, but is ${describe(value)}`);

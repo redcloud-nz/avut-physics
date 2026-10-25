@@ -496,7 +496,7 @@ export function Canvas(props: {
             const { t } = geometry.strands[i].segments[k].cubic.nearest(
                 toPicture(e.clientX, e.clientY),
             );
-            dispatch({ type: "edit", edit: (q) => insertPin(q, geometry, [i, k], t) });
+            dispatch({ type: "edit", edit: (q, ids) => insertPin(q, geometry, [i, k], t, ids) });
             dispatch({
                 type: "select",
                 selection: { kind: "parts", pins: [[i, k + 1]], segments: [] },

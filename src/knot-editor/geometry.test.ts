@@ -5,20 +5,16 @@ import { hobbyControls } from "@/lib/hobby";
 import { rad } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
-import type { Picture, Pin, Rope, StrandSegment } from "./format";
+import type { Picture, Rope } from "./format";
 import { pictureGeometry, strandDistance, strandPosition, TIGHTEST_BEND } from "./geometry";
+import { testStrand, type TestPin, type TestSegment } from "./test-pictures";
 
-const rope = (pins: Pin[], segments?: StrandSegment[]): Rope => ({
-    kind: "rope",
-    colour: "orange",
-    diameter: 1,
-    pins,
-    segments: segments ?? pins.slice(1).map(() => ({ tension: [1, 1] })),
-});
+const rope = (pins: TestPin[], segments?: TestSegment[]) =>
+    testStrand("rope", pins, { segments }) as Rope;
 const picture = (...strands: Rope[]): Picture => ({ strands, crossings: [], props: [] });
 
 /** A bowed segment: from (0, 0) heading 45° below the x axis, to (6, 0) heading 45° above it. */
-const BOW: Pin[] = [
+const BOW: TestPin[] = [
     { x: 0, y: 0, angle: 45 },
     { x: 6, y: 0, angle: -45 },
 ];
@@ -75,8 +71,8 @@ describe("pictureGeometry", () => {
         const base = wavy(8, [3]);
         const before = pictureGeometry(picture(base)).strands[0].directions;
         const segments = [...base.segments];
-        segments[2] = { tension: [2.5, 0.8] };
-        segments[5] = { tension: [1, 1], length: 3.5 };
+        segments[2] = { ...segments[2], tension: [2.5, 0.8] };
+        segments[5] = { ...segments[5], tension: [1, 1], length: 3.5 };
         const after = pictureGeometry(picture({ ...base, segments })).strands[0].directions;
         expect(after).toEqual(before);
     });
@@ -85,7 +81,7 @@ describe("pictureGeometry", () => {
         const base = wavy(10, [3, 6]);
         const g = pictureGeometry(picture(base));
         const pins = [...base.pins];
-        pins[1] = { x: pins[1].x + 0.5, y: pins[1].y - 1 };
+        pins[1] = { ...pins[1], x: pins[1].x + 0.5, y: pins[1].y - 1 };
         const moved = pictureGeometry(picture({ ...base, pins }), g);
         const [old, now] = [g.strands[0].segments, moved.strands[0].segments];
         // Pin 1's run is pins 0 to 3, so segments 0 to 2.
@@ -103,7 +99,7 @@ describe("pictureGeometry", () => {
         const again = pictureGeometry(base, g);
         again.strands[0].segments.forEach((s, k) => expect(s).toBe(g.strands[0].segments[k]));
         const segments = [...base.strands[0].segments];
-        segments[4] = { tension: [1.2, 1.2] };
+        segments[4] = { ...segments[4], tension: [1.2, 1.2] };
         const retensioned = pictureGeometry(picture({ ...(base.strands[0] as Rope), segments }), g);
         expect(retensioned.strands[0].segments[4]).not.toBe(g.strands[0].segments[4]);
         expect(retensioned.strands[0].segments[3]).toBe(g.strands[0].segments[3]);
@@ -111,7 +107,7 @@ describe("pictureGeometry", () => {
 
     it("finds tight bends on ropes, and none on arrows", () => {
         // A hairpin round two pins a diameter apart.
-        const pins: Pin[] = [
+        const pins: TestPin[] = [
             { x: 0, y: 5 },
             { x: 0, y: 0, angle: -90 },
             { x: 1, y: 0, angle: 90 },
@@ -123,7 +119,7 @@ describe("pictureGeometry", () => {
         expect(turn.bends.length).toBeGreaterThan(0);
         expect(g.strands[0].segments[0].bends).toEqual([]);
         const arrow = pictureGeometry({
-            strands: [{ kind: "arrow", pins, segments: rope(pins).segments }],
+            strands: [testStrand("arrow", pins)],
             crossings: [],
             props: [],
         });

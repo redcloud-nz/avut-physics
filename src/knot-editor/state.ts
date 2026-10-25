@@ -7,6 +7,7 @@
 
 import type { Edited, Renumbering } from "./edits";
 import type { KnotFile, Picture, PinRef, SegmentRef } from "./format";
+import { idsFor, type Ids } from "./ids";
 
 /** The finished knot, or a step (by its place in the file's list). */
 export type PictureId = "knot" | number;
@@ -46,8 +47,8 @@ export type EditorAction =
       }
     /** This file written to the handle (it may be older than the file now, if edits came while it saved). */
     | { type: "saved"; file: KnotFile; handle: FileSystemFileHandle; fileName: string }
-    /** An edit to the picture being edited. */
-    | { type: "edit"; edit: (picture: Picture) => Picture | Edited }
+    /** An edit to the picture being edited, given new ids from the file for anything it makes. */
+    | { type: "edit"; edit: (picture: Picture, ids: Ids) => Picture | Edited }
     /**
      * An edit to the file as a whole (its steps, details or frame), showing `show` after it where given. During a drag
      * it goes into the drag's entry, as `edit` does.
@@ -134,7 +135,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
             };
         case "edit": {
             const before = pictureOf(state.file, state.picture);
-            const result = action.edit(before);
+            const result = action.edit(before, idsFor(state.file));
             const edited: Edited = "strands" in result ? { picture: result } : result;
             if (edited.picture === before) return state;
             return {

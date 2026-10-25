@@ -18,8 +18,8 @@ import {
     sameSegment,
     segmentBefore,
     strandSize,
-    type CrossingEntry,
-    type PassEntry,
+    type CrossingAt,
+    type PassAt,
     type PassSide,
     type Picture,
     type SegmentRef,
@@ -30,6 +30,7 @@ import {
     type PictureGeometry,
     type StrandGeometry,
 } from "./geometry";
+import { crossingsAt, passesAt, segmentPlaces } from "./ids";
 import { kindOf } from "./props";
 
 export type MatchStatus = "set" | "unset" | "to-check";
@@ -72,17 +73,17 @@ export type FoundPass = {
 export type PictureCrossings = {
     crossings: FoundCrossing[];
     /** Entries whose pair of segments no longer cross. */
-    lost: CrossingEntry[];
+    lost: CrossingAt[];
     /** Pairs crossing a different number of times than they have entries. */
-    toCheck: { pair: [SegmentRef, SegmentRef]; entries: CrossingEntry[]; found: number }[];
+    toCheck: { pair: [SegmentRef, SegmentRef]; entries: CrossingAt[]; found: number }[];
     passes: FoundPass[];
-    lostPasses: { prop: number; entry: PassEntry }[];
+    lostPasses: { prop: number; entry: PassAt }[];
     /** Segments passing a prop a different number of times than they have entries. */
     passesToCheck: {
         prop: number;
         strand: number;
         segment: number;
-        entries: PassEntry[];
+        entries: PassAt[];
         found: number;
     }[];
 };
@@ -136,8 +137,9 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
             );
         }
 
-    const entriesByPair = new Map<string, CrossingEntry[]>();
-    for (const entry of picture.crossings) {
+    const places = segmentPlaces(picture);
+    const entriesByPair = new Map<string, CrossingAt[]>();
+    for (const entry of crossingsAt(picture, places)) {
         const key = pairKey(crossingPair(entry));
         entriesByPair.set(key, [...(entriesByPair.get(key) ?? []), entry]);
     }
@@ -198,7 +200,7 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
 
     picture.props.forEach((prop, p) => {
         const kind = kindOf(prop);
-        const entries = kind.passes(prop);
+        const entries = passesAt(picture, p, places);
         geometry.strands.forEach((strand, i) =>
             strand.segments.forEach((seg, k) => {
                 const size = strandSize(picture.strands[i]);

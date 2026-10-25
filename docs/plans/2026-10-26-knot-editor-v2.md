@@ -79,10 +79,32 @@ The design is in the spec. What it leaves to the build is settled here.
 - Snapping rounds to the nearest grid line. A pin drag snaps the pin under the pointer and moves the others by the
   same amount. A prop drag snaps the middle of the prop's bounds. A frame drag snaps the edges being dragged.
 
+### Ids (added after group 2, at the user's ask)
+
+- **Everything in a picture has an id**: each strand, segment, pin and prop, a whole number from 1. Ids are unique
+  within a picture. One counter runs across the file: a new thing gets the lowest number above every id in the file,
+  and copying a picture into a step keeps its ids, so an id is the same thing in every step that has it. The file
+  doesn't store the counter; it's worked out from the ids there.
+- **References are ids.** A crossing entry names its two segments by id (`{ "over": 12, "under": 31 }`), a pass names
+  its segment by id (`[12, 1, "front"]`), and a link names its leader pin by id. So adding or deleting pins and strands
+  never renumbers a reference; an edit only moves entries where it splits or joins segments, as now, and drops those
+  on segments it deletes. The `n` of a crossing still counts along whichever of its pair comes first in the picture.
+- **Where positions stay.** The editor's selection, its hit areas and the panel's names ("Rope 2, pin 3") stay by
+  position, as they're about what's on screen. Each edit that renumbers still gives its `Renumbering`, for the
+  selection only.
+- **New ids.** Picture edits that make things (a strand, a pin inserted, a prop) take an id source the reducer gives
+  them, worked out from the file. Joining two segments keeps the first one's id; splitting one gives the second half a
+  new one.
+- **File version 3.** The upgrade from version 2 numbers everything in the file in order (each picture's strands, with
+  their pins and segments, then its props), and turns crossings' and passes' positions into the ids. It can't know
+  which things in two steps are the same, so upgraded steps don't share ids. `samples/v3.json` is the version 2 sample
+  upgraded; `v2.json` stays as it is. In the file, `id` is each object's first field.
+
 ### Linked pins
 
 - **The file.** A pin is either free (`x`, `y`, optional `angle`, as now) or linked:
-  `{ "link": { "pin": [strand, pin], "side": "left" | "right", "gap"?: number, "reverse"?: true } }`. The reader
+  `{ "id": 7, "link": { "pin": 3, "side": "left" | "right", "gap"?: number, "reverse"?: true } }`, `pin` being
+  the leader's id. The reader
   checks that the leader exists, isn't the pin itself, and that following leaders never comes back round. A linked
   pin's leader may itself be linked.
 - **Where it sits.** From the leader's place and direction `d` (its held angle, or for a linked leader, its own
@@ -96,9 +118,8 @@ The design is in the spec. What it leaves to the build is settled here.
 - **Edits.** `linkPins(picture, geometry, leader, follower)` takes the side from which side of the leader the
   follower is now, `reverse` from whether the two run opposite ways, and no gap. `unlinkPin` writes the follower's
   resolved place and angle as a free pin. `setLink` sets side, gap and reverse.
-- **Renumbering.** Links name pins, so every edit that renumbers pins (adding, deleting, a strand deleted) maps them
-  through its `Renumbering`, as the selection is. A leader deleted unlinks its followers first, leaving them where they
-  were.
+- **Deleting a leader.** Links name pins by id, so they need no renumbering. A leader deleted unlinks its followers
+  first, leaving them where they were.
 - **The editor.** Edit > Link Pins (key L) links the second of two selected pins to the first; Edit > Unlink (Shift+L)
   unlinks the selected linked pins. Dragging a linked pin drags its leader (and so it); turning a linked pin's ring
   turns its leader. A linked pin's handle is drawn hollow, with a thin line to its leader. Its panel shows its place
@@ -179,20 +200,34 @@ Review group 1 ends here, with its visual checkpoint.
 
 Review group 2 ends here, with its visual checkpoint.
 
-### Review group 3: linked pins (visual checkpoint: two ropes side by side round a bend, and a bight)
+### Review group 3: ids and linked pins (visual checkpoint: two ropes side by side round a bend, and a bight)
 
-- [ ] **6. Linked pins in the file and geometry** — Read, write and resolve linked pins, and keep links through edits
+- [x] **6. Ids** — Give everything in a picture an id, and refer to segments and pins by id
+  - **Files:** `src/knot-editor/format.ts`, `src/knot-editor/versions.ts`, `src/knot-editor/samples/v3.json`,
+    `src/knot-editor/props/*`, `src/knot-editor/edits.ts`, `src/knot-editor/state.ts`,
+    `src/knot-editor/crossing-geometry.ts`, `src/knot-editor/inspector.tsx`, `src/knot-editor/editor.tsx`, their
+    tests
+  - **Do:** as in Decisions: the ids and the reader's checks (whole numbers from 1, unique in a picture, references
+    naming segments and pins that are there), the writer, version 3 and its upgrade, the id source, and every edit
+    and the crossing matching working on ids.
+  - **Done when:** tests check the v2 sample upgrades (everything numbered, crossings and passes naming the same
+    segments as before), the v3 sample comes back byte for byte, an id repeated or a reference to a missing one is
+    refused, new things get ids above any in the file, a step copied keeps its ids, and crossings and passes stay
+    matched through adding and deleting pins and strands. Every existing test still passes on the same pictures. In
+    the browser, the v2 sample opened looks and checks as before. Type check, lint and `npm test` pass.
+
+- [ ] **7. Linked pins in the file and geometry** — Read, write and resolve linked pins, and keep links through edits
   - **Files:** `src/knot-editor/format.ts`, `src/knot-editor/geometry.ts`, `src/knot-editor/edits.ts`,
     `src/knot-editor/format.test.ts`, `src/knot-editor/geometry.test.ts`, `src/knot-editor/edits.test.ts`
   - **Do:** as in Decisions: the pin union and its checks, resolving in `pictureGeometry` with the cache keyed on
-    resolved values, `linkPins`, `unlinkPin`, `setLink`, and links renumbered by every edit that renumbers pins.
+    resolved values, `linkPins`, `unlinkPin`, `setLink`, and followers unlinked in place when their leader goes.
   - **Done when:** tests check a follower's place and angle on either side, reversed, with a gap and between ropes
     of two sizes; a chain of three; the reader refusing a missing leader, a loop and a free leader with no angle;
     links surviving a pin added before the leader, the leader's strand deleted (followers unlinked in place), and a
     follower deleted; and the cache recomputing a follower's segments when only its leader moved. Type check, lint
     and `npm test` pass.
 
-- [ ] **7. Linked pins in the editor** — Link, unlink and drag linked pins
+- [ ] **8. Linked pins in the editor** — Link, unlink and drag linked pins
   - **Files:** `src/knot-editor/menus.tsx`, `src/knot-editor/editor.tsx`, `src/knot-editor/canvas.tsx`,
     `src/knot-editor/handles.tsx`, `src/knot-editor/inspector.tsx`, `src/knot-editor/shortcuts.tsx`
   - **Do:** as in Decisions: the two commands, dragging and turning through the leader, the hollow handle with its
@@ -202,7 +237,7 @@ Review group 2 ends here, with its visual checkpoint.
     and reverse in the panel moves the follower; unlinking leaves it in place. Type check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **8. Docs** — Bring the editor's design doc into line with version 2
+- [ ] **9. Docs** — Bring the editor's design doc into line with version 2
   - **Files:** `docs/knot-editor.md`
   - **Do:** fold the "Version 2 (proposed)" section into the doc's body (Curves, Files, the page) as what's built,
     with the file examples in millimetres, and bring it into line with anything the build settled differently.

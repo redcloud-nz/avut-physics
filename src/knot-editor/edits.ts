@@ -19,9 +19,11 @@ import {
     crossingPair,
     sameSegment,
     segmentBefore,
+    type CrossingAt,
     type CrossingEntry,
     type Frame,
     type KnotFile,
+    type PassAt,
     type PassEntry,
     type PassSide,
     type Picture,
@@ -35,6 +37,7 @@ import {
     type StrandSegment,
 } from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
+import { crossingEntry, passEntry, passesAt, segmentIdAt, segmentPlaces, type Ids } from "./ids";
 import { kindOf } from "./props";
 
 /** Where an edit moved each pin and segment: none where it went, two where a segment was split. */
@@ -109,15 +112,18 @@ export const movePin = (picture: Picture, ref: PinRef, x: number, y: number) =>
 /** The pin holding this angle (degrees), or, given none, free again. */
 export const setPinAngle = (picture: Picture, ref: PinRef, angle: number | undefined) =>
     withPin(picture, ref, (pin) => {
-        if (angle === undefined) return pin.angle === undefined ? pin : { x: pin.x, y: pin.y };
+        if (angle === undefined)
+            return pin.angle === undefined ? pin : { id: pin.id, x: pin.x, y: pin.y };
         const held = angleWithin(angle);
-        return pin.angle === held ? pin : { x: pin.x, y: pin.y, angle: held };
+        return pin.angle === held ? pin : { id: pin.id, x: pin.x, y: pin.y, angle: held };
     });
 
 /** A segment's tensions, kept within 0.75 to 4. Refused on a locked segment, whose tensions follow its length. */
 export const setTensions = (picture: Picture, ref: SegmentRef, tension: [number, number]) =>
     withSegment(picture, ref, (segment) =>
-        segment.length !== undefined ? segment : { tension: tensionsWithin(tension) },
+        segment.length !== undefined
+            ? segment
+            : { id: segment.id, tension: tensionsWithin(tension) },
     );
 
 /** A segment locked at the length it's drawn with, its tensions kept as the ratio, so nothing moves. */
@@ -125,7 +131,11 @@ export const lockSegment = (picture: Picture, geometry: PictureGeometry, [i, k]:
     withSegment(picture, [i, k], (segment) =>
         segment.length !== undefined
             ? segment
-            : { tension: segment.tension, length: geometry.strands[i].segments[k].length },
+            : {
+                  id: segment.id,
+                  tension: segment.tension,
+                  length: geometry.strands[i].segments[k].length,
+              },
     );
 
 /** A segment unlocked, keeping the tensions it's drawn with, so nothing moves. */
@@ -133,7 +143,7 @@ export const unlockSegment = (picture: Picture, geometry: PictureGeometry, [i, k
     withSegment(picture, [i, k], (segment) =>
         segment.length === undefined
             ? segment
-            : { tension: tensionsWithin(geometry.strands[i].segments[k].tension) },
+            : { id: segment.id, tension: tensionsWithin(geometry.strands[i].segments[k].tension) },
     );
 
 /** A locked segment's length. Refused on one that isn't locked, or a length that isn't more than 0. */
@@ -176,17 +186,22 @@ function freeN(taken: Set<number>, n: number) {
 }
 
 /**
- * The picture's crossing entries and props' passes after an edit that splits, joins, renumbers or removes segments.
- * Each crossing and pass found before the edit is moved to where it ends up and counted again along its new pair's
- * first segment (or its new segment); each entry follows the one it was matched to. An entry that matched nothing
- * keeps its n where it's free, and goes on the first of a split segment's halves; one on a removed segment goes.
+ * The picture's crossing entries and props' passes after an edit that splits, joins or removes segments, the edit's
+ * `strands` replacing the picture's. Each crossing and pass found before the edit is moved to where it ends up and
+ * counted again along its new pair's first segment (or its new segment); each entry follows the one it was matched
+ * to. An entry that matched nothing keeps its n where it's free, and goes on the first of a split segment's halves;
+ * one on a removed segment goes. (It works by where segments are, and gives the entries back by id.)
  */
 function followEntries(
     picture: Picture,
     geometry: PictureGeometry,
     move: MovePlace,
+    strands: Strand[],
 ): Pick<Picture, "crossings" | "props"> {
     const found = pictureCrossings(picture, geometry);
+    const after: Picture = { ...picture, strands };
+    const places = segmentPlaces(picture);
+    const idAt = (ref: SegmentRef) => segmentIdAt(after, ref)!;
 
     // Crossings: each one found, at its new place, counted again along its new pair.
     const newPairs = new Map<
@@ -215,14 +230,22 @@ function followEntries(
         taken.set(key, new Set(list.map((_, k) => k + 1)));
     }
     const sameEntry = (a: CrossingEntry, b: CrossingEntry) =>
-        sameSegment(a.over, b.over) && sameSegment(a.under, b.under) && a.n === b.n;
+        a.over === b.over && a.under === b.under && a.n === b.n;
+    /** An entry by place after the edit, by id, kept as the one it was where it's unchanged. */
+    const asBefore = (moved: CrossingAt, was: CrossingEntry): CrossingEntry => {
+        const entry = { over: idAt(moved.over), under: idAt(moved.under), n: moved.n };
+        return sameEntry(entry, was) ? was : entry;
+    };
     const crossings: CrossingEntry[] = [];
-    const unmatched: CrossingEntry[] = [];
-    for (const entry of picture.crossings) {
+    const unmatched: { at: CrossingAt; was: CrossingEntry }[] = [];
+    for (const was of picture.crossings) {
+        const [over, under] = [places.get(was.over), places.get(was.under)];
+        if (!over || !under) continue;
+        const entry: CrossingAt = { over, under, n: was.n };
         const pair = crossingPair(entry);
         const to = followed.get(`${pairKey(pair)}#${entry.n}`);
         if (!to) {
-            unmatched.push(entry);
+            unmatched.push({ at: entry, was });
             continue;
         }
         const overFirst = sameSegment(entry.over, pair[0]);
@@ -231,9 +254,9 @@ function followEntries(
             under: to.refs[overFirst ? 1 : 0],
             n: to.n,
         };
-        crossings.push(sameEntry(moved, entry) ? entry : moved);
+        crossings.push(asBefore(moved, was));
     }
-    for (const entry of unmatched) {
+    for (const { at: entry, was } of unmatched) {
         const [over, under] = [move(entry.over, 0), move(entry.under, 0)];
         if (!over || !under) continue;
         const moved = { over: over.ref, under: under.ref, n: entry.n };
@@ -242,7 +265,7 @@ function followEntries(
         moved.n = freeN(used, entry.n);
         used.add(moved.n);
         taken.set(key, used);
-        crossings.push(sameEntry(moved, entry) ? entry : moved);
+        crossings.push(asBefore(moved, was));
     }
 
     // Passes, the same way, per prop and segment.
@@ -268,13 +291,14 @@ function followEntries(
     }
     const props = picture.props.map((prop, p) => {
         const kind = kindOf(prop);
-        const entries = kind.passes(prop);
-        if (!entries.length) return prop;
+        const old = kind.passes(prop);
+        if (!old.length) return prop;
+        const entries = passesAt(picture, p, places);
         const passes: PassEntry[] = [];
-        const left: PassEntry[] = [];
+        const left: PassAt[] = [];
         for (const entry of entries) {
             const to = followedPasses.get(`${passKey(p, [entry[0], entry[1]])}#${entry[2]}`);
-            if (to) passes.push([to.ref[0], to.ref[1], to.n, entry[3]]);
+            if (to) passes.push([idAt(to.ref), to.n, entry[3]]);
             else left.push(entry);
         }
         for (const entry of left) {
@@ -285,11 +309,11 @@ function followEntries(
             const n = freeN(used, entry[2]);
             used.add(n);
             takenPasses.set(key, used);
-            passes.push([to.ref[0], to.ref[1], n, entry[3]]);
+            passes.push([idAt(to.ref), n, entry[3]]);
         }
         const same =
-            passes.length === entries.length &&
-            passes.every((q, k) => q.every((v, j) => v === entries[k][j]));
+            passes.length === old.length &&
+            passes.every((q, k) => q.every((v, j) => v === old[k][j]));
         return same ? prop : kind.withPasses(prop, passes);
     });
 
@@ -311,22 +335,23 @@ export function setCrossing(
     n: number,
     over: 0 | 1,
 ): Picture {
-    const entry: CrossingEntry = { over: pair[over], under: pair[1 - over], n };
-    const k = picture.crossings.findIndex((e) => e.n === n && samePair(crossingPair(e), pair));
+    const entry = crossingEntry(picture, { over: pair[over], under: pair[1 - over], n });
+    if (!entry) return picture;
+    const ids = [entry.over, entry.under];
+    const k = picture.crossings.findIndex(
+        (e) => e.n === n && ids.includes(e.over) && ids.includes(e.under),
+    );
     if (k < 0) return { ...picture, crossings: [...picture.crossings, entry] };
-    if (sameSegment(picture.crossings[k].over, entry.over)) return picture;
+    if (picture.crossings[k].over === entry.over) return picture;
     return { ...picture, crossings: replaced(picture.crossings, k, entry) };
 }
 
-/** An entry deleted (one that's lost, its segments no longer crossing there). */
-export function deleteCrossing(picture: Picture, entry: CrossingEntry): Picture {
+/** An entry deleted (one that's lost, its segments no longer crossing there), given by where its segments are. */
+export function deleteCrossing(picture: Picture, at: CrossingAt): Picture {
+    const entry = crossingEntry(picture, at);
+    if (!entry) return picture;
     const crossings = picture.crossings.filter(
-        (e) =>
-            !(
-                e.n === entry.n &&
-                sameSegment(e.over, entry.over) &&
-                sameSegment(e.under, entry.under)
-            ),
+        (e) => !(e.n === entry.n && e.over === entry.over && e.under === entry.under),
     );
     return crossings.length === picture.crossings.length ? picture : { ...picture, crossings };
 }
@@ -344,14 +369,17 @@ export function confirmCrossings(
     const found = pictureCrossings(picture, geometry).crossings.filter((c) =>
         samePair(c.pair, pair),
     );
-    const entries = found.map((c): CrossingEntry => {
+    const entries = found.flatMap((c) => {
         const over = c.over ?? 0;
-        return { over: pair[over], under: pair[1 - over], n: c.n };
+        const entry = crossingEntry(picture, { over: pair[over], under: pair[1 - over], n: c.n });
+        return entry ? [entry] : [];
     });
-    const at = picture.crossings.findIndex((e) => samePair(crossingPair(e), pair));
+    const ids = pair.map((ref) => segmentIdAt(picture, ref));
+    const ofPair = (e: CrossingEntry) => ids.includes(e.over) && ids.includes(e.under);
+    const at = picture.crossings.findIndex(ofPair);
     if (at < 0) return picture;
     // None of the entries before `at` are the pair's, so they keep their places.
-    const others = picture.crossings.filter((e) => !samePair(crossingPair(e), pair));
+    const others = picture.crossings.filter((e) => !ofPair(e));
     return { ...picture, crossings: [...others.slice(0, at), ...entries, ...others.slice(at)] };
 }
 
@@ -387,29 +415,33 @@ function withPasses(
     });
 }
 
-const onSegment = (entry: PassEntry, [i, k]: SegmentRef) => entry[0] === i && entry[1] === k;
-
 /** Which side of a prop a segment's nth pass across it goes: its entry changed, or added after the others. */
-export const setPass = (
+export function setPass(
     picture: Picture,
     p: number,
     ref: SegmentRef,
     n: number,
     side: PassSide,
-): Picture =>
-    withPasses(picture, p, (passes) => {
-        const entry: PassEntry = [ref[0], ref[1], n, side];
-        const k = passes.findIndex((e) => onSegment(e, ref) && e[2] === n);
+): Picture {
+    const id = segmentIdAt(picture, ref);
+    if (id === undefined) return picture;
+    return withPasses(picture, p, (passes) => {
+        const entry: PassEntry = [id, n, side];
+        const k = passes.findIndex((e) => e[0] === id && e[1] === n);
         if (k < 0) return [...passes, entry];
-        return passes[k][3] === side ? passes : replaced(passes, k, entry);
+        return passes[k][2] === side ? passes : replaced(passes, k, entry);
     });
+}
 
-/** A pass's entry deleted (one that's lost, its segment no longer passing there). */
-export const deletePass = (picture: Picture, p: number, entry: PassEntry): Picture =>
-    withPasses(picture, p, (passes) => {
+/** A pass's entry deleted (one that's lost, its segment no longer passing there), given by where its segment is. */
+export function deletePass(picture: Picture, p: number, at: PassAt): Picture {
+    const entry = passEntry(picture, at);
+    if (!entry) return picture;
+    return withPasses(picture, p, (passes) => {
         const kept = passes.filter((e) => !e.every((v, j) => v === entry[j]));
         return kept.length === passes.length ? passes : kept;
     });
+}
 
 /**
  * A segment's passes across a prop, when they're to check, replaced by its passes as they're drawn now, numbered
@@ -425,11 +457,13 @@ export function confirmPasses(
     const found = pictureCrossings(picture, geometry).passes.filter(
         (q) => q.prop === p && q.strand === ref[0] && q.segment === ref[1],
     );
-    const entries = found.map((q): PassEntry => [ref[0], ref[1], q.n, q.side ?? "behind"]);
+    const id = segmentIdAt(picture, ref);
+    if (id === undefined) return picture;
+    const entries = found.map((q): PassEntry => [id, q.n, q.side ?? "behind"]);
     return withPasses(picture, p, (passes) => {
-        const at = passes.findIndex((e) => onSegment(e, ref));
+        const at = passes.findIndex((e) => e[0] === id);
         if (at < 0) return passes;
-        const others = passes.filter((e) => !onSegment(e, ref));
+        const others = passes.filter((e) => e[0] !== id);
         return [...others.slice(0, at), ...entries, ...others.slice(at)];
     });
 }
@@ -445,13 +479,14 @@ const tensionsOf = (c: Cubic) => tensionsWithin(hobbyTensions(c.p0, c.p1, c.p2, 
  * were free: Hobby's directions come from runs between pins holding an angle, so without them the runs either side
  * would be solved again and move. Each half takes its tensions from its piece of the curve; a locked segment's
  * halves are both locked, at the curve's lengths up to and after the new pin. Crossings and passes on the segment
- * go to the half they're on.
+ * go to the half they're on. The first half keeps the segment's id; the new pin and the second half get new ones.
  */
 export function insertPin(
     picture: Picture,
     geometry: PictureGeometry,
     [i, k]: SegmentRef,
     t: number,
+    ids: Ids,
 ): Edited {
     const strand = picture.strands[i];
     const segment = strand?.segments[k];
@@ -464,17 +499,21 @@ export function insertPin(
     const pins = [
         ...strand.pins.slice(0, k),
         holding(strand.pins[k], strandGeometry.directions[k]),
-        { x: first.p3.x, y: first.p3.y, angle: angleOf(cubic.tangentAt(t)) },
+        { id: ids(), x: first.p3.x, y: first.p3.y, angle: angleOf(cubic.tangentAt(t)) },
         holding(strand.pins[k + 1], strandGeometry.directions[k + 1]),
         ...strand.pins.slice(k + 2),
     ];
     const lengthBefore = cubic.lengthTo(t);
+    const secondId = ids();
     const halves: StrandSegment[] =
         segment.length === undefined
-            ? [{ tension: tensionsOf(first) }, { tension: tensionsOf(second) }]
+            ? [
+                  { id: segment.id, tension: tensionsOf(first) },
+                  { id: secondId, tension: tensionsOf(second) },
+              ]
             : [
-                  { tension: tensionsOf(first), length: lengthBefore },
-                  { tension: tensionsOf(second), length: length - lengthBefore },
+                  { id: segment.id, tension: tensionsOf(first), length: lengthBefore },
+                  { id: secondId, tension: tensionsOf(second), length: length - lengthBefore },
               ];
     const segments = [...strand.segments.slice(0, k), ...halves, ...strand.segments.slice(k + 1)];
 
@@ -483,11 +522,9 @@ export function insertPin(
         if (ref[1] > k) return { ref: [i, ref[1] + 1], t: u };
         return u < t ? { ref: [i, k], t: u / t } : { ref: [i, k + 1], t: (u - t) / (1 - t) };
     };
+    const strands = replaced(picture.strands, i, { ...strand, pins, segments });
     return {
-        picture: {
-            strands: replaced(picture.strands, i, { ...strand, pins, segments }),
-            ...followEntries(picture, geometry, move),
-        },
+        picture: { strands, ...followEntries(picture, geometry, move, strands) },
         renumbering: {
             pin: ([s, p]) => (s === i && p > k ? [s, p + 1] : [s, p]),
             segment: ([s, j]) =>
@@ -507,7 +544,8 @@ export function insertPin(
  * A pin deleted. Between two segments it joins them: locked at the sum of their lengths when both were locked, and
  * unlocked otherwise, with the tensions they were drawn with at its two ends. At a strand's end it takes its segment
  * with it. Crossings and passes move to the joined segment, counted again; an entry between the two segments joined
- * now names one segment twice, and is left to check. Refused on a strand of two pins.
+ * now names one segment twice, and is left to check. The joined segment keeps the first one's id. Refused on a strand
+ * of two pins.
  */
 export function deletePin(picture: Picture, geometry: PictureGeometry, [i, k]: PinRef): Edited {
     const strand = picture.strands[i];
@@ -534,8 +572,8 @@ export function deletePin(picture: Picture, geometry: PictureGeometry, [i, k]: P
         const tension = tensionsWithin([drawn[k - 1].tension[0], drawn[k].tension[1]]);
         const joined: StrandSegment =
             before.length !== undefined && after.length !== undefined
-                ? { tension, length: before.length + after.length }
-                : { tension };
+                ? { id: before.id, tension, length: before.length + after.length }
+                : { id: before.id, tension };
         segments = [...strand.segments.slice(0, k - 1), joined, ...strand.segments.slice(k + 1)];
         move = (ref, u) => {
             if (ref[0] !== i || ref[1] < k - 1) return { ref, t: u };
@@ -545,11 +583,9 @@ export function deletePin(picture: Picture, geometry: PictureGeometry, [i, k]: P
         };
         segmentMap = (j) => [j < k ? j : j - 1];
     }
+    const strands = replaced(picture.strands, i, { ...strand, pins, segments });
     return {
-        picture: {
-            strands: replaced(picture.strands, i, { ...strand, pins, segments }),
-            ...followEntries(picture, geometry, move),
-        },
+        picture: { strands, ...followEntries(picture, geometry, move, strands) },
         renumbering: {
             pin: ([s, p]) => (s !== i ? [s, p] : p === k ? undefined : [s, p > k ? p - 1 : p]),
             segment: ([s, j]) => (s !== i ? [[s, j]] : segmentMap(j).map((m) => [s, m])),
@@ -615,13 +651,15 @@ export function addStrand(
     kind: Strand["kind"],
     from: Vector2,
     to: Vector2,
+    ids: Ids,
 ): Picture {
     const shape = {
+        id: ids(),
         pins: [
-            { x: from.x, y: from.y },
-            { x: to.x, y: to.y },
+            { id: ids(), x: from.x, y: from.y },
+            { id: ids(), x: to.x, y: to.y },
         ],
-        segments: [{ tension: [1, 1] as [number, number] }],
+        segments: [{ id: ids(), tension: [1, 1] as [number, number] }],
     };
     const strand: Strand =
         kind === "rope"
@@ -637,24 +675,18 @@ export function addStrand(
     return { ...picture, strands: [...picture.strands, strand] };
 }
 
-/** A strand deleted, with its crossing entries and passes; later strands' numbers move down by one. */
+/** A strand deleted, with its crossing entries and passes; later strands' places move down by one. */
 export function deleteStrand(picture: Picture, i: number): Edited {
-    if (!picture.strands[i]) return { picture };
+    const strand = picture.strands[i];
+    if (!strand) return { picture };
     const after = (s: number) => (s > i ? s - 1 : s);
-    const ref = ([s, k]: SegmentRef): SegmentRef => (s > i ? [s - 1, k] : [s, k]);
-    const crossings = picture.crossings
-        .filter((c) => c.over[0] !== i && c.under[0] !== i)
-        .map((c) =>
-            c.over[0] > i || c.under[0] > i ? { ...c, over: ref(c.over), under: ref(c.under) } : c,
-        );
+    const gone = new Set(strand.segments.map((segment) => segment.id));
+    const crossings = picture.crossings.filter((c) => !gone.has(c.over) && !gone.has(c.under));
     const props = picture.props.map((prop) => {
         const kind = kindOf(prop);
         const entries = kind.passes(prop);
-        if (!entries.some((e) => e[0] >= i)) return prop;
-        return kind.withPasses(
-            prop,
-            entries.filter((e) => e[0] !== i).map(([s, k, n, side]) => [after(s), k, n, side]),
-        );
+        const kept = entries.filter((e) => !gone.has(e[0]));
+        return kept.length === entries.length ? prop : kind.withPasses(prop, kept);
     });
     return {
         picture: { strands: picture.strands.filter((_, s) => s !== i), crossings, props },

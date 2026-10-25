@@ -2,8 +2,8 @@
  * The knot file: one knot, its finished picture and its tying steps, holding only what can't be worked out. The
  * format is described in `docs/knot-editor.md`; its versions and upgrades are in `versions.ts`.
  *
- * Coordinates and sizes are millimetres with y down, as in SVG, and angles are degrees. Strands, segments and pins are
- * counted from 0 in the file.
+ * Coordinates and sizes are millimetres with y down, as in SVG, and angles are degrees. Everything in a picture has an
+ * id (see `ids.ts`), and references name things by id.
  */
 
 import type { Plugin } from "prettier";
@@ -20,6 +20,7 @@ import {
     onlyFields,
     readChoice,
     readCount,
+    readId,
     readList,
     readNumber,
     readObject,
@@ -35,7 +36,10 @@ import {
 } from "./versions";
 
 export type { Prop } from "./props";
-export type { PassEntry, PassSide } from "./props";
+export type { PassAt, PassEntry, PassSide } from "./props";
+
+/** What a strand, segment, pin or prop is called in the file: a whole number from 1, unique in its picture. */
+export type Id = number;
 
 /** What a knot file says it is. */
 export const FORMAT = "avut-knot";
@@ -45,15 +49,16 @@ export const ROPE_COLOURS = ["orange", "green", "blue", "purple", "yellow"] as c
 export type RopeColour = (typeof ROPE_COLOURS)[number];
 
 /** A point a strand passes through, and the way it runs through it (degrees), when it holds one. */
-export type Pin = { x: number; y: number; angle?: number };
+export type Pin = { id: Id; x: number; y: number; angle?: number };
 
 /**
  * The curve between two pins. `tension` shapes it, one at each end (1 by default). A locked segment holds its
  * `length` too, and `tension` is then the ratio the editor keeps while it scales them to meet that length.
  */
-export type StrandSegment = { tension: [number, number]; length?: number };
+export type StrandSegment = { id: Id; tension: [number, number]; length?: number };
 
 type StrandShape = {
+    id: Id;
     /** At least two. */
     pins: Pin[];
     /** One fewer than the pins: segment k runs from pin k to pin k + 1. */
@@ -81,19 +86,22 @@ export const ARROW_SIZE = 11;
 export const strandSize = (strand: Strand) =>
     strand.kind === "rope" ? strand.diameter : ARROW_SIZE;
 
-/** A segment of a picture: its strand, and which segment of that strand. */
+/** A segment of a picture by where it is: its strand, and which segment of that strand (from 0). */
 export type SegmentRef = [strand: number, segment: number];
 
-/** A pin of a picture: its strand, and which pin of that strand. */
+/** A pin of a picture by where it is: its strand, and which pin of that strand (from 0). */
 export type PinRef = [strand: number, pin: number];
 
 /**
- * Which of two segments is on top where they cross. `n` (from 1) says which of their crossings it is, counting along
- * whichever of the two comes first in the picture (the lower strand, then the lower segment). An entry naming one
- * segment twice is left by deleting the pin between two segments that crossed: it can't be matched, and is shown as
- * one to check until it's removed.
+ * Which of two segments (by id) is on top where they cross. `n` (from 1) says which of their crossings it is,
+ * counting along whichever of the two comes first in the picture (the lower strand, then the lower segment). An entry
+ * naming one segment twice is left by deleting the pin between two segments that crossed: it can't be matched, and
+ * is shown as one to check until it's removed.
  */
-export type CrossingEntry = { over: SegmentRef; under: SegmentRef; n: number };
+export type CrossingEntry = { over: Id; under: Id; n: number };
+
+/** A crossing entry with its segments by where they are, as the editor matches and shows them. */
+export type CrossingAt = { over: SegmentRef; under: SegmentRef; n: number };
 
 /** The knot, or one of its steps, as drawn. Its view is worked out from what's in it. */
 export type Picture = { strands: Strand[]; crossings: CrossingEntry[]; props: Prop[] };
@@ -125,7 +133,7 @@ export const segmentBefore = (a: SegmentRef, b: SegmentRef) =>
     a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
 
 /** A crossing's pair of segments in the picture's order: the one `n` counts along first. */
-export const crossingPair = (entry: CrossingEntry): [SegmentRef, SegmentRef] =>
+export const crossingPair = (entry: CrossingAt): [SegmentRef, SegmentRef] =>
     segmentBefore(entry.over, entry.under) ? [entry.over, entry.under] : [entry.under, entry.over];
 
 // Reading
@@ -230,15 +238,29 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
     const strands = readList(json.strands, below(at, "strands")).map((s, k) =>
         readStrand(s, below(below(at, "strands"), k)),
     );
-    const segmentAt = (value: JsonValue | undefined, where: string): SegmentRef => {
-        const ref = readList(value, where);
-        if (ref.length !== 2)
-            throw new FileError(where, `should be [strand, segment], but has ${ref.length} items`);
-        return checkSegment(
-            [readCount(ref[0], below(where, 0), 0), readCount(ref[1], below(where, 1), 0)],
-            strands,
-            where,
-        );
+    // Every id once in the picture, and each segment's for references to name.
+    const seen = new Map<Id, string>();
+    const once = (id: Id, where: string) => {
+        const first = seen.get(id);
+        if (first !== undefined)
+            throw new FileError(where, `has id ${id}, which ${first} has already`);
+        seen.set(id, where);
+    };
+    const segmentIds = new Set<Id>();
+    strands.forEach((strand, i) => {
+        const here = below(below(at, "strands"), i);
+        once(strand.id, here);
+        strand.pins.forEach((pin, k) => once(pin.id, below(below(here, "pins"), k)));
+        strand.segments.forEach((segment, k) => {
+            once(segment.id, below(below(here, "segments"), k));
+            segmentIds.add(segment.id);
+        });
+    });
+    const segmentId = (value: JsonValue | undefined, where: string): Id => {
+        const id = readId(value, where);
+        if (!segmentIds.has(id))
+            throw new FileError(where, `names segment ${id}, which isn't in the picture`);
+        return id;
     };
 
     const crossings = readList(json.crossings, below(at, "crossings")).map(
@@ -246,18 +268,16 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
             const where = below(below(at, "crossings"), k);
             const entry = readObject(item, where);
             onlyFields(entry, where, ["over", "under", "n"]);
-            const over = segmentAt(entry.over, below(where, "over"));
-            const under = segmentAt(entry.under, below(where, "under"));
+            const over = segmentId(entry.over, below(where, "over"));
+            const under = segmentId(entry.under, below(where, "under"));
             const n = entry.n === undefined ? 1 : readCount(entry.n, below(where, "n"), 1);
             return { over, under, n };
         },
     );
+    const samePair = (a: CrossingEntry, b: CrossingEntry) =>
+        (a.over === b.over && a.under === b.under) || (a.over === b.under && a.under === b.over);
     crossings.forEach((entry, k) => {
-        const [a, b] = crossingPair(entry);
-        const first = crossings.findIndex((other) => {
-            const [c, d] = crossingPair(other);
-            return sameSegment(a, c) && sameSegment(b, d) && other.n === entry.n;
-        });
+        const first = crossings.findIndex((other) => samePair(entry, other) && other.n === entry.n);
         if (first < k)
             throw new FileError(
                 below(below(at, "crossings"), k),
@@ -273,13 +293,12 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
             PROP_KIND_NAMES,
         );
         const prop = PROP_KINDS[kind].read(item, where);
+        once(prop.id, where);
         const passes = kindOf(prop).passes(prop);
-        passes.forEach(([strand, segment, n], j) => {
+        passes.forEach(([segment, n], j) => {
             const passAt = below(below(where, "passes"), j);
-            checkSegment([strand, segment], strands, passAt);
-            const first = passes.findIndex(
-                (p) => p[0] === strand && p[1] === segment && p[2] === n,
-            );
+            segmentId(segment, below(passAt, 0));
+            const first = passes.findIndex((p) => p[0] === segment && p[1] === n);
             if (first < j)
                 throw new FileError(
                     passAt,
@@ -292,19 +311,6 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
     return { strands, crossings, props };
 }
 
-/** The reference, if it names a segment of one of the strands. */
-function checkSegment(ref: SegmentRef, strands: Strand[], at: string): SegmentRef {
-    const [s, k] = ref;
-    if (s >= strands.length)
-        throw new FileError(at, `names strand ${s}, but there are ${strands.length} strands`);
-    if (k >= strands[s].segments.length)
-        throw new FileError(
-            at,
-            `names segment ${k} of strand ${s}, which has ${strands[s].segments.length}`,
-        );
-    return ref;
-}
-
 function readStrand(value: JsonValue, at: string): Strand {
     const json = readObject(value, at);
     const kind = readChoice(json.kind, below(at, "kind"), STRAND_KINDS);
@@ -312,14 +318,15 @@ function readStrand(value: JsonValue, at: string): Strand {
         json,
         at,
         kind === "rope"
-            ? ["kind", "colour", "diameter", "name", "pins", "segments"]
-            : ["kind", "pins", "segments"],
+            ? ["id", "kind", "colour", "diameter", "name", "pins", "segments"]
+            : ["id", "kind", "pins", "segments"],
     );
     const pins = readList(json.pins, below(at, "pins")).map((item, k): Pin => {
         const where = below(below(at, "pins"), k);
         const pin = readObject(item, where);
-        onlyFields(pin, where, ["x", "y", "angle"]);
+        onlyFields(pin, where, ["id", "x", "y", "angle"]);
         return {
+            id: readId(pin.id, below(where, "id")),
             x: readNumber(pin.x, below(where, "x")),
             y: readNumber(pin.y, below(where, "y")),
             ...(pin.angle !== undefined && { angle: readNumber(pin.angle, below(where, "angle")) }),
@@ -329,7 +336,7 @@ function readStrand(value: JsonValue, at: string): Strand {
         (item, k): StrandSegment => {
             const where = below(below(at, "segments"), k);
             const segment = readObject(item, where);
-            onlyFields(segment, where, ["length", "tension"]);
+            onlyFields(segment, where, ["id", "length", "tension"]);
             let tension: [number, number] = [1, 1];
             if (segment.tension !== undefined) {
                 const pair = readList(segment.tension, below(where, "tension"));
@@ -349,6 +356,7 @@ function readStrand(value: JsonValue, at: string): Strand {
                 }) as [number, number];
             }
             return {
+                id: readId(segment.id, below(where, "id")),
                 tension,
                 ...(segment.length !== undefined && {
                     length: readPositive(segment.length, below(where, "length")),
@@ -363,8 +371,10 @@ function readStrand(value: JsonValue, at: string): Strand {
             at,
             `${pins.length} pins but ${segments.length} segments (there should be ${pins.length - 1})`,
         );
-    if (kind === "arrow") return { kind, pins, segments };
+    const id = readId(json.id, below(at, "id"));
+    if (kind === "arrow") return { id, kind, pins, segments };
     return {
+        id,
         kind,
         colour: readChoice(json.colour, below(at, "colour"), ROPE_COLOURS),
         diameter: readPositive(json.diameter, below(at, "diameter")),
@@ -386,6 +396,7 @@ function writePicture(picture: Picture, expanded: Expanded): JsonObject {
     const json: JsonObject = {
         strands: picture.strands.map((strand) => {
             const out: JsonObject = {
+                id: strand.id,
                 kind: strand.kind,
                 ...(strand.kind === "rope" && {
                     colour: strand.colour,
@@ -393,11 +404,13 @@ function writePicture(picture: Picture, expanded: Expanded): JsonObject {
                     ...(strand.name !== undefined && { name: strand.name }),
                 }),
                 pins: strand.pins.map((pin) => ({
+                    id: pin.id,
                     x: pin.x,
                     y: pin.y,
                     ...(pin.angle !== undefined && { angle: pin.angle }),
                 })),
                 segments: strand.segments.map((segment) => ({
+                    id: segment.id,
                     ...(segment.length !== undefined && { length: segment.length }),
                     ...((segment.tension[0] !== 1 || segment.tension[1] !== 1) && {
                         tension: [...segment.tension],
@@ -408,8 +421,8 @@ function writePicture(picture: Picture, expanded: Expanded): JsonObject {
             return out;
         }),
         crossings: picture.crossings.map((entry) => ({
-            over: [...entry.over],
-            under: [...entry.under],
+            over: entry.over,
+            under: entry.under,
             ...(entry.n !== 1 && { n: entry.n }),
         })),
         ...(picture.props.length > 0 && {

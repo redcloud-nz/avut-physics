@@ -39,15 +39,7 @@ import {
     shiftAt,
     unlockSegment,
 } from "./edits";
-import {
-    parseKnotFile,
-    writeKnotFile,
-    type CrossingEntry,
-    type KnotFile,
-    type Picture,
-    type Pin,
-    type Strand,
-} from "./format";
+import { parseKnotFile, writeKnotFile, type KnotFile, type Picture, type Strand } from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
 import { kindOf } from "./props";
 import { BAR, type BarProp } from "./props/bar";
@@ -60,20 +52,23 @@ import {
     type EditorState,
     type Selection,
 } from "./state";
+import {
+    entriesAt,
+    newIds,
+    passesOf,
+    pinId,
+    segmentId,
+    testPicture,
+    testStrand,
+    withoutIds,
+    type TestBar,
+    type TestPin,
+} from "./test-pictures";
 
-const rope = (pins: Pin[], colour: "orange" | "green" | "blue" = "orange"): Strand => ({
-    kind: "rope",
-    colour,
-    diameter: 1,
-    pins,
-    segments: pins.slice(1).map(() => ({ tension: [1, 1] as [number, number] })),
-});
+const rope = (pins: TestPin[], colour: "orange" | "green" | "blue" = "orange"): Strand =>
+    testStrand("rope", pins, { colour });
 
-const picture = (
-    strands: Strand[],
-    crossings: CrossingEntry[] = [],
-    props: BarProp[] = [],
-): Picture => ({ strands, crossings, props });
+const picture = testPicture;
 
 /** A rope wandering through five free pins. */
 const WIGGLE = rope([
@@ -131,7 +126,7 @@ describe("pins and segments", () => {
 
     it("moves a pin, sharing everything else", () => {
         const moved = movePin(p, [0, 2], 11, -3);
-        expect(moved.strands[0].pins[2]).toEqual({ x: 11, y: -3 });
+        expect(moved.strands[0].pins[2]).toEqual({ id: pinId(0, 2), x: 11, y: -3 });
         expect(moved.strands[1]).toBe(p.strands[1]);
         expect(moved.strands[0].segments).toBe(p.strands[0].segments);
         moved.strands[0].pins.forEach(
@@ -142,9 +137,13 @@ describe("pins and segments", () => {
 
     it("sets and clears an angle", () => {
         const held = setPinAngle(p, [0, 1], 270);
-        expect(held.strands[0].pins[1]).toEqual({ x: 5, y: 3, angle: -90 });
+        expect(held.strands[0].pins[1]).toEqual({ id: pinId(0, 1), x: 5, y: 3, angle: -90 });
         expect(setPinAngle(held, [0, 1], -90)).toBe(held);
-        expect(setPinAngle(held, [0, 1], undefined).strands[0].pins[1]).toEqual({ x: 5, y: 3 });
+        expect(setPinAngle(held, [0, 1], undefined).strands[0].pins[1]).toEqual({
+            id: pinId(0, 1),
+            x: 5,
+            y: 3,
+        });
         expect(setPinAngle(p, [0, 1], undefined)).toBe(p);
     });
 
@@ -159,6 +158,7 @@ describe("pins and segments", () => {
         const geometry = pictureGeometry(before);
         const locked = lockSegment(before, geometry, [0, 1]);
         expect(locked.strands[0].segments[1]).toEqual({
+            id: segmentId(0, 1),
             tension: [1.4, 0.9],
             length: geometry.strands[0].segments[1].length,
         });
@@ -214,7 +214,7 @@ describe("inserting a pin", () => {
             [1, 0.3],
             [3, 0.7],
         ] as const) {
-            const { picture: after } = insertPin(p, g, [0, k], t);
+            const { picture: after } = insertPin(p, g, [0, k], t, newIds());
             const strand = after.strands[0];
             expect(strand.pins).toHaveLength(6);
             expect(strand.segments).toHaveLength(5);
@@ -227,7 +227,7 @@ describe("inserting a pin", () => {
     it("gives a locked segment two locked halves, their lengths summing to its", () => {
         const locked = lockSegment(p, g, [0, 1]);
         const lockedGeometry = pictureGeometry(locked);
-        const { picture: after } = insertPin(locked, lockedGeometry, [0, 1], 0.4);
+        const { picture: after } = insertPin(locked, lockedGeometry, [0, 1], 0.4, newIds());
         const [a, b] = after.strands[0].segments.slice(1, 3);
         expect(a.length! + b.length!).toBeCloseTo(locked.strands[0].segments[1].length!, 9);
         const afterGeometry = pictureGeometry(after);
@@ -237,8 +237,8 @@ describe("inserting a pin", () => {
     });
 
     it("refuses the very ends of a segment", () => {
-        expect(insertPin(p, g, [0, 1], 0).picture).toBe(p);
-        expect(insertPin(p, g, [0, 1], 1).picture).toBe(p);
+        expect(insertPin(p, g, [0, 1], 0, newIds()).picture).toBe(p);
+        expect(insertPin(p, g, [0, 1], 1, newIds()).picture).toBe(p);
     });
 });
 
@@ -269,9 +269,14 @@ describe("deleting a pin", () => {
     });
 
     it("undoes an insert", () => {
-        const { picture: inserted } = insertPin(p, g, [0, 1], 0.5);
+        const { picture: inserted } = insertPin(p, g, [0, 1], 0.5, newIds());
         const { picture: after } = deletePin(inserted, pictureGeometry(inserted), [0, 2]);
-        expect(after.strands[0].pins.map(({ x, y }) => ({ x, y }))).toEqual(p.strands[0].pins);
+        expect(after.strands[0].pins.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+            p.strands[0].pins,
+        );
+        expect(after.strands[0].segments.map((q) => q.id)).toEqual(
+            p.strands[0].segments.map((q) => q.id),
+        );
     });
 });
 
@@ -291,8 +296,8 @@ describe("crossings and passes follow inserts and deletes", () => {
     });
 
     it("splits the pair's first segment between its crossings", () => {
-        const { picture: after } = insertPin(crossed, g, [0, 0], 0.5);
-        expect(after.crossings).toEqual([
+        const { picture: after } = insertPin(crossed, g, [0, 0], 0.5, newIds());
+        expect(entriesAt(after)).toEqual([
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [1, 0], under: [0, 1], n: 1 },
         ]);
@@ -300,8 +305,8 @@ describe("crossings and passes follow inserts and deletes", () => {
     });
 
     it("splits the pair's second segment between its crossings", () => {
-        const { picture: after } = insertPin(crossed, g, [1, 0], 0.5);
-        expect(after.crossings).toEqual([
+        const { picture: after } = insertPin(crossed, g, [1, 0], 0.5, newIds());
+        expect(entriesAt(after)).toEqual([
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [1, 1], under: [0, 0], n: 1 },
         ]);
@@ -309,8 +314,8 @@ describe("crossings and passes follow inserts and deletes", () => {
     });
 
     it("renumbers a split before both crossings, and joins them back", () => {
-        const { picture: after } = insertPin(crossed, g, [0, 0], 0.1);
-        expect(after.crossings).toEqual([
+        const { picture: after } = insertPin(crossed, g, [0, 0], 0.1, newIds());
+        expect(entriesAt(after)).toEqual([
             { over: [0, 1], under: [1, 0], n: 1 },
             { over: [1, 0], under: [0, 1], n: 2 },
         ]);
@@ -321,8 +326,8 @@ describe("crossings and passes follow inserts and deletes", () => {
     });
 
     it("keeps entries untouched by the edit", () => {
-        const three = picture([LINE, ARCH, WIGGLE], crossed.crossings);
-        const { picture: after } = insertPin(three, pictureGeometry(three), [2, 1], 0.5);
+        const three = picture([LINE, ARCH, WIGGLE], entriesAt(crossed));
+        const { picture: after } = insertPin(three, pictureGeometry(three), [2, 1], 0.5, newIds());
         after.crossings.forEach((c, k) => expect(c).toBe(three.crossings[k]));
     });
 
@@ -344,17 +349,17 @@ describe("crossings and passes follow inserts and deletes", () => {
         ]);
         const set = {
             ...loop,
-            crossings: [{ over: [0, 0], under: [0, 1], n: 1 } as CrossingEntry],
+            crossings: [{ over: segmentId(0, 0), under: segmentId(0, 1), n: 1 }],
         };
         const { picture: after } = deletePin(set, pictureGeometry(set), [0, 1]);
-        expect(after.crossings).toEqual([{ over: [0, 0], under: [0, 0], n: 1 }]);
+        expect(entriesAt(after)).toEqual([{ over: [0, 0], under: [0, 0], n: 1 }]);
         const check = pictureCrossings(after, pictureGeometry(after));
         expect(check.toCheck).toHaveLength(1);
         expect(check.lost).toEqual([]);
     });
 
     it("moves a prop's passes to the half they're on", () => {
-        const bar: BarProp = {
+        const bar: TestBar = {
             kind: "bar",
             x: 0,
             y: 0,
@@ -366,15 +371,15 @@ describe("crossings and passes follow inserts and deletes", () => {
             ],
         };
         const p = picture([ARCH], [], [bar]);
-        const { picture: after } = insertPin(p, pictureGeometry(p), [0, 0], 0.5);
-        expect(after.props[0].passes).toEqual([
+        const { picture: after } = insertPin(p, pictureGeometry(p), [0, 0], 0.5, newIds());
+        expect(passesOf(after, 0)).toEqual([
             [0, 0, 1, "front"],
             [0, 1, 1, "behind"],
         ]);
         const check = pictureCrossings(after, pictureGeometry(after));
         expect(check.passes.map((q) => q.status)).toEqual(["set", "set"]);
         const { picture: joined } = deletePin(after, pictureGeometry(after), [0, 1]);
-        expect(joined.props[0].passes).toEqual(bar.passes);
+        expect(passesOf(joined, 0)).toEqual(bar.passes);
     });
 });
 
@@ -388,13 +393,13 @@ describe("setting crossings", () => {
     it("sets each crossing, then swaps one in place", () => {
         expect(statuses(bare)).toEqual(["unset", "unset"]);
         const one = setCrossing(bare, pair, 1, 0);
-        expect(one.crossings).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
+        expect(entriesAt(one)).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
         // One entry for a pair crossing twice can't be trusted to name the same crossing.
         expect(statuses(one)).toEqual(["to-check", "to-check"]);
         const both = setCrossing(one, pair, 2, 1);
         expect(statuses(both)).toEqual(["set", "set"]);
         const swapped = setCrossing(both, pair, 1, 1);
-        expect(swapped.crossings).toEqual([
+        expect(entriesAt(swapped)).toEqual([
             { over: [1, 0], under: [0, 0], n: 1 },
             { over: [1, 0], under: [0, 0], n: 2 },
         ]);
@@ -436,7 +441,7 @@ describe("setting crossings", () => {
         const apart = movePin(movePin(set, [0, 0], -10, 9), [0, 1], 10, 9);
         const found = pictureCrossings(apart, pictureGeometry(apart));
         expect(found.crossings).toEqual([]);
-        expect(found.lost).toEqual(set.crossings);
+        expect(found.lost).toEqual(entriesAt(set));
         const cleared = deleteCrossing(apart, found.lost[0]);
         expect(cleared.crossings).toEqual([set.crossings[1]]);
         expect(deleteCrossing(cleared, found.lost[0])).toBe(cleared);
@@ -448,14 +453,14 @@ describe("setting crossings", () => {
         expect(found.crossings.map((c) => [c.status, c.over])).toEqual([["to-check", 0]]);
         expect(found.toCheck).toHaveLength(1);
         const confirmed = confirmCrossings(once, pictureGeometry(once), pair);
-        expect(confirmed.crossings).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
+        expect(entriesAt(confirmed)).toEqual([{ over: [0, 0], under: [1, 0], n: 1 }]);
         expect(statuses(confirmed)).toEqual(["set"]);
     });
 
     it("confirms a pair with no side yet with its first segment on top", () => {
         const one = setCrossing(bare, pair, 2, 1);
         const confirmed = confirmCrossings(one, pictureGeometry(one), pair);
-        expect(confirmed.crossings).toEqual([
+        expect(entriesAt(confirmed)).toEqual([
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [1, 0], under: [0, 0], n: 2 },
         ]);
@@ -467,7 +472,7 @@ describe("setting crossings", () => {
             [0, 0],
             [0, 0],
         ]);
-        expect(confirmed.crossings).toEqual([]);
+        expect(entriesAt(confirmed)).toEqual([]);
     });
 });
 
@@ -475,8 +480,10 @@ describe("props", () => {
     const at = (x: number, y: number) => new Vector2(x, y);
 
     it("adds a bar, moves it, sets its fields and deletes it", () => {
-        const p = addProp(picture([LINE]), BAR.create(at(2, 3)));
-        expect(p.props).toEqual([{ kind: "bar", x: 2, y: 3, r: 17.6, length: 220, passes: [] }]);
+        const p = addProp(picture([LINE]), BAR.create(at(2, 3), 7));
+        expect(p.props).toEqual([
+            { id: 7, kind: "bar", x: 2, y: 3, r: 17.6, length: 220, passes: [] },
+        ]);
         const bar = p.props[0];
         const moved = changeProp(p, 0, (q) => kindOf(q).moved(q, at(1, -1)));
         expect([moved.props[0].x, moved.props[0].y]).toEqual([3, 2]);
@@ -492,11 +499,14 @@ describe("props", () => {
     });
 
     it("drops a bar's length and passes when it's seen end on, and gives it a length back", () => {
-        const bar: BarProp = { ...BAR.create(at(0, 0)), passes: [[0, 0, 1, "front"]] };
+        const bar: BarProp = {
+            ...BAR.create(at(0, 0), 7),
+            passes: [[segmentId(0, 0), 1, "front"]],
+        };
         const seen = BAR.fields(bar).find((f) => f.label === "Seen")!;
         if (seen.kind !== "choice") throw new Error("Seen should be a choice");
         const endOn = seen.set(bar, "end");
-        expect(endOn).toEqual({ kind: "bar", x: 0, y: 0, r: 17.6, passes: [] });
+        expect(endOn).toEqual({ id: 7, kind: "bar", x: 0, y: 0, r: 17.6, passes: [] });
         expect(BAR.fields(endOn).map((f) => f.label)).not.toContain("Length");
         expect(seen.set(endOn, "side").length).toBe(220);
         expect(seen.set(bar, "side")).toBe(bar);
@@ -505,14 +515,14 @@ describe("props", () => {
     });
 
     // The arch crosses the x axis twice, about 2.3 either side of the middle, so a short bar there has two passes.
-    const short: BarProp = { kind: "bar", x: 0, y: 0, r: 1, length: 6, passes: [] };
+    const short: TestBar = { kind: "bar", x: 0, y: 0, r: 1, length: 6, passes: [] };
     const bare = picture([ARCH], [], [short]);
     const found = (p: Picture) => pictureCrossings(p, pictureGeometry(p));
 
     it("sets each pass's side, then swaps one in place", () => {
         expect(found(bare).passes.map((q) => q.status)).toEqual(["unset", "unset"]);
         const both = setPass(setPass(bare, 0, [0, 0], 1, "front"), 0, [0, 0], 2, "behind");
-        expect(both.props[0].passes).toEqual([
+        expect(passesOf(both, 0)).toEqual([
             [0, 0, 1, "front"],
             [0, 0, 2, "behind"],
         ]);
@@ -521,7 +531,7 @@ describe("props", () => {
             ["set", "behind"],
         ]);
         const swapped = setPass(both, 0, [0, 0], 2, "front");
-        expect(swapped.props[0].passes[1]).toEqual([0, 0, 2, "front"]);
+        expect(passesOf(swapped, 0)[1]).toEqual([0, 0, 2, "front"]);
         expect(setPass(swapped, 0, [0, 0], 2, "front")).toBe(swapped);
     });
 
@@ -533,7 +543,7 @@ describe("props", () => {
         expect(now.passes.map((q) => [q.status, q.side])).toEqual([["to-check", "front"]]);
         expect(now.passesToCheck).toHaveLength(1);
         const confirmed = confirmPasses(shifted, pictureGeometry(shifted), 0, [0, 0]);
-        expect(confirmed.props[0].passes).toEqual([[0, 0, 1, "front"]]);
+        expect(passesOf(confirmed, 0)).toEqual([[0, 0, 1, "front"]]);
         expect(found(confirmed).passes.map((q) => q.status)).toEqual(["set"]);
     });
 
@@ -541,9 +551,9 @@ describe("props", () => {
         const away = changeProp(set, 0, (q) => kindOf(q).moved(q, at(30, 0)));
         const now = found(away);
         expect(now.passes).toEqual([]);
-        expect(now.lostPasses.map((q) => q.entry)).toEqual(set.props[0].passes);
+        expect(now.lostPasses.map((q) => q.entry)).toEqual(passesOf(set, 0));
         const cleared = deletePass(away, 0, now.lostPasses[0].entry);
-        expect(cleared.props[0].passes).toEqual([set.props[0].passes[1]]);
+        expect(passesOf(cleared, 0)).toEqual([passesOf(set, 0)[1]]);
         expect(deletePass(cleared, 0, now.lostPasses[0].entry)).toBe(cleared);
     });
 });
@@ -555,7 +565,8 @@ describe("deleting the selected pins", () => {
             [1, 1],
             [1, 3],
         ]);
-        expect(after.strands[1].pins).toEqual([WIGGLE.pins[0], WIGGLE.pins[2], WIGGLE.pins[4]]);
+        const was = p.strands[1].pins;
+        expect(after.strands[1].pins).toEqual([was[0], was[2], was[4]]);
         expect(after.strands[0]).toBe(p.strands[0]);
         expect(renumbering!.pin([1, 4])).toEqual([1, 2]);
         expect(renumbering!.pin([1, 3])).toBeUndefined();
@@ -570,7 +581,7 @@ describe("deleting the selected pins", () => {
             [1, 2],
             [1, 3],
         ]);
-        expect(after.strands).toEqual([ARCH]);
+        expect(after.strands).toEqual([p.strands[2]]);
         expect(renumbering!.pin([2, 1])).toEqual([0, 1]);
     });
 });
@@ -578,33 +589,41 @@ describe("deleting the selected pins", () => {
 describe("strands", () => {
     it("adds ropes in the first colour not used, and arrows", () => {
         const p = picture([LINE]);
-        const added = addStrand(p, "rope", new Vector2(0, 5), new Vector2(10, 5));
+        const added = addStrand(p, "rope", new Vector2(0, 5), new Vector2(10, 5), newIds());
         expect(added.strands[1]).toMatchObject({ kind: "rope", colour: "green", diameter: 1 });
         // As thick as the picture's last rope, or 11 mm in a picture with none.
         const thin = setRopeDiameter(added, 1, 6);
-        expect(addStrand(thin, "rope", Vector2.ZERO, Vector2.ZERO).strands[2]).toMatchObject({
+        expect(
+            addStrand(thin, "rope", Vector2.ZERO, Vector2.ZERO, newIds()).strands[2],
+        ).toMatchObject({
             diameter: 6,
         });
-        expect(addStrand(picture([]), "rope", Vector2.ZERO, Vector2.ZERO).strands[0]).toMatchObject(
-            { diameter: NEW_ROPE_DIAMETER },
-        );
+        expect(
+            addStrand(picture([]), "rope", Vector2.ZERO, Vector2.ZERO, newIds()).strands[0],
+        ).toMatchObject({ diameter: NEW_ROPE_DIAMETER });
         expect(added.strands[0]).toBe(p.strands[0]);
-        const arrow = addStrand(added, "arrow", new Vector2(0, 8), new Vector2(10, 8));
-        expect(arrow.strands[2]).toEqual({
+        const arrow = addStrand(added, "arrow", new Vector2(0, 8), new Vector2(10, 8), newIds());
+        expect(withoutIds(arrow.strands[2])).toEqual({
+            id: 0,
             kind: "arrow",
             pins: [
-                { x: 0, y: 8 },
-                { x: 10, y: 8 },
+                { id: 0, x: 0, y: 8 },
+                { id: 0, x: 10, y: 8 },
             ],
-            segments: [{ tension: [1, 1] }],
+            segments: [{ id: 0, tension: [1, 1] }],
         });
-        expect(addStrand(arrow, "rope", Vector2.ZERO, new Vector2(1, 0)).strands[3]).toMatchObject({
+        // Each new thing has a new id.
+        const made = arrow.strands[2];
+        expect(new Set([made.id, ...made.pins.map((q) => q.id), made.segments[0].id]).size).toBe(4);
+        expect(
+            addStrand(arrow, "rope", Vector2.ZERO, new Vector2(1, 0), newIds()).strands[3],
+        ).toMatchObject({
             colour: "blue",
         });
     });
 
     it("deletes a strand with its entries, renumbering the rest and keeping colours", () => {
-        const bar: BarProp = {
+        const bar: TestBar = {
             kind: "bar",
             x: 0,
             y: 0,
@@ -635,8 +654,11 @@ describe("strands", () => {
         );
         const { picture: after, renumbering } = deleteStrand(p, 1);
         expect(after.strands.map((s) => s.kind === "rope" && s.colour)).toEqual(["orange", "blue"]);
-        expect(after.crossings).toEqual([{ over: [1, 0], under: [0, 0], n: 1 }]);
-        expect(after.props[0].passes).toEqual([[1, 0, 1, "behind"]]);
+        expect(entriesAt(after)).toEqual([{ over: [1, 0], under: [0, 0], n: 1 }]);
+        expect(passesOf(after, 0)).toEqual([[1, 0, 1, "behind"]]);
+        // Nothing else is renumbered: the strands after it keep their ids, and so do the entries naming them.
+        expect(after.strands.map((q) => q.id)).toEqual([p.strands[0].id, p.strands[2].id]);
+        expect(after.crossings).toEqual([p.crossings[1]]);
         expect(renumbering!.pin([1, 0])).toBeUndefined();
         expect(renumbering!.pin([2, 1])).toEqual([1, 1]);
     });
@@ -789,7 +811,7 @@ describe("state", () => {
             type: "select",
             selection: { kind: "parts", pins: [[0, 3]], segments: [[0, 1]] },
         });
-        s = run(s, { type: "edit", edit: (q) => insertPin(q, g, [0, 1], 0.5) });
+        s = run(s, { type: "edit", edit: (q) => insertPin(q, g, [0, 1], 0.5, newIds()) });
         expect(s.selection).toEqual({
             kind: "parts",
             pins: [[0, 4]],
@@ -833,7 +855,7 @@ describe("state", () => {
                 }) as const,
         );
         const dragged = run(s0, { type: "begin-drag" }, ...moves, { type: "end-drag" });
-        expect(knotOf(dragged).strands[0].pins[1]).toEqual({ x: 3, y: 3 });
+        expect(knotOf(dragged).strands[0].pins[1]).toEqual({ id: pinId(0, 1), x: 3, y: 3 });
         expect(dragged.undo).toHaveLength(1);
         const undone = run(dragged, { type: "undo" });
         expect(undone.file).toBe(s0.file);
@@ -880,7 +902,7 @@ describe("state", () => {
         expect(s.file).toBe(f);
         s = run(s, { type: "redo" });
         expect(s.picture).toBe(0);
-        expect(pictureOf(s.file, 0).strands[0].pins[2]).toEqual({ x: 0, y: 0 });
+        expect(pictureOf(s.file, 0).strands[0].pins[2]).toEqual({ id: pinId(0, 2), x: 0, y: 0 });
     });
 
     it("knows when it's saved, including after undoing back to it", () => {

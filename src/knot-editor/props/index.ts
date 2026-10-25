@@ -14,7 +14,7 @@ import type { JsonObject, JsonValue } from "../versions";
 import { BAR, type BarProp } from "./bar";
 import type { PassEntry } from "./passes";
 
-export type { PassEntry, PassSide } from "./passes";
+export type { PassAt, PassEntry, PassSide } from "./passes";
 export { PASS_SIDES } from "./passes";
 
 /** A prop of any kind. */
@@ -38,8 +38,8 @@ export type PropKind<P extends Prop> = {
     /** Its name in Insert > Prop and the panel, and the letter that inserts one (the key, on a QWERTY keyboard). */
     label: string;
     key: string;
-    /** A new one, centred here. */
-    create(at: Vector2): P;
+    /** A new one, centred here, with this id. */
+    create(at: Vector2, id: number): P;
     /** It moved by this much (millimetres). */
     moved(prop: P, by: Vector2): P;
     /** Its outline, as path data: where it's picked up to drag, and drawn round when it's selected. */

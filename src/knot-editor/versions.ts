@@ -21,7 +21,7 @@ export type JsonObject = { [key: string]: JsonValue };
 export type Upgrade = (file: JsonObject) => JsonObject;
 
 /** The version this editor reads and writes. */
-export const CURRENT_VERSION = 2;
+export const CURRENT_VERSION = 3;
 
 // The upgrades work on JSON as it comes, before it's checked: whatever isn't the shape they expect is passed over,
 // for the checks to refuse after.
@@ -95,5 +95,61 @@ function toMillimetres(file: JsonObject): JsonObject {
     return { ...file, frame: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } };
 }
 
+/**
+ * Version 3 gives everything in a picture an id, and refers to segments by id. Everything is numbered in order across
+ * the file, from 1 (each picture's strands, each with its pins and then its segments, then its props), so no two
+ * things share an id: version 2 doesn't say which things in two steps are the same. Crossings' and passes' [strand,
+ * segment] become the segment's id; one naming a segment that isn't there is left as it is, for the checks to refuse.
+ */
+function addIds(file: JsonObject): JsonObject {
+    let next = 1;
+    for (const picture of picturesIn(file)) {
+        const segmentIds: number[][] = [];
+        listIn(picture.strands).forEach((item, i, strands) => {
+            const ids: number[] = [];
+            segmentIds.push(ids);
+            const found = objectIn(item);
+            if (!found) return;
+            const strand = withId(next++, found);
+            strands[i] = strand;
+            listIn(strand.pins).forEach((pin, k, pins) => {
+                if (objectIn(pin)) pins[k] = withId(next++, objectIn(pin)!);
+            });
+            listIn(strand.segments).forEach((segment, k, segments) => {
+                if (!objectIn(segment)) return;
+                ids.push(next);
+                segments[k] = withId(next++, objectIn(segment)!);
+            });
+        });
+        const segmentId = (ref: JsonValue | undefined): JsonValue | undefined => {
+            if (!Array.isArray(ref) || ref.length !== 2) return ref;
+            const [s, k] = ref;
+            return typeof s === "number" && typeof k === "number"
+                ? (segmentIds[s]?.[k] ?? ref)
+                : ref;
+        };
+        for (const entry of listIn(picture.crossings).map(objectIn)) {
+            if (!entry) continue;
+            entry.over = segmentId(entry.over)!;
+            entry.under = segmentId(entry.under)!;
+        }
+        listIn(picture.props).forEach((item, p, props) => {
+            const prop = objectIn(item);
+            if (!prop) return;
+            prop.passes = listIn(prop.passes).map((pass) =>
+                Array.isArray(pass) && pass.length === 4
+                    ? [segmentId([pass[0], pass[1]])!, pass[2], pass[3]]
+                    : pass,
+            );
+            if (!listIn(prop.passes).length) delete prop.passes;
+            props[p] = withId(next++, prop);
+        });
+    }
+    return file;
+}
+
+/** The object with an id, as its first field. */
+const withId = (id: number, object: JsonObject): JsonObject => ({ id, ...object });
+
 /** The upgrades in order: `UPGRADES[k]` takes a file from version k + 1 to version k + 2. */
-export const UPGRADES: Upgrade[] = [toMillimetres];
+export const UPGRADES: Upgrade[] = [toMillimetres, addIds];

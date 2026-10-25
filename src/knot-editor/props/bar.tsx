@@ -10,13 +10,14 @@ import { segmentIntersection } from "@/lib/geometry";
 import { clamp } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
-import { FileError, onlyFields, readNumber, readObject, readPositive } from "../read-json";
+import { FileError, onlyFields, readId, readNumber, readObject, readPositive } from "../read-json";
 import type { JsonObject, JsonValue } from "../versions";
 
 import type { PropField } from "./index";
 import { readPasses, type PassEntry } from "./passes";
 
 export type BarProp = {
+    id: number;
     kind: "bar";
     /** Where its centre is (millimetres, y down). */
     x: number;
@@ -42,7 +43,8 @@ export const BAR = {
     label: "Bar",
     key: "B",
 
-    create: (at: Vector2): BarProp => ({
+    create: (at: Vector2, id: number): BarProp => ({
+        id,
         kind: "bar",
         x: at.x,
         y: at.y,
@@ -85,7 +87,7 @@ export const BAR = {
                     if (seen === "side")
                         return b.length === undefined ? { ...b, length: LENGTH } : b;
                     if (b.length === undefined) return b;
-                    return { kind: "bar", x: b.x, y: b.y, r: b.r, passes: [] };
+                    return { id: b.id, kind: "bar", x: b.x, y: b.y, r: b.r, passes: [] };
                 },
             },
         ];
@@ -102,8 +104,9 @@ export const BAR = {
 
     read(value: JsonValue, at: string): BarProp {
         const json = readObject(value, at);
-        onlyFields(json, at, ["kind", "x", "y", "r", "length", "passes"]);
+        onlyFields(json, at, ["id", "kind", "x", "y", "r", "length", "passes"]);
         const bar: BarProp = {
+            id: readId(json.id, `${at}.id`),
             kind: "bar",
             x: readNumber(json.x, `${at}.x`),
             y: readNumber(json.y, `${at}.y`),
@@ -118,6 +121,7 @@ export const BAR = {
 
     write(bar: BarProp): JsonObject {
         return {
+            id: bar.id,
             kind: "bar",
             x: bar.x,
             y: bar.y,

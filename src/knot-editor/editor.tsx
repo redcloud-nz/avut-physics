@@ -51,14 +51,15 @@ export function untitledKnot(): KnotFile {
         knot: {
             strands: [
                 {
+                    id: 1,
                     kind: "rope",
                     colour: "orange",
                     diameter: NEW_ROPE_DIAMETER,
                     pins: [
-                        { x: 0, y: 0 },
-                        { x: 110, y: 0 },
+                        { id: 2, x: 0, y: 0 },
+                        { id: 3, x: 110, y: 0 },
                     ],
-                    segments: [{ tension: [1, 1] }],
+                    segments: [{ id: 4, tension: [1, 1] }],
                 },
             ],
             crossings: [],
@@ -239,12 +240,13 @@ export default function KnotEditor() {
         const n = picture.strands.length;
         dispatch({
             type: "edit",
-            edit: (q) =>
+            edit: (q, ids) =>
                 addStrand(
                     q,
                     kind,
                     centre.sub(new Vector2(offset.x, offset.y)),
                     centre.add(new Vector2(offset.x, offset.y)),
+                    ids,
                 ),
         });
         selectPins([
@@ -274,7 +276,7 @@ export default function KnotEditor() {
             const [i, k] = segments[0];
             const seg = geometry.strands[i].segments[k];
             const t = seg.cubic.tAtLength(seg.length / 2, seg.length);
-            dispatch({ type: "edit", edit: (q) => insertPin(q, geometry, [i, k], t) });
+            dispatch({ type: "edit", edit: (q, ids) => insertPin(q, geometry, [i, k], t, ids) });
             selectPins([[i, k + 1]]);
         } else if (id === "insertRope") insertStrand("rope");
         else if (id === "insertArrow") insertStrand("arrow");
@@ -290,7 +292,7 @@ export default function KnotEditor() {
             const centre = canvas.current?.centre();
             if (!centre) return;
             const n = picture.props.length;
-            dispatch({ type: "edit", edit: (q) => addProp(q, kind.create(centre)) });
+            dispatch({ type: "edit", edit: (q, ids) => addProp(q, kind.create(centre, ids())) });
             dispatch({ type: "select", selection: { kind: "prop", prop: n } });
         } else if (id === "zoomIn") canvas.current?.zoom(1.25);
         else if (id === "zoomOut") canvas.current?.zoom(0.8);

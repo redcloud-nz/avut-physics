@@ -10,6 +10,7 @@ import {
     type KnotFile,
     type Picture,
 } from "./format";
+import { crossingsAt, passesAt } from "./ids";
 import { CURRENT_VERSION, UPGRADES, type JsonObject } from "./versions";
 
 const SAMPLES = join(import.meta.dirname, "samples");
@@ -18,54 +19,61 @@ const SAMPLES = join(import.meta.dirname, "samples");
 const PICTURE: Picture = {
     strands: [
         {
+            id: 1,
             kind: "rope",
             colour: "orange",
             diameter: 11,
             name: "Main line",
             pins: [
-                { x: 0, y: 10, angle: -90 },
-                { x: 0.5, y: 0 },
-                { x: -3.25, y: -2.12 },
+                { id: 2, x: 0, y: 10, angle: -90 },
+                { id: 3, x: 0.5, y: 0 },
+                { id: 4, x: -3.25, y: -2.12 },
             ],
-            segments: [{ tension: [1, 1], length: 10.5 }, { tension: [1.2, 0.8] }],
+            segments: [
+                { id: 5, tension: [1, 1], length: 10.5 },
+                { id: 6, tension: [1.2, 0.8] },
+            ],
         },
         {
+            id: 7,
             kind: "rope",
             colour: "green",
             diameter: 6.5,
             pins: [
-                { x: -5, y: 0 },
-                { x: 5, y: 0, angle: 12.5 },
+                { id: 8, x: -5, y: 0 },
+                { id: 9, x: 5, y: 0, angle: 12.5 },
             ],
-            segments: [{ tension: [1.5, 1.5], length: 10.2 }],
+            segments: [{ id: 10, tension: [1.5, 1.5], length: 10.2 }],
         },
         {
+            id: 11,
             kind: "arrow",
             pins: [
-                { x: 2, y: 4 },
-                { x: 2, y: -4 },
+                { id: 12, x: 2, y: 4 },
+                { id: 13, x: 2, y: -4 },
             ],
-            segments: [{ tension: [1, 1] }],
+            segments: [{ id: 14, tension: [1, 1] }],
         },
     ],
     crossings: [
-        { over: [0, 0], under: [1, 0], n: 1 },
-        { over: [2, 0], under: [1, 0], n: 1 },
-        { over: [1, 0], under: [2, 0], n: 2 },
+        { over: 5, under: 10, n: 1 },
+        { over: 14, under: 10, n: 1 },
+        { over: 10, under: 14, n: 2 },
     ],
     props: [
         {
+            id: 15,
             kind: "bar",
             x: 0,
             y: 0,
             r: 1.6,
             length: 20,
             passes: [
-                [0, 0, 1, "front"],
-                [1, 0, 1, "behind"],
+                [5, 1, "front"],
+                [10, 1, "behind"],
             ],
         },
-        { kind: "bar", x: 6, y: 6, r: 1, passes: [] },
+        { id: 16, kind: "bar", x: 6, y: 6, r: 1, passes: [] },
     ],
 };
 
@@ -88,18 +96,19 @@ const BARE: KnotFile = {
     knot: {
         strands: [
             {
+                id: 1,
                 kind: "rope",
                 colour: "orange",
                 diameter: 11,
                 pins: [
-                    { x: 0, y: 0 },
-                    { x: 3, y: 0 },
+                    { id: 2, x: 0, y: 0 },
+                    { id: 3, x: 3, y: 0 },
                 ],
-                segments: [{ tension: [1, 1] }],
+                segments: [{ id: 4, tension: [1, 1] }],
             },
         ],
         crossings: [],
-        props: [{ kind: "bar", x: 0, y: 2, r: 1, passes: [] }],
+        props: [{ id: 5, kind: "bar", x: 0, y: 2, r: 1, passes: [] }],
     },
     steps: [],
 };
@@ -133,23 +142,30 @@ describe("writeKnotFile and parseKnotFile", () => {
         const json = JSON.parse(await writeKnotFile(BARE));
         expect(Object.keys(json)).toEqual(["format", "version", "name", "frame", "knot"]);
         const strand = json.knot.strands[0];
-        expect(Object.keys(strand)).toEqual(["kind", "colour", "diameter", "pins", "segments"]);
-        expect(strand.pins[0]).toEqual({ x: 0, y: 0 });
-        expect(strand.segments[0]).toEqual({});
-        expect(json.knot.props[0]).toEqual({ kind: "bar", x: 0, y: 2, r: 1 });
+        expect(Object.keys(strand)).toEqual([
+            "id",
+            "kind",
+            "colour",
+            "diameter",
+            "pins",
+            "segments",
+        ]);
+        expect(strand.pins[0]).toEqual({ id: 2, x: 0, y: 0 });
+        expect(strand.segments[0]).toEqual({ id: 4 });
+        expect(json.knot.props[0]).toEqual({ id: 5, kind: "bar", x: 0, y: 2, r: 1 });
 
         const full = JSON.parse(await writeKnotFile(FULL));
-        expect(full.knot.strands[0].segments[0]).toEqual({ length: 10.5 });
-        expect(full.knot.crossings[0]).toEqual({ over: [0, 0], under: [1, 0] });
-        expect(full.knot.crossings[2]).toEqual({ over: [1, 0], under: [2, 0], n: 2 });
+        expect(full.knot.strands[0].segments[0]).toEqual({ id: 5, length: 10.5 });
+        expect(full.knot.crossings[0]).toEqual({ over: 5, under: 10 });
+        expect(full.knot.crossings[2]).toEqual({ over: 10, under: 14, n: 2 });
         expect(Object.keys(full.steps[2].picture)).toEqual(["strands", "crossings"]);
     });
 
     it("rounds numbers to 0.01", async () => {
         const file = structuredClone(BARE);
-        file.knot.strands[0].pins[1] = { x: 1 / 3, y: -1e-9, angle: 45.0049 };
+        file.knot.strands[0].pins[1] = { id: 3, x: 1 / 3, y: -1e-9, angle: 45.0049 };
         const json = JSON.parse(await writeKnotFile(file));
-        expect(json.knot.strands[0].pins[1]).toEqual({ x: 0.33, y: 0, angle: 45 });
+        expect(json.knot.strands[0].pins[1]).toEqual({ id: 3, x: 0.33, y: 0, angle: 45 });
     });
 
     it("lays the file out as the repo's Prettier does", async () => {
@@ -171,7 +187,7 @@ describe("writeKnotFile and parseKnotFile", () => {
             [(j) => (j.extra = 1), 'has an unknown field "extra"'],
             [(j) => j.knot.strands[0].segments.pop(), "knot.strands[0]: 3 pins but 1 segments"],
             [
-                (j) => (j.steps[1].picture.strands[2].pins = [{ x: 0, y: 0 }]),
+                (j) => (j.steps[1].picture.strands[2].pins = [{ id: 12, x: 0, y: 0 }]),
                 "steps[1].picture.strands[2]: has 1 pins",
             ],
             [
@@ -196,10 +212,28 @@ describe("writeKnotFile and parseKnotFile", () => {
                 (j) => (j.knot.strands[0].segments[0].length = 0),
                 "segments[0].length: should be more than 0",
             ],
-            [(j) => (j.knot.crossings[0].over = [3, 0]), "knot.crossings[0].over: names strand 3"],
+            [(j) => (j.knot.crossings[0].over = 99), "knot.crossings[0].over: names segment 99"],
+            [(j) => (j.knot.crossings[0].under = 3), "knot.crossings[0].under: names segment 3"],
             [
-                (j) => (j.knot.crossings[0].under = [1, 1]),
-                "knot.crossings[0].under: names segment 1 of strand 1",
+                (j) => (j.knot.crossings[0].over = [0, 0]),
+                "knot.crossings[0].over: should be a number",
+            ],
+            [
+                (j) => (j.knot.strands[1].id = 1),
+                "knot.strands[1]: has id 1, which knot.strands[0] has",
+            ],
+            [
+                (j) => (j.knot.strands[0].pins[2].id = 10),
+                "knot.strands[1].segments[0]: has id 10, which knot.strands[0].pins[2] has",
+            ],
+            [
+                (j) => (j.knot.props[1].id = 2),
+                "knot.props[1]: has id 2, which knot.strands[0].pins[0]",
+            ],
+            [(j) => delete j.knot.strands[0].segments[1].id, "segments[1].id: should be a number"],
+            [
+                (j) => (j.knot.strands[2].pins[0].id = 0),
+                "pins[0].id: should be a whole number from 1",
             ],
             [
                 (j) => (j.knot.crossings[2].n = 1),
@@ -211,16 +245,13 @@ describe("writeKnotFile and parseKnotFile", () => {
             ],
             [(j) => (j.knot.props[0].kind = "tree"), "knot.props[0].kind"],
             [
-                (j) => (j.knot.props[0].passes[1] = [0, 2, 1, "front"]),
-                "knot.props[0].passes[1]: names segment 2",
+                (j) => (j.knot.props[0].passes[1] = [4, 1, "front"]),
+                "knot.props[0].passes[1][0]: names segment 4",
             ],
-            [(j) => (j.knot.props[0].passes[1][3] = "under"), "knot.props[0].passes[1][3]"],
+            [(j) => (j.knot.props[0].passes[1][2] = "under"), "knot.props[0].passes[1][2]"],
+            [(j) => (j.knot.props[0].passes[1] = [5, 1, "behind"]), "the same pass as passes[0]"],
             [
-                (j) => (j.knot.props[0].passes[1] = [0, 0, 1, "behind"]),
-                "the same pass as passes[0]",
-            ],
-            [
-                (j) => (j.knot.props[1].passes = [[0, 0, 1, "front"]]),
+                (j) => (j.knot.props[1].passes = [[5, 1, "front"]]),
                 "knot.props[1]: a bar seen end on",
             ],
             [(j) => (j.knot.props[0].r = -1), "knot.props[0].r: should be more than 0"],
@@ -329,7 +360,7 @@ describe("versions", () => {
             }),
         );
         expect(file.knot.props[0]).toMatchObject({ x: 0, y: 0, r: 17.6, length: 220 });
-        expect(file.knot.props[0].passes).toEqual(old.knot.props[0].passes);
+        expect(passesAt(file.knot, 0)).toEqual(old.knot.props[0].passes);
 
         // Whole centimetres, at least 30 mm clear of every pin and of the bar.
         const { frame } = file;
@@ -347,16 +378,45 @@ describe("versions", () => {
         expect(frame.x + frame.w).toBeGreaterThanOrEqual(110 + 30);
     });
 
+    it("upgrades version 2 by numbering everything, its entries naming the same segments by id", () => {
+        const text = readFileSync(join(SAMPLES, "v2.json"), "utf8");
+        const old = JSON.parse(text);
+        const read = parseKnotFile(text);
+        expect(read).toMatchObject({ kind: "ok", upgradedFrom: 2 });
+        if (read.kind !== "ok") return;
+        const pictures = [read.file.knot, ...read.file.steps.map((s) => s.picture)];
+        const oldPictures = [old.knot, ...old.steps.map((s: Written) => s.picture)];
+        // Every id once in the file, counting up from 1 in order.
+        const ids = pictures.flatMap((p) => [
+            ...p.strands.flatMap((q) => [
+                q.id,
+                ...q.pins.map((r) => r.id),
+                ...q.segments.map((r) => r.id),
+            ]),
+            ...p.props.map((q) => q.id),
+        ]);
+        expect(ids).toEqual(Array.from({ length: ids.length }, (_, k) => k + 1));
+        pictures.forEach((picture, p) => {
+            expect(crossingsAt(picture)).toEqual(
+                oldPictures[p].crossings.map((c: Written) => ({ n: 1, ...c })),
+            );
+            picture.props.forEach((_, q) =>
+                expect(passesAt(picture, q)).toEqual(oldPictures[p].props[q].passes ?? []),
+            );
+        });
+    });
+
     it("runs a file through the upgrades from its version", () => {
         const text = readFileSync(join(SAMPLES, "v1.json"), "utf8");
         const upgrade = (file: JsonObject) => ({ ...file, name: String(file.name).toUpperCase() });
-        const read = parseKnotFile(text, { current: 3, upgrades: [...UPGRADES, upgrade] });
+        const later = CURRENT_VERSION + 1;
+        const read = parseKnotFile(text, { current: later, upgrades: [...UPGRADES, upgrade] });
         expect(read).toMatchObject({ kind: "ok", upgradedFrom: 1 });
         if (read.kind === "ok") expect(read.file.name).toBe(JSON.parse(text).name.toUpperCase());
-        // Without the last upgrade it can't be opened as version 3.
-        expect(parseKnotFile(text, { current: 3, upgrades: UPGRADES })).toMatchObject({
+        // Without the last upgrade it can't be opened as the version after this one.
+        expect(parseKnotFile(text, { current: later, upgrades: UPGRADES })).toMatchObject({
             kind: "error",
-            reason: expect.stringContaining("no upgrade from version 2"),
+            reason: expect.stringContaining(`no upgrade from version ${CURRENT_VERSION}`),
         });
     });
 });

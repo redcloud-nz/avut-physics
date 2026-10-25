@@ -13,16 +13,11 @@ import {
     strandPaths,
     type PictureCrossings,
 } from "./crossing-geometry";
-import { parseKnotFile, type CrossingEntry, type Picture, type Pin, type Strand } from "./format";
+import { parseKnotFile, type CrossingAt, type Picture, type Strand } from "./format";
 import { pictureGeometry } from "./geometry";
-import type { BarProp } from "./props/bar";
+import { testPicture, testStrand, type TestBar, type TestPin } from "./test-pictures";
 
-const strand = (pins: Pin[], kind: "rope" | "arrow" = "rope"): Strand => {
-    const segments = pins.slice(1).map(() => ({ tension: [1, 1] as [number, number] }));
-    return kind === "rope"
-        ? { kind, colour: "orange", diameter: 1, pins, segments }
-        : { kind, pins, segments };
-};
+const strand = (pins: TestPin[], kind: "rope" | "arrow" = "rope"): Strand => testStrand(kind, pins);
 
 /** A straight rope along the x axis. */
 const LINE = strand([
@@ -42,15 +37,7 @@ const LIFTED = strand([
     { x: 5, y: -3, angle: 70 },
 ]);
 
-const picture = (
-    strands: Strand[],
-    crossings: CrossingEntry[] = [],
-    props: BarProp[] = [],
-): Picture => ({
-    strands,
-    crossings,
-    props,
-});
+const picture = testPicture;
 
 function found(p: Picture) {
     const geometry = pictureGeometry(p);
@@ -113,7 +100,7 @@ describe("pictureCrossings", () => {
     });
 
     it("shows both entries to check when a pair crossing twice loses one", () => {
-        const entries: CrossingEntry[] = [
+        const entries: CrossingAt[] = [
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [1, 0], under: [0, 0], n: 2 },
         ];
@@ -138,7 +125,7 @@ describe("pictureCrossings", () => {
             { x: -5, y: 3 },
             { x: 5, y: 3 },
         ]);
-        const entry: CrossingEntry = { over: [0, 0], under: [1, 0], n: 1 };
+        const entry: CrossingAt = { over: [0, 0], under: [1, 0], n: 1 };
         const { crossings: c } = found(picture([LINE, apart], [entry]));
         expect(c.crossings).toEqual([]);
         expect(c.lost).toEqual([entry]);
@@ -183,7 +170,7 @@ describe("pictureCrossings", () => {
             { x: 0, y: 4 },
             { x: 2, y: -6 },
         ]);
-        const bar = (passes: BarProp["passes"]): BarProp => ({
+        const bar = (passes: TestBar["passes"]): TestBar => ({
             kind: "bar",
             x: 0,
             y: 0,
@@ -213,7 +200,7 @@ describe("pictureCrossings", () => {
             ["unset", undefined],
         ]);
         // An end-on bar has no passes.
-        const end: BarProp = { kind: "bar", x: 0, y: 0, r: 1.6, passes: [] };
+        const end: TestBar = { kind: "bar", x: 0, y: 0, r: 1.6, passes: [] };
         expect(found(picture([round], [], [end])).crossings.passes).toEqual([]);
     });
 
@@ -224,7 +211,7 @@ describe("pictureCrossings", () => {
                 { x: -5, y: -3, angle: 70 },
                 { x: 5, y: -3 - lift, angle: -70 },
             ]);
-        const bar: BarProp = {
+        const bar: TestBar = {
             kind: "bar",
             x: 0,
             y: 0,
@@ -303,7 +290,7 @@ describe("strandPaths", () => {
         const between_ = c.crossings.filter((x) => x.pair[0][0] !== x.pair[1][0]);
         expect(between_.length).toBeGreaterThanOrEqual(2);
         // Alternate which is on top.
-        const entries: CrossingEntry[] = c.crossings.map((x, k) => ({
+        const entries: CrossingAt[] = c.crossings.map((x, k) => ({
             over: x.pair[k % 2],
             under: x.pair[1 - (k % 2)],
             n: x.n,
@@ -324,7 +311,7 @@ describe("strandPaths", () => {
                 { x: x + lean, y: 6 },
             ]);
         const strands = [LINE, across(-6, 0), across(0, 3), across(6, 1)];
-        const entries: CrossingEntry[] = [
+        const entries: CrossingAt[] = [
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [2, 0], under: [0, 0], n: 1 },
             { over: [0, 0], under: [3, 0], n: 1 },
@@ -352,7 +339,7 @@ describe("strandPaths", () => {
             ]);
         // Over at x = 0 and under at x = gap: clipped at the clearance short of it.
         for (const gap of [2, 3.5]) {
-            const entries: CrossingEntry[] = [
+            const entries: CrossingAt[] = [
                 { over: [0, 0], under: [1, 0], n: 1 },
                 { over: [2, 0], under: [0, 0], n: 1 },
             ];
@@ -375,7 +362,7 @@ describe("strandPaths", () => {
                 { x, y: -6 },
                 { x, y: 6 },
             ]);
-        const entries: CrossingEntry[] = [
+        const entries: CrossingAt[] = [
             { over: [0, 0], under: [1, 0], n: 1 },
             { over: [0, 0], under: [2, 0], n: 1 },
         ];
@@ -392,7 +379,7 @@ describe("strandPaths", () => {
             { x: 0, y: 4 },
             { x: 2, y: -6 },
         ]);
-        const bar: BarProp = {
+        const bar: TestBar = {
             kind: "bar",
             x: 0,
             y: 0,
@@ -466,16 +453,17 @@ describe("strand sizes", () => {
 
     it("works out the same bends, crossings, passes and over stretches at any size", () => {
         const read = parseKnotFile(
-            readFileSync(join(import.meta.dirname, "samples", "v2.json"), "utf8"),
+            readFileSync(join(import.meta.dirname, "samples", "v3.json"), "utf8"),
         );
         if (read.kind !== "ok") throw new Error(read.reason);
         // Without its arrow, whose size is fixed: 11 mm ropes, and the same in 1 mm ropes, scaled down by 11.
         const knot = read.file.knot;
         const arrow = knot.strands.findIndex((s) => s.kind === "arrow");
+        const gone = new Set(knot.strands[arrow].segments.map((q) => q.id));
         const big: Picture = {
             ...knot,
             strands: knot.strands.filter((_, i) => i !== arrow),
-            crossings: knot.crossings.filter((e) => e.over[0] !== arrow && e.under[0] !== arrow),
+            crossings: knot.crossings.filter((e) => !gone.has(e.over) && !gone.has(e.under)),
         };
         const small = scaled(big, 1 / 11, 1);
         const [a, b] = [found(big), found(small)];
