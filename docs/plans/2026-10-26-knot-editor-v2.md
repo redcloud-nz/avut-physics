@@ -27,7 +27,13 @@ The design is in the spec. What it leaves to the build is settled here.
   - the step `coverAround` walks a pass with (0.1), by the passing strand's size;
   - a bar's pass margin (0.6), by the passing rope's diameter: `covers` takes the size as an argument;
   - the tape's length (1.2) and every width and dash in `Stretch`, by the rope's diameter;
-  - the arrow's shaft, head and outline, by `ARROW_SIZE`.
+  - the arrow's shaft, head and outline, by `ARROW_SIZE`;
+  - the spacing of the samples crossings are found from (0.25), by the strand's size, so a millimetre picture isn't
+    sampled eleven times as finely.
+- **An over stretch always clears the strand under it.** It reaches the larger of its reach and its clearance, so a
+  thin rope over a thick one is drawn over the thick one's whole width. (Settled in the build.)
+- **The bar's lines** (`BarDrawing`'s outline and highlight) take a `unit`, 1 by default for the knot pages, and the
+  editor draws them as beside an 11 mm rope. (Settled in the build.)
 - **`Stretch` takes a `width`, 1 by default.** The existing knots don't pass one, so their markup stays exactly as it
   is: Task 1 checks it byte for byte.
 - **Sizes not tied to a strand** are set in millimetres: the fitted view's margin (33 mm, for 3 diameters), a new
@@ -90,14 +96,14 @@ The design is in the spec. What it leaves to the build is settled here.
 
 ### Review group 1: millimetres and rope sizes (visual checkpoint: an upgraded file looks as it did, and a 6 mm rope beside an 11 mm one)
 
-- [ ] **1. Rope drawings of any width** — Let `Stretch` and `Tape` draw ropes of any width
+- [x] **1. Rope drawings of any width** — Let `Stretch` and `Tape` draw ropes of any width
   - **Files:** `src/knots/rope-drawing.tsx`
   - **Do:** `Stretch` and `Tape` take an optional `width` (1 by default), and every stroke width, the weave's dash,
     `TRIM` and `TAPE_LENGTH` are multiplied by it.
   - **Done when:** the knot pages' SVG markup (figure-8, on a bight, rethreaded, joining, round turn) is byte for byte
     what it was before the change, compared in the browser. Type check, lint and `npm test` pass.
 
-- [ ] **2. File version 2** — Read and write knot files in millimetres, with rope diameters and the frame
+- [x] **2. File version 2** — Read and write knot files in millimetres, with rope diameters and the frame
   - **Files:** `src/knot-editor/format.ts`, `src/knot-editor/versions.ts`, `src/knot-editor/samples/v2.json`,
     `src/knot-editor/format.test.ts`, `src/knot-editor/edits.test.ts`, `src/knot-editor/editor.tsx`,
     `src/knot-editor/props/bar.tsx`
@@ -115,7 +121,7 @@ The design is in the spec. What it leaves to the build is settled here.
     v2 sample comes back byte for byte; a frame or diameter that's missing or not above 0 is refused, saying where.
     Type check, lint and `npm test` pass.
 
-- [ ] **3. Sizes from each rope** — Size bends, crossings, passes and drawings by each strand's own size
+- [x] **3. Sizes from each rope** — Size bends, crossings, passes and drawings by each strand's own size
   - **Files:** `src/knot-editor/geometry.ts`, `src/knot-editor/crossing-geometry.ts`, `src/knot-editor/props/index.ts`,
     `src/knot-editor/props/bar.tsx`, `src/knot-editor/picture-drawing.tsx`, `src/knot-editor/arrow-drawing.tsx`,
     `src/knot-editor/canvas.tsx`, `src/knot-editor/zoom.ts`, `src/knot-editor/editor.tsx`,

@@ -2,7 +2,7 @@
  * The knot file: one knot, its finished picture and its tying steps, holding only what can't be worked out. The
  * format is described in `docs/knot-editor.md`; its versions and upgrades are in `versions.ts`.
  *
- * Coordinates are rope diameters with y down, as in SVG, and angles are degrees. Strands, segments and pins are
+ * Coordinates and sizes are millimetres with y down, as in SVG, and angles are degrees. Strands, segments and pins are
  * counted from 0 in the file.
  */
 
@@ -59,11 +59,27 @@ type StrandShape = {
     /** One fewer than the pins: segment k runs from pin k to pin k + 1. */
     segments: StrandSegment[];
 };
-export type Rope = StrandShape & { kind: "rope"; colour: RopeColour; name?: string };
+export type Rope = StrandShape & {
+    kind: "rope";
+    colour: RopeColour;
+    /** How thick it is (millimetres). */
+    diameter: number;
+    name?: string;
+};
 export type Arrow = StrandShape & { kind: "arrow" };
 /** A rope or an arrow: built and edited the same way, and drawn differently. */
 export type Strand = Rope | Arrow;
 export const STRAND_KINDS = ["rope", "arrow"] as const;
+
+/** How big an arrow counts as wherever a strand's size is needed (millimetres): as thick as an 11 mm rope. */
+export const ARROW_SIZE = 11;
+
+/**
+ * A strand's size (millimetres): a rope's diameter, or for an arrow, `ARROW_SIZE`. Sizes that go with a strand (how
+ * tight it may bend, how far it's drawn over at a crossing, how wide it's drawn) are multiples of it.
+ */
+export const strandSize = (strand: Strand) =>
+    strand.kind === "rope" ? strand.diameter : ARROW_SIZE;
 
 /** A segment of a picture: its strand, and which segment of that strand. */
 export type SegmentRef = [strand: number, segment: number];
@@ -85,10 +101,17 @@ export type Picture = { strands: Strand[]; crossings: CrossingEntry[]; props: Pr
 /** A tying step. Numbers are typed, not counted, and repeat where a step is shown in more than one picture. */
 export type Step = { number: number; instructions: string; picture: Picture };
 
+/**
+ * What the knot's page shows of every picture: one rectangle (millimetres, y down) shared by the knot and its steps,
+ * so they line up as you step through them.
+ */
+export type Frame = { x: number; y: number; w: number; h: number };
+
 export type KnotFile = {
     name: string;
     description?: string;
     about?: string;
+    frame: Frame;
     /** The finished knot. */
     knot: Picture;
     steps: Step[];
@@ -161,9 +184,26 @@ export function parseKnotFile(
 }
 
 function readFile(json: JsonObject): KnotFile {
-    onlyFields(json, "", ["format", "version", "name", "description", "about", "knot", "steps"]);
+    onlyFields(json, "", [
+        "format",
+        "version",
+        "name",
+        "description",
+        "about",
+        "frame",
+        "knot",
+        "steps",
+    ]);
+    const frame = readObject(json.frame, "frame");
+    onlyFields(frame, "frame", ["x", "y", "w", "h"]);
     const file: KnotFile = {
         name: readString(json.name, "name"),
+        frame: {
+            x: readNumber(frame.x, "frame.x"),
+            y: readNumber(frame.y, "frame.y"),
+            w: readPositive(frame.w, "frame.w"),
+            h: readPositive(frame.h, "frame.h"),
+        },
         knot: readPicture(json.knot, "knot"),
         steps: [],
     };
@@ -272,7 +312,7 @@ function readStrand(value: JsonValue, at: string): Strand {
         json,
         at,
         kind === "rope"
-            ? ["kind", "colour", "name", "pins", "segments"]
+            ? ["kind", "colour", "diameter", "name", "pins", "segments"]
             : ["kind", "pins", "segments"],
     );
     const pins = readList(json.pins, below(at, "pins")).map((item, k): Pin => {
@@ -327,6 +367,7 @@ function readStrand(value: JsonValue, at: string): Strand {
     return {
         kind,
         colour: readChoice(json.colour, below(at, "colour"), ROPE_COLOURS),
+        diameter: readPositive(json.diameter, below(at, "diameter")),
         ...(json.name !== undefined && { name: readString(json.name, below(at, "name")) }),
         pins,
         segments,
@@ -335,8 +376,8 @@ function readStrand(value: JsonValue, at: string): Strand {
 
 // Writing
 
-/** A number as it's written: to 1e-4, as `rounded()` in `rope-drawing.tsx` rounds for drawing. */
-const round = (value: number) => Math.round(value * 1e4) / 1e4 || 0;
+/** A number as it's written: to 0.01 (a hundredth of a millimetre, for coordinates and sizes). */
+const round = (value: number) => Math.round(value * 100) / 100 || 0;
 
 /** Objects written with each field on its own line, however short: the file, its pictures, steps and strands. */
 type Expanded = WeakSet<object>;
@@ -348,6 +389,7 @@ function writePicture(picture: Picture, expanded: Expanded): JsonObject {
                 kind: strand.kind,
                 ...(strand.kind === "rope" && {
                     colour: strand.colour,
+                    diameter: strand.diameter,
                     ...(strand.name !== undefined && { name: strand.name }),
                 }),
                 pins: strand.pins.map((pin) => ({
@@ -391,7 +433,7 @@ function stringify(value: JsonValue, expanded: Expanded): string {
 
 /**
  * The file as text: the current version, fields in a fixed order, defaults left out (unset angles and names,
- * unlocked lengths, tensions of 1 at both ends, n of 1, and empty steps, props and passes), numbers rounded to 1e-4,
+ * unlocked lengths, tensions of 1 at both ends, n of 1, and empty steps, props and passes), numbers rounded to 0.01,
  * and laid out by Prettier with the repo's settings, so the commit hook leaves a saved file as it is.
  */
 export async function writeKnotFile(file: KnotFile): Promise<string> {
@@ -402,6 +444,7 @@ export async function writeKnotFile(file: KnotFile): Promise<string> {
         name: file.name,
         ...(file.description !== undefined && { description: file.description }),
         ...(file.about !== undefined && { about: file.about }),
+        frame: { x: file.frame.x, y: file.frame.y, w: file.frame.w, h: file.frame.h },
         knot: writePicture(file.knot, expanded),
         ...(file.steps.length > 0 && {
             steps: file.steps.map((step) => {

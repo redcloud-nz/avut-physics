@@ -1,15 +1,15 @@
 /**
- * The zoom, as the canvas holds it (pixels per rope diameter) and as the status bar shows it (a percentage, 100% being
+ * The zoom, as the canvas holds it (pixels per millimetre) and as the status bar shows it (a percentage, 100% being
  * `BASE_SCALE`). The status bar's slider runs on a log scale, so 100% is in its middle and each step along it zooms by
  * the same factor; its − and + go to the next round level down or up.
  */
 
 import { clamp } from "@/lib/math";
 
-/** Pixels per diameter at 100%. */
-export const BASE_SCALE = 20;
-/** How far the view zooms each way (pixels per diameter): 5% to 2000%. */
-export const [LEAST_SCALE, MOST_SCALE] = [1, 400];
+/** Pixels per millimetre at 100%: an 11 mm rope is 20 pixels across. */
+export const BASE_SCALE = 20 / 11;
+/** How far the view zooms each way (pixels per millimetre): 5% to 2000%. */
+export const [LEAST_SCALE, MOST_SCALE] = [1 / 11, 400 / 11];
 
 export const withinZoom = (scale: number) => clamp(scale, LEAST_SCALE, MOST_SCALE);
 

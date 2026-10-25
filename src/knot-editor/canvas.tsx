@@ -57,7 +57,7 @@ const curve = (c: Cubic) => `M ${point(c.p0)} C ${point(c.p1)} ${point(c.p2)} ${
 
 /**
  * Warnings on the drawing: ropes' bends tighter than `TIGHTEST_BEND` shaded (when shown), and a red line along each
- * locked segment that can't meet its length.
+ * locked segment that can't meet its length, each as wide as goes with its strand's size.
  */
 function Warnings(props: { geometry: PictureGeometry; bends: boolean }) {
     return props.geometry.strands.flatMap((strand, i) =>
@@ -69,7 +69,7 @@ function Warnings(props: { geometry: PictureGeometry; bends: boolean }) {
                     fill="none"
                     stroke="var(--warning)"
                     strokeOpacity={0.55}
-                    strokeWidth={1.8}
+                    strokeWidth={1.8 * seg.size}
                     strokeLinecap="round"
                 />
             )),
@@ -80,7 +80,7 @@ function Warnings(props: { geometry: PictureGeometry; bends: boolean }) {
                           d={curve(seg.cubic)}
                           fill="none"
                           stroke="var(--danger)"
-                          strokeWidth={0.45}
+                          strokeWidth={0.45 * seg.size}
                           strokeLinecap="round"
                       />,
                   ]
@@ -91,7 +91,7 @@ function Warnings(props: { geometry: PictureGeometry; bends: boolean }) {
 
 /**
  * What the editor can ask of the canvas: the View menu's zooms, the status bar's (to a scale, in pixels per
- * diameter), and where the middle of the view is. Both zoom about the middle.
+ * millimetre), and where the middle of the view is. Both zoom about the middle.
  */
 export type CanvasControls = {
     zoom(factor: number): void;
@@ -100,12 +100,14 @@ export type CanvasControls = {
     centre(): Vector2;
 };
 
-/** Where the view is centred (diameters) and how big a diameter is drawn (pixels). */
+/** Where the view is centred (millimetres) and how big a millimetre is drawn (pixels). */
 type View = { cx: number; cy: number; scale: number };
 type Size = { w: number; h: number };
 
-/** How far round the picture the fitted view leaves (diameters). */
-const MARGIN = 3;
+/** How far round the picture the fitted view leaves (millimetres: 3 diameters of an 11 mm rope). */
+const MARGIN = 33;
+/** What a drag rounds places to (millimetres). */
+const DRAG_STEP = 0.1;
 /** How far (pixels) the pointer moves before a press becomes a drag. */
 const DRAG = 3;
 
@@ -145,7 +147,8 @@ type Gesture = { from: { x: number; y: number }; moved: boolean } & (
 );
 
 const same = (a: readonly number[], b: readonly number[]) => a[0] === b[0] && a[1] === b[1];
-const rounded = (v: number, step: number) => Math.round(v / step) * step;
+/** A value rounded to a step (0.1 or 0.01), written as it reads: 0.3, not 0.30000000000000004. */
+const rounded = (v: number, step: number) => Math.round(v / step) / Math.round(1 / step);
 
 export function Canvas(props: {
     picture: Picture;
@@ -229,7 +232,7 @@ export function Canvas(props: {
     const pointer = useRef<{ x: number; y: number } | null>(null);
     const frame = useRef<number | null>(null);
 
-    /** A point on the screen (client pixels) in the picture (diameters). */
+    /** A point on the screen (client pixels) in the picture (millimetres). */
     const toPicture = (x: number, y: number) => {
         const rect = svg.current!.getBoundingClientRect();
         const v = latest.current.view!;
@@ -269,15 +272,15 @@ export function Canvas(props: {
                             movePin(
                                 pic,
                                 ref,
-                                rounded(g.origins[k].x + d.x, 1e-3),
-                                rounded(g.origins[k].y + d.y, 1e-3),
+                                rounded(g.origins[k].x + d.x, DRAG_STEP),
+                                rounded(g.origins[k].y + d.y, DRAG_STEP),
                             ),
                         q,
                     ),
             });
         } else if (g.kind === "prop") {
             const d = at.sub(g.start);
-            const by = new Vector2(rounded(d.x, 1e-3), rounded(d.y, 1e-3));
+            const by = new Vector2(rounded(d.x, DRAG_STEP), rounded(d.y, DRAG_STEP));
             const { index, origin } = g;
             dispatch({
                 type: "edit",

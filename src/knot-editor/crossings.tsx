@@ -4,7 +4,7 @@
  * small dot and a letter (A, B…, as the old editor had), and every pass a dot, so they can be named.
  *
  * Each mark is also where a click sets or swaps that crossing or pass: they carry `data-hit` and `data-ref` (the
- * index into `pictureCrossings`' lists) for the canvas. Sizes are in screen pixels, turned into diameters by `px`.
+ * index into `pictureCrossings`' lists) for the canvas. Sizes are in screen pixels, turned into millimetres by `px`.
  */
 
 import type { Vector2 } from "@/lib/vector2";

@@ -1,6 +1,7 @@
 /**
  * An arrow strand: a thin shaft along its curves with a head at its last pin, outlined so it reads over the ropes.
- * Its over stretches are the shaft again, drawn in the top layer. Coordinates are rope diameters.
+ * Its over stretches are the shaft again, drawn in the top layer. Coordinates are millimetres, and its sizes are
+ * multiples of `ARROW_SIZE`.
  */
 
 import { memo } from "react";
@@ -10,12 +11,17 @@ import type { Vector2 } from "@/lib/vector2";
 
 import { ARROW_TOKENS } from "./colours";
 import { pathBetween } from "./crossing-geometry";
+import { ARROW_SIZE } from "./format";
 import type { StrandGeometry } from "./geometry";
 
-/** How long the head is, and how wide the shaft and its outline (diameters), as the knot pages' arrows. */
-const HEAD = 1.1;
-const SHAFT = 0.28;
-const OUTLINE = SHAFT + 0.2;
+/**
+ * How long the head is, how wide the shaft and its outline, and how thick the head's outline, as the knot pages'
+ * arrows beside their ropes.
+ */
+const HEAD = 1.1 * ARROW_SIZE;
+const SHAFT = 0.28 * ARROW_SIZE;
+const HEAD_OUTLINE = 0.2 * ARROW_SIZE;
+const OUTLINE = SHAFT + HEAD_OUTLINE;
 
 /**
  * An arrow as drawn: its shaft's path data (stopping where the head starts), its head's corners, its over stretches,
@@ -56,7 +62,7 @@ function Head(props: { head: string }) {
                 points={props.head}
                 fill={ARROW_TOKENS.outline}
                 stroke={ARROW_TOKENS.outline}
-                strokeWidth={0.2}
+                strokeWidth={HEAD_OUTLINE}
                 strokeLinejoin="round"
             />
             <polygon points={props.head} fill={ARROW_TOKENS.fill} />

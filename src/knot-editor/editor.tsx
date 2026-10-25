@@ -28,6 +28,7 @@ import {
     deleteProp,
     insertPin,
     insertStep,
+    NEW_ROPE_DIAMETER,
     setDetails,
 } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
@@ -45,14 +46,16 @@ import { CURRENT_VERSION } from "./versions";
 export function untitledKnot(): KnotFile {
     return {
         name: "Untitled knot",
+        frame: { x: -95, y: -100, w: 300, h: 200 },
         knot: {
             strands: [
                 {
                     kind: "rope",
                     colour: "orange",
+                    diameter: NEW_ROPE_DIAMETER,
                     pins: [
                         { x: 0, y: 0 },
-                        { x: 10, y: 0 },
+                        { x: 110, y: 0 },
                     ],
                     segments: [{ tension: [1, 1] }],
                 },
@@ -227,7 +230,7 @@ export default function KnotEditor() {
     function insertStrand(kind: "rope" | "arrow") {
         const centre = canvas.current?.centre();
         if (!centre) return;
-        const offset = { x: 5, y: 0 } as const;
+        const offset = { x: 55, y: 0 } as const;
         const n = picture.strands.length;
         dispatch({
             type: "edit",

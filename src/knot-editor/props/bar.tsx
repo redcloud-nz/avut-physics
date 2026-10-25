@@ -18,10 +18,10 @@ import { readPasses, type PassEntry } from "./passes";
 
 export type BarProp = {
     kind: "bar";
-    /** Where its centre is (diameters, y down). */
+    /** Where its centre is (millimetres, y down). */
     x: number;
     y: number;
-    /** Its radius (diameters). */
+    /** Its radius (millimetres). */
     r: number;
     /** How long it is, seen side on; none when seen end on. */
     length?: number;
@@ -29,8 +29,11 @@ export type BarProp = {
     passes: PassEntry[];
 };
 
-/** A new bar's radius, and its length seen side on (diameters), as in the sample knot. */
-const [RADIUS, LENGTH] = [1.6, 20];
+/** A new bar's radius, and its length seen side on (millimetres), as in the sample knot. */
+const [RADIUS, LENGTH] = [17.6, 220];
+
+/** The bar's lines are drawn as thick as beside an 11 mm rope, whatever passes it. */
+const LINE_UNIT = 11;
 
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
@@ -61,9 +64,15 @@ export const BAR = {
         const positive = (change: (v: number) => Partial<BarProp>) => (b: BarProp, v: number) =>
             v > 0 ? { ...b, ...change(v) } : b;
         const fields: PropField<BarProp>[] = [
-            { kind: "number", label: "x", value: bar.x, set: (b, x) => ({ ...b, x }) },
-            { kind: "number", label: "y", value: bar.y, set: (b, y) => ({ ...b, y }) },
-            { kind: "number", label: "Radius", value: bar.r, set: positive((r) => ({ r })) },
+            { kind: "number", label: "x", unit: "mm", value: bar.x, set: (b, x) => ({ ...b, x }) },
+            { kind: "number", label: "y", unit: "mm", value: bar.y, set: (b, y) => ({ ...b, y }) },
+            {
+                kind: "number",
+                label: "Radius",
+                unit: "mm",
+                value: bar.r,
+                set: positive((r) => ({ r })),
+            },
             {
                 kind: "choice",
                 label: "Seen",
@@ -84,6 +93,7 @@ export const BAR = {
             fields.push({
                 kind: "number",
                 label: "Length",
+                unit: "mm",
                 value: bar.length,
                 set: positive((length) => ({ length })),
             });
@@ -152,14 +162,15 @@ export const BAR = {
 
     /**
      * Whether a pass in front must be over at this point of the strand: within the bar's radius of its middle line,
-     * and a margin more so the rope's edges clear it.
+     * and a margin more (in the passing strand's sizes) so its edges clear it.
      */
-    covers: (bar: BarProp, point: Vector2) => Math.abs(point.y - bar.y) < bar.r + PASS_MARGIN,
+    covers: (bar: BarProp, point: Vector2, size: number) =>
+        Math.abs(point.y - bar.y) < bar.r + PASS_MARGIN * size,
 
     /** Seen side on, strands pass in front of it and behind it; seen end on, they lie across it. */
     between: (bar: BarProp) => bar.length !== undefined,
 
-    draw: (bar: BarProp) => <BarDrawing bar={bar} />,
+    draw: (bar: BarProp) => <BarDrawing bar={bar} unit={LINE_UNIT} />,
 
     bounds(bar: BarProp): Box {
         const half = bar.length ? bar.length / 2 : bar.r;
@@ -170,5 +181,5 @@ export const BAR = {
     },
 };
 
-/** How far past the bar's edge (diameters, across it) a pass in front is drawn over. */
+/** How far past the bar's edge (the passing strand's sizes, across it) a pass in front is drawn over. */
 const PASS_MARGIN = 0.6;

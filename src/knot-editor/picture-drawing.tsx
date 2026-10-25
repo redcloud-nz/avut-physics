@@ -4,7 +4,7 @@
  * rope's taped end. Ropes are drawn with `RopeDrawing`'s pieces, so a knot looks the same here as on its page.
  *
  * Each strand and prop is its own memoised piece, compared by what it draws, so a change to one redraws only it.
- * Coordinates are rope diameters.
+ * Coordinates are millimetres, and each rope is drawn its own diameter across.
  */
 
 import { memo } from "react";
@@ -14,7 +14,7 @@ import { laySegments, type RopePath } from "@/knots/rope-path";
 
 import { ArrowDrawing, ArrowOverDrawing, arrowShape } from "./arrow-drawing";
 import { ROPE_TOKENS, TAPE_TOKENS } from "./colours";
-import type { Picture, Prop } from "./format";
+import { strandSize, type Picture, type Prop } from "./format";
 import type { PictureGeometry } from "./geometry";
 import { kindOf } from "./props";
 
@@ -25,12 +25,12 @@ const PropDrawing = memo(function PropDrawing(props: { prop: Prop }) {
     return kindOf(props.prop).draw(props.prop);
 });
 
-const RopeWhole = memo(function RopeWhole(props: { d: string; colors: RopeColors }) {
-    return <Stretch d={props.d} offset={0} colors={props.colors} />;
+const RopeWhole = memo(function RopeWhole(props: { d: string; colors: RopeColors; width: number }) {
+    return <Stretch d={props.d} offset={0} colors={props.colors} width={props.width} />;
 });
 
 const RopeOver = memo(
-    function RopeOver(props: { path: RopePath; colors: RopeColors }) {
+    function RopeOver(props: { path: RopePath; colors: RopeColors; width: number }) {
         return laySegments(props.path).map(
             (seg, k) =>
                 seg.over && (
@@ -40,18 +40,19 @@ const RopeOver = memo(
                         offset={seg.start}
                         length={seg.length}
                         colors={props.colors}
+                        width={props.width}
                     />
                 ),
         );
     },
-    (a, b) => a.colors === b.colors && samePath(a.path, b.path),
+    (a, b) => a.colors === b.colors && a.width === b.width && samePath(a.path, b.path),
 );
 
 const RopeTape = memo(
-    function RopeTape(props: { path: RopePath }) {
-        return <Tape path={props.path} colors={TAPE_TOKENS} />;
+    function RopeTape(props: { path: RopePath; width: number }) {
+        return <Tape path={props.path} colors={TAPE_TOKENS} width={props.width} />;
     },
-    (a, b) => samePath(a.path, b.path),
+    (a, b) => a.width === b.width && samePath(a.path, b.path),
 );
 
 /** The picture, from its geometry and each strand's path (from `strandPaths`). */
@@ -75,7 +76,12 @@ export function PictureDrawing(props: {
                 arrow ? (
                     <ArrowDrawing key={i} shaft={arrow.shaft} head={arrow.head} />
                 ) : (
-                    <RopeWhole key={i} d={path.map((s) => s.d).join(" ")} colors={colors!} />
+                    <RopeWhole
+                        key={i}
+                        d={path.map((s) => s.d).join(" ")}
+                        colors={colors!}
+                        width={strandSize(strands[i].strand)}
+                    />
                 ),
             )}
             {picture.props.map((prop, p) => between[p] && <PropDrawing key={p} prop={prop} />)}
@@ -88,11 +94,19 @@ export function PictureDrawing(props: {
                         headOver={arrow.headOver}
                     />
                 ) : (
-                    <RopeOver key={i} path={path} colors={colors!} />
+                    <RopeOver
+                        key={i}
+                        path={path}
+                        colors={colors!}
+                        width={strandSize(strands[i].strand)}
+                    />
                 ),
             )}
             {strands.map(
-                ({ strand, path }, i) => strand.kind === "rope" && <RopeTape key={i} path={path} />,
+                ({ strand, path }, i) =>
+                    strand.kind === "rope" && (
+                        <RopeTape key={i} path={path} width={strand.diameter} />
+                    ),
             )}
         </g>
     );

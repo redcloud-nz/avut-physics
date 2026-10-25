@@ -19,7 +19,9 @@ import type { BarProp } from "./props/bar";
 
 const strand = (pins: Pin[], kind: "rope" | "arrow" = "rope"): Strand => {
     const segments = pins.slice(1).map(() => ({ tension: [1, 1] as [number, number] }));
-    return kind === "rope" ? { kind, colour: "orange", pins, segments } : { kind, pins, segments };
+    return kind === "rope"
+        ? { kind, colour: "orange", diameter: 1, pins, segments }
+        : { kind, pins, segments };
 };
 
 /** A straight rope along the x axis. */
@@ -437,5 +439,109 @@ describe("samples/v1.json", () => {
         expect(new Set(knot.crossings.passes.map((p) => p.side))).toEqual(
             new Set(["front", "behind"]),
         );
+    });
+});
+
+describe("strand sizes", () => {
+    /** The picture with every place and length scaled, and its ropes given a diameter. */
+    const scaled = (p: Picture, by: number, diameter: number): Picture => ({
+        ...p,
+        strands: p.strands.map((s) => ({
+            ...s,
+            ...(s.kind === "rope" && { diameter }),
+            pins: s.pins.map((pin) => ({ ...pin, x: pin.x * by, y: pin.y * by })),
+            segments: s.segments.map((seg) => ({
+                ...seg,
+                ...(seg.length !== undefined && { length: seg.length * by }),
+            })),
+        })),
+        props: p.props.map((prop) => ({
+            ...prop,
+            x: prop.x * by,
+            y: prop.y * by,
+            r: prop.r * by,
+            ...(prop.length !== undefined && { length: prop.length * by }),
+        })),
+    });
+
+    it("works out the same bends, crossings, passes and over stretches at any size", () => {
+        const read = parseKnotFile(
+            readFileSync(join(import.meta.dirname, "samples", "v2.json"), "utf8"),
+        );
+        if (read.kind !== "ok") throw new Error(read.reason);
+        // Without its arrow, whose size is fixed: 11 mm ropes, and the same in 1 mm ropes, scaled down by 11.
+        const knot = read.file.knot;
+        const arrow = knot.strands.findIndex((s) => s.kind === "arrow");
+        const big: Picture = {
+            ...knot,
+            strands: knot.strands.filter((_, i) => i !== arrow),
+            crossings: knot.crossings.filter((e) => e.over[0] !== arrow && e.under[0] !== arrow),
+        };
+        const small = scaled(big, 1 / 11, 1);
+        const [a, b] = [found(big), found(small)];
+        a.geometry.strands.forEach((strand, i) =>
+            strand.segments.forEach((seg, k) => {
+                const other = b.geometry.strands[i].segments[k];
+                expect(seg.bends.length).toBe(other.bends.length);
+                seg.bends.forEach(([t0, t1], j) => {
+                    expect(t0).toBeCloseTo(other.bends[j][0], 6);
+                    expect(t1).toBeCloseTo(other.bends[j][1], 6);
+                });
+            }),
+        );
+        expect(a.crossings.crossings.length).toBeGreaterThan(0);
+        expect(a.crossings.crossings.map((c) => [c.pair, c.n, c.status, c.over])).toEqual(
+            b.crossings.crossings.map((c) => [c.pair, c.n, c.status, c.over]),
+        );
+        a.crossings.crossings.forEach((c, j) => {
+            expect(c.t[0]).toBeCloseTo(b.crossings.crossings[j].t[0], 6);
+            expect(c.s[0] / 11).toBeCloseTo(b.crossings.crossings[j].s[0], 6);
+        });
+        expect(a.crossings.passes.length).toBeGreaterThan(0);
+        a.crossings.passes.forEach((p, j) => {
+            const q = b.crossings.passes[j];
+            expect([p.prop, p.strand, p.segment, p.n, p.side]).toEqual([
+                q.prop,
+                q.strand,
+                q.segment,
+                q.n,
+                q.side,
+            ]);
+            expect(p.cover[0] / 11).toBeCloseTo(q.cover[0], 4);
+            expect(p.cover[1] / 11).toBeCloseTo(q.cover[1], 4);
+        });
+        expect([a.paths.tooClose, a.paths.tooClosePasses]).toEqual([
+            b.paths.tooClose,
+            b.paths.tooClosePasses,
+        ]);
+        a.paths.paths.forEach((path, i) => {
+            const [mine, theirs] = [overStretches(path), overStretches(b.paths.paths[i])];
+            expect(mine.length).toBe(theirs.length);
+            mine.forEach(([from, to], j) => {
+                expect(from / 11).toBeCloseTo(theirs[j][0], 4);
+                expect(to / 11).toBeCloseTo(theirs[j][1], 4);
+            });
+        });
+    });
+
+    it("marks a thin rope over a thick one far enough to clear the thick one's width", () => {
+        const thick = { ...LINE, diameter: 4 } as Strand;
+        const thin = strand([
+            { x: 0, y: -8 },
+            { x: 0, y: 8 },
+        ]);
+        const { paths } = found(picture([thick, thin], [{ over: [1, 0], under: [0, 0], n: 1 }]));
+        const [stretch] = overStretches(paths.paths[1]);
+        // Its square-cut ends are past the thick rope's edges, outline and all, either side of where they cross.
+        const half = (1.25 * 4) / 2;
+        expect(stretch[0]).toBeLessThanOrEqual(8 - half + 1e-9);
+        expect(stretch[1]).toBeGreaterThanOrEqual(8 + half - 1e-9);
+        expect(clearance(1, 1, 4)).toBeCloseTo(half, 9);
+        // And the thick rope over the thin one reaches its own, longer, reach.
+        const { paths: flipped } = found(
+            picture([thick, thin], [{ over: [0, 0], under: [1, 0], n: 1 }]),
+        );
+        const [wide] = overStretches(flipped.paths[0]);
+        expect(wide[1] - wide[0]).toBeCloseTo(2 * overReach(1, 4), 6);
     });
 });

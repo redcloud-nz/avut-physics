@@ -22,11 +22,13 @@ import {
     lockSegment,
     movePin,
     moveStep,
+    NEW_ROPE_DIAMETER,
     setCrossing,
     setDetails,
     setPass,
     setPinAngle,
     setRopeColour,
+    setRopeDiameter,
     setRopeName,
     setSegmentLength,
     setStepInstructions,
@@ -60,6 +62,7 @@ import {
 const rope = (pins: Pin[], colour: "orange" | "green" | "blue" = "orange"): Strand => ({
     kind: "rope",
     colour,
+    diameter: 1,
     pins,
     segments: pins.slice(1).map(() => ({ tension: [1, 1] as [number, number] })),
 });
@@ -190,6 +193,12 @@ describe("pins and segments", () => {
         const named = setRopeName(p, 0, "  Working end ");
         expect(named.strands[0]).toMatchObject({ name: "Working end" });
         expect(setRopeName(named, 0, " ").strands[0]).not.toHaveProperty("name");
+    });
+
+    it("sets a rope's diameter, above 0", () => {
+        expect(setRopeDiameter(p, 1, 6).strands[1]).toMatchObject({ diameter: 6 });
+        expect(setRopeDiameter(p, 1, 6).strands[0]).toBe(p.strands[0]);
+        for (const d of [1, 0, -2, NaN]) expect(setRopeDiameter(p, 1, d)).toBe(p);
     });
 });
 
@@ -465,7 +474,7 @@ describe("props", () => {
 
     it("adds a bar, moves it, sets its fields and deletes it", () => {
         const p = addProp(picture([LINE]), BAR.create(at(2, 3)));
-        expect(p.props).toEqual([{ kind: "bar", x: 2, y: 3, r: 1.6, length: 20, passes: [] }]);
+        expect(p.props).toEqual([{ kind: "bar", x: 2, y: 3, r: 17.6, length: 220, passes: [] }]);
         const bar = p.props[0];
         const moved = changeProp(p, 0, (q) => kindOf(q).moved(q, at(1, -1)));
         expect([moved.props[0].x, moved.props[0].y]).toEqual([3, 2]);
@@ -485,9 +494,9 @@ describe("props", () => {
         const seen = BAR.fields(bar).find((f) => f.label === "Seen")!;
         if (seen.kind !== "choice") throw new Error("Seen should be a choice");
         const endOn = seen.set(bar, "end");
-        expect(endOn).toEqual({ kind: "bar", x: 0, y: 0, r: 1.6, passes: [] });
+        expect(endOn).toEqual({ kind: "bar", x: 0, y: 0, r: 17.6, passes: [] });
         expect(BAR.fields(endOn).map((f) => f.label)).not.toContain("Length");
-        expect(seen.set(endOn, "side").length).toBe(20);
+        expect(seen.set(endOn, "side").length).toBe(220);
         expect(seen.set(bar, "side")).toBe(bar);
         // Seen end on, it's drawn behind every strand.
         expect([BAR.between(bar), BAR.between(endOn)]).toEqual([true, false]);
@@ -568,7 +577,15 @@ describe("strands", () => {
     it("adds ropes in the first colour not used, and arrows", () => {
         const p = picture([LINE]);
         const added = addStrand(p, "rope", new Vector2(0, 5), new Vector2(10, 5));
-        expect(added.strands[1]).toMatchObject({ kind: "rope", colour: "green" });
+        expect(added.strands[1]).toMatchObject({ kind: "rope", colour: "green", diameter: 1 });
+        // As thick as the picture's last rope, or 11 mm in a picture with none.
+        const thin = setRopeDiameter(added, 1, 6);
+        expect(addStrand(thin, "rope", Vector2.ZERO, Vector2.ZERO).strands[2]).toMatchObject({
+            diameter: 6,
+        });
+        expect(addStrand(picture([]), "rope", Vector2.ZERO, Vector2.ZERO).strands[0]).toMatchObject(
+            { diameter: NEW_ROPE_DIAMETER },
+        );
         expect(added.strands[0]).toBe(p.strands[0]);
         const arrow = addStrand(added, "arrow", new Vector2(0, 8), new Vector2(10, 8));
         expect(arrow.strands[2]).toEqual({
@@ -628,6 +645,7 @@ describe("steps and details", () => {
     const one = picture([WIGGLE]);
     const base: KnotFile = {
         name: "Test",
+        frame: { x: -20, y: -20, w: 40, h: 40 },
         knot,
         steps: [{ number: 1, instructions: "Make a bight.", picture: one }],
     };
@@ -695,6 +713,7 @@ describe("steps and details", () => {
 describe("state", () => {
     const file = (knot: Picture, steps: Picture[] = []): KnotFile => ({
         name: "Test",
+        frame: { x: -20, y: -20, w: 40, h: 40 },
         knot,
         steps: steps.map((picture, k) => ({ number: k + 1, instructions: "", picture })),
     });

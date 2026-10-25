@@ -20,17 +20,19 @@ const PICTURE: Picture = {
         {
             kind: "rope",
             colour: "orange",
+            diameter: 11,
             name: "Main line",
             pins: [
                 { x: 0, y: 10, angle: -90 },
                 { x: 0.5, y: 0 },
-                { x: -3.25, y: -2.1234 },
+                { x: -3.25, y: -2.12 },
             ],
             segments: [{ tension: [1, 1], length: 10.5 }, { tension: [1.2, 0.8] }],
         },
         {
             kind: "rope",
             colour: "green",
+            diameter: 6.5,
             pins: [
                 { x: -5, y: 0 },
                 { x: 5, y: 0, angle: 12.5 },
@@ -71,6 +73,7 @@ const FULL: KnotFile = {
     name: "Test knot",
     description: "A line or so.",
     about: "Longer text.\n\nOver two paragraphs.",
+    frame: { x: -12.5, y: -10, w: 25, h: 20.25 },
     knot: PICTURE,
     steps: [
         { number: 1, instructions: "First.", picture: PICTURE },
@@ -81,11 +84,13 @@ const FULL: KnotFile = {
 
 const BARE: KnotFile = {
     name: "Bare",
+    frame: { x: -5, y: -5, w: 10, h: 10 },
     knot: {
         strands: [
             {
                 kind: "rope",
                 colour: "orange",
+                diameter: 11,
                 pins: [
                     { x: 0, y: 0 },
                     { x: 3, y: 0 },
@@ -126,9 +131,9 @@ describe("writeKnotFile and parseKnotFile", () => {
 
     it("leaves out what's unset or the default", async () => {
         const json = JSON.parse(await writeKnotFile(BARE));
-        expect(Object.keys(json)).toEqual(["format", "version", "name", "knot"]);
+        expect(Object.keys(json)).toEqual(["format", "version", "name", "frame", "knot"]);
         const strand = json.knot.strands[0];
-        expect(Object.keys(strand)).toEqual(["kind", "colour", "pins", "segments"]);
+        expect(Object.keys(strand)).toEqual(["kind", "colour", "diameter", "pins", "segments"]);
         expect(strand.pins[0]).toEqual({ x: 0, y: 0 });
         expect(strand.segments[0]).toEqual({});
         expect(json.knot.props[0]).toEqual({ kind: "bar", x: 0, y: 2, r: 1 });
@@ -140,11 +145,11 @@ describe("writeKnotFile and parseKnotFile", () => {
         expect(Object.keys(full.steps[2].picture)).toEqual(["strands", "crossings"]);
     });
 
-    it("rounds numbers to 1e-4", async () => {
+    it("rounds numbers to 0.01", async () => {
         const file = structuredClone(BARE);
-        file.knot.strands[0].pins[1] = { x: 1 / 3, y: -1e-9, angle: 45.000049 };
+        file.knot.strands[0].pins[1] = { x: 1 / 3, y: -1e-9, angle: 45.0049 };
         const json = JSON.parse(await writeKnotFile(file));
-        expect(json.knot.strands[0].pins[1]).toEqual({ x: 0.3333, y: 0, angle: 45 });
+        expect(json.knot.strands[0].pins[1]).toEqual({ x: 0.33, y: 0, angle: 45 });
     });
 
     it("lays the file out as the repo's Prettier does", async () => {
@@ -219,6 +224,22 @@ describe("writeKnotFile and parseKnotFile", () => {
                 "knot.props[1]: a bar seen end on",
             ],
             [(j) => (j.knot.props[0].r = -1), "knot.props[0].r: should be more than 0"],
+            [(j) => delete j.frame, "frame: should be an object"],
+            [(j) => (j.frame.w = 0), "frame.w: should be more than 0"],
+            [(j) => delete j.frame.h, "frame.h: should be a number"],
+            [(j) => (j.frame.d = 1), 'frame: has an unknown field "d"'],
+            [
+                (j) => delete j.knot.strands[1].diameter,
+                "knot.strands[1].diameter: should be a number",
+            ],
+            [
+                (j) => (j.knot.strands[0].diameter = -2),
+                "knot.strands[0].diameter: should be more than 0",
+            ],
+            [
+                (j) => (j.knot.strands[2].diameter = 11),
+                'knot.strands[2]: has an unknown field "diameter"',
+            ],
             [(j) => (j.steps[0].number = 0), "steps[0].number: should be a whole number from 1"],
             [(j) => (j.steps[0].number = 1.5), "steps[0].number"],
             [(j) => delete j.steps[2].instructions, "steps[2].instructions: should be text"],
@@ -281,16 +302,61 @@ describe("versions", () => {
         }
     });
 
+    it("upgrades version 1 to millimetres, with 11 mm ropes and a frame round everything", () => {
+        const text = readFileSync(join(SAMPLES, "v1.json"), "utf8");
+        const old = JSON.parse(text);
+        const read = parseKnotFile(text);
+        expect(read).toMatchObject({ kind: "ok", upgradedFrom: 1 });
+        if (read.kind !== "ok") return;
+        const { file } = read;
+        const pictures = [file.knot, ...file.steps.map((s) => s.picture)];
+        const oldPictures = [old.knot, ...old.steps.map((s: Written) => s.picture)];
+        pictures.forEach((picture, p) =>
+            picture.strands.forEach((strand, i) => {
+                const was = oldPictures[p].strands[i];
+                if (strand.kind === "rope") expect(strand.diameter).toBe(11);
+                strand.pins.forEach((pin, k) => {
+                    expect(pin.x).toBeCloseTo(was.pins[k].x * 11, 9);
+                    expect(pin.y).toBeCloseTo(was.pins[k].y * 11, 9);
+                    expect(pin.angle).toBe(was.pins[k].angle);
+                });
+                strand.segments.forEach((segment, k) => {
+                    const length = was.segments[k].length;
+                    if (length === undefined) expect(segment.length).toBeUndefined();
+                    else expect(segment.length).toBeCloseTo(length * 11, 9);
+                    expect(segment.tension).toEqual(was.segments[k].tension ?? [1, 1]);
+                });
+            }),
+        );
+        expect(file.knot.props[0]).toMatchObject({ x: 0, y: 0, r: 17.6, length: 220 });
+        expect(file.knot.props[0].passes).toEqual(old.knot.props[0].passes);
+
+        // Whole centimetres, at least 30 mm clear of every pin and of the bar.
+        const { frame } = file;
+        for (const v of [frame.x, frame.y, frame.w, frame.h]) expect(Math.abs(v % 10)).toBe(0);
+        for (const picture of pictures) {
+            for (const strand of picture.strands)
+                for (const pin of strand.pins) {
+                    expect(pin.x - frame.x).toBeGreaterThanOrEqual(30);
+                    expect(frame.x + frame.w - pin.x).toBeGreaterThanOrEqual(30);
+                    expect(pin.y - frame.y).toBeGreaterThanOrEqual(30);
+                    expect(frame.y + frame.h - pin.y).toBeGreaterThanOrEqual(30);
+                }
+        }
+        expect(frame.x).toBeLessThanOrEqual(-110 - 30);
+        expect(frame.x + frame.w).toBeGreaterThanOrEqual(110 + 30);
+    });
+
     it("runs a file through the upgrades from its version", () => {
         const text = readFileSync(join(SAMPLES, "v1.json"), "utf8");
         const upgrade = (file: JsonObject) => ({ ...file, name: String(file.name).toUpperCase() });
-        const read = parseKnotFile(text, { current: 2, upgrades: [upgrade] });
+        const read = parseKnotFile(text, { current: 3, upgrades: [...UPGRADES, upgrade] });
         expect(read).toMatchObject({ kind: "ok", upgradedFrom: 1 });
         if (read.kind === "ok") expect(read.file.name).toBe(JSON.parse(text).name.toUpperCase());
-        // Without the upgrade it can't be opened as version 2.
-        expect(parseKnotFile(text, { current: 2, upgrades: [] })).toMatchObject({
+        // Without the last upgrade it can't be opened as version 3.
+        expect(parseKnotFile(text, { current: 3, upgrades: UPGRADES })).toMatchObject({
             kind: "error",
-            reason: expect.stringContaining("no upgrade from version 1"),
+            reason: expect.stringContaining("no upgrade from version 2"),
         });
     });
 });

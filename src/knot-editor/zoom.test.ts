@@ -20,8 +20,8 @@ describe("zoom", () => {
 
     it("runs the slider from the least zoom to the most, and back", () => {
         expect([sliderOf(LEAST_SCALE), sliderOf(MOST_SCALE)]).toEqual([0, SLIDER_STEPS]);
-        expect([sliderOf(0.1), sliderOf(9000)]).toEqual([0, SLIDER_STEPS]);
-        for (const scale of [1, 3.7, 20, 64, 400])
+        expect([sliderOf(0.01), sliderOf(9000)]).toEqual([0, SLIDER_STEPS]);
+        for (const scale of [1, 3.7, 20, 64, 400].map((s) => s / 11))
             expect(scaleAtSlider(sliderOf(scale)) / scale).toBeCloseTo(1, 2);
     });
 

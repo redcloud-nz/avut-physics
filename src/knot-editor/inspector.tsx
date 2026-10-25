@@ -22,6 +22,7 @@ import {
     movePin,
     setPinAngle,
     setRopeColour,
+    setRopeDiameter,
     setRopeName,
     setSegmentLength,
     setStepInstructions,
@@ -46,8 +47,16 @@ import type { EditorAction, Selection } from "./state";
 
 const shown = (value: number) => String(Math.round(value * 1000) / 1000);
 
+/** A row of the panel: its label, then its field and the field's unit at the right. */
+const ROW = "flex items-center gap-2 py-0.5";
+
 const FIELD =
     "w-24 rounded border border-line-faint bg-surface px-1.5 py-0.5 text-ink outline-none focus:border-highlight";
+
+/** A field's unit, after it ("mm", "°"); a space kept for it where there's none, so fields line up. */
+const Unit = (props: { unit?: string }) => (
+    <span className="w-5 text-xs text-ink-muted">{props.unit}</span>
+);
 
 /** A number typed in. Blank means none, where `blank` allows it; anything else that isn't a number is undone. */
 function NumberField(props: {
@@ -55,6 +64,7 @@ function NumberField(props: {
     value: number | undefined;
     onChange: (value: number | undefined) => void;
     blank?: boolean;
+    unit?: string;
 }) {
     const text = props.value === undefined ? "" : shown(props.value);
     const commit = (input: HTMLInputElement) => {
@@ -68,8 +78,8 @@ function NumberField(props: {
         else if (shown(value) !== text) props.onChange(value);
     };
     return (
-        <label className="flex items-center justify-between gap-2 py-0.5">
-            <span>{props.label}</span>
+        <label className={ROW}>
+            <span className="mr-auto">{props.label}</span>
             <input
                 // A new key when the value changes elsewhere, so the field shows it.
                 key={text}
@@ -85,16 +95,18 @@ function NumberField(props: {
                     }
                 }}
             />
+            <Unit unit={props.unit} />
         </label>
     );
 }
 
 /** A value shown, not typed: one that follows from others. */
-function Shown(props: { label: string; value: string }) {
+function Shown(props: { label: string; value: string; unit?: string }) {
     return (
-        <div className="flex items-center justify-between gap-2 py-0.5">
-            <span>{props.label}</span>
+        <div className="flex items-center gap-2 py-0.5">
+            <span className="mr-auto">{props.label}</span>
             <span className="w-24 px-1.5 text-right font-mono text-ink-muted">{props.value}</span>
+            <Unit unit={props.unit} />
         </div>
     );
 }
@@ -230,8 +242,8 @@ function RopeFields(props: {
     const rename = (name: string) => edit((q) => setRopeName(q, i, name));
     return (
         <div className="mt-3 border-t border-line-faint pt-2">
-            <label className="flex items-center justify-between gap-2 py-0.5">
-                <span>Colour</span>
+            <label className={ROW}>
+                <span className="mr-auto">Colour</span>
                 <select
                     className={FIELD}
                     value={rope.colour}
@@ -246,9 +258,16 @@ function RopeFields(props: {
                         </option>
                     ))}
                 </select>
+                <Unit />
             </label>
-            <label className="flex items-center justify-between gap-2 py-0.5">
-                <span>Name</span>
+            <NumberField
+                label="Diameter"
+                unit="mm"
+                value={rope.diameter}
+                onChange={(d) => d !== undefined && edit((q) => setRopeDiameter(q, i, d))}
+            />
+            <label className={ROW}>
+                <span className="mr-auto">Name</span>
                 <input
                     key={rope.name ?? ""}
                     className={`${FIELD} w-32`}
@@ -259,6 +278,7 @@ function RopeFields(props: {
                         if (e.key === "Enter") rename(e.currentTarget.value);
                     }}
                 />
+                <Unit />
             </label>
         </div>
     );
@@ -338,7 +358,7 @@ function SelectionPanel(props: {
     dispatch: Dispatch<EditorAction>;
 }) {
     const { picture, geometry, selection, dispatch } = props;
-    const [shift, setShift] = useState(0.5);
+    const [shift, setShift] = useState(5);
     const edit = (change: (picture: Picture) => Picture) =>
         dispatch({ type: "edit", edit: change });
 
@@ -357,17 +377,15 @@ function SelectionPanel(props: {
                             <NumberField
                                 key={field.label}
                                 label={field.label}
+                                unit={field.unit}
                                 value={field.value}
                                 onChange={(v) =>
                                     v !== undefined && editProp((q) => field.set(q, v))
                                 }
                             />
                         ) : (
-                            <label
-                                key={field.label}
-                                className="flex items-center justify-between gap-2 py-0.5"
-                            >
-                                <span>{field.label}</span>
+                            <label key={field.label} className={ROW}>
+                                <span className="mr-auto">{field.label}</span>
                                 <select
                                     className={FIELD}
                                     value={field.value}
@@ -382,6 +400,7 @@ function SelectionPanel(props: {
                                         </option>
                                     ))}
                                 </select>
+                                <Unit />
                             </label>
                         ),
                     )}
@@ -409,16 +428,19 @@ function SelectionPanel(props: {
                 {heading(`${strandName(strand, i)}, pin ${k + 1}`)}
                 <NumberField
                     label="x"
+                    unit="mm"
                     value={pin.x}
                     onChange={(x) => edit((q) => movePin(q, [i, k], x!, pin.y))}
                 />
                 <NumberField
                     label="y"
+                    unit="mm"
                     value={pin.y}
                     onChange={(y) => edit((q) => movePin(q, [i, k], pin.x, y!))}
                 />
                 <NumberField
-                    label="Angle (°)"
+                    label="Angle"
+                    unit="°"
                     value={pin.angle}
                     blank
                     onChange={(angle) => edit((q) => setPinAngle(q, [i, k], angle))}
@@ -430,6 +452,7 @@ function SelectionPanel(props: {
                     <div className="mt-3 border-t border-line-faint pt-2">
                         <NumberField
                             label="Move rope through"
+                            unit="mm"
                             value={shift}
                             onChange={(v) => v !== undefined && v > 0 && setShift(v)}
                         />
@@ -470,14 +493,15 @@ function SelectionPanel(props: {
                 {locked ? (
                     <NumberField
                         label="Length"
+                        unit="mm"
                         value={segment.length}
                         onChange={(length) => edit((q) => setSegmentLength(q, [i, k], length!))}
                     />
                 ) : (
-                    <Shown label="Length" value={shown(drawn.length)} />
+                    <Shown label="Length" value={shown(drawn.length)} unit="mm" />
                 )}
-                <label className="flex items-center justify-between gap-2 py-0.5">
-                    <span>Locked</span>
+                <label className={ROW}>
+                    <span className="mr-auto">Locked</span>
                     <input
                         type="checkbox"
                         className="accent-action"
@@ -490,6 +514,7 @@ function SelectionPanel(props: {
                             )
                         }
                     />
+                    <Unit />
                 </label>
                 {locked ? (
                     <>

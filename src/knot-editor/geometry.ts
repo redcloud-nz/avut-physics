@@ -13,10 +13,10 @@ import { rad } from "@/lib/math";
 import { bisect } from "@/lib/numeric";
 import { Vector2 } from "@/lib/vector2";
 
-import type { Picture, Pin, Strand, StrandSegment } from "./format";
+import { strandSize, type Picture, type Pin, type Strand, type StrandSegment } from "./format";
 
 /**
- * Bends tighter than this radius (diameters, to the rope's centre line) are shaded on ropes as a warning: about as
+ * Bends tighter than this radius (rope diameters, to the rope's centre line) are shaded on ropes as a warning: about as
  * tight as a rope pulled snug round another of its size. To be made a setting later.
  */
 export const TIGHTEST_BEND = 1;
@@ -36,6 +36,8 @@ export type SegmentGeometry = {
     arriving: Vector2;
     segment: StrandSegment;
     strandKind: Strand["kind"];
+    /** The strand's size (`strandSize`). */
+    size: number;
 
     cubic: Cubic;
     /** The tensions it's drawn with: its own, or for a locked segment, scaled to meet its length. */
@@ -43,12 +45,12 @@ export type SegmentGeometry = {
     length: number;
     /** For a locked segment, whether it meets its length. */
     lock?: LockStatus;
-    /** Its tightest bend: the least radius (diameters) and where it is. */
+    /** Its tightest bend: the least radius and where it is. */
     tightest: { radius: number; t: number };
-    /** On a rope, the stretches (ranges of t) bending tighter than `TIGHTEST_BEND`. None on an arrow. */
+    /** On a rope, the stretches (ranges of t) bending tighter than `TIGHTEST_BEND` diameters. None on an arrow. */
     bends: [number, number][];
     box: Box;
-    /** Points along it, evenly spaced in t, for finding crossings. */
+    /** Points along it, evenly spaced in t, for finding crossings: about a quarter of the strand's size apart. */
     samples: Vector2[];
 };
 
@@ -140,6 +142,7 @@ function segmentGeometry(
     arriving: Vector2,
     segment: StrandSegment,
     strandKind: Strand["kind"],
+    size: number,
 ): SegmentGeometry {
     const [a, b] = [pinAt(from), pinAt(to)];
     const shaped =
@@ -158,17 +161,21 @@ function segmentGeometry(
         arriving,
         segment,
         strandKind,
+        size,
         ...shaped,
         length: cubic.length(),
         tightest,
         bends:
-            strandKind === "rope" && tightest.radius < TIGHTEST_BEND
-                ? cubic.tighterThan(TIGHTEST_BEND)
+            strandKind === "rope" && tightest.radius < TIGHTEST_BEND * size
+                ? cubic.tighterThan(TIGHTEST_BEND * size)
                 : [],
         box: cubic.bounds(),
-        samples: cubic.points(cubic.pieces()),
+        samples: cubic.points(cubic.pieces(SAMPLE_SPACING * size)),
     };
 }
+
+/** How far apart a segment's samples are, roughly, in strand sizes. */
+const SAMPLE_SPACING = 0.25;
 
 const sameDirection = (a: Vector2, b: Vector2) => a.x === b.x && a.y === b.y;
 
@@ -180,10 +187,12 @@ const unchanged = (
     leaving: Vector2,
     arriving: Vector2,
     strandKind: Strand["kind"],
+    size: number,
 ) =>
     old.from === from &&
     old.to === to &&
     old.strandKind === strandKind &&
+    old.size === size &&
     sameDirection(old.leaving, leaving) &&
     sameDirection(old.arriving, arriving);
 
@@ -197,13 +206,14 @@ export function pictureGeometry(picture: Picture, previous?: PictureGeometry): P
     return {
         strands: picture.strands.map((strand) => {
             const directions = strandDirections(strand.pins);
+            const size = strandSize(strand);
             const segments = strand.segments.map((segment, k) => {
                 const [from, to] = [strand.pins[k], strand.pins[k + 1]];
                 const [leaving, arriving] = [directions[k], directions[k + 1]];
                 const old = before.get(segment);
-                return old && unchanged(old, from, to, leaving, arriving, strand.kind)
+                return old && unchanged(old, from, to, leaving, arriving, strand.kind, size)
                     ? old
-                    : segmentGeometry(from, to, leaving, arriving, segment, strand.kind);
+                    : segmentGeometry(from, to, leaving, arriving, segment, strand.kind, size);
             });
             const starts: number[] = [];
             let length = 0;

@@ -17,6 +17,7 @@ import {
     crossingPair,
     sameSegment,
     segmentBefore,
+    strandSize,
     type CrossingEntry,
     type PassEntry,
     type PassSide,
@@ -200,6 +201,7 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
         const entries = kind.passes(prop);
         geometry.strands.forEach((strand, i) =>
             strand.segments.forEach((seg, k) => {
+                const size = strandSize(picture.strands[i]);
                 const ts = kind.passesAcross(prop, seg.cubic, seg.samples);
                 const mine = entries.filter((e) => e[0] === i && e[1] === k);
                 const status = matchStatus(
@@ -229,7 +231,9 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
                         t,
                         s,
                         at: seg.cubic.pointAt(t),
-                        cover: coverAround(strand, s, (point) => kind.covers(prop, point)),
+                        cover: coverAround(strand, s, size, (point) =>
+                            kind.covers(prop, point, size),
+                        ),
                         status,
                         ...(entry && { side: entry[3] }),
                     });
@@ -246,13 +250,17 @@ function pointAlong(strand: StrandGeometry, distance: number): Vector2 {
     return strand.segments[segment].cubic.pointAt(t);
 }
 
-/** How far along the strand, each way from `s`, `covers` keeps holding: stepped along, then bisected. */
+/**
+ * How far along the strand, each way from `s`, `covers` keeps holding: stepped along (a tenth of the strand's size at
+ * a time), then bisected.
+ */
 function coverAround(
     strand: StrandGeometry,
     s: number,
+    size: number,
     covers: (point: Vector2) => boolean,
 ): [number, number] {
-    const STEP = 0.1;
+    const STEP = 0.1 * size;
     const edge = (way: 1 | -1) => {
         let [inside, outside] = [s, s];
         for (;;) {
@@ -276,25 +284,27 @@ function coverAround(
 
 // Over stretches
 
-/** Half a rope's drawn width, with its outline (diameters). */
+/** Half a strand's drawn width, with its outline (in its sizes). */
 const HALF_WIDTH = 0.625;
 
 /** The sine of the shallowest angle the over stretches allow for; shallower crossings are treated as this. */
 const SHALLOWEST = 0.15;
 
 /**
- * How far along a strand going over a crossing it's marked over, each way: the old editor's angle-dependent amount,
- * longer at a shallow crossing.
+ * How far along a strand of this size going over a crossing it's marked over, each way: the old editor's
+ * angle-dependent amount (in strand sizes), longer at a shallow crossing.
  */
-export const overReach = (sin: number) => Math.min(4, 0.75 + 0.6 / Math.max(sin, SHALLOWEST));
+export const overReach = (sin: number, size = 1) =>
+    size * Math.min(4, 0.75 + 0.6 / Math.max(sin, SHALLOWEST));
 
 /**
- * How far along a strand, each way from a crossing, it must be clear of the other strand's width: an over stretch
- * must reach at least this far past its own crossing, and stop at least this short of a crossing where its strand
- * goes under.
+ * How far along a strand (of size `own`), each way from a crossing, it must be for its square-cut end to be clear of
+ * the other strand (of size `other`): the other's half-width, and its own half-width turned by the angle between
+ * them, over the sine of that angle. An over stretch must reach at least this far past its own crossing, and stop at
+ * least this short of a crossing where its strand goes under.
  */
-export const clearance = (sin: number) =>
-    (HALF_WIDTH * (1 + Math.sqrt(1 - sin * sin))) / Math.max(sin, SHALLOWEST);
+export const clearance = (sin: number, own = 1, other = 1) =>
+    (HALF_WIDTH * (other + own * Math.sqrt(1 - sin * sin))) / Math.max(sin, SHALLOWEST);
 
 /** Where along a strand it goes under: at a crossing (with the clearance it needs) or behind a prop (its cover). */
 type Under = { from: number; to: number };
@@ -352,6 +362,7 @@ export function strandPaths(
 ): StrandPaths {
     const tooClose = new Set<number>();
     const tooClosePasses = new Set<number>();
+    const sizes = picture.strands.map(strandSize);
     const paths = geometry.strands.map((strand, i) => {
         const wants: Want[] = [];
         const unders: (Under & { crossing?: number; pass?: number })[] = [];
@@ -359,9 +370,11 @@ export function strandPaths(
             c.pair.forEach((ref, side) => {
                 if (ref[0] !== i || c.over === undefined) return;
                 const s = c.s[side];
+                const [own, other] = [sizes[i], sizes[c.pair[1 - side][0]]];
                 if (c.over === side) {
-                    const reach = overReach(c.sin);
-                    const need = clearance(c.sin);
+                    const need = clearance(c.sin, own, other);
+                    // Never short of clearing the other strand, as over a thicker one it would be.
+                    const reach = Math.max(overReach(c.sin, own), need);
                     wants.push({
                         at: s,
                         from: s - reach,
@@ -370,7 +383,7 @@ export function strandPaths(
                         crossing: index,
                     });
                 } else {
-                    const gap = clearance(c.sin);
+                    const gap = clearance(c.sin, own, other);
                     unders.push({ from: s - gap, to: s + gap, crossing: index });
                 }
             }),

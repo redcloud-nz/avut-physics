@@ -602,7 +602,13 @@ export function deletePins(picture: Picture, pins: PinRef[]): Edited {
 
 // Strands
 
-/** A straight rope (in the first colour not used yet) or arrow from one point to another, after the others. */
+/** A new rope's diameter (millimetres), in a picture with no rope to take one from. */
+export const NEW_ROPE_DIAMETER = 11;
+
+/**
+ * A straight rope or arrow from one point to another, after the others. A rope is in the first colour not used yet,
+ * and as thick as the picture's last rope.
+ */
 export function addStrand(
     picture: Picture,
     kind: Strand["kind"],
@@ -618,7 +624,14 @@ export function addStrand(
     };
     const strand: Strand =
         kind === "rope"
-            ? { kind, colour: firstUnusedColour(picture), ...shape }
+            ? {
+                  kind,
+                  colour: firstUnusedColour(picture),
+                  diameter:
+                      picture.strands.findLast((s) => s.kind === "rope")?.diameter ??
+                      NEW_ROPE_DIAMETER,
+                  ...shape,
+              }
             : { kind, ...shape };
     return { ...picture, strands: [...picture.strands, strand] };
 }
@@ -654,6 +667,14 @@ export function deleteStrand(picture: Picture, i: number): Edited {
 export const setRopeColour = (picture: Picture, i: number, colour: RopeColour) =>
     withStrand(picture, i, (strand) =>
         strand.kind !== "rope" || strand.colour === colour ? strand : { ...strand, colour },
+    );
+
+/** A rope's diameter (millimetres, above 0). */
+export const setRopeDiameter = (picture: Picture, i: number, diameter: number) =>
+    withStrand(picture, i, (strand) =>
+        strand.kind !== "rope" || !(diameter > 0) || strand.diameter === diameter
+            ? strand
+            : { ...strand, diameter },
     );
 
 /** A rope's name for the panel, or none, given only spaces. */

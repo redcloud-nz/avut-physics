@@ -1,6 +1,6 @@
 /**
  * What's drawn over the picture to edit it: each segment's hit area along its curve, each pin, and for a selected
- * pin its angle ring and tension handles. Sizes are in screen pixels, turned into diameters by `px` (diameters per
+ * pin its angle ring and tension handles. Sizes are in screen pixels, turned into millimetres by `px` (millimetres per
  * pixel), so they stay the same size as the view zooms.
  *
  * Each piece is memoised on plain values, so a drag re-renders only the pins and segments that moved. They carry

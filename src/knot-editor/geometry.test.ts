@@ -11,6 +11,7 @@ import { pictureGeometry, strandDistance, strandPosition, TIGHTEST_BEND } from "
 const rope = (pins: Pin[], segments?: StrandSegment[]): Rope => ({
     kind: "rope",
     colour: "orange",
+    diameter: 1,
     pins,
     segments: segments ?? pins.slice(1).map(() => ({ tension: [1, 1] })),
 });
@@ -149,5 +150,22 @@ describe("pictureGeometry", () => {
             return performance.now() - start;
         }).sort((a, b) => a - b);
         expect(times[10]).toBeLessThan(50);
+    });
+});
+
+describe("bend warnings by size", () => {
+    it("warns of a 6 mm rope's bends tighter than 6 mm, and an 11 mm rope's tighter than 11 mm", () => {
+        const radius = pictureGeometry(picture(rope(BOW))).strands[0].segments[0].tightest.radius;
+        const bow = (tightest: number, diameter: number) => {
+            const by = tightest / radius;
+            const pins = BOW.map((pin) => ({ ...pin, x: pin.x * by, y: pin.y * by }));
+            const seg = pictureGeometry(picture({ ...rope(pins), diameter })).strands[0]
+                .segments[0];
+            expect(seg.tightest.radius).toBeCloseTo(tightest, 6);
+            return seg.bends.length > 0;
+        };
+        expect([bow(5.9, 6), bow(6.1, 6)]).toEqual([true, false]);
+        expect([bow(10.9, 11), bow(11.1, 11)]).toEqual([true, false]);
+        expect(TIGHTEST_BEND).toBe(1);
     });
 });

@@ -14,10 +14,12 @@ const COLORS = { body: "#94a3b8", shade: "#475569", highlight: "#f1f5f9", outlin
 
 /**
  * The bar's end: a disc, shaded round its edge, with a highlight on its upper left. Seen side on, a band, shaded along
- * its bottom, with a highlight along its top, and cut off square at its ends.
+ * its bottom, with a highlight along its top, and cut off square at its ends. Its lines are sized for a rope `unit`
+ * across (1 by default, for coordinates in rope diameters).
  */
-export function BarDrawing(props: { bar: Bar }) {
+export function BarDrawing(props: { bar: Bar; unit?: number }) {
     const { x, y, r, length } = props.bar;
+    const { unit = 1 } = props;
     if (length) {
         const left = x - length / 2;
         return (
@@ -25,10 +27,10 @@ export function BarDrawing(props: { bar: Bar }) {
                 <rect x={left} y={y - r} width={length} height={2 * r} fill={COLORS.shade} />
                 <rect x={left} y={y - r} width={length} height={1.6 * r} fill={COLORS.body} />
                 <path
-                    d={`M ${left + 0.4} ${y - 0.55 * r} h ${length - 0.8}`}
+                    d={`M ${left + 0.4 * unit} ${y - 0.55 * r} h ${length - 0.8 * unit}`}
                     stroke={COLORS.highlight}
                     strokeOpacity={0.8}
-                    strokeWidth={0.25}
+                    strokeWidth={0.25 * unit}
                     strokeLinecap="round"
                 />
                 <rect
@@ -38,7 +40,7 @@ export function BarDrawing(props: { bar: Bar }) {
                     height={2 * r}
                     fill="none"
                     stroke={COLORS.outline}
-                    strokeWidth={0.25}
+                    strokeWidth={0.25 * unit}
                 />
             </g>
         );
@@ -52,7 +54,7 @@ export function BarDrawing(props: { bar: Bar }) {
                 r={r}
                 fill={COLORS.shade}
                 stroke={COLORS.outline}
-                strokeWidth={0.25}
+                strokeWidth={0.25 * unit}
             />
             <circle cx={x} cy={y} r={r * 0.8} fill={COLORS.body} />
             <path
@@ -60,7 +62,7 @@ export function BarDrawing(props: { bar: Bar }) {
                 fill="none"
                 stroke={COLORS.highlight}
                 strokeOpacity={0.8}
-                strokeWidth={0.25}
+                strokeWidth={0.25 * unit}
                 strokeLinecap="round"
             />
         </g>

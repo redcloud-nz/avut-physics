@@ -43,8 +43,8 @@ function Pointer(props: { readouts: ReadoutStore }) {
         () => undefined,
     );
     return (
-        <span className="w-36">
-            {pointer ? `x ${pointer.x.toFixed(2)}  y ${pointer.y.toFixed(2)}` : ""}
+        <span className="w-44">
+            {pointer ? `x ${pointer.x.toFixed(1)}  y ${pointer.y.toFixed(1)} mm` : ""}
         </span>
     );
 }
@@ -73,10 +73,7 @@ function Zoom(props: { readouts: ReadoutStore; onZoom: (scale: number) => void }
     );
     if (scale === undefined) return null;
     return (
-        <div
-            className="flex items-center gap-1"
-            title={`${Math.round(scale)} px per rope diameter`}
-        >
+        <div className="flex items-center gap-1" title={`${scale.toFixed(1)} px per millimetre`}>
             <button
                 type="button"
                 className={STEP}
@@ -125,7 +122,7 @@ export function StatusBar(props: {
     readouts: ReadoutStore;
     warnings: Warnings;
     saved: boolean;
-    /** Zooms the view to this scale (pixels per diameter). */
+    /** Zooms the view to this scale (pixels per millimetre). */
     onZoom: (scale: number) => void;
 }) {
     const warnings = props.warnings.filter((w) => w.count > 0);
