@@ -56,6 +56,9 @@ The design is in the spec. What it leaves to the build is settled here.
   those keep priority where they overlap it.
 - File > Knot Details… gains the frame's x, y, width and height.
 - View > Fit fits the frame and everything in the picture.
+- The view is kept on the knot (`view.ts`): it zooms out only until the frame fills half of it, across or down
+  (further only where the picture reaches past the frame, far enough to fit it), and pans only until the frame's edge,
+  or the edge of what's drawn past it, is in its middle. (The user's ask after group 2.)
 
 ### The grid and snapping
 

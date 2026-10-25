@@ -2,7 +2,7 @@
 
 /**
  * The drawing in the middle of the editor: the picture being edited, with its handles, panned by dragging the
- * background and zoomed with the wheel (about the pointer) or the View menu.
+ * background and zoomed with the wheel (about the pointer) or the View menu, and kept on the knot as `view.ts` says.
  *
  * Pointer events are all handled here, on the SVG, from what they land on (`hitAt`). A drag reads the pointer from
  * its events and applies at most one change per animation frame, under one history entry from its begin to its end.
@@ -46,7 +46,7 @@ import { PictureDrawing } from "./picture-drawing";
 import { kindOf } from "./props";
 import { NOTHING, type EditorAction, type Selection } from "./state";
 import type { ReadoutStore } from "./status-bar";
-import { withinZoom } from "./zoom";
+import { bounded, fitted, pictureBox, type Size, type View } from "./view";
 
 /** The picture's geometry, worked out from the last picture's where it can be. */
 export function useGeometry(picture: Picture): PictureGeometry {
@@ -106,37 +106,10 @@ export type CanvasControls = {
     centre(): Vector2;
 };
 
-/** Where the view is centred (millimetres) and how big a millimetre is drawn (pixels). */
-type View = { cx: number; cy: number; scale: number };
-type Size = { w: number; h: number };
-
-/** How far round the picture the fitted view leaves (millimetres: 3 diameters of an 11 mm rope). */
-const MARGIN = 33;
 /** What a drag rounds places to (millimetres). */
 const DRAG_STEP = 0.1;
 /** How far (pixels) the pointer moves before a press becomes a drag. */
 const DRAG = 3;
-
-/** The view taking in the frame and every strand and prop. */
-function fitted(picture: Picture, geometry: PictureGeometry, frame: Frame, size: Size): View {
-    const boxes = [
-        {
-            min: new Vector2(frame.x, frame.y),
-            max: new Vector2(frame.x + frame.w, frame.y + frame.h),
-        },
-        ...geometry.strands.flatMap((strand) => strand.segments.map((seg) => seg.box)),
-        ...picture.props.map((prop) => kindOf(prop).bounds(prop)),
-    ];
-    const x0 = Math.min(...boxes.map((b) => b.min.x)) - MARGIN;
-    const x1 = Math.max(...boxes.map((b) => b.max.x)) + MARGIN;
-    const y0 = Math.min(...boxes.map((b) => b.min.y)) - MARGIN;
-    const y1 = Math.max(...boxes.map((b) => b.max.y)) + MARGIN;
-    return {
-        cx: (x0 + x1) / 2,
-        cy: (y0 + y1) / 2,
-        scale: withinZoom(Math.min(size.w / (x1 - x0), size.h / (y1 - y0))),
-    };
-}
 
 /** A drag under way. `from` is where it began (client pixels), and `moved` whether it's become a drag yet. */
 type Gesture = { from: { x: number; y: number }; moved: boolean } & (
@@ -208,16 +181,26 @@ export function Canvas(props: {
         latest.current = { picture, knotFrame, geometry, crossings, selection, view, size, snap };
     });
 
-    // The panel's size, and the view fitted to the picture once it's known.
+    /** A view kept on the knot (see `view.ts`), for the canvas at this size. */
+    const keep = (v: View, at = latest.current.size) => {
+        const { picture, geometry, knotFrame } = latest.current;
+        return at ? bounded(v, pictureBox(picture, geometry, knotFrame), knotFrame, at) : v;
+    };
+    const keepRef = useRef(keep);
+    useEffect(() => {
+        keepRef.current = keep;
+    });
+
+    // The panel's size, and the view fitted to the picture once it's known (and kept on it as the size changes).
     useEffect(() => {
         const element = svg.current!;
         const observer = new ResizeObserver(() => {
             const next = { w: element.clientWidth, h: element.clientHeight };
             setSize(next);
             setView((v) => {
-                if (v) return v;
+                if (v) return keepRef.current(v, next);
                 const { picture, geometry, knotFrame } = latest.current;
-                return fitted(picture, geometry, knotFrame, next);
+                return fitted(pictureBox(picture, geometry, knotFrame), knotFrame, next);
             });
         });
         observer.observe(element);
@@ -227,11 +210,13 @@ export function Canvas(props: {
     useImperativeHandle(
         ref,
         () => ({
-            zoom: (factor) => setView((v) => v && { ...v, scale: withinZoom(v.scale * factor) }),
-            setScale: (scale) => setView((v) => v && { ...v, scale: withinZoom(scale) }),
+            zoom: (factor) =>
+                setView((v) => v && keepRef.current({ ...v, scale: v.scale * factor })),
+            setScale: (scale) => setView((v) => v && keepRef.current({ ...v, scale })),
             fit: () => {
                 const { picture, geometry, knotFrame, size } = latest.current;
-                if (size) setView(fitted(picture, geometry, knotFrame, size));
+                if (size)
+                    setView(fitted(pictureBox(picture, geometry, knotFrame), knotFrame, size));
             },
             centre: () => {
                 const v = latest.current.view;
@@ -255,9 +240,9 @@ export function Canvas(props: {
             const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002));
             setView((v) => {
                 if (!v) return v;
-                const scale = withinZoom(v.scale * factor);
+                const scale = keepRef.current({ ...v, scale: v.scale * factor }).scale;
                 const [x, y] = [v.cx + dx / v.scale, v.cy + dy / v.scale];
-                return { scale, cx: x - dx / scale, cy: y - dy / scale };
+                return keepRef.current({ scale, cx: x - dx / scale, cy: y - dy / scale });
             });
         };
         element.addEventListener("wheel", onWheel, { passive: false });
@@ -290,11 +275,13 @@ export function Canvas(props: {
         }
         if (g.kind === "pan") {
             const { view: v } = g;
-            setView({
-                ...v,
-                cx: v.cx - (p.x - g.from.x) / v.scale,
-                cy: v.cy - (p.y - g.from.y) / v.scale,
-            });
+            setView(
+                keep({
+                    ...v,
+                    cx: v.cx - (p.x - g.from.x) / v.scale,
+                    cy: v.cy - (p.y - g.from.y) / v.scale,
+                }),
+            );
             return;
         }
         const at = toPicture(p.x, p.y);
