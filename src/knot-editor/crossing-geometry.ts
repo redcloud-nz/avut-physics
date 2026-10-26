@@ -25,6 +25,7 @@ import {
     type SegmentRef,
 } from "./format";
 import {
+    DRAWN_WIDTH,
     strandDistance,
     strandPosition,
     type PictureGeometry,
@@ -287,7 +288,7 @@ function coverAround(
 // Over stretches
 
 /** Half a strand's drawn width, with its outline (in its sizes). */
-const HALF_WIDTH = 0.625;
+const HALF_WIDTH = DRAWN_WIDTH / 2;
 
 /** The sine of the shallowest angle the over stretches allow for; shallower crossings are treated as this. */
 const SHALLOWEST = 0.15;

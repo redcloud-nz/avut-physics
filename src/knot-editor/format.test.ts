@@ -11,6 +11,7 @@ import {
     type Picture,
 } from "./format";
 import { crossingsAt, passesAt } from "./ids";
+import { free } from "./test-pictures";
 import { CURRENT_VERSION, UPGRADES, type JsonObject } from "./versions";
 
 const SAMPLES = join(import.meta.dirname, "samples");
@@ -346,7 +347,7 @@ describe("versions", () => {
             picture.strands.forEach((strand, i) => {
                 const was = oldPictures[p].strands[i];
                 if (strand.kind === "rope") expect(strand.diameter).toBe(11);
-                strand.pins.forEach((pin, k) => {
+                strand.pins.map(free).forEach((pin, k) => {
                     expect(pin.x).toBeCloseTo(was.pins[k].x * 11, 9);
                     expect(pin.y).toBeCloseTo(was.pins[k].y * 11, 9);
                     expect(pin.angle).toBe(was.pins[k].angle);
@@ -367,7 +368,7 @@ describe("versions", () => {
         for (const v of [frame.x, frame.y, frame.w, frame.h]) expect(Math.abs(v % 10)).toBe(0);
         for (const picture of pictures) {
             for (const strand of picture.strands)
-                for (const pin of strand.pins) {
+                for (const pin of strand.pins.map(free)) {
                     expect(pin.x - frame.x).toBeGreaterThanOrEqual(30);
                     expect(frame.x + frame.w - pin.x).toBeGreaterThanOrEqual(30);
                     expect(pin.y - frame.y).toBeGreaterThanOrEqual(30);

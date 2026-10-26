@@ -7,15 +7,17 @@
  * other.
  */
 
-import type {
-    CrossingAt,
-    CrossingEntry,
-    Id,
-    KnotFile,
-    PassAt,
-    PassEntry,
-    Picture,
-    SegmentRef,
+import {
+    isLinked,
+    type CrossingAt,
+    type CrossingEntry,
+    type Id,
+    type KnotFile,
+    type PassAt,
+    type PassEntry,
+    type Picture,
+    type PinRef,
+    type SegmentRef,
 } from "./format";
 import { kindOf } from "./props";
 
@@ -53,6 +55,34 @@ export function segmentPlaces(picture: Picture): Map<Id, SegmentRef> {
         strand.segments.forEach((segment, k) => places.set(segment.id, [i, k])),
     );
     return places;
+}
+
+/** Where each pin is, by id. */
+export function pinPlaces(picture: Picture): Map<Id, PinRef> {
+    const places = new Map<Id, PinRef>();
+    picture.strands.forEach((strand, i) =>
+        strand.pins.forEach((pin, k) => places.set(pin.id, [i, k])),
+    );
+    return places;
+}
+
+/** The pin a linked pin's leaders lead back to: the free pin heading its chain of links (itself, if it's free). */
+export function headOf(picture: Picture, ref: PinRef, places = pinPlaces(picture)): PinRef {
+    let at = ref;
+    for (let steps = 0; steps < places.size; steps++) {
+        const pin = picture.strands[at[0]]?.pins[at[1]];
+        if (!pin || !isLinked(pin)) return at;
+        const next = places.get(pin.link.pin);
+        if (!next) return at;
+        at = next;
+    }
+    return at;
+}
+
+/** The leader of a linked pin, if it's linked and its leader is there. */
+export function leaderOf(picture: Picture, [i, k]: PinRef, places = pinPlaces(picture)) {
+    const pin = picture.strands[i]?.pins[k];
+    return pin && isLinked(pin) ? places.get(pin.link.pin) : undefined;
 }
 
 /** The id of the segment at a place, if there's one there. */

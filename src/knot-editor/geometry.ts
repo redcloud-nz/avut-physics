@@ -3,8 +3,12 @@
  * angle keep it; each run of pins between them gets its directions from Hobby's method, with curl 1 at a free end
  * of the strand. A locked segment's tensions are scaled together, keeping their ratio, until it has its length.
  *
- * Working out a picture again after a change, pass the geometry from before it: every segment whose pins (by
- * identity), directions (by value) and own values are unchanged keeps its old results.
+ * Linked pins are placed from their leaders first (`placedPins`), so to the curves every pin is a place, holding an angle
+ * or not.
+ *
+ * Working out a picture again after a change, pass the geometry from before it: every segment whose pins' places and
+ * directions (by value) and own values are unchanged keeps its old results. (By value, as a linked pin moves with its
+ * leader without itself changing.)
  */
 
 import { Cubic, type Box } from "@/lib/bezier";
@@ -13,13 +17,24 @@ import { rad } from "@/lib/math";
 import { bisect } from "@/lib/numeric";
 import { Vector2 } from "@/lib/vector2";
 
-import { strandSize, type Picture, type Pin, type Strand, type StrandSegment } from "./format";
+import {
+    isLinked,
+    strandSize,
+    type Id,
+    type Picture,
+    type Pin,
+    type Strand,
+    type StrandSegment,
+} from "./format";
 
 /**
  * Bends tighter than this radius (rope diameters, to the rope's centre line) are shaded on ropes as a warning: about as
  * tight as a rope pulled snug round another of its size. To be made a setting later.
  */
 export const TIGHTEST_BEND = 1;
+
+/** How wide a strand is drawn, with its outline (in its sizes): ropes linked side by side are set this far apart. */
+export const DRAWN_WIDTH = 1.25;
 
 /** How well a locked segment meets its length, against its reach: the shortest and longest it can be. */
 export type LockStatus = { reach: [number, number] } & (
@@ -30,8 +45,8 @@ export type LockStatus = { reach: [number, number] } & (
 
 export type SegmentGeometry = {
     /** What it was worked out from, to tell when it can be kept. */
-    from: Pin;
-    to: Pin;
+    from: PlacedPin;
+    to: PlacedPin;
     leaving: Vector2;
     arriving: Vector2;
     segment: StrandSegment;
@@ -55,6 +70,8 @@ export type SegmentGeometry = {
 };
 
 export type StrandGeometry = {
+    /** Each pin where it is, linked pins placed from their leaders. */
+    pins: PlacedPin[];
     /** Each pin's direction (a unit vector). */
     directions: Vector2[];
     segments: SegmentGeometry[];
@@ -65,12 +82,58 @@ export type StrandGeometry = {
 
 export type PictureGeometry = { strands: StrandGeometry[] };
 
-const pinAt = (pin: Pin) => new Vector2(pin.x, pin.y);
-const held = (pin: Pin) =>
+/** A pin where it is, and the way it runs through it (degrees) where that's held or comes from a link. */
+export type PlacedPin = { x: number; y: number; angle?: number };
+
+const pinAt = (pin: PlacedPin) => new Vector2(pin.x, pin.y);
+const held = (pin: PlacedPin) =>
     pin.angle === undefined ? undefined : Vector2.fromAngle(rad(pin.angle));
 
+/** An angle in degrees, brought into (−180, 180]. */
+const angleWithin = (angle: number) => {
+    const turned = (((angle + 180) % 360) + 360) % 360;
+    return turned === 0 ? 180 : turned - 180;
+};
+
+/**
+ * Every pin of the picture where it is. A free pin is where it's placed. A linked pin is beside its leader (placed
+ * first): across the way the leader runs, to the side its link names, the two strands' half-widths and the link's
+ * gap from it, running the leader's way or, reversed, the other way. (y is down, so left of a direction d is
+ * (d.y, −d.x).) A leader with no angle (which the file refuses) is taken as running along x.
+ */
+export function placedPins(picture: Picture): PlacedPin[][] {
+    const where = new Map<Id, { pin: Pin; size: number }>();
+    for (const strand of picture.strands)
+        for (const pin of strand.pins) where.set(pin.id, { pin, size: strandSize(strand) });
+    const placed = new Map<Id, PlacedPin>();
+    const place = (pin: Pin, size: number, from: Set<Id>): PlacedPin => {
+        const known = placed.get(pin.id);
+        if (known) return known;
+        if (!isLinked(pin)) return pin;
+        const leading = where.get(pin.link.pin);
+        // A missing leader or a loop (which the file refuses) leaves the pin at the origin.
+        if (!leading || from.has(pin.id)) return { x: 0, y: 0, angle: 0 };
+        const leader = place(leading.pin, leading.size, new Set([...from, pin.id]));
+        const angle = leader.angle ?? 0;
+        const d = Vector2.fromAngle(rad(angle));
+        const left = new Vector2(d.y, -d.x);
+        const apart = (DRAWN_WIDTH * (leading.size + size)) / 2 + (pin.link.gap ?? 0);
+        const at = pinAt(leader).add(left.scale(pin.link.side === "left" ? apart : -apart));
+        const result = {
+            x: at.x,
+            y: at.y,
+            angle: pin.link.reverse ? angleWithin(angle + 180) : angle,
+        };
+        placed.set(pin.id, result);
+        return result;
+    };
+    return picture.strands.map((strand) =>
+        strand.pins.map((pin) => place(pin, strandSize(strand), new Set())),
+    );
+}
+
 /** Each pin's direction: held, or from Hobby's run between the nearest pins holding one (or the strand's ends). */
-export function strandDirections(pins: readonly Pin[]): Vector2[] {
+export function strandDirections(pins: readonly PlacedPin[]): Vector2[] {
     const points = pins.map(pinAt);
     const holding = pins.map(held);
     const directions: Vector2[] = new Array(pins.length);
@@ -136,8 +199,8 @@ function meetLength(
 }
 
 function segmentGeometry(
-    from: Pin,
-    to: Pin,
+    from: PlacedPin,
+    to: PlacedPin,
     leaving: Vector2,
     arriving: Vector2,
     segment: StrandSegment,
@@ -180,17 +243,19 @@ const SAMPLE_SPACING = 0.25;
 const sameDirection = (a: Vector2, b: Vector2) => a.x === b.x && a.y === b.y;
 
 /** Whether old results still hold for a segment worked out from these. */
+const samePlace = (a: PlacedPin, b: PlacedPin) => a.x === b.x && a.y === b.y && a.angle === b.angle;
+
 const unchanged = (
     old: SegmentGeometry,
-    from: Pin,
-    to: Pin,
+    from: PlacedPin,
+    to: PlacedPin,
     leaving: Vector2,
     arriving: Vector2,
     strandKind: Strand["kind"],
     size: number,
 ) =>
-    old.from === from &&
-    old.to === to &&
+    samePlace(old.from, from) &&
+    samePlace(old.to, to) &&
     old.strandKind === strandKind &&
     old.size === size &&
     sameDirection(old.leaving, leaving) &&
@@ -203,12 +268,14 @@ export function pictureGeometry(picture: Picture, previous?: PictureGeometry): P
         for (const seg of strand.segments)
             if (!before.has(seg.segment)) before.set(seg.segment, seg);
 
+    const placed = placedPins(picture);
     return {
-        strands: picture.strands.map((strand) => {
-            const directions = strandDirections(strand.pins);
+        strands: picture.strands.map((strand, i) => {
+            const pins = placed[i];
+            const directions = strandDirections(pins);
             const size = strandSize(strand);
             const segments = strand.segments.map((segment, k) => {
-                const [from, to] = [strand.pins[k], strand.pins[k + 1]];
+                const [from, to] = [pins[k], pins[k + 1]];
                 const [leaving, arriving] = [directions[k], directions[k + 1]];
                 const old = before.get(segment);
                 return old && unchanged(old, from, to, leaving, arriving, strand.kind, size)
@@ -221,7 +288,7 @@ export function pictureGeometry(picture: Picture, previous?: PictureGeometry): P
                 starts.push(length);
                 length += seg.length;
             }
-            return { directions, segments, starts, length };
+            return { pins, directions, segments, starts, length };
         }),
     };
 }

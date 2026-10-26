@@ -50,6 +50,8 @@ const BASE_COMMANDS = {
     redo: { label: "Redo", shortcut: { ...letter("Z"), mod: true, shift: true } },
     delete: { label: "Delete", shortcut: { code: "Backspace", label: "⌫" } },
     selectAll: { label: "Select All", shortcut: { ...letter("A"), mod: true } },
+    link: { label: "Link Pins", shortcut: letter("L") },
+    unlink: { label: "Unlink", shortcut: { ...letter("L"), shift: true } },
     insertPin: { label: "Pin", shortcut: letter("P") },
     insertRope: { label: "Rope", shortcut: letter("R") },
     insertArrow: { label: "Arrow", shortcut: letter("A") },
@@ -92,7 +94,7 @@ export type MenuItem = CommandId | null | { submenu: string; items: CommandId[] 
 /** The menus, their items in order. */
 export const MENUS: { name: string; items: MenuItem[] }[] = [
     { name: "File", items: ["new", "open", null, "save", "saveAs", null, "details"] },
-    { name: "Edit", items: ["undo", "redo", null, "delete", "selectAll"] },
+    { name: "Edit", items: ["undo", "redo", null, "delete", "selectAll", null, "link", "unlink"] },
     {
         name: "Insert",
         items: [

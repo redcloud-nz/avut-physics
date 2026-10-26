@@ -15,7 +15,7 @@ import {
 } from "./crossing-geometry";
 import { parseKnotFile, type CrossingAt, type Picture, type Strand } from "./format";
 import { pictureGeometry } from "./geometry";
-import { testPicture, testStrand, type TestBar, type TestPin } from "./test-pictures";
+import { free, testPicture, testStrand, type TestBar, type TestPin } from "./test-pictures";
 
 const strand = (pins: TestPin[], kind: "rope" | "arrow" = "rope"): Strand => testStrand(kind, pins);
 
@@ -436,7 +436,7 @@ describe("strand sizes", () => {
         strands: p.strands.map((s) => ({
             ...s,
             ...(s.kind === "rope" && { diameter }),
-            pins: s.pins.map((pin) => ({ ...pin, x: pin.x * by, y: pin.y * by })),
+            pins: s.pins.map(free).map((pin) => ({ ...pin, x: pin.x * by, y: pin.y * by })),
             segments: s.segments.map((seg) => ({
                 ...seg,
                 ...(seg.length !== undefined && { length: seg.length * by }),

@@ -54,6 +54,7 @@ import {
 } from "./state";
 import {
     entriesAt,
+    free,
     newIds,
     passesOf,
     pinId,
@@ -218,7 +219,7 @@ describe("inserting a pin", () => {
             const strand = after.strands[0];
             expect(strand.pins).toHaveLength(6);
             expect(strand.segments).toHaveLength(5);
-            expect(strand.pins[k + 1].angle).toBeDefined();
+            expect(free(strand.pins[k + 1]).angle).toBeDefined();
             expect(after.strands[1]).toBe(p.strands[1]);
             expect(farthest(g, pictureGeometry(after), 0)).toBeLessThan(1e-3);
         }
@@ -271,7 +272,7 @@ describe("deleting a pin", () => {
     it("undoes an insert", () => {
         const { picture: inserted } = insertPin(p, g, [0, 1], 0.5, newIds());
         const { picture: after } = deletePin(inserted, pictureGeometry(inserted), [0, 2]);
-        expect(after.strands[0].pins.map(({ id, x, y }) => ({ id, x, y }))).toEqual(
+        expect(after.strands[0].pins.map(free).map(({ id, x, y }) => ({ id, x, y }))).toEqual(
             p.strands[0].pins,
         );
         expect(after.strands[0].segments.map((q) => q.id)).toEqual(

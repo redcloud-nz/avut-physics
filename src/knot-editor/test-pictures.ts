@@ -4,7 +4,16 @@
  * into the ids they name. Only the tests use this.
  */
 
-import type { CrossingAt, PassAt, Picture, Pin, Strand, StrandSegment } from "./format";
+import {
+    isLinked,
+    type CrossingAt,
+    type FreePin,
+    type PassAt,
+    type Picture,
+    type Pin,
+    type Strand,
+    type StrandSegment,
+} from "./format";
 import { crossingsAt, passesAt, type Ids } from "./ids";
 import type { BarProp } from "./props/bar";
 
@@ -15,7 +24,7 @@ export const segmentId = (i: number, k: number) => 1000 * (i + 1) + 500 + k;
 export const propId = (p: number) => 100_000 + p;
 
 /** A pin or segment as a test writes it, without an id. */
-export type TestPin = Omit<Pin, "id">;
+export type TestPin = Omit<FreePin, "id">;
 export type TestSegment = Omit<StrandSegment, "id">;
 
 /** A strand as a test writes it: its id and its pins' and segments' are 0 until `testPicture` numbers them. */
@@ -84,6 +93,12 @@ export const entriesAt = (picture: Picture): CrossingAt[] => crossingsAt(picture
 
 /** A prop's passes by where their segments are, as tests write them. */
 export const passesOf = (picture: Picture, p: number): PassAt[] => passesAt(picture, p);
+
+/** A pin a test knows is free, typed as one. */
+export function free(pin: Pin): FreePin {
+    if (isLinked(pin)) throw new Error(`pin ${pin.id} is linked, not free`);
+    return pin;
+}
 
 /** A strand without its ids, to compare with one a test wrote. */
 export const withoutIds = (strand: Strand) => ({

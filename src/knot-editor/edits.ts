@@ -11,18 +11,21 @@
 import type { Cubic } from "@/lib/bezier";
 import { hobbyTensions, MAX_TENSION, MIN_TENSION } from "@/lib/hobby";
 import { clamp, deg } from "@/lib/math";
-import type { Vector2 } from "@/lib/vector2";
+import { Vector2 } from "@/lib/vector2";
 
 import { firstUnusedColour } from "./colours";
 import { pictureCrossings } from "./crossing-geometry";
 import {
     crossingPair,
+    isLinked,
     sameSegment,
     segmentBefore,
     type CrossingAt,
     type CrossingEntry,
     type Frame,
+    type Id,
     type KnotFile,
+    type LinkSide,
     type PassAt,
     type PassEntry,
     type PassSide,
@@ -36,7 +39,7 @@ import {
     type Strand,
     type StrandSegment,
 } from "./format";
-import { pictureGeometry, type PictureGeometry } from "./geometry";
+import { pictureGeometry, placedPins, type PictureGeometry } from "./geometry";
 import { crossingEntry, passEntry, passesAt, segmentIdAt, segmentPlaces, type Ids } from "./ids";
 import { kindOf } from "./props";
 
@@ -106,17 +109,141 @@ const angleOf = (direction: Vector2) => angleWithin(deg(direction.angle()));
 
 // Pins and segments
 
+/** A pin moved. Refused on a linked pin, which goes where its leader puts it. */
 export const movePin = (picture: Picture, ref: PinRef, x: number, y: number) =>
-    withPin(picture, ref, (pin) => (pin.x === x && pin.y === y ? pin : { ...pin, x, y }));
+    withPin(picture, ref, (pin) =>
+        isLinked(pin) || (pin.x === x && pin.y === y) ? pin : { ...pin, x, y },
+    );
 
-/** The pin holding this angle (degrees), or, given none, free again. */
+/** Whether any pin is linked to this one. */
+const leads = (picture: Picture, id: Id) =>
+    picture.strands.some((strand) =>
+        strand.pins.some((pin) => isLinked(pin) && pin.link.pin === id),
+    );
+
+/**
+ * The pin holding this angle (degrees), or, given none, free again. Refused on a linked pin, which runs the way its
+ * leader puts it, and clearing the angle of a pin that leads, as its followers are placed across it.
+ */
 export const setPinAngle = (picture: Picture, ref: PinRef, angle: number | undefined) =>
     withPin(picture, ref, (pin) => {
+        if (isLinked(pin)) return pin;
         if (angle === undefined)
-            return pin.angle === undefined ? pin : { id: pin.id, x: pin.x, y: pin.y };
+            return pin.angle === undefined || leads(picture, pin.id)
+                ? pin
+                : { id: pin.id, x: pin.x, y: pin.y };
         const held = angleWithin(angle);
         return pin.angle === held ? pin : { id: pin.id, x: pin.x, y: pin.y, angle: held };
     });
+
+// Linked pins
+
+/** Where a pin is, and which way it runs: its own place and angle, or for a linked pin, where its link puts it. */
+const placeOf = (picture: Picture, [i, k]: PinRef) => placedPins(picture)[i]?.[k];
+
+/**
+ * The pins linked to any of these (by id) made free again, each left where it was and holding the angle it ran at,
+ * as when its leader is deleted.
+ */
+function unlinkFollowers(picture: Picture, leaders: Set<Id>): Picture {
+    if (!picture.strands.some((s) => s.pins.some((p) => isLinked(p) && leaders.has(p.link.pin))))
+        return picture;
+    const placed = placedPins(picture);
+    return {
+        ...picture,
+        strands: picture.strands.map((strand, i) =>
+            strand.pins.some((p) => isLinked(p) && leaders.has(p.link.pin))
+                ? {
+                      ...strand,
+                      pins: strand.pins.map((pin, k) =>
+                          isLinked(pin) && leaders.has(pin.link.pin)
+                              ? freed(pin.id, placed[i][k])
+                              : pin,
+                      ),
+                  }
+                : strand,
+        ),
+    };
+}
+
+/** A free pin at a placed pin's place, holding its angle (if it has one). */
+const freed = (id: Id, at: { x: number; y: number; angle?: number }): Pin => ({
+    id,
+    x: at.x,
+    y: at.y,
+    ...(at.angle !== undefined && { angle: angleWithin(at.angle) }),
+});
+
+/**
+ * The follower linked to the leader: on whichever side of the leader it is now, running the leader's way or, where
+ * it runs the other way now, reversed, with no gap. A free leader with no angle first holds the way it runs now.
+ * Refused where they're the same pin, or where the leader already follows the follower (however far back), which
+ * would link them round in a loop.
+ */
+export function linkPins(
+    picture: Picture,
+    geometry: PictureGeometry,
+    leaderRef: PinRef,
+    followerRef: PinRef,
+): Picture {
+    const leader = picture.strands[leaderRef[0]]?.pins[leaderRef[1]];
+    const follower = picture.strands[followerRef[0]]?.pins[followerRef[1]];
+    if (!leader || !follower || leader === follower) return picture;
+    const pins = new Map<Id, Pin>();
+    for (const strand of picture.strands) for (const pin of strand.pins) pins.set(pin.id, pin);
+    for (let at: Pin | undefined = leader; at && isLinked(at); at = pins.get(at.link.pin))
+        if (at.link.pin === follower.id) return picture;
+
+    const [li, lk] = leaderRef;
+    const [fi, fk] = followerRef;
+    const direction = geometry.strands[li].directions[lk];
+    const holding =
+        !isLinked(leader) && leader.angle === undefined
+            ? setPinAngle(picture, leaderRef, angleOf(direction))
+            : picture;
+    const [from, to] = [geometry.strands[li].pins[lk], geometry.strands[fi].pins[fk]];
+    const left = new Vector2(direction.y, -direction.x);
+    const side = new Vector2(to.x - from.x, to.y - from.y).dot(left) >= 0 ? "left" : "right";
+    const reverse = geometry.strands[fi].directions[fk].dot(direction) < 0;
+    const linked: Pin = {
+        id: follower.id,
+        link: { pin: leader.id, side, ...(reverse && { reverse: true as const }) },
+    };
+    return withPin(holding, followerRef, () => linked);
+}
+
+/** A linked pin made free, left where it is, holding the angle it runs at. */
+export function unlinkPin(picture: Picture, ref: PinRef): Picture {
+    const pin = picture.strands[ref[0]]?.pins[ref[1]];
+    if (!pin || !isLinked(pin)) return picture;
+    return withPin(picture, ref, () => freed(pin.id, placeOf(picture, ref)!));
+}
+
+/** A linked pin's side, gap (0 or more; 0 is left out) or reverse changed. */
+export function setLink(
+    picture: Picture,
+    ref: PinRef,
+    change: { side?: LinkSide; gap?: number; reverse?: boolean },
+): Picture {
+    return withPin(picture, ref, (pin) => {
+        if (!isLinked(pin)) return pin;
+        const side = change.side ?? pin.link.side;
+        const gap = change.gap ?? pin.link.gap ?? 0;
+        const reverse = change.reverse ?? pin.link.reverse ?? false;
+        if (!(gap >= 0)) return pin;
+        if (side === pin.link.side && gap === (pin.link.gap ?? 0) && reverse === !!pin.link.reverse)
+            return pin;
+        return {
+            id: pin.id,
+            link: {
+                pin: pin.link.pin,
+                side,
+                ...(gap > 0 && { gap }),
+                ...(reverse && { reverse: true as const }),
+            },
+        };
+    });
+}
 
 /** A segment's tensions, kept within 0.75 to 4. Refused on a locked segment, whose tensions follow its length. */
 export const setTensions = (picture: Picture, ref: SegmentRef, tension: [number, number]) =>
@@ -495,7 +622,7 @@ export function insertPin(
     const { cubic, length } = strandGeometry.segments[k];
     const [first, second] = cubic.split(t);
     const holding = (pin: Pin, direction: Vector2): Pin =>
-        pin.angle === undefined ? { ...pin, angle: angleOf(direction) } : pin;
+        !isLinked(pin) && pin.angle === undefined ? { ...pin, angle: angleOf(direction) } : pin;
     const pins = [
         ...strand.pins.slice(0, k),
         holding(strand.pins[k], strandGeometry.directions[k]),
@@ -547,10 +674,13 @@ export function insertPin(
  * now names one segment twice, and is left to check. The joined segment keeps the first one's id. Refused on a strand
  * of two pins.
  */
-export function deletePin(picture: Picture, geometry: PictureGeometry, [i, k]: PinRef): Edited {
+export function deletePin(before: Picture, geometry: PictureGeometry, [i, k]: PinRef): Edited {
+    const going = before.strands[i]?.pins[k];
+    const last = going ? before.strands[i].pins.length - 1 : -1;
+    if (!going || last < 2) return { picture: before };
+    // Its followers stay where they are, free.
+    const picture = unlinkFollowers(before, new Set([going.id]));
     const strand = picture.strands[i];
-    const last = strand ? strand.pins.length - 1 : -1;
-    if (!strand || k < 0 || k > last || last < 2) return { picture };
     const pins = strand.pins.filter((_, j) => j !== k);
     let segments: StrandSegment[];
     let move: MovePlace;
@@ -676,9 +806,12 @@ export function addStrand(
 }
 
 /** A strand deleted, with its crossing entries and passes; later strands' places move down by one. */
-export function deleteStrand(picture: Picture, i: number): Edited {
+export function deleteStrand(before: Picture, i: number): Edited {
+    const going = before.strands[i];
+    if (!going) return { picture: before };
+    // Pins following its pins, on other strands, stay where they are, free.
+    const picture = unlinkFollowers(before, new Set(going.pins.map((pin) => pin.id)));
     const strand = picture.strands[i];
-    if (!strand) return { picture };
     const after = (s: number) => (s > i ? s - 1 : s);
     const gone = new Set(strand.segments.map((segment) => segment.id));
     const crossings = picture.crossings.filter((c) => !gone.has(c.over) && !gone.has(c.under));

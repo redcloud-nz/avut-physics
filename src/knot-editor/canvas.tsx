@@ -42,6 +42,7 @@ import { pictureGeometry, type PictureGeometry } from "./geometry";
 import { snappedFrame, snappedMove, snapStep } from "./grid";
 import { GridDrawing, GridNumbers } from "./grid-drawing";
 import { hitAt, PinHandle, PinTools, SegmentHandle } from "./handles";
+import { headOf, leaderOf, pinPlaces } from "./ids";
 import { PictureDrawing } from "./picture-drawing";
 import { kindOf } from "./props";
 import { NOTHING, type EditorAction, type Selection } from "./state";
@@ -118,7 +119,8 @@ type Gesture = { from: { x: number; y: number }; moved: boolean } & (
     | { kind: "pins"; refs: PinRef[]; origins: Vector2[]; anchor: number; start: Vector2 }
     | { kind: "prop"; index: number; origin: Prop; start: Vector2 }
     | { kind: "frame"; sides: FrameSides; origin: Frame; start: Vector2 }
-    | { kind: "angle"; ref: PinRef; centre: Vector2 }
+    /** `turn` is how far the pin turned runs from the pin whose ring it is (a linked pin turns its chain's head). */
+    | { kind: "angle"; ref: PinRef; centre: Vector2; turn: number }
     | {
           kind: "tension";
           segment: SegmentRef;
@@ -329,7 +331,7 @@ export function Canvas(props: {
             };
             dispatch({ type: "edit-file", edit: (f) => setFrame(f, rect) });
         } else if (g.kind === "angle") {
-            const angle = rounded(deg(at.sub(g.centre).angle()), 0.1);
+            const angle = rounded(deg(at.sub(g.centre).angle()) + g.turn, 0.1);
             dispatch({ type: "edit", edit: (q) => setPinAngle(q, g.ref, angle) });
         } else {
             const along = (g.end === 0 ? at.sub(g.pin) : g.pin.sub(at)).dot(g.direction);
@@ -360,16 +362,22 @@ export function Canvas(props: {
                 return;
             }
             if (!selected) select([hit.ref], []);
-            const refs = selected ? parts.pins : [hit.ref];
+            // A linked pin is moved by moving the free pin heading its chain, which takes it along.
+            const places = pinPlaces(picture);
+            const heads = (selected ? parts.pins : [hit.ref]).map((r) =>
+                headOf(picture, r, places),
+            );
+            const refs = heads.filter((r, k) => heads.findIndex((q) => same(q, r)) === k);
             const origins = refs.map(([i, k]) => {
-                const pin = picture.strands[i].pins[k];
+                const pin = geometry.strands[i].pins[k];
                 return new Vector2(pin.x, pin.y);
             });
+            const picked = headOf(picture, hit.ref, places);
             next = {
                 kind: "pins",
                 refs,
                 origins,
-                anchor: refs.findIndex((r) => same(r, hit.ref)),
+                anchor: refs.findIndex((r) => same(r, picked)),
                 start: toPicture(from.x, from.y),
                 from,
                 moved: false,
@@ -426,11 +434,16 @@ export function Canvas(props: {
                 moved: false,
             };
         } else if (hit.kind === "ring") {
-            const pin = picture.strands[hit.ref[0]].pins[hit.ref[1]];
+            // A linked pin's ring turns the free pin heading its chain, keeping how far apart they run.
+            const pin = geometry.strands[hit.ref[0]].pins[hit.ref[1]];
+            const head = headOf(picture, hit.ref);
+            const headPin = geometry.strands[head[0]].pins[head[1]];
+            const [own, led] = [pin.angle, headPin.angle];
             next = {
                 kind: "angle",
-                ref: hit.ref,
+                ref: head,
                 centre: new Vector2(pin.x, pin.y),
+                turn: own !== undefined && led !== undefined ? led - own : 0,
                 from,
                 moved: false,
             };
@@ -519,6 +532,7 @@ export function Canvas(props: {
     }));
 
     const parts = selection.kind === "parts" ? selection : { pins: [], segments: [] };
+    const pinsById = pinPlaces(picture);
     const isPin = (i: number, k: number) => parts.pins.some((r) => r[0] === i && r[1] === k);
     const isSegment = (i: number, k: number) =>
         parts.segments.some((r) => r[0] === i && r[1] === k);
@@ -597,27 +611,33 @@ export function Canvas(props: {
                         shown={show.crossings}
                         px={px}
                     />
-                    {picture.strands.map((strand, i) =>
-                        strand.pins.map((pin, k) => (
-                            <PinHandle
-                                key={`${i}-${k}`}
-                                strand={i}
-                                pin={k}
-                                x={pin.x}
-                                y={pin.y}
-                                angle={pin.angle}
-                                selected={isPin(i, k)}
-                                number={show.pinNumbers ? k + 1 : undefined}
-                                px={px}
-                            />
-                        )),
+                    {geometry.strands.map((strand, i) =>
+                        strand.pins.map((pin, k) => {
+                            const leader = leaderOf(picture, [i, k], pinsById);
+                            const led = leader && geometry.strands[leader[0]]?.pins[leader[1]];
+                            return (
+                                <PinHandle
+                                    key={`${i}-${k}`}
+                                    strand={i}
+                                    pin={k}
+                                    x={pin.x}
+                                    y={pin.y}
+                                    angle={pin.angle}
+                                    selected={isPin(i, k)}
+                                    number={show.pinNumbers ? k + 1 : undefined}
+                                    leaderX={led?.x}
+                                    leaderY={led?.y}
+                                    px={px}
+                                />
+                            );
+                        }),
                     )}
                     {show.handles &&
                         parts.pins.map(([i, k]) => {
                             const strand = picture.strands[i];
-                            const pin = strand?.pins[k];
-                            if (!pin) return null;
                             const shape = geometry.strands[i];
+                            const pin = shape?.pins[k];
+                            if (!strand || !pin) return null;
                             const tensions = [
                                 ...(k > 0
                                     ? [

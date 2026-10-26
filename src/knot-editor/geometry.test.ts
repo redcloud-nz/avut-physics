@@ -7,7 +7,7 @@ import { Vector2 } from "@/lib/vector2";
 
 import type { Picture, Rope } from "./format";
 import { pictureGeometry, strandDistance, strandPosition, TIGHTEST_BEND } from "./geometry";
-import { testStrand, type TestPin, type TestSegment } from "./test-pictures";
+import { free, testStrand, type TestPin, type TestSegment } from "./test-pictures";
 
 const rope = (pins: TestPin[], segments?: TestSegment[]) =>
     testStrand("rope", pins, { segments }) as Rope;
@@ -80,7 +80,7 @@ describe("pictureGeometry", () => {
     it("keeps every segment outside the moved pin's run", () => {
         const base = wavy(10, [3, 6]);
         const g = pictureGeometry(picture(base));
-        const pins = [...base.pins];
+        const pins = base.pins.map(free);
         pins[1] = { ...pins[1], x: pins[1].x + 0.5, y: pins[1].y - 1 };
         const moved = pictureGeometry(picture({ ...base, pins }), g);
         const [old, now] = [g.strands[0].segments, moved.strands[0].segments];

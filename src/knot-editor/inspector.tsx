@@ -20,6 +20,7 @@ import {
     deletePass,
     lockSegment,
     movePin,
+    setLink,
     setPinAngle,
     setRopeColour,
     setRopeDiameter,
@@ -29,19 +30,24 @@ import {
     setStepNumber,
     setTensions,
     shiftAt,
+    unlinkPin,
     unlockSegment,
 } from "./edits";
 import {
+    isLinked,
     ROPE_COLOURS,
     sameSegment,
     type KnotFile,
+    type LinkSide,
     type Picture,
+    type PinLink,
+    type PinRef,
     type RopeColour,
     type SegmentRef,
     type Step,
     type Strand,
 } from "./format";
-import type { LockStatus, PictureGeometry } from "./geometry";
+import type { LockStatus, PictureGeometry, PlacedPin } from "./geometry";
 import { kindOf, type Prop } from "./props";
 import type { EditorAction, Selection } from "./state";
 
@@ -230,6 +236,87 @@ function lockProblem(lock: LockStatus): string | null {
 }
 
 /** A rope's colour and name. */
+/**
+ * A linked pin's fields: where its leader puts it (shown, not typed), what it's linked to, and the link's side, gap
+ * and direction, to set.
+ */
+function LinkFields(props: {
+    picture: Picture;
+    link: PinLink;
+    placed: PlacedPin;
+    pinRef: PinRef;
+    edit: (change: (picture: Picture) => Picture) => void;
+}) {
+    const { picture, link, placed, pinRef, edit } = props;
+    const leader = picture.strands.flatMap((strand, i) =>
+        strand.pins.flatMap((pin, k) => (pin.id === link.pin ? [{ strand, i, k }] : [])),
+    )[0];
+    return (
+        <>
+            <Shown label="x" value={shown(placed.x)} unit="mm" />
+            <Shown label="y" value={shown(placed.y)} unit="mm" />
+            <Shown
+                label="Angle"
+                value={placed.angle === undefined ? "" : shown(placed.angle)}
+                unit="°"
+            />
+            <div className="mt-3 border-t border-line-faint pt-2">
+                <div className="py-0.5">
+                    Linked to{" "}
+                    {leader
+                        ? `${strandName(leader.strand, leader.i)}, pin ${leader.k + 1}`
+                        : "a pin that's gone"}
+                </div>
+                <label className={ROW}>
+                    <span className="mr-auto">Side</span>
+                    <select
+                        className={FIELD}
+                        value={link.side}
+                        onChange={(e) => {
+                            const side = e.currentTarget.value as LinkSide;
+                            edit((q) => setLink(q, pinRef, { side }));
+                        }}
+                    >
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                    </select>
+                    <Unit />
+                </label>
+                <NumberField
+                    label="Gap"
+                    unit="mm"
+                    value={link.gap ?? 0}
+                    onChange={(gap) =>
+                        gap !== undefined && edit((q) => setLink(q, pinRef, { gap }))
+                    }
+                />
+                <label className={ROW}>
+                    <span className="mr-auto">Reversed</span>
+                    <input
+                        type="checkbox"
+                        className="accent-action"
+                        checked={!!link.reverse}
+                        onChange={() => edit((q) => setLink(q, pinRef, { reverse: !link.reverse }))}
+                    />
+                    <Unit />
+                </label>
+                <div className="text-xs text-ink-muted">
+                    Beside its leader, running the same way unless reversed. Dragging or turning it
+                    moves its leader.
+                </div>
+                <Button
+                    className="mt-2"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => edit((q) => unlinkPin(q, pinRef))}
+                >
+                    Unlink
+                </Button>
+            </div>
+        </>
+    );
+}
+
 function RopeFields(props: {
     picture: Picture;
     strand: number;
@@ -420,34 +507,47 @@ function SelectionPanel(props: {
         const [i, k] = pins[0];
         const strand = picture.strands[i];
         const pin = strand?.pins[k];
-        if (!pin) return null;
+        const placed = geometry.strands[i]?.pins[k];
+        if (!pin || !placed) return null;
         const [before, after] = [strand.segments[k - 1], strand.segments[k]];
         const canShift = before?.length !== undefined && after?.length !== undefined;
         return (
             <div>
                 {heading(`${strandName(strand, i)}, pin ${k + 1}`)}
-                <NumberField
-                    label="x"
-                    unit="mm"
-                    value={pin.x}
-                    onChange={(x) => edit((q) => movePin(q, [i, k], x!, pin.y))}
-                />
-                <NumberField
-                    label="y"
-                    unit="mm"
-                    value={pin.y}
-                    onChange={(y) => edit((q) => movePin(q, [i, k], pin.x, y!))}
-                />
-                <NumberField
-                    label="Angle"
-                    unit="°"
-                    value={pin.angle}
-                    blank
-                    onChange={(angle) => edit((q) => setPinAngle(q, [i, k], angle))}
-                />
-                <div className="text-xs text-ink-muted">
-                    Blank for none: the curve then sets it.
-                </div>
+                {isLinked(pin) ? (
+                    <LinkFields
+                        picture={picture}
+                        link={pin.link}
+                        placed={placed}
+                        pinRef={[i, k]}
+                        edit={edit}
+                    />
+                ) : (
+                    <>
+                        <NumberField
+                            label="x"
+                            unit="mm"
+                            value={pin.x}
+                            onChange={(x) => edit((q) => movePin(q, [i, k], x!, pin.y))}
+                        />
+                        <NumberField
+                            label="y"
+                            unit="mm"
+                            value={pin.y}
+                            onChange={(y) => edit((q) => movePin(q, [i, k], pin.x, y!))}
+                        />
+                        <NumberField
+                            label="Angle"
+                            unit="°"
+                            value={pin.angle}
+                            blank
+                            onChange={(angle) => edit((q) => setPinAngle(q, [i, k], angle))}
+                        />
+                        <div className="text-xs text-ink-muted">
+                            Blank for none: the curve then sets it.
+                        </div>
+                    </>
+                )}
                 {canShift && (
                     <div className="mt-3 border-t border-line-faint pt-2">
                         <NumberField

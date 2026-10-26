@@ -49,7 +49,24 @@ export const ROPE_COLOURS = ["orange", "green", "blue", "purple", "yellow"] as c
 export type RopeColour = (typeof ROPE_COLOURS)[number];
 
 /** A point a strand passes through, and the way it runs through it (degrees), when it holds one. */
-export type Pin = { id: Id; x: number; y: number; angle?: number };
+export type FreePin = { id: Id; x: number; y: number; angle?: number };
+
+/** Which side of its leader a linked pin is on, looking the way the leader runs. */
+export type LinkSide = "left" | "right";
+export const LINK_SIDES = ["left", "right"] as const;
+
+/**
+ * Where a linked pin is, from its leader (by id): beside it, at right angles to the way it runs, the two strands'
+ * half-widths and `gap` (millimetres, 0 by default) apart, running the same way or, `reverse`, the other way. For
+ * ropes run side by side.
+ */
+export type PinLink = { pin: Id; side: LinkSide; gap?: number; reverse?: true };
+export type LinkedPin = { id: Id; link: PinLink };
+
+/** A pin: free, where it's placed, or linked to another pin, its leader. */
+export type Pin = FreePin | LinkedPin;
+
+export const isLinked = (pin: Pin): pin is LinkedPin => "link" in pin;
 
 /**
  * The curve between two pins. `tension` shapes it, one at each end (1 by default). A locked segment holds its
@@ -285,6 +302,8 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
             );
     });
 
+    checkLinks(strands, at);
+
     const props = readList(json.props ?? [], below(at, "props")).map((item, k) => {
         const where = below(below(at, "props"), k);
         const kind = readChoice(
@@ -311,6 +330,60 @@ function readPicture(value: JsonValue | undefined, at: string): Picture {
     return { strands, crossings, props };
 }
 
+/**
+ * Every link's leader is another pin of the picture, following leaders never comes back round, and a free pin that
+ * leads holds an angle (its followers are placed across the way it runs).
+ */
+function checkLinks(strands: Strand[], at: string) {
+    const pins = new Map<Id, Pin>();
+    for (const strand of strands) for (const pin of strand.pins) pins.set(pin.id, pin);
+    strands.forEach((strand, i) =>
+        strand.pins.forEach((pin, k) => {
+            if (!isLinked(pin)) return;
+            const where = below(below(below(below(at, "strands"), i), "pins"), k);
+            const leader = pins.get(pin.link.pin);
+            if (!leader)
+                throw new FileError(
+                    below(below(where, "link"), "pin"),
+                    `names pin ${pin.link.pin}, which isn't in the picture`,
+                );
+            if (leader === pin) throw new FileError(where, "is linked to itself");
+            const seen = new Set([pin.id]);
+            let next: Pin = leader;
+            while (isLinked(next)) {
+                if (seen.has(next.id)) throw new FileError(where, "is linked round in a loop");
+                seen.add(next.id);
+                next = pins.get(next.link.pin)!;
+            }
+            if (!isLinked(leader) && leader.angle === undefined)
+                throw new FileError(
+                    where,
+                    `is linked to pin ${leader.id}, which holds no angle (a free pin that leads must)`,
+                );
+        }),
+    );
+}
+
+function readLink(value: JsonValue | undefined, at: string): PinLink {
+    const json = readObject(value, at);
+    onlyFields(json, at, ["pin", "side", "gap", "reverse"]);
+    const link: PinLink = {
+        pin: readId(json.pin, below(at, "pin")),
+        side: readChoice(json.side, below(at, "side"), LINK_SIDES),
+    };
+    if (json.gap !== undefined) {
+        const gap = readNumber(json.gap, below(at, "gap"));
+        if (gap < 0) throw new FileError(below(at, "gap"), `should be 0 or more, but is ${gap}`);
+        link.gap = gap;
+    }
+    if (json.reverse !== undefined) {
+        if (json.reverse !== true)
+            throw new FileError(below(at, "reverse"), "should be true, or left out");
+        link.reverse = true;
+    }
+    return link;
+}
+
 function readStrand(value: JsonValue, at: string): Strand {
     const json = readObject(value, at);
     const kind = readChoice(json.kind, below(at, "kind"), STRAND_KINDS);
@@ -324,6 +397,13 @@ function readStrand(value: JsonValue, at: string): Strand {
     const pins = readList(json.pins, below(at, "pins")).map((item, k): Pin => {
         const where = below(below(at, "pins"), k);
         const pin = readObject(item, where);
+        if (pin.link !== undefined) {
+            onlyFields(pin, where, ["id", "link"]);
+            return {
+                id: readId(pin.id, below(where, "id")),
+                link: readLink(pin.link, below(where, "link")),
+            };
+        }
         onlyFields(pin, where, ["id", "x", "y", "angle"]);
         return {
             id: readId(pin.id, below(where, "id")),
@@ -403,12 +483,25 @@ function writePicture(picture: Picture, expanded: Expanded): JsonObject {
                     diameter: strand.diameter,
                     ...(strand.name !== undefined && { name: strand.name }),
                 }),
-                pins: strand.pins.map((pin) => ({
-                    id: pin.id,
-                    x: pin.x,
-                    y: pin.y,
-                    ...(pin.angle !== undefined && { angle: pin.angle }),
-                })),
+                pins: strand.pins.map(
+                    (pin): JsonObject =>
+                        isLinked(pin)
+                            ? {
+                                  id: pin.id,
+                                  link: {
+                                      pin: pin.link.pin,
+                                      side: pin.link.side,
+                                      ...(pin.link.gap && { gap: pin.link.gap }),
+                                      ...(pin.link.reverse && { reverse: true }),
+                                  },
+                              }
+                            : {
+                                  id: pin.id,
+                                  x: pin.x,
+                                  y: pin.y,
+                                  ...(pin.angle !== undefined && { angle: pin.angle }),
+                              },
+                ),
                 segments: strand.segments.map((segment) => ({
                     id: segment.id,
                     ...(segment.length !== undefined && { length: segment.length }),

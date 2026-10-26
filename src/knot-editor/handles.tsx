@@ -76,19 +76,27 @@ export const SegmentHandle = memo(function SegmentHandle(props: {
     );
 });
 
-/** A pin: a dot, with a tick across it along its angle when it holds one, and its number (from 1) when shown. */
+/**
+ * A pin: a dot, with a tick across it along its angle when it holds one, and its number (from 1) when shown. A linked
+ * pin is a ring rather than a dot, with a thin line to its leader.
+ */
 export const PinHandle = memo(function PinHandle(props: {
     strand: number;
     pin: number;
     x: number;
     y: number;
-    /** The angle it holds (degrees), if any. */
+    /** The angle it holds or runs at (degrees), if any. */
     angle?: number;
     selected: boolean;
     number?: number;
+    /** Where its leader is, for a linked pin. */
+    leaderX?: number;
+    leaderY?: number;
     px: number;
 }) {
-    const { x, y, angle, selected, number, px } = props;
+    const { x, y, angle, selected, number, leaderX, leaderY, px } = props;
+    const linked = leaderX !== undefined && leaderY !== undefined;
+    const colour = selected ? "var(--highlight)" : "var(--ink)";
     const tick =
         angle !== undefined &&
         [-1, 1].map((s) => {
@@ -97,6 +105,15 @@ export const PinHandle = memo(function PinHandle(props: {
         });
     return (
         <g data-hit="pin" data-ref={`${props.strand},${props.pin}`} className="cursor-move">
+            {linked && (
+                <path
+                    d={`M ${r4(x)} ${r4(y)} L ${r4(leaderX)} ${r4(leaderY)}`}
+                    stroke={colour}
+                    strokeWidth={px}
+                    strokeOpacity={0.7}
+                    pointerEvents="none"
+                />
+            )}
             {tick && (
                 <path
                     d={`M ${tick[0]} L ${tick[1]}`}
@@ -113,14 +130,35 @@ export const PinHandle = memo(function PinHandle(props: {
                     strokeLinecap="round"
                 />
             )}
-            <circle
-                cx={x}
-                cy={y}
-                r={PIN * px}
-                fill={selected ? "var(--highlight)" : "var(--ink)"}
-                stroke="var(--knot-outline)"
-                strokeWidth={1.5 * px}
-            />
+            {linked ? (
+                <>
+                    <circle
+                        cx={x}
+                        cy={y}
+                        r={PIN * px}
+                        fill="transparent"
+                        stroke="var(--knot-outline)"
+                        strokeWidth={4 * px}
+                    />
+                    <circle
+                        cx={x}
+                        cy={y}
+                        r={PIN * px}
+                        fill="none"
+                        stroke={colour}
+                        strokeWidth={2 * px}
+                    />
+                </>
+            ) : (
+                <circle
+                    cx={x}
+                    cy={y}
+                    r={PIN * px}
+                    fill={colour}
+                    stroke="var(--knot-outline)"
+                    strokeWidth={1.5 * px}
+                />
+            )}
             {number !== undefined && (
                 <text
                     x={x + 7 * px}

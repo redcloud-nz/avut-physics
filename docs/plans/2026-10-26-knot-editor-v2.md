@@ -216,7 +216,7 @@ Review group 2 ends here, with its visual checkpoint.
     matched through adding and deleting pins and strands. Every existing test still passes on the same pictures. In
     the browser, the v2 sample opened looks and checks as before. Type check, lint and `npm test` pass.
 
-- [ ] **7. Linked pins in the file and geometry** — Read, write and resolve linked pins, and keep links through edits
+- [x] **7. Linked pins in the file and geometry** — Read, write and resolve linked pins, and keep links through edits
   - **Files:** `src/knot-editor/format.ts`, `src/knot-editor/geometry.ts`, `src/knot-editor/edits.ts`,
     `src/knot-editor/format.test.ts`, `src/knot-editor/geometry.test.ts`, `src/knot-editor/edits.test.ts`
   - **Do:** as in Decisions: the pin union and its checks, resolving in `pictureGeometry` with the cache keyed on
@@ -227,7 +227,7 @@ Review group 2 ends here, with its visual checkpoint.
     follower deleted; and the cache recomputing a follower's segments when only its leader moved. Type check, lint
     and `npm test` pass.
 
-- [ ] **8. Linked pins in the editor** — Link, unlink and drag linked pins
+- [x] **8. Linked pins in the editor** — Link, unlink and drag linked pins
   - **Files:** `src/knot-editor/menus.tsx`, `src/knot-editor/editor.tsx`, `src/knot-editor/canvas.tsx`,
     `src/knot-editor/handles.tsx`, `src/knot-editor/inspector.tsx`, `src/knot-editor/shortcuts.tsx`
   - **Do:** as in Decisions: the two commands, dragging and turning through the leader, the hollow handle with its
@@ -237,7 +237,7 @@ Review group 2 ends here, with its visual checkpoint.
     and reverse in the panel moves the follower; unlinking leaves it in place. Type check, lint and `npm test` pass.
   - `visual`
 
-- [ ] **9. Docs** — Bring the editor's design doc into line with version 2
+- [x] **9. Docs** — Bring the editor's design doc into line with version 2
   - **Files:** `docs/knot-editor.md`
   - **Do:** fold the "Version 2 (proposed)" section into the doc's body (Curves, Files, the page) as what's built,
     with the file examples in millimetres, and bring it into line with anything the build settled differently.

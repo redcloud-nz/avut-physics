@@ -28,12 +28,14 @@ import {
     deleteProp,
     insertPin,
     insertStep,
+    linkPins,
     NEW_ROPE_DIAMETER,
     setDetails,
     setFrame,
+    unlinkPin,
 } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
-import type { KnotFile, PinRef } from "./format";
+import { isLinked, type KnotFile, type PinRef } from "./format";
 import { Inspector } from "./inspector";
 import { Menus, propCommand, useShortcuts, type CommandId } from "./menus";
 import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
@@ -164,6 +166,11 @@ export default function KnotEditor() {
         redo: state.redo.length > 0,
         delete: pins.length > 0 || selection.kind === "prop",
         selectAll: picture.strands.length > 0,
+        link: pins.length === 2,
+        unlink: pins.some(([i, k]) => {
+            const pin = picture.strands[i]?.pins[k];
+            return !!pin && isLinked(pin);
+        }),
         insertPin: segments.length > 0,
         insertRope: true,
         insertArrow: true,
@@ -269,7 +276,13 @@ export default function KnotEditor() {
                 dispatch({ type: "edit", edit: (q) => deleteProp(q, p) });
                 dispatch({ type: "select", selection: NOTHING });
             } else dispatch({ type: "edit", edit: (q) => deletePins(q, pins) });
-        } else if (id === "selectAll")
+        } else if (id === "link") {
+            // The second pin selected follows the first.
+            const [leader, follower] = pins;
+            dispatch({ type: "edit", edit: (q) => linkPins(q, geometry, leader, follower) });
+        } else if (id === "unlink")
+            dispatch({ type: "edit", edit: (q) => pins.reduce(unlinkPin, q) });
+        else if (id === "selectAll")
             selectPins(picture.strands.flatMap((s, i) => s.pins.map((_, k): PinRef => [i, k])));
         else if (id === "insertPin") {
             // At the middle (by length) of the first segment selected.
