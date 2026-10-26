@@ -22,6 +22,7 @@ import { Vector2 } from "@/lib/vector2";
 import { Canvas, useGeometry, type CanvasControls } from "./canvas";
 import { pictureCrossings, strandPaths } from "./crossing-geometry";
 import { DetailsDialog } from "./details-dialog";
+import { DrawingMenu, type MenuTarget } from "./drawing-menu";
 import {
     addProp,
     addStrand,
@@ -43,7 +44,7 @@ import { Inspector } from "./inspector";
 import { FAR_TURN_STEP, moved, moveStep, nextPin, TURN_STEP, turned } from "./keyboard";
 import { Menus, propCommand, useShortcuts, type CommandId, type RunOptions } from "./menus";
 import { ObjectsList } from "./objects-list";
-import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
+import { PROP_KIND_NAMES, PROP_KINDS, type PropKindName } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
 import { editorReducer, isSaved, loaded, NOTHING, pictureOf } from "./state";
 import { createReadouts, StatusBar, type Warnings } from "./status-bar";
@@ -266,9 +267,8 @@ export default function KnotEditor() {
     const selectPins = (refs: PinRef[]) =>
         dispatch({ type: "select", selection: { kind: "parts", pins: refs, segments: [] } });
 
-    /** A short straight rope or arrow across the middle of the view, its pins selected. */
-    function insertStrand(kind: "rope" | "arrow") {
-        const centre = canvas.current?.centre();
+    /** A short straight rope or arrow centred here (the middle of the view, unless it's given), its pins selected. */
+    function insertStrand(kind: "rope" | "arrow", centre = canvas.current?.centre()) {
         if (!centre) return;
         const offset = { x: 55, y: 0 } as const;
         const n = picture.strands.length;
@@ -288,6 +288,29 @@ export default function KnotEditor() {
             [n, 1],
         ]);
     }
+    /** A prop of this kind centred here (the middle of the view, unless it's given), selected. */
+    function insertProp(name: PropKindName, centre = canvas.current?.centre()) {
+        if (!centre) return;
+        const kind = PROP_KINDS[name];
+        const n = picture.props.length;
+        dispatch({ type: "edit", edit: (q, ids) => addProp(q, kind.create(centre, ids())) });
+        dispatch({ type: "select", selection: { kind: "prop", prop: n } });
+    }
+    const menu = (target: MenuTarget) => (
+        <DrawingMenu
+            target={target}
+            picture={picture}
+            geometry={geometry}
+            crossings={crossings}
+            enabled={enabled}
+            checked={checked}
+            run={run}
+            dispatch={dispatch}
+            insertAt={(what, at) =>
+                what === "rope" || what === "arrow" ? insertStrand(what, at) : insertProp(what, at)
+            }
+        />
+    );
     const run = (id: CommandId, { far = false }: RunOptions = {}) => {
         if (id === "new") {
             if (mayDiscard())
@@ -351,14 +374,8 @@ export default function KnotEditor() {
                 edit: (f) => insertStep(f, after).file,
                 show: insertStep(state.file, after).index,
             });
-        } else if (id.startsWith("prop:")) {
-            const kind = PROP_KINDS[id.slice("prop:".length) as keyof typeof PROP_KINDS];
-            const centre = canvas.current?.centre();
-            if (!centre) return;
-            const n = picture.props.length;
-            dispatch({ type: "edit", edit: (q, ids) => addProp(q, kind.create(centre, ids())) });
-            dispatch({ type: "select", selection: { kind: "prop", prop: n } });
-        } else if (id === "zoomIn") canvas.current?.zoom(1.25);
+        } else if (id.startsWith("prop:")) insertProp(id.slice("prop:".length) as PropKindName);
+        else if (id === "zoomIn") canvas.current?.zoom(1.25);
         else if (id === "zoomOut") canvas.current?.zoom(0.8);
         else if (id === "fit") canvas.current?.fit();
         else if (
@@ -394,6 +411,7 @@ export default function KnotEditor() {
                         selection={selection}
                         dispatch={dispatch}
                         run={run}
+                        menu={menu}
                     />
                 </aside>
                 <main className="min-w-0 flex-1 bg-surface" aria-label="Drawing">
@@ -409,6 +427,7 @@ export default function KnotEditor() {
                         dispatch={dispatch}
                         show={show}
                         readouts={readouts}
+                        menu={menu}
                     />
                 </main>
                 <aside className="w-64 shrink-0 overflow-y-auto border-l border-line-faint p-3">

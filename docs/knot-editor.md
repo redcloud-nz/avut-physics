@@ -277,6 +277,15 @@ chrome for addresses that match no page.
     prop to move it in front or behind.
   - A linked pin's handle is a ring rather than a dot, with a thin line to its leader.
   - Scroll to zoom, drag the background to pan.
+- **Context menu:** right-clicking selects the thing under the pointer (unless it's selected already) and lists what
+  can be done to it. Commands among them come from the menu bar's table, with its labels and shortcuts.
+  - pin: Delete, Clear Angle, Link to the pin selected before (the one right-clicked follows it), Unlink, Select Rope;
+  - segment: Add Pin Here, Lock or Unlock Length, Select Rope, and the rope's Colour and Delete Rope;
+  - rope or arrow in the objects list: Colour (ropes) and Delete;
+  - prop: its kind's choices (a bar's Seen) and Delete;
+  - crossing or pass: swap it, as a click does;
+  - background: a rope, an arrow or each kind of prop inserted where it was clicked, Select All, Select None, Grid
+    and Snap to Grid.
 - **Keyboard**, so the right hand can stay on the mouse:
   - W, A, S and D (or the arrow keys) move what's selected: pins, a segment's two pins, a whole strand, or a prop.
     Each press goes 1 mm, or 10 mm with Shift. With snap on, it takes the first pin (or the prop's centre) to the

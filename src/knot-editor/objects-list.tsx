@@ -2,10 +2,12 @@
 
 /**
  * The list under the steps: the ropes, arrows and props in the picture shown, in the order they're drawn. Choosing one
- * selects it whole, to see and set its values in the panel. Its + adds a rope, an arrow or a prop, as Insert does.
+ * selects it whole, to see and set its values in the panel, and right-clicking one opens its context menu. Its + adds
+ * a rope, an arrow or a prop, as Insert does.
  */
 import type { Dispatch, ReactNode } from "react";
 
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -16,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ARROW_TOKENS, ROPE_TOKENS } from "./colours";
+import type { MenuTarget } from "./drawing-menu";
 import type { Picture } from "./format";
 import { ListHeading } from "./list-heading";
 import { COMMANDS, propCommand, shortcutLabel, type CommandId } from "./menus";
@@ -46,20 +49,36 @@ export function ObjectsList(props: {
     dispatch: Dispatch<EditorAction>;
     /** Runs a command from the + menu, as the Insert menu does. */
     run: (id: CommandId) => void;
+    /** The context menu's items for a rope, arrow or prop right-clicked in the list. */
+    menu: (target: MenuTarget) => ReactNode;
 }) {
     const { picture, selection, dispatch } = props;
-    const item = (key: string, chosen: boolean, label: ReactNode, select: Selection) => (
-        <button
-            key={key}
-            type="button"
-            className={`block w-full truncate rounded px-2 py-0.5 text-left ${
-                chosen ? "bg-surface-raised text-highlight" : "text-ink hover:bg-surface"
-            }`}
-            onClick={() => dispatch({ type: "select", selection: select })}
-        >
-            {label}
-        </button>
-    );
+    const item = (key: string, chosen: boolean, label: ReactNode, select: Selection) => {
+        const choose = () => dispatch({ type: "select", selection: select });
+        const target: MenuTarget =
+            select.kind === "prop"
+                ? { kind: "prop", index: select.prop }
+                : { kind: "strand", strand: select.kind === "strand" ? select.strand : 0 };
+        return (
+            <ContextMenu key={key}>
+                <ContextMenuTrigger asChild>
+                    <button
+                        type="button"
+                        className={`block w-full truncate rounded px-2 py-0.5 text-left ${
+                            chosen
+                                ? "bg-surface-raised text-highlight"
+                                : "text-ink hover:bg-surface"
+                        }`}
+                        onClick={choose}
+                        onContextMenu={choose}
+                    >
+                        {label}
+                    </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="min-w-52">{props.menu(target)}</ContextMenuContent>
+            </ContextMenu>
+        );
+    };
     const empty = picture.strands.length === 0 && picture.props.length === 0;
     return (
         <nav aria-label="Objects">

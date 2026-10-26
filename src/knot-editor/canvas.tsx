@@ -14,16 +14,19 @@ import {
     useRef,
     useState,
     type Dispatch,
+    type ReactNode,
     type PointerEvent as ReactPointerEvent,
     type Ref,
 } from "react";
 
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Cubic } from "@/lib/bezier";
 import { deg } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
 import type { PictureCrossings, StrandPaths } from "./crossing-geometry";
 import { crossingLetter, CrossingMarks, type Mark } from "./crossings";
+import type { MenuTarget } from "./drawing-menu";
 import {
     changeProp,
     draggedFrame,
@@ -160,6 +163,8 @@ export function Canvas(props: {
     /** Where the canvas puts the pointer's position and the zoom, for the status bar. */
     readouts: ReadoutStore;
     ref?: Ref<CanvasControls>;
+    /** The context menu's items for what was right-clicked; with none, right-clicking does nothing of the editor's. */
+    menu?: (target: MenuTarget) => ReactNode;
 }) {
     const {
         picture,
@@ -506,6 +511,32 @@ export function Canvas(props: {
             dispatch({ type: "select", selection: NOTHING });
     };
 
+    // What was right-clicked, selected first so the menu acts on what's highlighted.
+    const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
+    const onContextMenu = (e: React.MouseEvent<SVGSVGElement>) => {
+        const hit = hitAt(e.target);
+        const { geometry, selection } = latest.current;
+        const parts = selection.kind === "parts" ? selection : { pins: [], segments: [] };
+        const at = toPicture(e.clientX, e.clientY);
+        const selectParts = (pins: PinRef[], segments: SegmentRef[]) =>
+            dispatch({ type: "select", selection: { kind: "parts", pins, segments } });
+        if (hit.kind === "pin" || hit.kind === "ring" || hit.kind === "tension") {
+            if (!parts.pins.some((r) => same(r, hit.ref))) selectParts([hit.ref], []);
+            setMenuTarget({ kind: "pin", ref: hit.ref, before: selection });
+        } else if (hit.kind === "segment") {
+            const [i, k] = hit.ref;
+            const whole = selection.kind === "strand" && selection.strand === i;
+            if (!whole && !parts.segments.some((r) => same(r, hit.ref))) selectParts([], [hit.ref]);
+            const { t } = geometry.strands[i].segments[k].cubic.nearest(at);
+            setMenuTarget({ kind: "segment", ref: hit.ref, t });
+        } else if (hit.kind === "prop") {
+            dispatch({ type: "select", selection: { kind: "prop", prop: hit.index } });
+            setMenuTarget({ kind: "prop", index: hit.index });
+        } else if (hit.kind === "crossing" || hit.kind === "pass") {
+            setMenuTarget({ kind: hit.kind, index: hit.index });
+        } else setMenuTarget({ kind: "background", at });
+    };
+
     const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
         const hit = hitAt(e.target);
         const { geometry } = latest.current;
@@ -553,7 +584,7 @@ export function Canvas(props: {
               h: size.h / view.scale,
           }
         : { x: 0, y: 0, w: 0, h: 0 };
-    return (
+    const drawing = (
         <svg
             ref={svg}
             className="size-full touch-none select-none"
@@ -566,6 +597,7 @@ export function Canvas(props: {
             onPointerCancel={onPointerUp}
             onPointerLeave={() => readouts.set({ pointer: undefined })}
             onDoubleClick={onDoubleClick}
+            onContextMenu={props.menu ? onContextMenu : undefined}
         >
             {ready && (
                 <>
@@ -687,5 +719,14 @@ export function Canvas(props: {
                 </>
             )}
         </svg>
+    );
+    if (!props.menu) return drawing;
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{drawing}</ContextMenuTrigger>
+            <ContextMenuContent className="min-w-52">
+                {menuTarget && props.menu(menuTarget)}
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
