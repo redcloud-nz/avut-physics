@@ -1,8 +1,8 @@
 # Knot editor: design
 
-A new editor for drawing knots and their tying steps, built from scratch beside the old rope editor
-(`docs/rope-editor.md` lists that one's problems). The existing knots stay as they are, drawn by `pinned-rope.ts`, until
-this editor has proved itself; then they're ported to its files. It was built to two plans:
+The editor for drawing knots and their tying steps. Every knot on the knots' pages is one of its files
+(`src/knots/files/`, see `docs/knots.md`). It replaced an older rope editor, and the knots were ported to its files
+(`docs/plans/2026-10-26-port-knots.md`). It was built to two plans:
 `docs/plans/2026-10-25-knot-editor.md` (the editor) and `docs/plans/2026-10-26-knot-editor-v2.md` (millimetres, rope
 sizes, the frame, the grid, ids and linked pins).
 

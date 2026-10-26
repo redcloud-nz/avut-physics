@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { arcLengths, resample } from "./curve";
+import { arcLengths } from "./curve";
 import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
 import { clamp, linearScale } from "./math";
 import { pathPoints } from "./svg-path";
@@ -76,12 +76,8 @@ describe("segmentIntersection", () => {
 });
 
 describe("curves", () => {
-    it("measures and evenly respaces a polyline", () => {
+    it("measures along a polyline", () => {
         expect(arcLengths([vec2(0, 0), vec2(3, 4), vec2(3, 5)])).toEqual([0, 5, 6]);
-        const even = resample(pathPoints("M 0 0 C 1 2, 3 2, 4 0"), 0.1);
-        const gaps = arcLengths(even).map((s, i, all) => (i ? s - all[i - 1] : 0.1));
-        expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.002);
-        expect(even[even.length - 1].distanceTo(vec2(4, 0))).toBeLessThan(1e-9);
     });
 });
 

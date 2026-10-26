@@ -239,39 +239,3 @@ export function bisect(
     }
     return [a, b];
 }
-
-/** The determinant of a small square matrix, by Gaussian elimination with partial pivoting. 1 for an empty one. */
-export function determinant(A: Matrix): number {
-    const n = A.length;
-    const M = A.map((row) => [...row]);
-    let det = 1;
-    for (let col = 0; col < n; col++) {
-        let pivot = col;
-        for (let r = col + 1; r < n; r++)
-            if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
-        if (M[pivot][col] === 0) return 0;
-        if (pivot !== col) {
-            [M[col], M[pivot]] = [M[pivot], M[col]];
-            det = -det;
-        }
-        det *= M[col][col];
-        for (let r = col + 1; r < n; r++) {
-            const k = M[r][col] / M[col][col];
-            for (let c = col; c < n; c++) M[r][c] -= k * M[col][c];
-        }
-    }
-    return det;
-}
-
-/** Where f crosses zero between lo and hi, by bisection, to within `tol`. f(lo) and f(hi) must differ in sign. */
-export function findRoot(f: (x: number) => number, lo: number, hi: number, tol = 1e-12): number {
-    let [a, b, fa] = [lo, hi, f(lo)];
-    if (fa * f(hi) > 0) throw new Error("findRoot: f has the same sign at both ends");
-    while (b - a > tol) {
-        const m = (a + b) / 2;
-        const fm = f(m);
-        if (fa * fm <= 0) b = m;
-        else [a, fa] = [m, fm];
-    }
-    return (a + b) / 2;
-}
