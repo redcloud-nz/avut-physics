@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { arcLengths } from "./curve";
-import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
+import {
+    nearestOnSegment,
+    Segment,
+    segmentDistance,
+    segmentGap,
+    segmentIntersection,
+} from "./geometry";
 import { clamp, linearScale, roundTo, wrapDegrees } from "./math";
 import { pathPoints, svgPoint } from "./svg-path";
 import { vec2, Vector2 } from "./vector2";
@@ -62,6 +68,34 @@ describe("geometry", () => {
     it("measures the gap between segments, zero where they cross", () => {
         expect(segmentGap(vec2(0, 0), vec2(2, 2), vec2(0, 2), vec2(2, 0))).toBe(0);
         expect(segmentGap(vec2(0, 0), vec2(2, 0), vec2(0, 1), vec2(2, 1))).toBe(1);
+    });
+});
+
+describe("Segment", () => {
+    const bar = new Segment(vec2(0, 0), vec2(4, 0));
+    const post = new Segment(vec2(2, -1), vec2(2, 3));
+
+    it("measures itself and points along it", () => {
+        expect(bar.vector()).toEqual(vec2(4, 0));
+        expect(bar.length()).toBe(4);
+        expect(bar.direction()).toEqual(vec2(1, 0));
+        expect(bar.mid()).toEqual(vec2(2, 0));
+        expect(bar.at(0.25)).toEqual(vec2(1, 0));
+    });
+
+    it("finds the nearest point and the distance, as the functions do", () => {
+        expect(bar.nearest(vec2(1, 2))).toEqual({ point: vec2(1, 0), t: 0.25 });
+        expect(bar.distanceTo(vec2(7, 4))).toBe(5);
+    });
+
+    it("crosses, gaps and intersects another segment", () => {
+        expect(bar.crosses(post)).toBe(true);
+        expect(bar.gap(post)).toBe(0);
+        expect(bar.intersection(post)).toEqual({ t: 0.5, u: 0.25 });
+        const above = new Segment(vec2(0, 1), vec2(4, 1));
+        expect(bar.crosses(above)).toBe(false);
+        expect(bar.gap(above)).toBe(1);
+        expect(bar.intersection(above)).toBeNull();
     });
 });
 

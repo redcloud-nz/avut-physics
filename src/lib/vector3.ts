@@ -1,7 +1,11 @@
 import { clamp } from "./math";
 import { Vector2 } from "./vector2";
 
-/** An immutable 3D vector. Every operation returns a new vector. */
+/**
+ * An immutable 3D vector. Every operation returns a new vector. It stands for points (positions) as well as vectors
+ * (displacements, directions, forces): `distanceTo` and `lerp` are the operations on points, and a point minus a point
+ * is the vector between them.
+ */
 export class Vector3 {
     static readonly ZERO = new Vector3(0, 0, 0);
 

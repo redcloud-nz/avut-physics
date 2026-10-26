@@ -1,4 +1,4 @@
-import { nearestOnSegment, segmentsCross } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 import { clamp, rad } from "@/lib/math";
 import { solveHeldBalance } from "@/lib/numeric/held-balance";
 import { solveLinear } from "@/lib/numeric/linear";
@@ -75,6 +75,7 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
     const normal = along.perp();
     const B = along.scale(s.attachDistance);
     const tip = along.scale(s.beamLength);
+    const ladder = new Segment(Vector2.ZERO, tip);
 
     const ropePath = (p: Vector2) => ropePathFor(s, p);
     const behindFace = (p: Vector2) => behindFaceFor(s, p);
@@ -94,12 +95,12 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
 
     /** The stretcher can't pass through the ladder (it can only get to the far side round the tip). */
     const valid = (q: number[]) => {
-        const [P1, P2] = ends(q);
-        return !segmentsCross(Vector2.ZERO, tip, P1, P2);
+        return !ladder.crosses(new Segment(...ends(q)));
     };
 
     const pieces = (q: number[]): Piece[] => {
         const [P1, P2] = ends(q);
+        const bar = new Segment(P1, P2);
         const out: Piece[] = [];
         const path = ropePath(P1);
         const towards = path.wrapEdge ?? anchor;
@@ -137,7 +138,7 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
                         ? { kind: "wall", g: -P.x, m: vec2(1, 0) }
                         : { kind: "top", g: h - P.y, m: vec2(0, 1) };
             out.push({ key: `wall${i}`, at: P, ...wall });
-            const onLadder = nearestOnSegment(P, Vector2.ZERO, tip).point;
+            const onLadder = ladder.nearest(P).point;
             out.push({
                 key: `ladder${i}`,
                 kind: "ladder",
@@ -149,13 +150,13 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
         }
         // Spanning the wall's face, the stretcher must pass above its top edge.
         if (behindFace(P1) !== behindFace(P2)) {
-            const d = P2.sub(P1).unit();
+            const d = bar.direction();
             const up = d.x > 0 ? d.perp() : d.perp().neg();
             const at = P1.add(d.scale(edge.sub(P1).dot(d)));
             out.push({ key: "corner", kind: "edge", g: edge.sub(P1).dot(up), at, m: up });
         }
         // The ladder's tip under the stretcher's middle (at its ends the ladder pieces above already count).
-        const onBar = nearestOnSegment(tip, P1, P2);
+        const onBar = bar.nearest(tip);
         if (onBar.t > 1e-9 && onBar.t < 1 - 1e-9) {
             out.push({
                 key: "tip",

@@ -1,5 +1,5 @@
 import { G } from "@/lib/constants";
-import { segmentDistance, segmentGap } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 import { seededPicker } from "@/lib/random";
 import { vec2, Vector2 } from "@/lib/vector2";
 
@@ -173,11 +173,12 @@ export function violations(s: Setup, r: Result): string[] {
 
     // Nothing passes through anything.
     const tip = along.scale(s.beamLength);
-    const gap = segmentGap(P1, P2, Vector2.ZERO, tip);
+    const bar = new Segment(P1, P2);
+    const gap = bar.gap(new Segment(Vector2.ZERO, tip));
     if (gap < s.touchGap - 1e-3) fail("stretcher into the ladder", gap);
     let depth = 0;
     for (let i = 0; i <= 100; i++) {
-        const p = P1.add(P2.sub(P1).scale(i / 100));
+        const p = bar.at(i / 100);
         if (p.x < 0 && p.y < s.wallHeight)
             depth = Math.max(depth, Math.min(-p.x, s.wallHeight - p.y));
         depth = Math.max(depth, -p.y);
@@ -202,8 +203,8 @@ export function violations(s: Setup, r: Result): string[] {
                   : c.surface === "top"
                     ? [c.force.y, c.force.x, c.point.y - s.wallHeight]
                     : [
-                          P2.sub(P1).cross(c.force) / s.barLength,
-                          c.force.dot(P2.sub(P1).unit()),
+                          bar.vector().cross(c.force) / s.barLength,
+                          c.force.dot(bar.direction()),
                           c.point.distanceTo(vec2(0, s.wallHeight)),
                       ];
         if (push < -barTol) fail(`${c.surface} pulls the stretcher`, push);
@@ -310,12 +311,13 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
         fail("rope length", rope.length);
 
     const tip = along.scale(s.beamLength);
-    const gap = segmentGap(P1, P2, Vector2.ZERO, tip);
+    const bar = new Segment(P1, P2);
+    const gap = bar.gap(new Segment(Vector2.ZERO, tip));
     if (gap < s.touchGap - 1e-3) fail("stretcher into the ladder", gap);
     if (P2.dot(normal) < 0 && !h.attachVia) fail("attachment through the ladder", P2.dot(normal));
     let depth = 0;
     for (let i = 0; i <= 100; i++) {
-        const p = P1.add(P2.sub(P1).scale(i / 100));
+        const p = bar.at(i / 100);
         if (p.x < 0 && p.y < s.wallHeight)
             depth = Math.max(depth, Math.min(-p.x, s.wallHeight - p.y));
         depth = Math.max(depth, -p.y);
@@ -328,7 +330,7 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
         fail("rope doesn't pull towards its anchor", h.t1.len());
     if (!pulls(h.t2, (h.attachVia ?? B).sub(P2)))
         fail("attachment doesn't pull towards the ladder", h.t2.len());
-    const barDir = P2.sub(P1).unit();
+    const barDir = bar.direction();
     h.contacts.forEach((c, i) => {
         const lp = h.ladderPoints[i];
         // Square to the surface: the ground, wall and wall top have fixed normals; at the wall's edge or the
@@ -351,7 +353,7 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
                 : c.surface === "wall"
                   ? c.force.x
                   : c.surface === "edge"
-                    ? P2.sub(P1).cross(c.force) / s.barLength
+                    ? bar.vector().cross(c.force) / s.barLength
                     : lp
                       ? c.force.dot(c.point.sub(lp).unit())
                       : 0;
@@ -366,7 +368,7 @@ export function heldViolations(s: Setup, phi: number, r: HeldResult): string[] {
                   : c.surface === "top"
                     ? c.point.y - s.wallHeight
                     : c.surface === "edge"
-                      ? segmentDistance(vec2(0, s.wallHeight), P1, P2)
+                      ? bar.distanceTo(vec2(0, s.wallHeight))
                       : touchingAt;
         if (Math.abs(off) > 1e-3) fail(`${c.surface} contact off its surface`, off);
         if (c.surface === "ladder" && !lp) fail("ladder contact without a point on the ladder", 0);

@@ -105,8 +105,9 @@ that a diagram draws correctly. The article's first load compiles for around 20 
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
     `a.distanceTo(b)`, `a.mid(b)`, `a.lerp(b, t)`, `Vector2.sum(vs)`); every operation returns a new vector.
-  - `geometry.ts`: segment geometry. `wall.ts`: the wall the lowers share, its anchor and the rope's
-    path over its edge.
+  - `geometry.ts`: segment geometry: `Segment` for a straight piece such as a stretcher or ladder, and
+    the same tests as functions of two points for working along polylines. `wall.ts`: the wall the
+    lowers share, its anchor and the rope's path over its edge.
   - `numeric/`: one file per kind of method, imported by file (there's no index, so a figure's hash
     covers only the methods it uses). `linear.ts`: the `Matrix` alias (row-major `number[][]`),
     transposes, linear and least-squares solves, `maxAbs`. `nonnegative.ts`: least squares kept
@@ -130,6 +131,8 @@ To add a visualisation: write the solver and its tests, the component and notes,
 - Units are SI: metres, kilograms, newtons, radians (degrees only for display). Physics
   coordinates have y up, with x = 0 at the wall's face. SVG has y down, so diagrams flip y when
   drawing.
+- `Vector2`/`Vector3` stand for points and vectors alike, so names say which: points for where they
+  are (`P1`, `tip`, `anchor`), vectors for what they are (`pull`, `dir`, `along`).
 - Solvers find where things settle by minimising potential energy, then solve the balance of
   forces exactly at that position. Ropes only pull, surfaces only push.
 

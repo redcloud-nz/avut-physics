@@ -1,4 +1,8 @@
-/** An immutable 2D vector. Every operation returns a new vector. */
+/**
+ * An immutable 2D vector. Every operation returns a new vector. It stands for points (positions) as well as vectors
+ * (displacements, directions, forces): `distanceTo`, `mid` and `lerp` are the operations on points, and a point minus
+ * a point is the vector between them.
+ */
 export class Vector2 {
     static readonly ZERO = new Vector2(0, 0);
 

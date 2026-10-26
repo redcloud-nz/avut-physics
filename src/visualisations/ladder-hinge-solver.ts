@@ -1,4 +1,4 @@
-import { segmentGap, segmentsCross } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 import { rad } from "@/lib/math";
 import { solveLinear } from "@/lib/numeric/linear";
 import { goldenSection, gridMinima, nelderMead } from "@/lib/numeric/minimise";
@@ -466,11 +466,12 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
     };
     const P1 = settle(g.P1);
     const P2 = settle(g.P2);
+    const bar = new Segment(P1, P2);
     // An end sunk into the wall's face by the penalty springs can slip the bar past the corner check: check again.
     if (cutsCorner(P1, P2, s)) return slack(THROUGH_CORNER);
     if (g.overEdge) {
         // The edge pushes square to the bar (which runs outwards over it), so upwards.
-        const d = P2.sub(P1).unit();
+        const d = bar.direction();
         contacts.push({ surface: "edge", point: vec2(0, s.wallHeight), normal: d.perp() });
     }
     if (contacts.length > 1) {
@@ -484,14 +485,14 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
     const C = anchorOf(s);
     const u1 = (g.wrapEdge ?? C).sub(P1).unit(); // the wall cable pulls towards the anchor, or the edge it wraps over
     const u2 = g.B.sub(P2).unit();
-    const centre = P1.mid(P2);
+    const centre = bar.mid();
     const contact = contacts[0];
     const x = contact
         ? solveLinear(
               [
                   [u1.x, u2.x, contact.normal.x],
                   [u1.y, u2.y, contact.normal.y],
-                  [0, P2.sub(P1).cross(u2), contact.point.sub(P1).cross(contact.normal)],
+                  [0, bar.vector().cross(u2), contact.point.sub(P1).cross(contact.normal)],
               ],
               [0, s.barWeight, s.barWeight * (centre.x - P1.x)],
           )
@@ -520,7 +521,7 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
     // Without a contact, the torque balance on the bar isn't one of the equations solved above. It holds
     // at a true minimum, but not where the bar and beam cable are pulled into a straight line (the
     // search's boundary) — there the beam cable would really go slack.
-    const barTorque = P2.sub(P1).cross(u2.scale(T2)) - s.barWeight * (centre.x - P1.x);
+    const barTorque = bar.vector().cross(u2.scale(T2)) - s.barWeight * (centre.x - P1.x);
     if (!contact && Math.abs(barTorque) > 1e-3 * s.barWeight * s.barLength) {
         return slack(
             "The attachment would go slack and the stretcher would drop onto the ground, so nothing holds the ladder up.",
@@ -585,6 +586,7 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
     const C = anchorOf(s);
     const edge = vec2(0, s.wallHeight);
     const { P1, P2, B } = g;
+    const bar = new Segment(P1, P2);
     const u1 = C.sub(P1).unit();
     const u2 = B.sub(P2).unit();
     const W = s.barWeight;
@@ -594,8 +596,8 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
         return slack(
             "The rope or attachment would go slack, so the stretcher can't be held by both.",
         );
-    const centre = P1.mid(P2);
-    const atEdge = (W * (centre.x - P1.x) - P2.sub(P1).cross(u2.scale(T2))) / (edge.x - P1.x);
+    const centre = bar.mid();
+    const atEdge = (W * (centre.x - P1.x) - bar.vector().cross(u2.scale(T2))) / (edge.x - P1.x);
     const atEnd1 = W - T1 * u1.y - T2 * u2.y - atEdge;
     if (atEdge < 0 || atEnd1 < 0) return fail("The stretcher would tip over the wall's edge.");
     const t2 = u2.scale(T2);
@@ -653,10 +655,9 @@ export function solve(s: Setup): Result {
 
 /** Whether the bar crosses the main beam or comes closer to it than their thicknesses allow. */
 function beamsOverlap(eq: Equilibrium, s: Setup): boolean {
-    const O = Vector2.ZERO;
-    const tip = Vector2.fromAngle(eq.phi, s.beamLength);
-    const [p, q] = [eq.barEnd1, eq.barEnd2];
-    return segmentsCross(O, tip, p, q) || segmentGap(O, tip, p, q) < s.touchGap * (1 - 1e-6);
+    const beam = new Segment(Vector2.ZERO, Vector2.fromAngle(eq.phi, s.beamLength));
+    const bar = new Segment(eq.barEnd1, eq.barEnd2);
+    return beam.crosses(bar) || beam.gap(bar) < s.touchGap * (1 - 1e-6);
 }
 
 /** Length of the wall cable's path from its anchor to p, wrapping over the wall's top edge if it has to. */

@@ -59,3 +59,62 @@ export function segmentIntersection(
     const [from, to] = [-tolerance, 1 + tolerance];
     return t >= from && t < to && u >= from && u < to ? { t, u } : null;
 }
+
+/**
+ * A straight piece from point `a` to point `b`, such as a stretcher between its ends or a ladder from its hinge to its
+ * tip. Like `Vector2`, it's immutable. (Polylines, worked through a pair of points at a time, use the functions above
+ * directly instead.)
+ */
+export class Segment {
+    constructor(
+        readonly a: Vector2,
+        readonly b: Vector2,
+    ) {}
+
+    /** From a to b. */
+    vector(): Vector2 {
+        return this.b.sub(this.a);
+    }
+
+    length(): number {
+        return this.a.distanceTo(this.b);
+    }
+
+    /** The unit vector from a towards b. */
+    direction(): Vector2 {
+        return this.vector().unit();
+    }
+
+    mid(): Vector2 {
+        return this.a.mid(this.b);
+    }
+
+    /** The point `t` of the way along (0 at a, 1 at b). */
+    at(t: number): Vector2 {
+        return this.a.lerp(this.b, t);
+    }
+
+    /** The point of the segment nearest p, and how far along it is (0 to 1). */
+    nearest(p: Vector2): { point: Vector2; t: number } {
+        return nearestOnSegment(p, this.a, this.b);
+    }
+
+    distanceTo(p: Vector2): number {
+        return segmentDistance(p, this.a, this.b);
+    }
+
+    /** Whether this and `other` cross (touching doesn't count). */
+    crosses(other: Segment): boolean {
+        return segmentsCross(this.a, this.b, other.a, other.b);
+    }
+
+    /** The distance between this and `other`, or 0 if they cross. */
+    gap(other: Segment): number {
+        return segmentGap(this.a, this.b, other.a, other.b);
+    }
+
+    /** Where this and `other` cross, as how far along each: see `segmentIntersection`. */
+    intersection(other: Segment, tolerance = 0): { t: number; u: number } | null {
+        return segmentIntersection(this.a, this.b, other.a, other.b, tolerance);
+    }
+}
