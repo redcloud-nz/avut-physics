@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { nearestOnSegment, segmentDistance, segmentGap } from "./geometry";
+import { arcLengths } from "./curve";
+import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
 import { clamp, linearScale } from "./math";
+import { pathPoints } from "./svg-path";
 import { vec2 } from "./vector2";
 import { vec3 } from "./vector3";
 
@@ -57,5 +59,58 @@ describe("math", () => {
         expect(clamp(5, 0, 1)).toBe(1);
         expect(clamp(-5, 0, 1)).toBe(0);
         expect(linearScale([0, 10], [100, 0])(2.5)).toBe(75);
+    });
+});
+
+describe("segmentIntersection", () => {
+    it("says how far along each segment they cross", () => {
+        const hit = segmentIntersection(vec2(0, 0), vec2(4, 0), vec2(1, -1), vec2(1, 3));
+        expect(hit?.t).toBeCloseTo(0.25);
+        expect(hit?.u).toBeCloseTo(0.25);
+    });
+
+    it("finds nothing for parallel or separate segments", () => {
+        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1))).toBeNull();
+        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(2, -1), vec2(2, 1))).toBeNull();
+    });
+});
+
+describe("curves", () => {
+    it("measures along a polyline", () => {
+        expect(arcLengths([vec2(0, 0), vec2(3, 4), vec2(3, 5)])).toEqual([0, 5, 6]);
+    });
+});
+
+describe("pathPoints", () => {
+    const end = (d: string) => pathPoints(d).at(-1)!;
+
+    it("follows lines, curves and arcs to where they end", () => {
+        expect(end("M 1 2 L 4 6 H 0 V -1")).toEqual(vec2(0, -1));
+        expect(end("M 0 0 C 0 1, 2 1, 2 0").distanceTo(vec2(2, 0))).toBeLessThan(1e-12);
+        expect(arcLengths(pathPoints("M 0 0 L 3 4")).at(-1)).toBeCloseTo(5);
+    });
+
+    it("reads numbers written with an exponent", () => {
+        expect(end("M 0 0 L 2e-16 1E+1 -1.5e-3 4")).toEqual(vec2(-0.0015, 4));
+        expect(pathPoints("M 0 0 L 2e-16 1E+1")).toContainEqual(vec2(2e-16, 10));
+    });
+
+    it("draws an arc as part of a circle, the way the flags say", () => {
+        // A half circle of radius 1 from (1, 0) to (-1, 0): sweep 0 goes through y = -1, sweep 1 through y = 1.
+        const up = pathPoints("M 1 0 A 1 1 0 0 0 -1 0");
+        const down = pathPoints("M 1 0 A 1 1 0 0 1 -1 0");
+        for (const p of up) expect(p.len()).toBeCloseTo(1, 9);
+        expect(Math.min(...up.map((p) => p.y))).toBeCloseTo(-1, 3);
+        expect(Math.max(...down.map((p) => p.y))).toBeCloseTo(1, 3);
+        expect(arcLengths(up).at(-1)).toBeCloseTo(Math.PI, 3);
+        // The large-arc flag picks the long way round.
+        const long = pathPoints("M 1 0 A 1 1 0 1 0 0 1");
+        expect(arcLengths(long).at(-1)).toBeCloseTo((3 * Math.PI) / 2, 3);
+    });
+
+    it("carries on from a given point", () => {
+        expect(pathPoints("L 1 0", vec2(0, 0))[0]).toEqual(vec2(0, 0));
+        expect(() => pathPoints("L 1 0")).toThrow(/start with M/);
+        expect(() => pathPoints("M 0 0 Q 1 1 2 2")).toThrow(/Unsupported/);
     });
 });

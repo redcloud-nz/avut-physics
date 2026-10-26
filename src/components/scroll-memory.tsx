@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 const saved = new Map<string, number>();
 
 /**
- * The page scrolls inside `.page-scroll` (see the root layout), not the window, so the browser doesn't put its
+ * The page scrolls inside `.page-scroll` (see `SiteChrome`), not the window, so the browser doesn't put its
  * scroll back on Back and Forward. This remembers how far down each page was and puts it back then.
  */
 export function ScrollMemory() {
@@ -21,19 +21,25 @@ export function ScrollMemory() {
     useEffect(() => {
         const box = document.querySelector<HTMLElement>(".page-scroll");
         if (!box) return;
-        if (goingBack.current) {
+        // Next may render the page it goes back to before the popstate reaches the listener above, so whether this is
+        // Back is only known a frame later, once the page has been laid out. Where it was is read now, before anything
+        // scrolls the box.
+        const top = saved.get(pathname) ?? 0;
+        const frame = requestAnimationFrame(() => {
+            if (!goingBack.current) return;
             goingBack.current = false;
-            const top = saved.get(pathname) ?? 0;
-            // Once the page has been laid out.
-            requestAnimationFrame(() => (box.scrollTop = top));
-        }
+            box.scrollTop = top;
+        });
         // Leaving the page, Next scrolls the box to the top for the next one: by then the address has changed, and
         // that scroll isn't this page's.
         const save = () => {
             if (location.pathname === pathname) saved.set(pathname, box.scrollTop);
         };
         box.addEventListener("scroll", save, { passive: true });
-        return () => box.removeEventListener("scroll", save);
+        return () => {
+            cancelAnimationFrame(frame);
+            box.removeEventListener("scroll", save);
+        };
     }, [pathname]);
     return null;
 }

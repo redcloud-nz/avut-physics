@@ -1,0 +1,397 @@
+{
+  "format": "avut-knot",
+  "version": 3,
+  "name": "Figure-8",
+  "description": "Tied by twisting a loop into an 8 and passing the end through it.",
+  "about": "More on how the figure-8 is used goes here.",
+  "frame": { "x": -106.7, "y": -181.5, "w": 213.4, "h": 362.9 },
+  "knot": {
+    "strands": [
+      {
+        "id": 1,
+        "kind": "rope",
+        "colour": "orange",
+        "diameter": 11,
+        "pins": [
+          { "id": 2, "x": 0, "y": 220 },
+          { "id": 3, "x": 0, "y": 99 },
+          { "id": 4, "x": 0, "y": 66, "angle": -90.15 },
+          { "id": 5, "x": 38.5, "y": -43.79 },
+          { "id": 6, "x": 19.25, "y": -77.33 },
+          { "id": 7, "x": -19.34, "y": -77.28 },
+          { "id": 8, "x": -38.5, "y": -44.19 },
+          { "id": 9, "x": 0.05, "y": 0.04 },
+          { "id": 10, "x": 38.5, "y": 43.81 },
+          { "id": 11, "x": -38.5, "y": 43.79, "angle": -89.65 },
+          { "id": 12, "x": 0, "y": -66, "angle": -90.15 },
+          { "id": 13, "x": -2.91, "y": -164.96 }
+        ],
+        "segments": [
+          { "id": 14 },
+          { "id": 15 },
+          { "id": 16, "tension": [1.04, 1.21] },
+          { "id": 17, "tension": [0.92, 0.89] },
+          { "id": 18, "tension": [0.97, 0.99] },
+          { "id": 19, "tension": [1.1, 1.07] },
+          { "id": 20, "tension": [1.13, 1.22] },
+          { "id": 21, "tension": [1.39, 1.23] },
+          { "id": 22, "tension": [1, 0.98] },
+          { "id": 23, "tension": [1.04, 1.01] },
+          { "id": 24, "tension": [1.02, 1.02] }
+        ]
+      }
+    ],
+    "crossings": [
+      { "over": 15, "under": 22 },
+      { "over": 21, "under": 16 },
+      { "over": 18, "under": 24 },
+      { "over": 23, "under": 20 }
+    ]
+  },
+  "steps": [
+    {
+      "number": 1,
+      "instructions": "Form a bight: take the rope up and over, so the end comes back down on the right.",
+      "picture": {
+        "strands": [
+          {
+            "id": 25,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 26, "x": 0, "y": 220 },
+              { "id": 27, "x": 0, "y": 99 },
+              { "id": 28, "x": 0, "y": 66, "angle": -89.85 },
+              { "id": 29, "x": -38.5, "y": -43.78, "angle": -90.39 },
+              { "id": 30, "x": 38.5, "y": -43.82, "angle": 90.13 },
+              { "id": 31, "x": 38.5, "y": 44.18, "angle": 90.13 },
+              { "id": 32, "x": 66, "y": 132 }
+            ],
+            "segments": [
+              { "id": 33 },
+              { "id": 34 },
+              { "id": 35, "tension": [1, 1.06] },
+              { "id": 36, "tension": [1.06, 0.97] },
+              { "id": 37 },
+              { "id": 38, "tension": [1.24, 1.23] }
+            ]
+          }
+        ],
+        "crossings": []
+      }
+    },
+    {
+      "number": 2,
+      "instructions": "Take the end round behind the standing part and up the other side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 39,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 41, "x": 0, "y": 220 },
+              { "id": 42, "x": 0, "y": 99 },
+              { "id": 43, "x": 0, "y": 66, "angle": -89.85 },
+              { "id": 44, "x": -38.5, "y": -43.78, "angle": -90.39 },
+              { "id": 45, "x": 38.5, "y": -43.82, "angle": 90.13 },
+              { "id": 46, "x": 38.5, "y": 44.18, "angle": 90.13 },
+              { "id": 47, "x": 66, "y": 132 }
+            ],
+            "segments": [
+              { "id": 55 },
+              { "id": 56 },
+              { "id": 57, "tension": [1, 1.06] },
+              { "id": 58, "tension": [1.06, 0.97] },
+              { "id": 59 },
+              { "id": 60, "tension": [1.24, 1.23] }
+            ]
+          },
+          {
+            "id": 40,
+            "kind": "arrow",
+            "pins": [
+              { "id": 48, "x": 61.6, "y": 149.6 },
+              { "id": 49, "x": 38.5, "y": 165 },
+              { "id": 50, "x": 0, "y": 168.3 },
+              { "id": 51, "x": -41.8, "y": 156.2 },
+              { "id": 52, "x": -72.6, "y": 123.2 },
+              { "id": 53, "x": -86.9, "y": 79.2 },
+              { "id": 54, "x": -90.2, "y": 38.5 }
+            ],
+            "segments": [
+              { "id": 61 },
+              { "id": 62 },
+              { "id": 63 },
+              { "id": 64 },
+              { "id": 65 },
+              { "id": 66 }
+            ]
+          }
+        ],
+        "crossings": [{ "over": 55, "under": 62 }]
+      }
+    },
+    {
+      "number": 2,
+      "instructions": "Bring the end round behind the standing part, making a loop.",
+      "picture": {
+        "strands": [
+          {
+            "id": 67,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 68, "x": 0, "y": 220 },
+              { "id": 69, "x": 0, "y": 99.02 },
+              { "id": 70, "x": 0, "y": 66.02, "angle": -89.86 },
+              { "id": 71, "x": -38.5, "y": -44.25, "angle": -89.64 },
+              { "id": 72, "x": 38.5, "y": -43.87, "angle": 90.15 },
+              { "id": 73, "x": 38.5, "y": 44.11 },
+              { "id": 74, "x": 20.15, "y": 117.61 },
+              { "id": 75, "x": -48.66, "y": 124.23 },
+              { "id": 76, "x": -77, "y": -22, "angle": -110.08 },
+              { "id": 77, "x": -84.91, "y": -42.53 }
+            ],
+            "segments": [
+              { "id": 78 },
+              { "id": 79 },
+              { "id": 80, "tension": [1, 1.07] },
+              { "id": 81, "tension": [1.06, 0.97] },
+              { "id": 82 },
+              { "id": 83, "tension": [1.11, 1.04] },
+              { "id": 84, "tension": [0.9, 0.89] },
+              { "id": 85, "tension": [1.1, 1.12] },
+              { "id": 86, "tension": [1.01, 1.01] }
+            ]
+          }
+        ],
+        "crossings": [{ "over": 78, "under": 84 }]
+      }
+    },
+    {
+      "number": 3,
+      "instructions": "Twist the top of the loop half a turn, so it crosses itself and makes an 8.",
+      "picture": {
+        "strands": [
+          {
+            "id": 87,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 90, "x": 0, "y": 220 },
+              { "id": 91, "x": 0, "y": 99.02 },
+              { "id": 92, "x": 0, "y": 66.02, "angle": -89.86 },
+              { "id": 93, "x": -38.5, "y": -44.25, "angle": -89.64 },
+              { "id": 94, "x": 38.5, "y": -43.87, "angle": 90.15 },
+              { "id": 95, "x": 38.5, "y": 44.11 },
+              { "id": 96, "x": 20.15, "y": 117.61 },
+              { "id": 97, "x": -48.66, "y": 124.23 },
+              { "id": 98, "x": -77, "y": -22, "angle": -110.08 },
+              { "id": 99, "x": -84.91, "y": -42.53 }
+            ],
+            "segments": [
+              { "id": 110 },
+              { "id": 111 },
+              { "id": 112, "tension": [1, 1.07] },
+              { "id": 113, "tension": [1.06, 0.97] },
+              { "id": 114 },
+              { "id": 115, "tension": [1.11, 1.04] },
+              { "id": 116, "tension": [0.9, 0.89] },
+              { "id": 117, "tension": [1.1, 1.12] },
+              { "id": 118, "tension": [1.01, 1.01] }
+            ]
+          },
+          {
+            "id": 88,
+            "kind": "arrow",
+            "pins": [
+              { "id": 100, "x": -56.9, "y": -39 },
+              { "id": 101, "x": -34.6, "y": -47.4 },
+              { "id": 102, "x": 0, "y": -50.6 },
+              { "id": 103, "x": 34.7, "y": -47.4 },
+              { "id": 104, "x": 56.9, "y": -39 }
+            ],
+            "segments": [{ "id": 119 }, { "id": 120 }, { "id": 121 }, { "id": 122 }]
+          },
+          {
+            "id": 89,
+            "kind": "arrow",
+            "pins": [
+              { "id": 105, "x": 56.9, "y": -26.9 },
+              { "id": 106, "x": 34.7, "y": -18.6 },
+              { "id": 107, "x": 0, "y": -15.4 },
+              { "id": 108, "x": -34.6, "y": -18.6 },
+              { "id": 109, "x": -56.9, "y": -26.9 }
+            ],
+            "segments": [{ "id": 123 }, { "id": 124 }, { "id": 125 }, { "id": 126 }]
+          }
+        ],
+        "crossings": [
+          { "over": 110, "under": 116 },
+          { "over": 125, "under": 112 },
+          { "over": 113, "under": 119 },
+          { "over": 113, "under": 122 },
+          { "over": 123, "under": 114 }
+        ]
+      }
+    },
+    {
+      "number": 3,
+      "instructions": "The top of the loop now crosses itself, making an 8.",
+      "picture": {
+        "strands": [
+          {
+            "id": 127,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 128, "x": 0, "y": 220 },
+              { "id": 129, "x": 0, "y": 99.01 },
+              { "id": 130, "x": 0, "y": 66.01, "angle": -90.14 },
+              { "id": 131, "x": 38.5, "y": -43.76 },
+              { "id": 132, "x": 19.27, "y": -77.32 },
+              { "id": 133, "x": -19.31, "y": -77.29 },
+              { "id": 134, "x": -38.5, "y": -44.22 },
+              { "id": 135, "x": 0.02, "y": 0.02 },
+              { "id": 136, "x": 40.61, "y": 43.82 },
+              { "id": 137, "x": 37.68, "y": 118.96 },
+              { "id": 138, "x": -33.16, "y": 125.22 },
+              { "id": 139, "x": -77.44, "y": -22, "angle": -110.06 },
+              { "id": 140, "x": -85.23, "y": -42.57 }
+            ],
+            "segments": [
+              { "id": 141 },
+              { "id": 142 },
+              { "id": 143, "tension": [1.04, 1.21] },
+              { "id": 144, "tension": [0.93, 0.9] },
+              { "id": 145, "tension": [0.96, 0.98] },
+              { "id": 146, "tension": [1.14, 1.1] },
+              { "id": 147, "tension": [0.96, 1.06] },
+              { "id": 148, "tension": [0.88, 0.87] },
+              { "id": 149, "tension": [1.14, 1.04] },
+              { "id": 150, "tension": [0.89, 0.93] },
+              { "id": 151, "tension": [1.1, 1.15] },
+              { "id": 152 }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 141, "under": 150 },
+          { "over": 148, "under": 143 }
+        ]
+      }
+    },
+    {
+      "number": 4,
+      "instructions": "Bring the end round and up in front of the 8, over the top loop, and pass it up through the loop.",
+      "picture": {
+        "strands": [
+          {
+            "id": 153,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 155, "x": 0, "y": 220 },
+              { "id": 156, "x": 0, "y": 99.01 },
+              { "id": 157, "x": 0, "y": 66.01, "angle": -90.15 },
+              { "id": 158, "x": 38.5, "y": -43.77 },
+              { "id": 159, "x": 19.26, "y": -77.32 },
+              { "id": 160, "x": -19.32, "y": -77.29 },
+              { "id": 161, "x": -38.5, "y": -44.21 },
+              { "id": 162, "x": 0.03, "y": 0.02 },
+              { "id": 163, "x": 40.62, "y": 43.83 },
+              { "id": 164, "x": 45.43, "y": 119.81 },
+              { "id": 165, "x": -21.16, "y": 122.7 },
+              { "id": 166, "x": 0, "y": -27.5, "angle": -90.08 },
+              { "id": 167, "x": -0.42, "y": -49.5 }
+            ],
+            "segments": [
+              { "id": 171 },
+              { "id": 172 },
+              { "id": 173, "tension": [1.04, 1.21] },
+              { "id": 174, "tension": [0.93, 0.9] },
+              { "id": 175, "tension": [0.96, 0.98] },
+              { "id": 176, "tension": [1.15, 1.1] },
+              { "id": 177, "tension": [0.94, 1.04] },
+              { "id": 178, "tension": [0.8, 0.8] },
+              { "id": 179, "tension": [1.35, 1.2] },
+              { "id": 180, "tension": [0.82, 0.82] },
+              { "id": 181, "tension": [1.24, 1.26] },
+              { "id": 182, "tension": [1.01, 1.01] }
+            ]
+          },
+          {
+            "id": 154,
+            "kind": "arrow",
+            "pins": [
+              { "id": 168, "x": 0, "y": -58.3 },
+              { "id": 169, "x": 0, "y": -93.5 },
+              { "id": 170, "x": 0, "y": -126.5 }
+            ],
+            "segments": [{ "id": 183 }, { "id": 184 }]
+          }
+        ],
+        "crossings": [
+          { "over": 171, "under": 180 },
+          { "over": 178, "under": 173 },
+          { "over": 175, "under": 183 },
+          { "over": 181, "under": 177 }
+        ]
+      }
+    },
+    {
+      "number": 4,
+      "instructions": "Pull the end through: a loose figure-8.",
+      "picture": {
+        "strands": [
+          {
+            "id": 185,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 186, "x": 0, "y": 220 },
+              { "id": 187, "x": 0, "y": 99 },
+              { "id": 188, "x": 0, "y": 66, "angle": -90.15 },
+              { "id": 189, "x": 38.5, "y": -43.79 },
+              { "id": 190, "x": 19.25, "y": -77.33 },
+              { "id": 191, "x": -19.34, "y": -77.28 },
+              { "id": 192, "x": -38.5, "y": -44.19 },
+              { "id": 193, "x": 0.05, "y": 0.04 },
+              { "id": 194, "x": 38.5, "y": 43.81 },
+              { "id": 195, "x": -38.5, "y": 43.79, "angle": -89.65 },
+              { "id": 196, "x": 0, "y": -66, "angle": -90.15 },
+              { "id": 197, "x": -2.91, "y": -164.96 }
+            ],
+            "segments": [
+              { "id": 198 },
+              { "id": 199 },
+              { "id": 200, "tension": [1.04, 1.21] },
+              { "id": 201, "tension": [0.92, 0.89] },
+              { "id": 202, "tension": [0.97, 0.99] },
+              { "id": 203, "tension": [1.1, 1.07] },
+              { "id": 204, "tension": [1.13, 1.22] },
+              { "id": 205, "tension": [1.39, 1.23] },
+              { "id": 206, "tension": [1, 0.98] },
+              { "id": 207, "tension": [1.04, 1.01] },
+              { "id": 208, "tension": [1.02, 1.02] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 199, "under": 206 },
+          { "over": 205, "under": 200 },
+          { "over": 202, "under": 208 },
+          { "over": 207, "under": 204 }
+        ]
+      }
+    }
+  ]
+}

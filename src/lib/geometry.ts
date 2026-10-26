@@ -32,3 +32,30 @@ export function segmentGap(a: Vector2, b: Vector2, c: Vector2, d: Vector2): numb
         segmentDistance(d, a, b),
     );
 }
+
+/**
+ * Where segments ab and cd cross, as how far along each (t on ab, u on cd, both 0 to 1), or null if they
+ * don't (parallel segments never cross). A crossing at a segment's start counts and one at its end doesn't, so where
+ * a polyline crosses another at one of its points, it's found once, on the segment starting there.
+ *
+ * Rounding can leave a crossing at a polyline's point just past the end of one segment and just before the start of
+ * the next, so neither finds it. A `tolerance` (along each, 0 to 1) widens both ends to catch it, at the cost of
+ * sometimes finding it on both; t and u can then be a little outside 0 to 1.
+ */
+export function segmentIntersection(
+    a: Vector2,
+    b: Vector2,
+    c: Vector2,
+    d: Vector2,
+    tolerance = 0,
+): { t: number; u: number } | null {
+    const r = b.sub(a);
+    const s = d.sub(c);
+    const denom = r.cross(s);
+    if (Math.abs(denom) < 1e-15) return null;
+    const ac = c.sub(a);
+    const t = ac.cross(s) / denom;
+    const u = ac.cross(r) / denom;
+    const [from, to] = [-tolerance, 1 + tolerance];
+    return t >= from && t < to && u >= from && u < to ? { t, u } : null;
+}

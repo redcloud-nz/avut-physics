@@ -111,6 +111,12 @@ html {
   color-scheme: dark;
 }
 
+/* The scrollbar's room is kept whether or not the page scrolls, so pages don't shift sideways going from a short one
+   to a long one. */
+.page-scroll {
+  scrollbar-gutter: stable;
+}
+
 /* The page's scrollbar, in the page's own colours. Firefox uses the standard properties; Chrome and
    Safari use the -webkit- pseudo-elements, which Chrome ignores if scrollbar-color is also set. */
 @supports (-moz-appearance: none) {
@@ -275,6 +281,34 @@ html {
   --strand-2: #23935a;
   --strand-3: #3d83f0;
   --strand-4: #d9a816;
+
+  /* The knot editor's ropes, by the colour names its files use: each rope's body, the weave of its sheath and the
+     highlight along its top. Orange and green are the knot pages' two ropes. Then the outline every rope and arrow
+     has, the tape round a rope's end, the arrows, and the bar a knot's tied round (its body, its shading and the
+     highlight along it). */
+  --knot-orange: #f97316;
+  --knot-orange-weave: #9a3412;
+  --knot-orange-highlight: #fed7aa;
+  --knot-green: #16a34a;
+  --knot-green-weave: #14532d;
+  --knot-green-highlight: #bbf7d0;
+  --knot-blue: #0ea5e9;
+  --knot-blue-weave: #075985;
+  --knot-blue-highlight: #bae6fd;
+  --knot-purple: #9333ea;
+  --knot-purple-weave: #581c87;
+  --knot-purple-highlight: #e9d5ff;
+  --knot-yellow: #eab308;
+  --knot-yellow-weave: #854d0e;
+  --knot-yellow-highlight: #fef08a;
+  --knot-outline: #0f172a;
+  --knot-tape: #2563eb;
+  --knot-tape-weave: #1e3a8a;
+  --knot-tape-highlight: #bfdbfe;
+  --knot-arrow: #f8fafc;
+  --knot-bar: #94a3b8;
+  --knot-bar-shade: #475569;
+  --knot-bar-highlight: #f1f5f9;
 }
 
 @layer base {
