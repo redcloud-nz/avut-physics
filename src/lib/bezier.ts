@@ -3,7 +3,7 @@
  * and where two of them cross. Like `Vector2`, a `Cubic` is immutable, and every operation returns a new one.
  */
 
-import { segmentIntersection } from "./geometry";
+import { Segment } from "./geometry";
 import { clamp } from "./math";
 import { goldenSection } from "./numeric/minimise";
 import { bisect, rootsInUnit } from "./numeric/roots";
@@ -245,7 +245,7 @@ export class Cubic {
 
     /**
      * Where this curve and `other` cross. Each is sampled as a polyline (or given its samples, evenly spaced in t,
-     * from `points`), the polylines' crossings found with `segmentIntersection`, and each refined to t and u by
+     * from `points`), the polylines' crossings found piece by piece (`Segment.intersection`), and each refined to t and u by
      * Newton's method on the two curves meeting. A crossing at this curve's end, or at `other`'s end, isn't found.
      * The polylines' crossings are looked for with a little tolerance, so one at a shared point isn't lost to rounding.
      */
@@ -255,16 +255,11 @@ export class Cubic {
         theirs: Vector2[] = other.points(other.pieces()),
     ): CubicCrossing[] {
         const found: CubicCrossing[] = [];
-        const [m, n] = [mine.length - 1, theirs.length - 1];
+        const [minePieces, theirPieces] = [Segment.along(mine), Segment.along(theirs)];
+        const [m, n] = [minePieces.length, theirPieces.length];
         for (let i = 0; i < m; i++)
             for (let j = 0; j < n; j++) {
-                const hit = segmentIntersection(
-                    mine[i],
-                    mine[i + 1],
-                    theirs[j],
-                    theirs[j + 1],
-                    POLYLINE_TOLERANCE,
-                );
+                const hit = minePieces[i].intersection(theirPieces[j], POLYLINE_TOLERANCE);
                 if (!hit) continue;
                 const refined = this.refineCrossing(
                     other,

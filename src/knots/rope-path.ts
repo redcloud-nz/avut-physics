@@ -6,7 +6,7 @@
  */
 
 import { arcLengths } from "@/lib/curve";
-import { segmentIntersection } from "@/lib/geometry";
+import { Segment as LineSegment } from "@/lib/geometry";
 import { pathPoints } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 
@@ -65,14 +65,15 @@ export type Crossing = {
 export function crossings(path: RopePath): Crossing[] {
     const { points, over } = centreline(path);
     const s = arcLengths(points);
+    const pieces = LineSegment.along(points);
     const found: Crossing[] = [];
-    for (let i = 0; i < points.length - 1; i++)
-        for (let j = i + 2; j < points.length - 1; j++) {
-            const hit = segmentIntersection(points[i], points[i + 1], points[j], points[j + 1]);
+    for (let i = 0; i < pieces.length; i++)
+        for (let j = i + 2; j < pieces.length; j++) {
+            const hit = pieces[i].intersection(pieces[j]);
             if (!hit) continue;
             const [a, b] = [over[i] && over[i + 1], over[j] && over[j + 1]];
             found.push({
-                at: points[i].lerp(points[i + 1], hit.t),
+                at: pieces[i].at(hit.t),
                 s: [s[i] + (s[i + 1] - s[i]) * hit.t, s[j] + (s[j + 1] - s[j]) * hit.u],
                 over: a === b ? null : a ? 0 : 1,
             });

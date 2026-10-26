@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { arcLengths } from "./curve";
-import {
-    nearestOnSegment,
-    Segment,
-    segmentDistance,
-    segmentGap,
-    segmentIntersection,
-} from "./geometry";
+import { Segment } from "./geometry";
 import { clamp, linearScale, roundTo, wrapDegrees } from "./math";
 import { pathPoints, svgPoint } from "./svg-path";
 import { vec2, Vector2 } from "./vector2";
@@ -56,18 +50,22 @@ describe("Vector3", () => {
 });
 
 describe("geometry", () => {
+    const ab = new Segment(vec2(0, 0), vec2(2, 0));
+
     it("finds the nearest point on a segment, clamped to its ends", () => {
-        expect(nearestOnSegment(vec2(1, 1), vec2(0, 0), vec2(2, 0))).toEqual({
+        expect(ab.nearest(vec2(1, 1))).toEqual({
             point: vec2(1, 0),
             t: 0.5,
         });
-        expect(nearestOnSegment(vec2(5, 1), vec2(0, 0), vec2(2, 0)).t).toBe(1);
-        expect(segmentDistance(vec2(-3, 4), vec2(0, 0), vec2(2, 0))).toBe(5);
+        expect(ab.nearest(vec2(5, 1)).t).toBe(1);
+        expect(ab.distanceTo(vec2(-3, 4))).toBe(5);
     });
 
     it("measures the gap between segments, zero where they cross", () => {
-        expect(segmentGap(vec2(0, 0), vec2(2, 2), vec2(0, 2), vec2(2, 0))).toBe(0);
-        expect(segmentGap(vec2(0, 0), vec2(2, 0), vec2(0, 1), vec2(2, 1))).toBe(1);
+        expect(new Segment(vec2(0, 0), vec2(2, 2)).gap(new Segment(vec2(0, 2), vec2(2, 0)))).toBe(
+            0,
+        );
+        expect(ab.gap(new Segment(vec2(0, 1), vec2(2, 1)))).toBe(1);
     });
 });
 
@@ -97,6 +95,15 @@ describe("Segment", () => {
         expect(bar.gap(above)).toBe(1);
         expect(bar.intersection(above)).toBeNull();
     });
+
+    it("splits a polyline into its pieces", () => {
+        const pieces = Segment.along([vec2(0, 0), vec2(1, 0), vec2(1, 1)]);
+        expect(pieces).toEqual([
+            new Segment(vec2(0, 0), vec2(1, 0)),
+            new Segment(vec2(1, 0), vec2(1, 1)),
+        ]);
+        expect(Segment.along([vec2(0, 0)])).toEqual([]);
+    });
 });
 
 describe("math", () => {
@@ -123,16 +130,22 @@ describe("wrapDegrees and roundTo", () => {
     });
 });
 
-describe("segmentIntersection", () => {
+describe("Segment.intersection", () => {
     it("says how far along each segment they cross", () => {
-        const hit = segmentIntersection(vec2(0, 0), vec2(4, 0), vec2(1, -1), vec2(1, 3));
+        const hit = new Segment(vec2(0, 0), vec2(4, 0)).intersection(
+            new Segment(vec2(1, -1), vec2(1, 3)),
+        );
         expect(hit?.t).toBeCloseTo(0.25);
         expect(hit?.u).toBeCloseTo(0.25);
     });
 
     it("finds nothing for parallel or separate segments", () => {
-        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1))).toBeNull();
-        expect(segmentIntersection(vec2(0, 0), vec2(1, 0), vec2(2, -1), vec2(2, 1))).toBeNull();
+        expect(
+            new Segment(vec2(0, 0), vec2(1, 0)).intersection(new Segment(vec2(0, 1), vec2(1, 1))),
+        ).toBeNull();
+        expect(
+            new Segment(vec2(0, 0), vec2(1, 0)).intersection(new Segment(vec2(2, -1), vec2(2, 1))),
+        ).toBeNull();
     });
 });
 

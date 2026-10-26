@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { centreline, crossings, laySegments, type RopePath } from "@/knots/rope-path";
 import { arcLengths } from "@/lib/curve";
-import { segmentIntersection } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 
 import {
     clearance,
@@ -55,12 +55,12 @@ const overStretches = (path: RopePath) =>
 function between(first: RopePath, second: RopePath) {
     const [a, b] = [first, second].map((path) => {
         const { points, over } = centreline(path);
-        return { points, over, s: arcLengths(points) };
+        return { pieces: Segment.along(points), over, s: arcLengths(points) };
     });
     const hits: { over: [boolean, boolean] }[] = [];
-    for (let i = 0; i < a.points.length - 1; i++)
-        for (let j = 0; j < b.points.length - 1; j++)
-            if (segmentIntersection(a.points[i], a.points[i + 1], b.points[j], b.points[j + 1]))
+    for (let i = 0; i < a.pieces.length; i++)
+        for (let j = 0; j < b.pieces.length; j++)
+            if (a.pieces[i].intersection(b.pieces[j]))
                 hits.push({ over: [a.over[i] && a.over[i + 1], b.over[j] && b.over[j + 1]] });
     return hits;
 }

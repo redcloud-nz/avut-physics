@@ -6,7 +6,7 @@
 
 import { BarDrawing } from "@/knots/bar";
 import { POLYLINE_TOLERANCE, type Box, type Cubic } from "@/lib/bezier";
-import { segmentIntersection } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 import { clamp } from "@/lib/math";
 import { svgNumber } from "@/lib/svg-path";
 import { Vector2 } from "@/lib/vector2";
@@ -139,14 +139,15 @@ export const BAR = {
      */
     passesAcross(bar: BarProp, cubic: Cubic, samples: Vector2[]): number[] {
         if (!bar.length) return [];
-        const [a, b] = [
+        const middle = new Segment(
             new Vector2(bar.x - bar.length / 2, bar.y),
             new Vector2(bar.x + bar.length / 2, bar.y),
-        ];
-        const n = samples.length - 1;
+        );
+        const pieces = Segment.along(samples);
+        const n = pieces.length;
         const found: number[] = [];
         for (let i = 0; i < n; i++) {
-            const hit = segmentIntersection(samples[i], samples[i + 1], a, b, POLYLINE_TOLERANCE);
+            const hit = pieces[i].intersection(middle, POLYLINE_TOLERANCE);
             if (!hit) continue;
             // Newton's method on the curve's height, from where the polyline crossed.
             const from = clamp((i + hit.t) / n, 0, 1);
