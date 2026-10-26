@@ -6,20 +6,21 @@
  */
 
 import { arcLengths } from "@/lib/curve";
-import { Segment as LineSegment } from "@/lib/geometry";
+import { Segment } from "@/lib/geometry";
 import { pathPoints } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 
-export type Segment = { d: string; over?: boolean };
-export type RopePath = Segment[];
+/** A piece of a rope's path: SVG path data, and whether it goes over what crosses it. */
+export type PathSegment = { d: string; over?: boolean };
+export type RopePath = PathSegment[];
 
 /** A segment that goes under whatever crosses it, or crosses nothing. */
-export const plain = (d: string): Segment => ({ d });
+export const plain = (d: string): PathSegment => ({ d });
 /** A segment that goes over whatever crosses it. */
-export const over = (d: string): Segment => ({ d, over: true });
+export const over = (d: string): PathSegment => ({ d, over: true });
 
 /** A segment laid out: where it starts, its points, and how far along the rope it starts and how long it is. */
-export type LaidSegment = Segment & {
+export type LaidSegment = PathSegment & {
     from: Vector2;
     points: Vector2[];
     start: number;
@@ -65,7 +66,7 @@ export type Crossing = {
 export function crossings(path: RopePath): Crossing[] {
     const { points, over } = centreline(path);
     const s = arcLengths(points);
-    const pieces = LineSegment.along(points);
+    const pieces = Segment.along(points);
     const found: Crossing[] = [];
     for (let i = 0; i < pieces.length; i++)
         for (let j = i + 2; j < pieces.length; j++) {
