@@ -95,7 +95,7 @@ through anything else. They don't reuse the solvers' own working.
 
 The solvers find the resting position by minimising potential energy (with Nelder–Mead), then
 solve the balance of forces exactly at that position. The numerical methods are in
-`src/lib/numeric.ts`.
+`src/lib/numeric/`.
 
 The articles quote figures from the same solvers, too many to work out as the site builds. Each
 article's `src/articles/<name>.compute.ts` works them out, and `npm run figures` saves them in

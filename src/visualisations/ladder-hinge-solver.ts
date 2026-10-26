@@ -1,6 +1,8 @@
 import { segmentGap, segmentsCross } from "@/lib/geometry";
 import { rad } from "@/lib/math";
-import { bisect, goldenSection, gridMinima, nelderMead, solveLinear } from "@/lib/numeric";
+import { solveLinear } from "@/lib/numeric/linear";
+import { goldenSection, gridMinima, nelderMead } from "@/lib/numeric/minimise";
+import { bisect } from "@/lib/numeric/roots";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { anchorOf } from "@/lib/wall";
 

@@ -1,11 +1,6 @@
-import {
-    centralDifferences,
-    gridMinima,
-    leastSquares,
-    nelderMead,
-    transpose,
-    withColumns,
-} from "@/lib/numeric";
+import { centralDifferences } from "@/lib/numeric/differences";
+import { leastSquares, transpose, withColumns } from "@/lib/numeric/linear";
+import { gridMinima, nelderMead } from "@/lib/numeric/minimise";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
 

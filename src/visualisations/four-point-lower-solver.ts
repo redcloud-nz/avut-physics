@@ -1,11 +1,8 @@
 import { clamp } from "@/lib/math";
-import {
-    centralDifferences,
-    leastSquares,
-    nelderMead,
-    nonNegativeLeastSquares,
-    withColumns,
-} from "@/lib/numeric";
+import { centralDifferences } from "@/lib/numeric/differences";
+import { leastSquares, withColumns } from "@/lib/numeric/linear";
+import { nelderMead } from "@/lib/numeric/minimise";
+import { nonNegativeLeastSquares } from "@/lib/numeric/nonnegative";
 import { vec2 } from "@/lib/vector2";
 import { vec3, Vector3 } from "@/lib/vector3";
 import { ropePathFor } from "@/lib/wall";

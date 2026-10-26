@@ -5,7 +5,8 @@
 
 import { segmentIntersection } from "./geometry";
 import { clamp } from "./math";
-import { bisect, goldenSection } from "./numeric";
+import { goldenSection } from "./numeric/minimise";
+import { bisect, rootsInUnit } from "./numeric/roots";
 import { Vector2 } from "./vector2";
 
 /** An axis-aligned box: its least and greatest corners. */
@@ -39,21 +40,6 @@ const CURVATURE_SAMPLES = 32;
 
 /** How far past each end (along it, 0 to 1) a polyline's piece is looked along for crossings. */
 export const POLYLINE_TOLERANCE = 1e-9;
-
-/** The real roots of a t² + b t + c in (0, 1). */
-function rootsInUnit(a: number, b: number, c: number): number[] {
-    const roots: number[] = [];
-    if (Math.abs(a) < 1e-12) {
-        if (Math.abs(b) > 1e-12) roots.push(-c / b);
-    } else {
-        const disc = b * b - 4 * a * c;
-        if (disc >= 0) {
-            const q = Math.sqrt(disc);
-            roots.push((-b - q) / (2 * a), (-b + q) / (2 * a));
-        }
-    }
-    return roots.filter((t) => t > 0 && t < 1);
-}
 
 /** A cubic Bézier curve from `p0` to `p3`, with control points `p1` and `p2`. */
 export class Cubic {

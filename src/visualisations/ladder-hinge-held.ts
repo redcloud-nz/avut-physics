@@ -1,14 +1,8 @@
 import { nearestOnSegment, segmentsCross } from "@/lib/geometry";
 import { clamp, rad } from "@/lib/math";
-import {
-    centralDifferences,
-    gridMinima,
-    leastSquares,
-    nelderMead,
-    solveLinear,
-    transpose,
-    withColumns,
-} from "@/lib/numeric";
+import { centralDifferences } from "@/lib/numeric/differences";
+import { leastSquares, solveLinear, transpose, withColumns } from "@/lib/numeric/linear";
+import { gridMinima, nelderMead } from "@/lib/numeric/minimise";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
 

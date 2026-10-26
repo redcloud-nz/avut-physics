@@ -1,4 +1,4 @@
-import { solveLinear } from "@/lib/numeric";
+import { solveLinear } from "@/lib/numeric/linear";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 /**

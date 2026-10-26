@@ -104,11 +104,15 @@ that a diagram draws correctly. The article's first load compiles for around 20 
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
     `a.distanceTo(b)`); every operation returns a new vector.
-  - `geometry.ts`: segment geometry. `numeric.ts`: Nelder–Mead, linear and least-squares solves,
-    central differences, grid minima, golden-section search, bisection, and the `Matrix` alias
-    (row-major `number[][]`). `wall.ts`: the wall the lowers share, its anchor and the rope's path
-    over its edge.
-  - `curve.ts`: arc lengths and even resampling along a polyline. `svg-path.ts`: SVG path data
+  - `geometry.ts`: segment geometry. `wall.ts`: the wall the lowers share, its anchor and the rope's
+    path over its edge.
+  - `numeric/`: one file per kind of method, imported by file (there's no index, so a figure's hash
+    covers only the methods it uses). `linear.ts`: the `Matrix` alias (row-major `number[][]`),
+    transposes, linear and least-squares solves. `nonnegative.ts`: least squares kept non-negative.
+    `minimise.ts`: Nelder–Mead, grid minima, golden-section search. `roots.ts`: bisection and a
+    quadratic's roots. `differences.ts`: central differences.
+  - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
+    curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data
     (M, L, H, V, C, A) as points.
   - `math.ts` (`clamp`, `deg`, `rad`, `linearScale`), `constants.ts` (`G`), `format.ts` (units
     for display), `random.ts` (the seeded picker tests use for random setups).

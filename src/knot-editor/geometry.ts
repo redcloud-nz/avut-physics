@@ -14,7 +14,7 @@
 import { Cubic, type Box } from "@/lib/bezier";
 import { hobbyControls, hobbyDirections, MAX_TENSION, MIN_TENSION, type RunEnd } from "@/lib/hobby";
 import { rad } from "@/lib/math";
-import { bisect } from "@/lib/numeric";
+import { bisect } from "@/lib/numeric/roots";
 import { Vector2 } from "@/lib/vector2";
 
 import {

@@ -1,4 +1,4 @@
-import { solveLinear, type Matrix } from "@/lib/numeric";
+import { solveLinear, type Matrix } from "@/lib/numeric/linear";
 
 /*
  * The pulley systems in Part 2 of A Gentle Introduction to Rescue Physics, and how they move and pull. Everything lies
