@@ -3,10 +3,10 @@
  * and where two of them cross. Like `Vector2`, a `Cubic` is immutable, and every operation returns a new one.
  */
 
-import { Segment } from "./geometry";
 import { clamp } from "./math";
 import { goldenSection } from "./numeric/minimise";
 import { bisect, rootsInUnit } from "./numeric/roots";
+import { Segment } from "./segment";
 import { Vector2 } from "./vector2";
 
 /** An axis-aligned box: its least and greatest corners. */

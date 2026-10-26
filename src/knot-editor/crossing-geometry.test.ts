@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { centreline, crossings, laySegments, type RopePath } from "@/knots/rope-path";
 import { arcLengths } from "@/lib/curve";
-import { Segment } from "@/lib/geometry";
+import { Segment } from "@/lib/segment";
 
 import {
     clearance,

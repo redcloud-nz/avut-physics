@@ -1,8 +1,8 @@
-import { Segment } from "@/lib/geometry";
 import { clamp, rad } from "@/lib/math";
 import { solveHeldBalance } from "@/lib/numeric/held-balance";
 import { solveLinear } from "@/lib/numeric/linear";
 import { gridMinima, nelderMead } from "@/lib/numeric/minimise";
+import { Segment } from "@/lib/segment";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
 

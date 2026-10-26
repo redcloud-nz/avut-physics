@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { arcLengths } from "./curve";
-import { Segment } from "./geometry";
 import { clamp, linearScale, roundTo, wrapDegrees } from "./math";
+import { Segment } from "./segment";
 import { pathPoints, svgPoint } from "./svg-path";
 import { vec2, Vector2 } from "./vector2";
 import { vec3 } from "./vector3";

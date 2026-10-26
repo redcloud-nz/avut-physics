@@ -6,8 +6,8 @@
 
 import { BarDrawing } from "@/knots/bar";
 import { POLYLINE_TOLERANCE, type Box, type Cubic } from "@/lib/bezier";
-import { Segment } from "@/lib/geometry";
 import { clamp } from "@/lib/math";
+import { Segment } from "@/lib/segment";
 import { svgNumber } from "@/lib/svg-path";
 import { Vector2 } from "@/lib/vector2";
 

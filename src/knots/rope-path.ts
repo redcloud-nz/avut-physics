@@ -6,7 +6,7 @@
  */
 
 import { arcLengths } from "@/lib/curve";
-import { Segment } from "@/lib/geometry";
+import { Segment } from "@/lib/segment";
 import { pathPoints } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 

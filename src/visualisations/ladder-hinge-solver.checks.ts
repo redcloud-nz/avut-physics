@@ -1,6 +1,6 @@
 import { G } from "@/lib/constants";
-import { Segment } from "@/lib/geometry";
 import { seededPicker } from "@/lib/random";
+import { Segment } from "@/lib/segment";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import type { HeldResult } from "./ladder-hinge-held";
