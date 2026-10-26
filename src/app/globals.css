@@ -284,7 +284,8 @@ html {
 
   /* The knot editor's ropes, by the colour names its files use: each rope's body, the weave of its sheath and the
      highlight along its top. Orange and green are the knot pages' two ropes. Then the outline every rope and arrow
-     has, the tape round a rope's end, and the arrows. */
+     has, the tape round a rope's end, the arrows, and the bar a knot's tied round (its body, its shading and the
+     highlight along it). */
   --knot-orange: #f97316;
   --knot-orange-weave: #9a3412;
   --knot-orange-highlight: #fed7aa;
@@ -305,6 +306,9 @@ html {
   --knot-tape-weave: #1e3a8a;
   --knot-tape-highlight: #bfdbfe;
   --knot-arrow: #f8fafc;
+  --knot-bar: #94a3b8;
+  --knot-bar-shade: #475569;
+  --knot-bar-highlight: #f1f5f9;
 }
 
 @layer base {

@@ -10,7 +10,12 @@
 /** Where the bar's centre is and its radius (diameters), and where it's seen side on, running across, how long it is. */
 export type Bar = { x: number; y: number; r: number; length?: number };
 
-const COLORS = { body: "#94a3b8", shade: "#475569", highlight: "#f1f5f9", outline: "#0f172a" };
+const COLORS = {
+    body: "var(--knot-bar)",
+    shade: "var(--knot-bar-shade)",
+    highlight: "var(--knot-bar-highlight)",
+    outline: "var(--knot-outline)",
+};
 
 /**
  * The bar's end: a disc, shaded round its edge, with a highlight on its upper left. Seen side on, a band, shaded along
