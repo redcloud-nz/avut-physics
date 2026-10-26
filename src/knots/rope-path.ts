@@ -5,7 +5,7 @@
  * the rope crosses itself, and leave the rest plain.
  */
 
-import { arcLengths } from "@/lib/curve";
+import { arcLengths, lengthOf } from "@/lib/polyline";
 import { Segment } from "@/lib/segment";
 import { pathPoints } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
@@ -34,7 +34,7 @@ export function laySegments(path: RopePath): LaidSegment[] {
     for (const segment of path) {
         const last = laid[laid.length - 1];
         const points = pathPoints(segment.d, last?.points[last.points.length - 1]);
-        const length = arcLengths(points)[points.length - 1];
+        const length = lengthOf(points);
         laid.push({ ...segment, from: points[0], points, start: s, length });
         s += length;
     }

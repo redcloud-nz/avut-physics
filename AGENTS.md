@@ -115,9 +115,10 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     and a quadratic's roots. `differences.ts`: central differences. `held-balance.ts`: Newton's method
     on a balance with some constraints held exactly (the lowers' final solve).
   - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
-    curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data:
-    numbers and points written for it (`svgNumber`, `svgPoint`), and paths (M, L, H, V, C, A) read back
-    as points.
+    curves through points. `polyline.ts`: the `Polyline` type (a `readonly Vector2[]`), its arc lengths
+    and its length. `svg-path.ts`: SVG path data: numbers, points and polylines written for it
+    (`svgNumber`, `svgPoint`, `svgPoints` for a `points` attribute, `polylinePath`), and paths (M, L, H,
+    V, C, A) read back as points.
   - `math.ts` (`clamp`, `deg`, `rad`, `wrapDegrees`, `roundTo`, `linearScale`), `constants.ts` (`G`),
     `format.ts` (numbers for display: `readout` in the visualisations, `teaching` in the articles and
     the visual introduction, each with its own default places), `random.ts` (the seeded picker tests

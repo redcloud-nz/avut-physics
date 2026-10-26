@@ -7,6 +7,7 @@ import { AngleArc, Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
 import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import { COLORS } from "./colors";
@@ -242,7 +243,7 @@ function SideSquare(props: { a: Vector2; b: Vector2; out: Vector2; color: string
     const pts = [props.a, props.b, props.b.add(props.out), props.a.add(props.out)];
     return (
         <polygon
-            points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={svgPoints(pts)}
             fill={props.color}
             fillOpacity={0.12}
             stroke={props.color}

@@ -18,6 +18,7 @@ import { useInBrowser } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { readout } from "@/lib/format";
 import { clamp } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -287,7 +288,7 @@ export default function FourPointLower() {
     const PPM = W / (2 * halfSpan); // SVG units per metre
     const edgeX = slotWidth / 2;
     const anchorX = edgeX + anchorBack;
-    const points = (pts: Vector2[]) => pts.map((p) => `${p.x},${p.y}`).join(" ");
+    const points = svgPoints;
 
     // From above: x across the slot, z along it, the head (z > 0) at the top.
     const halfLong = Math.max(belaySpacing, BAR_LENGTH) / 2 + MARGIN;
@@ -901,9 +902,7 @@ function TraceGraph(props: { trace: Sample[]; weight: number }) {
                     series.map((s) => (
                         <polyline
                             key={s.name}
-                            points={trace
-                                .map((t, i) => `${x(i).toFixed(1)},${y(s.value(t)).toFixed(1)}`)
-                                .join(" ")}
+                            points={svgPoints(trace.map((t, i) => vec2(x(i), y(s.value(t)))))}
                             fill="none"
                             stroke={s.color}
                             strokeWidth={2}

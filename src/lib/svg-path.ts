@@ -1,10 +1,11 @@
 /**
- * SVG path data: numbers and points written for it, and paths read back as points, for measuring a path outside a
- * browser. Reading handles the absolute commands M, L, H, V, C and A (lines, cubic Béziers and elliptical arcs), the
- * ones worth writing by hand.
+ * SVG path data: numbers, points and polylines written for it, and paths read back as points, for measuring a path
+ * outside a browser. Reading handles the absolute commands M, L, H, V, C and A (lines, cubic Béziers and elliptical
+ * arcs), the ones worth writing by hand.
  */
 
 import { roundTo } from "./math";
+import type { Polyline } from "./polyline";
 import { Vector2 } from "./vector2";
 
 /**
@@ -15,6 +16,18 @@ export const svgNumber = (value: number) => roundTo(value, 4);
 
 /** A point as written in path data: its rounded x and y, separated by a space. */
 export const svgPoint = (p: Vector2) => `${svgNumber(p.x)} ${svgNumber(p.y)}`;
+
+/** A polyline as an SVG `points` attribute: each point's rounded x and y. */
+export const svgPoints = (line: Polyline) =>
+    line.map((p) => `${svgNumber(p.x)},${svgNumber(p.y)}`).join(" ");
+
+/** A polyline as path data: a move to its first point and a line to each of the rest, closed if `closed`. */
+export const polylinePath = (line: Polyline, closed = false) =>
+    [
+        `M ${svgPoint(line[0])}`,
+        ...line.slice(1).map((p) => `L ${svgPoint(p)}`),
+        ...(closed ? ["Z"] : []),
+    ].join(" ");
 
 /** How many numbers each command takes. */
 const ARITY: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, A: 7 };

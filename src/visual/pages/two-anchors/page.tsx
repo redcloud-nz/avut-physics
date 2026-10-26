@@ -2,6 +2,7 @@ import { COLORS } from "@/articles/colors";
 import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
 import { Eq } from "@/components/tex";
 import { rad } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { ink, Letter, r, Section, Var } from "@/visual/common/details";
 import { T, Y } from "@/visual/common/triangle";
@@ -113,14 +114,7 @@ const at = (thetaDeg: number, value: number) =>
 
 function Curve(props: { f: (theta: number) => number; color: string }) {
     const pts = Array.from({ length: 46 }, (_, i) => at(2 * i, props.f(rad(2 * i))));
-    return (
-        <polyline
-            points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
-            fill="none"
-            stroke={props.color}
-            strokeWidth={2.5}
-        />
-    );
+    return <polyline points={svgPoints(pts)} fill="none" stroke={props.color} strokeWidth={2.5} />;
 }
 
 /** cos θ and sin θ from 0° to 90°, with 60°, where cos θ is ½, marked. */

@@ -5,7 +5,7 @@
  * outline just short of its ends, so it joins the rope without a seam.
  */
 
-import { svgNumber, svgPoint } from "@/lib/svg-path";
+import { polylinePath, svgNumber } from "@/lib/svg-path";
 
 import { centreline, type RopePath } from "./rope-path";
 
@@ -92,10 +92,7 @@ export function Tape(props: { path: RopePath; colors: RopeColors; width?: number
     along.reverse();
     return (
         <Stretch
-            d={`M ${svgPoint(along[0])} ${along
-                .slice(1)
-                .map((p) => `L ${svgPoint(p)}`)
-                .join(" ")}`}
+            d={polylinePath(along)}
             offset={0}
             length={tape - left}
             colors={props.colors}

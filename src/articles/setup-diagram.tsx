@@ -1,5 +1,6 @@
 import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { linearScale } from "@/lib/math";
+import { polylinePath, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
 /*
@@ -22,7 +23,8 @@ const H = (TOP - BOTTOM) * S;
 
 const X = linearScale([LEFT, RIGHT], [0, W]);
 const Y = linearScale([TOP, BOTTOM], [0, H]);
-const pt = (p: Vector2) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
+/** A point of the scene in the drawing. */
+const drawn = (p: Vector2) => vec2(X(p.x), Y(p.y));
 /** The point `d` from `from` towards `to`. */
 const along = (from: Vector2, to: Vector2, d: number) => from.add(to.sub(from).unit().scale(d));
 
@@ -130,7 +132,7 @@ export function SetupDiagram() {
                     opacity={0.08}
                 />
                 <path
-                    d={`M${pt(vec2(LEFT, wall))} L${pt(vec2(0, wall))} L${pt(vec2(0, 0))}`}
+                    d={polylinePath([vec2(LEFT, wall), vec2(0, wall), vec2(0, 0)].map(drawn))}
                     stroke="currentColor"
                     strokeWidth={2}
                     fill="none"
@@ -152,8 +154,8 @@ export function SetupDiagram() {
                     strokeWidth={2}
                     fill="none"
                 >
-                    <polyline points={rope.map(pt).join(" ")} />
-                    <polyline points={line.map(pt).join(" ")} strokeDasharray="6 4" />
+                    <polyline points={svgPoints(rope.map(drawn))} />
+                    <polyline points={svgPoints(line.map(drawn))} strokeDasharray="6 4" />
                 </g>
 
                 {/* The stretcher. */}

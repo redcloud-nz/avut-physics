@@ -1,6 +1,7 @@
 /** Small SVG primitives for physics diagrams. Coordinates are SVG user units (y points down). */
 
 import { rad } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 /** An arrow from `from` along vector `v`, with an optional label just past the tip. */
@@ -147,7 +148,7 @@ export function forceScale(k: number, max: number) {
 export function Cable(props: { points: Vector2[]; taut: boolean }) {
     return (
         <polyline
-            points={props.points.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={svgPoints(props.points)}
             fill="none"
             stroke={props.taut ? "var(--ink-soft)" : "var(--ink-muted)"}
             strokeWidth={1.5}

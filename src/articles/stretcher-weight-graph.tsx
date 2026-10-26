@@ -1,5 +1,7 @@
 import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { linearScale } from "@/lib/math";
+import { polylinePath } from "@/lib/svg-path";
+import { vec2 } from "@/lib/vector2";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
 /*
@@ -23,9 +25,7 @@ const x = linearScale([MASS.from, MASS.to], [PLOT.left, PLOT.right]);
 const y = linearScale([SAFETY.from, SAFETY.to], [PLOT.bottom, PLOT.top]);
 
 const path = (points: [number, number][]) =>
-    points
-        .map(([kg, sf], i) => `${i ? "L" : "M"}${x(kg).toFixed(1)},${y(sf).toFixed(1)}`)
-        .join(" ");
+    polylinePath(points.map(([kg, sf]) => vec2(x(kg), y(sf))));
 
 export function StretcherWeightGraph() {
     // The grip needed doesn't depend on the surface, so one solve gives both lines.

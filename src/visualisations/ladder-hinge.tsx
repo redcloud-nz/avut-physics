@@ -26,6 +26,7 @@ import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { readout } from "@/lib/format";
 import { clamp, deg, roundTo } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import {
@@ -240,11 +241,7 @@ export default function LadderHinge() {
         </>
     );
 
-    const cablePath = (pts: Vector2[]) =>
-        pts
-            .map(toSvg)
-            .map((p) => `${p.x},${p.y}`)
-            .join(" ");
+    const cablePath = (pts: Vector2[]) => svgPoints(pts.map(toSvg));
     const beamLine = (phi: number) => {
         const tipS = toSvg(Vector2.fromAngle(phi, beamLength));
         const angle = deg(phi);
@@ -449,7 +446,7 @@ export default function LadderHinge() {
             <>
                 {ground}
                 <polyline
-                    points={wallPath.map((p) => `${p.x},${p.y}`).join(" ")}
+                    points={svgPoints(wallPath)}
                     fill="none"
                     stroke={h.cableTaut ? "var(--ink-soft)" : "var(--ink-muted)"}
                     strokeWidth={1.5}

@@ -18,6 +18,7 @@ import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
 import { readout } from "@/lib/format";
 import { deg } from "@/lib/math";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -337,7 +338,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                       return (
                           <g key={i}>
                               <polyline
-                                  points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                                  points={svgPoints(pts)}
                                   fill="none"
                                   stroke="var(--ink-soft)"
                                   strokeWidth={1.5}

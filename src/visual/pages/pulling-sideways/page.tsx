@@ -1,6 +1,7 @@
 import { COLORS } from "@/articles/colors";
 import { Label } from "@/components/diagram/svg";
 import { Eq } from "@/components/tex";
+import { svgPoints } from "@/lib/svg-path";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { ink, r, Section, Var } from "@/visual/common/details";
 import { AWAY, BOLT, CORNER, PULL, T, TIP, Triangle, X, Y } from "@/visual/common/triangle";
@@ -22,7 +23,7 @@ function SideSquare(props: {
     return (
         <>
             <polygon
-                points={pts.map((p) => `${p.x},${p.y}`).join(" ")}
+                points={svgPoints(pts)}
                 fill={props.color}
                 fillOpacity={0.12}
                 stroke={props.color}

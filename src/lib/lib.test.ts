@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { arcLengths } from "./curve";
 import { clamp, linearScale, roundTo, wrapDegrees } from "./math";
+import { arcLengths, lengthOf } from "./polyline";
 import { Segment } from "./segment";
-import { pathPoints, svgPoint } from "./svg-path";
+import { pathPoints, polylinePath, svgPoint, svgPoints } from "./svg-path";
 import { vec2, Vector2 } from "./vector2";
 import { vec3 } from "./vector3";
 
@@ -155,13 +155,29 @@ describe("curves", () => {
     });
 });
 
+describe("writing polylines for SVG", () => {
+    const line = [vec2(0, 0), vec2(1.00004, 2), vec2(3, -1.5)];
+
+    it("writes points attributes and path data, rounded", () => {
+        expect(svgPoints(line)).toBe("0,0 1,2 3,-1.5");
+        expect(polylinePath(line)).toBe("M 0 0 L 1 2 L 3 -1.5");
+        expect(polylinePath(line, true)).toBe("M 0 0 L 1 2 L 3 -1.5 Z");
+    });
+
+    it("measures a polyline as arcLengths does", () => {
+        const zigzag = [vec2(0, 0), vec2(3, 4), vec2(3, 5)];
+        expect(lengthOf(zigzag)).toBe(arcLengths(zigzag).at(-1));
+        expect(lengthOf([vec2(1, 1)])).toBe(0);
+    });
+});
+
 describe("pathPoints", () => {
     const end = (d: string) => pathPoints(d).at(-1)!;
 
     it("follows lines, curves and arcs to where they end", () => {
         expect(end("M 1 2 L 4 6 H 0 V -1")).toEqual(vec2(0, -1));
         expect(end("M 0 0 C 0 1, 2 1, 2 0").distanceTo(vec2(2, 0))).toBeLessThan(1e-12);
-        expect(arcLengths(pathPoints("M 0 0 L 3 4")).at(-1)).toBeCloseTo(5);
+        expect(lengthOf(pathPoints("M 0 0 L 3 4"))).toBeCloseTo(5);
     });
 
     it("reads numbers written with an exponent", () => {
@@ -176,10 +192,10 @@ describe("pathPoints", () => {
         for (const p of up) expect(p.len()).toBeCloseTo(1, 9);
         expect(Math.min(...up.map((p) => p.y))).toBeCloseTo(-1, 3);
         expect(Math.max(...down.map((p) => p.y))).toBeCloseTo(1, 3);
-        expect(arcLengths(up).at(-1)).toBeCloseTo(Math.PI, 3);
+        expect(lengthOf(up)).toBeCloseTo(Math.PI, 3);
         // The large-arc flag picks the long way round.
         const long = pathPoints("M 1 0 A 1 1 0 1 0 0 1");
-        expect(arcLengths(long).at(-1)).toBeCloseTo((3 * Math.PI) / 2, 3);
+        expect(lengthOf(long)).toBeCloseTo((3 * Math.PI) / 2, 3);
     });
 
     it("carries on from a given point", () => {

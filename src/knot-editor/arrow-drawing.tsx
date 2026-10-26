@@ -7,8 +7,7 @@
 import { memo } from "react";
 
 import { laySegments, type RopePath } from "@/knots/rope-path";
-import { svgNumber } from "@/lib/svg-path";
-import type { Vector2 } from "@/lib/vector2";
+import { svgPoints } from "@/lib/svg-path";
 
 import { ARROW_TOKENS } from "./colours";
 import { pathBetween } from "./crossing-geometry";
@@ -30,8 +29,6 @@ const OUTLINE = SHAFT + HEAD_OUTLINE;
  */
 export type ArrowShape = { shaft: string; head: string; over: string[]; headOver: boolean };
 
-const corner = (p: Vector2) => `${svgNumber(p.x)},${svgNumber(p.y)}`;
-
 /** The arrow's shaft, head and over stretches, from its geometry and its path (whose stretches marked over are kept). */
 export function arrowShape(strand: StrandGeometry, path: RopePath): ArrowShape {
     const last = strand.segments[strand.segments.length - 1].cubic;
@@ -44,7 +41,7 @@ export function arrowShape(strand: StrandGeometry, path: RopePath): ArrowShape {
     const laid = laySegments(path);
     return {
         shaft: pathBetween(strand, 0, shaftEnd),
-        head: [tip, base.add(side), base.sub(side)].map(corner).join(" "),
+        head: svgPoints([tip, base.add(side), base.sub(side)]),
         // Each over stretch, stopping where the head starts, so the shaft doesn't show past its point.
         over: laid
             .filter((seg) => seg.over && seg.start < shaftEnd)

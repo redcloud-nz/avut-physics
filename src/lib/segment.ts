@@ -1,4 +1,5 @@
 import { clamp } from "./math";
+import type { Polyline } from "./polyline";
 import type { Vector2 } from "./vector2";
 
 /**
@@ -12,7 +13,7 @@ export class Segment {
     ) {}
 
     /** The pieces of the polyline through `points`, in order: one fewer than the points. */
-    static along(points: readonly Vector2[]): Segment[] {
+    static along(points: Polyline): Segment[] {
         return points.slice(1).map((p, i) => new Segment(points[i], p));
     }
 

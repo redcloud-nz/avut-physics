@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Cubic } from "./bezier";
-import { arcLengths } from "./curve";
+import { lengthOf } from "./polyline";
 import { vec2, type Vector2 } from "./vector2";
 
 /** The usual cubic for a quarter of the unit circle, from (1, 0) round to (0, 1), its handles k long. */
@@ -17,7 +17,7 @@ const close = (a: Vector2, b: Vector2, digits = 9) => {
 };
 
 /** The length of a polyline through `n` + 1 points along the curve. */
-const polylineLength = (c: Cubic, n: number) => arcLengths(c.points(n)).at(-1)!;
+const polylineLength = (c: Cubic, n: number) => lengthOf(c.points(n));
 
 describe("Cubic", () => {
     it("starts and ends at its end points, heading at its control points", () => {

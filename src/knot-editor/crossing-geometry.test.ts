@@ -3,7 +3,7 @@ import { join } from "path";
 import { describe, expect, it } from "vitest";
 
 import { centreline, crossings, laySegments, type RopePath } from "@/knots/rope-path";
-import { arcLengths } from "@/lib/curve";
+import { arcLengths } from "@/lib/polyline";
 import { Segment } from "@/lib/segment";
 
 import {

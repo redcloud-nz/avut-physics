@@ -14,6 +14,7 @@ import {
 import { Arrow, Label } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { readout } from "@/lib/format";
+import { polylinePath } from "@/lib/svg-path";
 import { vec2 } from "@/lib/vector2";
 
 import { UteLoadNotes } from "./ute-load-notes";
@@ -172,7 +173,10 @@ export default function UteLoad() {
     /** World (metres back from the front axle, y up) → SVG (x right, y down). */
     const toSvg = (x: number, y: number) => vec2((x - X_MIN) * PPM, (ABOVE - y) * PPM);
     const path = (pts: [number, number][]) =>
-        pts.map(([x, y], i) => `${i ? "L" : "M"}${toSvg(x, y).x},${toSvg(x, y).y}`).join(" ") + "Z";
+        polylinePath(
+            pts.map(([x, y]) => toSvg(x, y)),
+            true,
+        );
     const ground = toSvg(0, 0).y;
 
     const cabBack = lay.tubStart - 0.1;
