@@ -84,7 +84,7 @@ Props are the things a knot is tied round or with. Each is of a kind, with that 
 kept in one place (`src/knot-editor/props/`): its type and checks, its drawing, and its fields in the panel. Adding a
 kind touches nothing else.
 
-A prop is drawn behind every strand, unless strands pass both in front of it and behind it. Then it's drawn over the strands but under their over stretches. It lists every pass across it with its side, front or behind, as crossings are listed, and you click a pass to swap it. A pass in front is drawn as an over stretch long enough to cover the prop.
+A prop is drawn behind every strand, unless strands pass both in front of it and behind it. Then it's drawn over the strands but under their over stretches. It lists every pass across it with its side, front or behind, as crossings are listed, and you click a pass to swap it. A pass in front is drawn as an over stretch long enough to cover the prop, ending where the strand turns back across it (as a rope wrapped round a bar does at its edge), since the next pass begins there.
 
 The first kind is the bar: end on (a circle, behind the rope) or side on (with a length, passes in front and behind).
 A new one is 17.6 mm in radius and 220 mm long. To come later: a carabiner and a ring, with passes in front and behind

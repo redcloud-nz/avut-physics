@@ -234,8 +234,12 @@ export function pictureCrossings(picture: Picture, geometry: PictureGeometry): P
                         t,
                         s,
                         at: seg.cubic.pointAt(t),
-                        cover: coverAround(strand, s, size, (point) =>
-                            kind.covers(prop, point, size),
+                        cover: coverAround(
+                            strand,
+                            s,
+                            size,
+                            (point) => kind.covers(prop, point, size),
+                            kind.across?.(prop),
                         ),
                         status,
                         ...(entry && { side: entry[3] }),
@@ -253,23 +257,36 @@ function pointAlong(strand: StrandGeometry, distance: number): Vector2 {
     return strand.segments[segment].cubic.pointAt(t);
 }
 
+/** The strand's direction at a distance along it. */
+function directionAlong(strand: StrandGeometry, distance: number): Vector2 {
+    const { segment, t } = strandPosition(strand, distance);
+    return strand.segments[segment].cubic.tangentAt(t);
+}
+
 /**
  * How far along the strand, each way from `s`, `covers` keeps holding: stepped along (a tenth of the strand's size at
- * a time), then bisected.
+ * a time), then bisected. Given the way strands pass `across` the prop, it stops, too, where the strand turns back
+ * along it, as a rope wrapped round a bar does at its edge: there one pass ends and the next, on the other side,
+ * begins.
  */
 function coverAround(
     strand: StrandGeometry,
     s: number,
     size: number,
     covers: (point: Vector2) => boolean,
+    across?: Vector2,
 ): [number, number] {
     const STEP = 0.1 * size;
+    const way0 = across && Math.sign(directionAlong(strand, s).dot(across));
+    const holds = (distance: number) =>
+        covers(pointAlong(strand, distance)) &&
+        (!across || Math.sign(directionAlong(strand, distance).dot(across)) === way0);
     const edge = (way: 1 | -1) => {
         let [inside, outside] = [s, s];
         for (;;) {
             const next = inside + way * STEP;
             if (next <= 0 || next >= strand.length) return way > 0 ? strand.length : 0;
-            if (!covers(pointAlong(strand, next))) {
+            if (!holds(next)) {
                 outside = next;
                 break;
             }
@@ -277,7 +294,7 @@ function coverAround(
         }
         for (let k = 0; k < 20; k++) {
             const mid = (inside + outside) / 2;
-            if (covers(pointAlong(strand, mid))) inside = mid;
+            if (holds(mid)) inside = mid;
             else outside = mid;
         }
         return outside;
@@ -289,6 +306,9 @@ function coverAround(
 
 /** Half a strand's drawn width, with its outline (in its sizes). */
 const HALF_WIDTH = DRAWN_WIDTH / 2;
+
+/** How much of their ends two stretches may share (millimetres): passes meeting at a turn, found by bisection. */
+const SHARED = 1e-3;
 
 /** The sine of the shallowest angle the over stretches allow for; shallower crossings are treated as this. */
 const SHALLOWEST = 0.15;
@@ -415,8 +435,11 @@ export function strandPaths(
                 Math.max(0, want.need[0]),
                 Math.min(strand.length, want.need[1]),
             ];
-            // Where it's under within the stretch it must have, it doesn't fit.
-            const inTheWay = unders.filter((u) => u.from < needTo && u.to > needFrom);
+            // Where it's under within the stretch it must have, it doesn't fit. Two passes meeting where a strand turns
+            // back round a prop share only their ends, found by bisection, so they're allowed that much.
+            const inTheWay = unders.filter(
+                (u) => u.from < needTo - SHARED && u.to > needFrom + SHARED,
+            );
             let inside = false;
             for (const under of unders) {
                 if (under.to <= want.at) from = Math.max(from, under.to);

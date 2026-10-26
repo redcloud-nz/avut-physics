@@ -1,0 +1,86 @@
+{
+  "format": "avut-knot",
+  "version": 3,
+  "name": "Round turn and two half hitches",
+  "description": "The rope taken round something one and a half times, with its tail tied round the standing part in two half hitches.",
+  "about": "More on how the round turn and two half hitches is used goes here.",
+  "frame": { "x": -99, "y": -55, "w": 198, "h": 365.2 },
+  "knot": {
+    "strands": [
+      {
+        "id": 1,
+        "kind": "rope",
+        "colour": "orange",
+        "diameter": 11,
+        "pins": [
+          { "id": 2, "x": 0, "y": 352 },
+          { "id": 3, "x": 0, "y": 123.03 },
+          { "id": 4, "x": 0, "y": 0.05, "angle": -89.93 },
+          { "id": 5, "x": -3.6, "y": -38.48, "angle": 171.97 },
+          { "id": 6, "x": -7.17, "y": 0.18, "angle": 93.47 },
+          { "id": 7, "x": -13.7, "y": 39.1, "angle": -104.2 },
+          { "id": 9, "x": -14.32, "y": -0.48 },
+          { "id": 10, "x": -15.2, "y": -19.9, "angle": -90.7 },
+          { "id": 11, "x": -18, "y": -38.44, "angle": 162.53 },
+          { "id": 12, "x": -21.45, "y": 0.21 },
+          { "id": 13, "x": -26.5, "y": 41, "angle": 89.86 },
+          { "id": 14, "x": -19, "y": 90.7 },
+          { "id": 15, "x": 21.9, "y": 74.8 },
+          { "id": 16, "x": 0.23, "y": 63.8 },
+          { "id": 17, "x": -36.9, "y": 100, "angle": 89.97 },
+          { "id": 19, "x": 3.9, "y": 145.5, "angle": -5.3 },
+          { "id": 20, "x": 25.2, "y": 126.1 },
+          { "id": 21, "x": -38.6, "y": 141.2 },
+          { "id": 24, "x": -41.8, "y": 207.3, "angle": 90.5 }
+        ],
+        "segments": [
+          { "id": 25 },
+          { "id": 26 },
+          { "id": 27, "tension": [3.08, 4] },
+          { "id": 28, "tension": [4, 2.31] },
+          { "id": 29, "tension": [3.05, 4] },
+          { "id": 30, "tension": [4, 4] },
+          { "id": 32, "tension": [4, 4] },
+          { "id": 33, "tension": [4, 4] },
+          { "id": 34, "tension": [4, 4] },
+          { "id": 35, "tension": [1.79, 1.49] },
+          { "id": 36, "tension": [1.14, 1.05] },
+          { "id": 37, "tension": [1.62, 1.07] },
+          { "id": 38, "tension": [0.9, 1.09] },
+          { "id": 39, "tension": [1.33, 0.78] },
+          { "id": 40, "tension": [1.05, 1.03] },
+          { "id": 42, "tension": [0.75, 0.93] },
+          { "id": 43, "tension": [1.05, 1.39] },
+          { "id": 44, "tension": [0.83, 1.04] }
+        ]
+      }
+    ],
+    "crossings": [
+      { "over": 37, "under": 26 },
+      { "over": 26, "under": 39 },
+      { "over": 39, "under": 36 },
+      { "over": 26, "under": 43 },
+      { "over": 40, "under": 25 },
+      { "over": 43, "under": 40 },
+      { "over": 44, "under": 40 },
+      { "over": 42, "under": 25 },
+      { "over": 25, "under": 43 }
+    ],
+    "props": [
+      {
+        "id": 47,
+        "kind": "bar",
+        "x": 0,
+        "y": 0,
+        "r": 33,
+        "length": 165,
+        "passes": [
+          [27, 1, "front"],
+          [28, 1, "behind"],
+          [30, 1, "front"],
+          [34, 1, "behind"]
+        ]
+      }
+    ]
+  }
+}

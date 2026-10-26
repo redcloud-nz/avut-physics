@@ -170,6 +170,9 @@ export const BAR = {
     covers: (bar: BarProp, point: Vector2, size: number) =>
         Math.abs(point.y - bar.y) < bar.r + PASS_MARGIN * size,
 
+    /** Seen side on, running across, strands pass across it up and down. */
+    across: () => new Vector2(0, 1),
+
     /** Seen side on, strands pass in front of it and behind it; seen end on, they lie across it. */
     between: (bar: BarProp) => bar.length !== undefined,
 

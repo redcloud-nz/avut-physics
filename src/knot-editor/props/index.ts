@@ -58,6 +58,11 @@ export type PropKind<P extends Prop> = {
     /** Whether a strand of this size passing in front must be drawn over at this point, to cover the prop. */
     covers(prop: P, point: Vector2, size: number): boolean;
     /**
+     * The way strands pass across it (a unit vector), for a kind with passes: a pass's cover ends where the strand
+     * turns back along it, as a rope wrapped round it does at its edge, since the next pass begins there.
+     */
+    across?(prop: P): Vector2;
+    /**
      * Whether strands pass both in front of it and behind it, so it's drawn over the strands' whole length but under
      * their over stretches; otherwise it's drawn behind every strand.
      */

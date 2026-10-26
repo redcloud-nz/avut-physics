@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:sweep": "SWEEP=1 vitest run sweep",
     "figures": "FIGURES=1 vitest run src/articles/figures.test.ts",
+    "port-knots": "PORT_KNOTS=1 vitest run src/knots/port/port.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

@@ -401,6 +401,31 @@ describe("strandPaths", () => {
             if (s[i] > behind.cover[0] && s[i] < behind.cover[1]) expect(over[i]).toBe(false);
         });
     });
+
+    it("ends a pass where the strand turns back round the bar's edge, so a wrap's passes don't meet", () => {
+        // Down in front of the bar, round its bottom edge, and back up behind it, as a round turn goes.
+        const wrap = strand([
+            { x: -1, y: -6 },
+            { x: 0, y: 1.6, angle: 0 },
+            { x: 1, y: -6 },
+        ]);
+        const bar: TestBar = {
+            kind: "bar",
+            x: 0,
+            y: 0,
+            r: 1.6,
+            length: 20,
+            passes: [
+                [0, 0, 1, "front"],
+                [0, 1, 1, "behind"],
+            ],
+        };
+        const { paths, crossings: c } = found(picture([wrap], [], [bar]));
+        const [front, behind] = c.passes;
+        expect(front.cover[1]).toBeLessThanOrEqual(behind.cover[0] + 1e-6);
+        expect(paths.tooClosePasses).toEqual([]);
+        expect(paths.paths[0].some((seg) => seg.over)).toBe(true);
+    });
 });
 
 describe("samples/v1.json", () => {

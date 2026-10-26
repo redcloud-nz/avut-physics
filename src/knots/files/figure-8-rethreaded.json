@@ -1,0 +1,899 @@
+{
+  "format": "avut-knot",
+  "version": 3,
+  "name": "Figure-8 rethreaded",
+  "description": "A figure-8 tied in a single strand, with the end followed back through it to leave a loop.",
+  "about": "More on how the figure-8 rethreaded is used goes here.",
+  "frame": { "x": -137.5, "y": -221.8, "w": 275, "h": 443.6 },
+  "knot": {
+    "strands": [
+      {
+        "id": 1,
+        "kind": "rope",
+        "colour": "orange",
+        "diameter": 11,
+        "pins": [
+          { "id": 2, "x": 6.05, "y": 220 },
+          { "id": 3, "x": 6.88, "y": 149.27, "angle": -89.9 },
+          { "id": 4, "x": 6.88, "y": 91.52, "angle": -90 },
+          { "id": 5, "x": 14.37, "y": 35.07, "angle": -66.25 },
+          { "id": 6, "x": 36.1, "y": -71.42, "angle": -126.85 },
+          { "id": 7, "x": -45.33, "y": -42.1, "angle": 87.16 },
+          { "id": 8, "x": -10.04, "y": 1.37, "angle": 34.89 },
+          { "id": 9, "x": 31.04, "y": 39.41, "angle": 76.36 },
+          { "id": 10, "x": 31.26, "y": 40.36, "angle": 77.12 },
+          { "id": 11, "x": 3.33, "y": 75.58, "angle": 173.23 },
+          { "id": 12, "x": -31.34, "y": 48.6, "angle": -97.48 },
+          { "id": 13, "x": 2.96, "y": -42.31, "angle": -70.23 },
+          { "id": 14, "x": 38.46, "y": -133.32, "angle": -78.07 },
+          { "id": 15, "x": -3.87, "y": -205.28 },
+          { "id": 16, "x": -45.23, "y": -135.51, "angle": 67.33 },
+          { "id": 17, "link": { "pin": 13, "side": "left", "reverse": true } },
+          { "id": 18, "link": { "pin": 12, "side": "left", "reverse": true } },
+          { "id": 19, "link": { "pin": 11, "side": "left", "reverse": true } },
+          { "id": 20, "link": { "pin": 10, "side": "left", "reverse": true } },
+          { "id": 21, "link": { "pin": 9, "side": "left", "reverse": true } },
+          { "id": 22, "link": { "pin": 8, "side": "left", "reverse": true } },
+          { "id": 23, "link": { "pin": 7, "side": "left", "reverse": true } },
+          { "id": 24, "link": { "pin": 6, "side": "left", "reverse": true } },
+          { "id": 25, "link": { "pin": 5, "side": "left", "reverse": true } },
+          { "id": 26, "link": { "pin": 4, "side": "left", "reverse": true } },
+          { "id": 27, "link": { "pin": 3, "side": "left", "reverse": true } }
+        ],
+        "segments": [
+          { "id": 28, "tension": [1.01, 1.01] },
+          { "id": 29 },
+          { "id": 30, "tension": [0.88, 0.86] },
+          { "id": 31, "tension": [1.18, 0.96] },
+          { "id": 32, "tension": [1.01, 1.01] },
+          { "id": 33, "tension": [1.01, 1.13] },
+          { "id": 34, "tension": [1.33, 1.3] },
+          { "id": 35 },
+          { "id": 36, "tension": [1.05, 1.18] },
+          { "id": 37, "tension": [0.98, 1.01] },
+          { "id": 38, "tension": [1.3, 1.23] },
+          { "id": 39, "tension": [1, 0.99] },
+          { "id": 40, "tension": [1.04, 0.78] },
+          { "id": 41, "tension": [0.88, 1.06] },
+          { "id": 42, "tension": [1.34, 1.32] },
+          { "id": 43, "tension": [0.83, 1.14] },
+          { "id": 44, "tension": [1.02, 1.04] },
+          { "id": 45, "tension": [1.18, 1.04] },
+          { "id": 46 },
+          { "id": 47, "tension": [1.22, 0.93] },
+          { "id": 48, "tension": [1.22, 1.15] },
+          { "id": 49, "tension": [1.01, 1.02] },
+          { "id": 50, "tension": [1.1, 1.67] },
+          { "id": 51, "tension": [0.91, 0.75] },
+          { "id": 52 }
+        ]
+      }
+    ],
+    "crossings": [
+      { "over": 30, "under": 36 },
+      { "over": 30, "under": 45 },
+      { "over": 34, "under": 31 },
+      { "over": 47, "under": 31 },
+      { "over": 32, "under": 39 },
+      { "over": 32, "under": 42 },
+      { "over": 38, "under": 33 },
+      { "over": 43, "under": 33 },
+      { "over": 34, "under": 50 },
+      { "over": 51, "under": 37 },
+      { "over": 38, "under": 48 },
+      { "over": 49, "under": 39 },
+      { "over": 49, "under": 42 },
+      { "over": 43, "under": 48 },
+      { "over": 51, "under": 44 },
+      { "over": 47, "under": 50 }
+    ],
+    "props": [{ "id": 53, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+  },
+  "steps": [
+    {
+      "number": 1,
+      "instructions": "Tie a loose figure-8, leaving a long tail.",
+      "picture": {
+        "strands": [
+          {
+            "id": 54,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 55, "x": 6.05, "y": 220 },
+              { "id": 56, "x": 6.05, "y": 106.52, "angle": -90 },
+              { "id": 57, "x": 8.09, "y": 49.74 },
+              { "id": 58, "x": 31.57, "y": -1.54 },
+              { "id": 59, "x": 42.85, "y": -56.07 },
+              { "id": 60, "x": 1.27, "y": -88.66 },
+              { "id": 61, "x": -42.18, "y": -58.03 },
+              { "id": 62, "x": -23.18, "y": -9.31 },
+              { "id": 63, "x": 22.47, "y": 24.72, "angle": 44.93 },
+              { "id": 64, "x": 15.78, "y": 72.22 },
+              { "id": 65, "x": -30.76, "y": 54.72 },
+              { "id": 66, "x": -18.27, "y": 1.08 },
+              { "id": 67, "x": 28.66, "y": -102.17, "angle": -67.74 },
+              { "id": 68, "x": 88, "y": -198, "angle": -59.94 }
+            ],
+            "segments": [
+              { "id": 69 },
+              { "id": 70, "tension": [1.06, 1.08] },
+              { "id": 71, "tension": [1.16, 1.14] },
+              { "id": 72, "tension": [1.09, 1.05] },
+              { "id": 73, "tension": [0.98, 0.99] },
+              { "id": 74, "tension": [1.12, 1.07] },
+              { "id": 75, "tension": [0.75, 0.8] },
+              { "id": 76, "tension": [1.02, 1] },
+              { "id": 77, "tension": [0.92, 0.93] },
+              { "id": 78, "tension": [0.95, 0.99] },
+              { "id": 79, "tension": [1.14, 1.23] },
+              { "id": 80, "tension": [1.03, 1.03] },
+              { "id": 81, "tension": [0.97, 0.99] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 70, "under": 78 },
+          { "over": 76, "under": 71 },
+          { "over": 73, "under": 80 },
+          { "over": 80, "under": 76 }
+        ],
+        "props": [{ "id": 82, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 2,
+      "instructions": "Take the tail round the bar.",
+      "picture": {
+        "strands": [
+          {
+            "id": 83,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 84, "x": 6.05, "y": 220 },
+              { "id": 85, "x": 6.05, "y": 82.47, "angle": -90 },
+              { "id": 86, "x": 22.35, "y": 16.67 },
+              { "id": 87, "x": 44.42, "y": -47.34, "angle": -94.26 },
+              { "id": 88, "x": -44.54, "y": -43.11 },
+              { "id": 89, "x": 27.82, "y": 60.11, "angle": 120.04 },
+              { "id": 90, "x": -28.94, "y": 59.1 },
+              { "id": 91, "x": -14.91, "y": -5.38 },
+              { "id": 92, "x": 13.41, "y": -67.71 },
+              { "id": 93, "x": 38.06, "y": -131.5 },
+              { "id": 94, "x": 24.14, "y": -195.09 },
+              { "id": 95, "x": -38.03, "y": -190.91 },
+              { "id": 96, "x": -51.43, "y": -159.23 },
+              { "id": 97, "x": -66.44, "y": -129.02 },
+              { "id": 98, "x": -110, "y": -77, "angle": 120.14 }
+            ],
+            "segments": [
+              { "id": 99 },
+              { "id": 100, "tension": [0.76, 0.77] },
+              { "id": 101, "tension": [1.08, 1.05] },
+              { "id": 102, "tension": [1.02, 1.03] },
+              { "id": 103, "tension": [0.93, 1.2] },
+              { "id": 104, "tension": [0.95, 0.98] },
+              { "id": 105, "tension": [1.12, 1.28] },
+              { "id": 106 },
+              { "id": 107, "tension": [1, 0.99] },
+              { "id": 108, "tension": [0.93, 0.86] },
+              { "id": 109, "tension": [1.13, 1.1] },
+              { "id": 110, "tension": [0.75, 0.76] },
+              { "id": 111, "tension": [0.84, 0.83] },
+              { "id": 112, "tension": [0.99, 0.94] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 103, "under": 100 },
+          { "over": 100, "under": 104 },
+          { "over": 102, "under": 107 },
+          { "over": 105, "under": 103 }
+        ],
+        "props": [{ "id": 113, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 3,
+      "instructions": "Line the end up beside the rope where it leaves the top of the knot. It goes in under the top of the loop.",
+      "picture": {
+        "strands": [
+          {
+            "id": 114,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 116, "x": 6.05, "y": 220 },
+              { "id": 117, "x": 6.05, "y": 87.53, "angle": -90 },
+              { "id": 118, "x": 18.94, "y": 23.44, "angle": -63.69 },
+              { "id": 119, "x": 44.06, "y": -37.26, "angle": -82.14 },
+              { "id": 120, "x": -42.33, "y": -57.54 },
+              { "id": 121, "x": 32.17, "y": 40.73, "angle": 80.37 },
+              { "id": 122, "x": -12.62, "y": 74.24 },
+              { "id": 123, "x": -25.95, "y": 17.35 },
+              { "id": 124, "x": 2.45, "y": -42.72, "angle": -68.3 },
+              { "id": 125, "x": 28.85, "y": -102.64 },
+              { "id": 126, "x": 40.45, "y": -167.38 },
+              { "id": 127, "x": -6.65, "y": -205.25 },
+              { "id": 128, "x": -50.39, "y": -163.01 },
+              { "id": 129, "x": -27.36, "y": -102.87, "angle": 58.59 }
+            ],
+            "segments": [
+              { "id": 135 },
+              { "id": 136, "tension": [0.8, 0.78] },
+              { "id": 137, "tension": [1.05, 1.04] },
+              { "id": 138, "tension": [1.02, 1.05] },
+              { "id": 139, "tension": [0.88, 1.12] },
+              { "id": 140, "tension": [1.14, 1.1] },
+              { "id": 141, "tension": [0.75, 0.95] },
+              { "id": 142, "tension": [1.06, 1.02] },
+              { "id": 143, "tension": [1.01, 1.01] },
+              { "id": 144, "tension": [1.33, 1.32] },
+              { "id": 145, "tension": [0.95, 0.9] },
+              { "id": 146, "tension": [0.99, 1.02] },
+              { "id": 147, "tension": [1.04, 1.09] }
+            ]
+          },
+          {
+            "id": 115,
+            "kind": "arrow",
+            "pins": [
+              { "id": 130, "x": -24.5, "y": -98.2 },
+              { "id": 131, "x": -16.8, "y": -84.2 },
+              { "id": 132, "x": -10.7, "y": -69.5 },
+              { "id": 133, "x": -8.6, "y": -53.8 },
+              { "id": 134, "x": -12.3, "y": -38.3 }
+            ],
+            "segments": [{ "id": 148 }, { "id": 149 }, { "id": 150 }, { "id": 151 }]
+          }
+        ],
+        "crossings": [
+          { "over": 136, "under": 140 },
+          { "over": 139, "under": 137 },
+          { "over": 138, "under": 143 },
+          { "over": 138, "under": 148 },
+          { "over": 142, "under": 139 }
+        ],
+        "props": [{ "id": 152, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 3,
+      "instructions": "Push the end through and pull the slack out to the side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 153,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 154, "x": 6.05, "y": 220 },
+              { "id": 155, "x": 6.03, "y": 64.53, "angle": -91.05 },
+              { "id": 156, "x": 28.73, "y": -78.04 },
+              { "id": 157, "x": -38.6, "y": -66.26 },
+              { "id": 158, "x": -13.57, "y": -2.13 },
+              { "id": 159, "x": 30.59, "y": 54 },
+              { "id": 160, "x": -29.49, "y": 57.97 },
+              { "id": 161, "x": -9.95, "y": -14.88, "angle": -62.93 },
+              { "id": 162, "x": 21.61, "y": -85.62 },
+              { "id": 163, "x": 41.15, "y": -159.92 },
+              { "id": 164, "x": -10.63, "y": -204.91 },
+              { "id": 165, "x": -49.13, "y": -147.62 },
+              { "id": 166, "x": -14.39, "y": -79.22 },
+              { "id": 167, "x": -34.89, "y": -12.19 },
+              { "id": 168, "x": -110, "y": 0, "angle": 179.99 }
+            ],
+            "segments": [
+              { "id": 169, "tension": [1.01, 1.01] },
+              { "id": 170, "tension": [1.03, 0.87] },
+              { "id": 171, "tension": [1.16, 1.15] },
+              { "id": 172, "tension": [0.75, 0.85] },
+              { "id": 173, "tension": [1.16, 0.91] },
+              { "id": 174, "tension": [0.94, 1.04] },
+              { "id": 175, "tension": [1.18, 1.34] },
+              { "id": 176, "tension": [1.02, 1.01] },
+              { "id": 177, "tension": [1.28, 1.27] },
+              { "id": 178, "tension": [0.96, 0.83] },
+              { "id": 179, "tension": [0.91, 1.01] },
+              { "id": 180, "tension": [1, 1.07] },
+              { "id": 181, "tension": [0.81, 0.77] },
+              { "id": 182, "tension": [1.22, 1.24] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 169, "under": 174 },
+          { "over": 173, "under": 170 },
+          { "over": 171, "under": 176 },
+          { "over": 171, "under": 180 },
+          { "over": 175, "under": 172 },
+          { "over": 181, "under": 172 }
+        ],
+        "props": [{ "id": 183, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 4,
+      "instructions": "Lay the end beside the rope round the left of the 8, down to the bottom. It goes under the standing part.",
+      "picture": {
+        "strands": [
+          {
+            "id": 184,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 186, "x": 6.05, "y": 220 },
+              { "id": 187, "x": 6.05, "y": 71.5, "angle": -90 },
+              { "id": 188, "x": 29.6, "y": 2.45 },
+              { "id": 189, "x": 37.78, "y": -67.51 },
+              { "id": 190, "x": -30.26, "y": -15.5, "angle": 44.19 },
+              { "id": 191, "x": 27.43, "y": 30.47, "angle": 54.05 },
+              { "id": 192, "x": -8.33, "y": 74.81, "angle": -166.51 },
+              { "id": 193, "x": -30.69, "y": 52.04, "angle": -103.77 },
+              { "id": 194, "x": -25.64, "y": 18.75, "angle": -68.03 },
+              { "id": 195, "x": 2.96, "y": -42.32, "angle": -70.24 },
+              { "id": 196, "x": 38.46, "y": -133.28, "angle": -78.03 },
+              { "id": 197, "x": -3.82, "y": -205.27 },
+              { "id": 198, "x": -45.25, "y": -135.55, "angle": 67.39 },
+              { "id": 199, "link": { "pin": 195, "side": "left", "reverse": true } },
+              { "id": 200, "link": { "pin": 194, "side": "left", "reverse": true } },
+              { "id": 201, "link": { "pin": 193, "side": "left", "reverse": true } },
+              { "id": 202, "link": { "pin": 192, "side": "left", "reverse": true } }
+            ],
+            "segments": [
+              { "id": 210 },
+              { "id": 211, "tension": [0.94, 0.95] },
+              { "id": 212, "tension": [1.24, 1.04] },
+              { "id": 213, "tension": [0.96, 0.92] },
+              { "id": 214, "tension": [1.06, 1.1] },
+              { "id": 215, "tension": [0.92, 1.13] },
+              { "id": 216, "tension": [1, 1.05] },
+              { "id": 217, "tension": [1.03, 1.05] },
+              { "id": 218, "tension": [1, 0.98] },
+              { "id": 219, "tension": [1, 0.99] },
+              { "id": 220, "tension": [1.04, 0.78] },
+              { "id": 221, "tension": [0.88, 1.06] },
+              { "id": 222, "tension": [1.34, 1.32] },
+              { "id": 223, "tension": [0.8, 1.05] },
+              { "id": 224, "tension": [0.97, 1.14] },
+              { "id": 225, "tension": [1.09, 1.05] }
+            ]
+          },
+          {
+            "id": 185,
+            "kind": "arrow",
+            "pins": [
+              { "id": 203, "x": -6.6, "y": 88.3 },
+              { "id": 204, "x": 9.8, "y": 87.5 },
+              { "id": 205, "x": 24.8, "y": 80.8 },
+              { "id": 206, "x": 36.4, "y": 69.2 },
+              { "id": 207, "x": 43.1, "y": 54.2 },
+              { "id": 208, "x": 44, "y": 37.9 },
+              { "id": 209, "x": 37, "y": 23.1 }
+            ],
+            "segments": [
+              { "id": 226 },
+              { "id": 227 },
+              { "id": 228 },
+              { "id": 229 },
+              { "id": 230 },
+              { "id": 231 }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 210, "under": 215 },
+          { "over": 210, "under": 226 },
+          { "over": 214, "under": 211 },
+          { "over": 213, "under": 219 },
+          { "over": 213, "under": 222 },
+          { "over": 218, "under": 214 },
+          { "over": 223, "under": 214 }
+        ],
+        "props": [{ "id": 232, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 4,
+      "instructions": "Push it under and up the right side, and pull the slack out to the side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 233,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 234, "x": 6.05, "y": 220 },
+              { "id": 235, "x": 6.05, "y": 87.01, "angle": -90 },
+              { "id": 236, "x": 19.16, "y": 22.97, "angle": -63.57 },
+              { "id": 237, "x": 44.13, "y": -37.77, "angle": -83.19 },
+              { "id": 238, "x": -42.33, "y": -57.51 },
+              { "id": 239, "x": 31.62, "y": 41.23, "angle": 84.94 },
+              { "id": 240, "x": 3.51, "y": 75.56, "angle": 172.91 },
+              { "id": 241, "x": -31.39, "y": 48.16, "angle": -96.79 },
+              { "id": 242, "x": 2.96, "y": -42.35, "angle": -71.58 },
+              { "id": 243, "x": 38.44, "y": -133.19, "angle": -77.92 },
+              { "id": 244, "x": -3.72, "y": -205.27 },
+              { "id": 245, "x": -45.29, "y": -135.66, "angle": 67.54 },
+              { "id": 246, "link": { "pin": 242, "side": "left", "reverse": true } },
+              { "id": 247, "link": { "pin": 241, "side": "left", "reverse": true } },
+              { "id": 248, "link": { "pin": 240, "side": "left", "reverse": true } },
+              { "id": 249, "link": { "pin": 239, "side": "left", "reverse": true } },
+              { "id": 250, "x": 121, "y": -33, "angle": -20.03 }
+            ],
+            "segments": [
+              { "id": 251 },
+              { "id": 252, "tension": [0.8, 0.78] },
+              { "id": 253, "tension": [1.07, 1.06] },
+              { "id": 254, "tension": [1.02, 1.06] },
+              { "id": 255, "tension": [0.87, 1.17] },
+              { "id": 256, "tension": [1.04, 1.05] },
+              { "id": 257, "tension": [0.99, 1] },
+              { "id": 258, "tension": [1.25, 1.2] },
+              { "id": 259, "tension": [1, 0.98] },
+              { "id": 260, "tension": [1.04, 0.78] },
+              { "id": 261, "tension": [0.87, 1.06] },
+              { "id": 262, "tension": [1.28, 1.25] },
+              { "id": 263, "tension": [0.91, 1.12] },
+              { "id": 264, "tension": [0.95, 1.12] },
+              { "id": 265, "tension": [1.04, 1.09] },
+              { "id": 266, "tension": [0.94, 1.25] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 251, "under": 265 },
+          { "over": 252, "under": 256 },
+          { "over": 255, "under": 253 },
+          { "over": 254, "under": 259 },
+          { "over": 254, "under": 262 },
+          { "over": 258, "under": 255 },
+          { "over": 263, "under": 255 }
+        ],
+        "props": [{ "id": 267, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 5,
+      "instructions": "Lay it beside the rope across the middle of the 8. It goes under into the top loop.",
+      "picture": {
+        "strands": [
+          {
+            "id": 268,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 270, "x": 6.05, "y": 220 },
+              { "id": 271, "x": 6.05, "y": 101.51, "angle": -90 },
+              { "id": 272, "x": 10.42, "y": 42.59 },
+              { "id": 273, "x": 35.61, "y": -10.17 },
+              { "id": 274, "x": 38.05, "y": -67.07 },
+              { "id": 275, "x": -13.06, "y": -86.65 },
+              { "id": 276, "x": -44.48, "y": -41.72 },
+              { "id": 277, "x": -8.36, "y": 2.54, "angle": 35.18 },
+              { "id": 278, "x": 30.99, "y": 39.24, "angle": 75.17 },
+              { "id": 279, "x": 31.23, "y": 40.19, "angle": 75.81 },
+              { "id": 280, "x": 3.68, "y": 75.53, "angle": 172.04 },
+              { "id": 281, "x": -31.31, "y": 48.8, "angle": -97.53 },
+              { "id": 282, "x": 2.96, "y": -42.34, "angle": -70.26 },
+              { "id": 283, "x": 38.44, "y": -133.22, "angle": -77.96 },
+              { "id": 284, "x": -3.76, "y": -205.27 },
+              { "id": 285, "x": -45.27, "y": -135.62, "angle": 67.48 },
+              { "id": 286, "link": { "pin": 282, "side": "left", "reverse": true } },
+              { "id": 287, "link": { "pin": 281, "side": "left", "reverse": true } },
+              { "id": 288, "link": { "pin": 280, "side": "left", "reverse": true } },
+              { "id": 289, "link": { "pin": 279, "side": "left", "reverse": true } },
+              { "id": 290, "link": { "pin": 278, "side": "left", "reverse": true } },
+              { "id": 291, "link": { "pin": 277, "side": "left", "reverse": true } }
+            ],
+            "segments": [
+              { "id": 297 },
+              { "id": 298, "tension": [0.94, 0.93] },
+              { "id": 299, "tension": [1.1, 1.07] },
+              { "id": 300, "tension": [0.97, 0.9] },
+              { "id": 301, "tension": [0.99, 1.02] },
+              { "id": 302, "tension": [1.12, 1.07] },
+              { "id": 303, "tension": [1.01, 1.08] },
+              { "id": 304, "tension": [1.28, 1.25] },
+              { "id": 305 },
+              { "id": 306, "tension": [1.05, 1.2] },
+              { "id": 307, "tension": [1.01, 1.01] },
+              { "id": 308, "tension": [1.29, 1.23] },
+              { "id": 309, "tension": [1, 0.99] },
+              { "id": 310, "tension": [1.04, 0.78] },
+              { "id": 311, "tension": [0.87, 1.06] },
+              { "id": 312, "tension": [1.34, 1.32] },
+              { "id": 313, "tension": [0.79, 1.14] },
+              { "id": 314, "tension": [1.02, 1.05] },
+              { "id": 315, "tension": [1.15, 1.07] },
+              { "id": 316, "tension": [1, 1.01] },
+              { "id": 317, "tension": [1.17, 1.03] }
+            ]
+          },
+          {
+            "id": 269,
+            "kind": "arrow",
+            "pins": [
+              { "id": 292, "x": -4.7, "y": -10.7 },
+              { "id": 293, "x": -18.3, "y": -21 },
+              { "id": 294, "x": -29.5, "y": -33.7 },
+              { "id": 295, "x": -31.7, "y": -50.1 },
+              { "id": 296, "x": -24.5, "y": -65.4 }
+            ],
+            "segments": [{ "id": 318 }, { "id": 319 }, { "id": 320 }, { "id": 321 }]
+          }
+        ],
+        "crossings": [
+          { "over": 298, "under": 306 },
+          { "over": 298, "under": 315 },
+          { "over": 304, "under": 299 },
+          { "over": 317, "under": 299 },
+          { "over": 301, "under": 309 },
+          { "over": 302, "under": 312 },
+          { "over": 308, "under": 303 },
+          { "over": 313, "under": 303 },
+          { "over": 308, "under": 318 },
+          { "over": 313, "under": 319 }
+        ],
+        "props": [{ "id": 322, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 5,
+      "instructions": "Push it through and pull the slack out to the side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 323,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 324, "x": 6.05, "y": 220 },
+              { "id": 325, "x": 6.05, "y": 123.01 },
+              { "id": 326, "x": 6.05, "y": 74.52 },
+              { "id": 327, "x": 16.54, "y": 28.37, "angle": -64.73 },
+              { "id": 328, "x": 40.61, "y": -62.19 },
+              { "id": 329, "x": -38.41, "y": -68.19, "angle": 125.41 },
+              { "id": 330, "x": -40.82, "y": -27.4, "angle": 60.64 },
+              { "id": 331, "x": -10.18, "y": 1.27, "angle": 34.89 },
+              { "id": 332, "x": 23.73, "y": 27.24, "angle": 47.13 },
+              { "id": 333, "x": 23.06, "y": 65.25, "angle": 131.63 },
+              { "id": 334, "x": -30.75, "y": 35.52, "angle": -79.61 },
+              { "id": 335, "x": 2.96, "y": -42.35, "angle": -71.58 },
+              { "id": 336, "x": 38.44, "y": -133.19, "angle": -77.92 },
+              { "id": 337, "x": -3.72, "y": -205.27 },
+              { "id": 338, "x": -45.29, "y": -135.66, "angle": 67.54 },
+              { "id": 339, "link": { "pin": 335, "side": "left", "reverse": true } },
+              { "id": 340, "link": { "pin": 334, "side": "left", "reverse": true } },
+              { "id": 341, "link": { "pin": 333, "side": "left", "reverse": true } },
+              { "id": 342, "link": { "pin": 332, "side": "left", "reverse": true } },
+              { "id": 343, "link": { "pin": 331, "side": "left", "reverse": true } },
+              { "id": 344, "link": { "pin": 330, "side": "left", "reverse": true } },
+              { "id": 345, "link": { "pin": 329, "side": "left", "reverse": true } },
+              { "id": 346, "x": 7.26, "y": -78.35 },
+              { "id": 347, "x": 45.86, "y": -61.08 },
+              { "id": 348, "x": 121, "y": -22 }
+            ],
+            "segments": [
+              { "id": 349, "tension": [1.02, 1.02] },
+              { "id": 350, "tension": [1.05, 1.06] },
+              { "id": 351, "tension": [0.79, 0.76] },
+              { "id": 352, "tension": [1.21, 1.08] },
+              { "id": 353, "tension": [0.96, 0.97] },
+              { "id": 354, "tension": [1.11, 1.05] },
+              { "id": 355, "tension": [1.03, 1.05] },
+              { "id": 356, "tension": [1.04, 1.04] },
+              { "id": 357, "tension": [0.89, 0.92] },
+              { "id": 358, "tension": [0.91, 1] },
+              { "id": 359, "tension": [1.04, 1.02] },
+              { "id": 360, "tension": [1, 0.98] },
+              { "id": 361, "tension": [1.04, 0.78] },
+              { "id": 362, "tension": [0.87, 1.06] },
+              { "id": 363, "tension": [1.28, 1.25] },
+              { "id": 364, "tension": [0.94, 1.15] },
+              { "id": 365, "tension": [0.94, 1.02] },
+              { "id": 366, "tension": [0.96, 0.97] },
+              { "id": 367, "tension": [1.14, 0.85] },
+              { "id": 368, "tension": [1.18, 1.14] },
+              { "id": 369, "tension": [1.11, 1.14] },
+              { "id": 370, "tension": [0.75, 0.75] },
+              { "id": 371, "tension": [1.57, 1.51] },
+              { "id": 372, "tension": [0.95, 0.96] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 350, "under": 358 },
+          { "over": 350, "under": 365 },
+          { "over": 356, "under": 352 },
+          { "over": 367, "under": 352 },
+          { "over": 353, "under": 360 },
+          { "over": 353, "under": 363 },
+          { "over": 371, "under": 353 },
+          { "over": 359, "under": 355 },
+          { "over": 364, "under": 355 },
+          { "over": 359, "under": 368 },
+          { "over": 371, "under": 360 },
+          { "over": 370, "under": 363 },
+          { "over": 364, "under": 368 }
+        ],
+        "props": [{ "id": 373, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 6,
+      "instructions": "Lay it beside the rope round the top loop and down. It goes under in the middle of the 8.",
+      "picture": {
+        "strands": [
+          {
+            "id": 374,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 376, "x": 6.05, "y": 220 },
+              { "id": 377, "x": 6.05, "y": 105, "angle": -90 },
+              { "id": 378, "x": 8.66, "y": 47.79 },
+              { "id": 379, "x": 33.54, "y": -3.72, "angle": -63.93 },
+              { "id": 380, "x": 32.61, "y": -75.52, "angle": -133.99 },
+              { "id": 381, "x": -34.75, "y": -73.26, "angle": 130.01 },
+              { "id": 382, "x": -22.19, "y": -7.47, "angle": 37.64 },
+              { "id": 383, "x": 31.62, "y": 43.64, "angle": 90.45 },
+              { "id": 384, "x": 31.6, "y": 44.65, "angle": 90.77 },
+              { "id": 385, "x": 0.91, "y": 75.78, "angle": 177.6 },
+              { "id": 386, "x": -31.55, "y": 46.51, "angle": -93.96 },
+              { "id": 387, "x": 2.96, "y": -42.32, "angle": -70.24 },
+              { "id": 388, "x": 38.46, "y": -133.28, "angle": -78.03 },
+              { "id": 389, "x": -3.82, "y": -205.27 },
+              { "id": 390, "x": -45.25, "y": -135.55, "angle": 67.39 },
+              { "id": 391, "link": { "pin": 387, "side": "left", "reverse": true } },
+              { "id": 392, "link": { "pin": 386, "side": "left", "reverse": true } },
+              { "id": 393, "link": { "pin": 385, "side": "left", "reverse": true } },
+              { "id": 394, "link": { "pin": 384, "side": "left", "reverse": true } },
+              { "id": 395, "link": { "pin": 383, "side": "left", "reverse": true } },
+              { "id": 396, "link": { "pin": 382, "side": "left", "reverse": true } },
+              { "id": 397, "link": { "pin": 381, "side": "left", "reverse": true } },
+              { "id": 398, "link": { "pin": 380, "side": "left", "reverse": true } },
+              { "id": 399, "link": { "pin": 379, "side": "left", "reverse": true } }
+            ],
+            "segments": [
+              { "id": 405 },
+              { "id": 406, "tension": [1.05, 1.06] },
+              { "id": 407, "tension": [1.03, 1.03] },
+              { "id": 408, "tension": [1.03, 0.87] },
+              { "id": 409 },
+              { "id": 410, "tension": [0.81, 0.96] },
+              { "id": 411, "tension": [1.54, 1.48] },
+              { "id": 412 },
+              { "id": 413, "tension": [1.06, 1.02] },
+              { "id": 414, "tension": [0.98, 1.01] },
+              { "id": 415, "tension": [1.27, 1.19] },
+              { "id": 416, "tension": [1, 0.99] },
+              { "id": 417, "tension": [1.04, 0.78] },
+              { "id": 418, "tension": [0.88, 1.06] },
+              { "id": 419, "tension": [1.34, 1.32] },
+              { "id": 420, "tension": [0.86, 1.13] },
+              { "id": 421, "tension": [1.02, 1.03] },
+              { "id": 422, "tension": [1.07, 1.05] },
+              { "id": 423, "tension": [1.01, 1.01] },
+              { "id": 424, "tension": [1.21, 0.87] },
+              { "id": 425, "tension": [0.99, 0.75] },
+              { "id": 426, "tension": [0.92, 1.1] },
+              { "id": 427, "tension": [0.87, 1.11] }
+            ]
+          },
+          {
+            "id": 375,
+            "kind": "arrow",
+            "pins": [
+              { "id": 400, "x": 19.9, "y": -5.1 },
+              { "id": 401, "x": 12, "y": 10.3 },
+              { "id": 402, "x": 4.3, "y": 25.9 },
+              { "id": 403, "x": -2.2, "y": 41.9 },
+              { "id": 404, "x": -5.9, "y": 58.8 }
+            ],
+            "segments": [{ "id": 428 }, { "id": 429 }, { "id": 430 }, { "id": 431 }]
+          }
+        ],
+        "crossings": [
+          { "over": 406, "under": 413 },
+          { "over": 406, "under": 422 },
+          { "over": 411, "under": 407 },
+          { "over": 424, "under": 407 },
+          { "over": 409, "under": 416 },
+          { "over": 409, "under": 419 },
+          { "over": 420, "under": 410 },
+          { "over": 415, "under": 411 },
+          { "over": 411, "under": 429 },
+          { "over": 415, "under": 424 },
+          { "over": 426, "under": 416 },
+          { "over": 426, "under": 419 },
+          { "over": 420, "under": 425 },
+          { "over": 424, "under": 428 }
+        ],
+        "props": [{ "id": 432, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 6,
+      "instructions": "Push it through and pull the slack out to the side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 433,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 434, "x": 6.05, "y": 220 },
+              { "id": 435, "x": 6.05, "y": 140.01, "angle": -90 },
+              { "id": 436, "x": 6.69, "y": 60.27, "angle": -81.9 },
+              { "id": 437, "x": 33.82, "y": -4.32, "angle": -64.7 },
+              { "id": 438, "x": 35.3, "y": -72.45, "angle": -128.65 },
+              { "id": 439, "x": -33.25, "y": -17.36, "angle": 47.07 },
+              { "id": 440, "x": 23.4, "y": 26.89, "angle": 46.82 },
+              { "id": 441, "x": -1.63, "y": 75.79, "angle": -178.27 },
+              { "id": 442, "x": -29.04, "y": 56.94, "angle": -112.25 },
+              { "id": 443, "x": -26.82, "y": 21.82, "angle": -69.42 },
+              { "id": 444, "x": 2.96, "y": -42.34, "angle": -70.26 },
+              { "id": 445, "x": 38.44, "y": -133.21, "angle": -77.95 },
+              { "id": 446, "x": -3.75, "y": -205.27 },
+              { "id": 447, "x": -45.28, "y": -135.63, "angle": 67.5 },
+              { "id": 448, "link": { "pin": 444, "side": "left", "reverse": true } },
+              { "id": 449, "link": { "pin": 443, "side": "left", "reverse": true } },
+              { "id": 450, "link": { "pin": 442, "side": "left", "reverse": true } },
+              { "id": 451, "link": { "pin": 441, "side": "left", "reverse": true } },
+              { "id": 452, "link": { "pin": 440, "side": "left", "reverse": true } },
+              { "id": 453, "link": { "pin": 439, "side": "left", "reverse": true } },
+              { "id": 454, "link": { "pin": 438, "side": "left", "reverse": true } },
+              { "id": 455, "link": { "pin": 437, "side": "left", "reverse": true } },
+              { "id": 456, "link": { "pin": 436, "side": "left", "reverse": true } },
+              { "id": 457, "x": -110, "y": 110, "angle": 179.96 }
+            ],
+            "segments": [
+              { "id": 458 },
+              { "id": 459, "tension": [1.09, 1.12] },
+              { "id": 460, "tension": [1.04, 1.04] },
+              { "id": 461, "tension": [1.01, 0.88] },
+              { "id": 462, "tension": [1.06, 0.97] },
+              { "id": 463, "tension": [1.01, 1.02] },
+              { "id": 464, "tension": [0.91, 1.08] },
+              { "id": 465, "tension": [1.01, 1.04] },
+              { "id": 466, "tension": [0.96, 1] },
+              { "id": 467, "tension": [1, 0.99] },
+              { "id": 468, "tension": [1, 0.99] },
+              { "id": 469, "tension": [1.04, 0.78] },
+              { "id": 470, "tension": [0.87, 1.06] },
+              { "id": 471, "tension": [1.34, 1.32] },
+              { "id": 472, "tension": [0.86, 1.17] },
+              { "id": 473, "tension": [0.87, 1.16] },
+              { "id": 474, "tension": [1, 1.16] },
+              { "id": 475, "tension": [1.05, 0.96] },
+              { "id": 476, "tension": [1.14, 0.83] },
+              { "id": 477, "tension": [0.95, 1.08] },
+              { "id": 478, "tension": [0.84, 1.29] },
+              { "id": 479, "tension": [0.82, 1.06] },
+              { "id": 480, "tension": [0.94, 1.32] }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 459, "under": 464 },
+          { "over": 459, "under": 475 },
+          { "over": 463, "under": 460 },
+          { "over": 476, "under": 460 },
+          { "over": 462, "under": 468 },
+          { "over": 462, "under": 471 },
+          { "over": 467, "under": 463 },
+          { "over": 472, "under": 463 },
+          { "over": 463, "under": 479 },
+          { "over": 480, "under": 465 },
+          { "over": 467, "under": 476 },
+          { "over": 477, "under": 468 },
+          { "over": 477, "under": 471 },
+          { "over": 472, "under": 476 },
+          { "over": 480, "under": 474 },
+          { "over": 476, "under": 479 }
+        ],
+        "props": [{ "id": 481, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    },
+    {
+      "number": 7,
+      "instructions": "Lay the end down beside the standing part, and pull each strand snug so the pairs lie side by side.",
+      "picture": {
+        "strands": [
+          {
+            "id": 482,
+            "kind": "rope",
+            "colour": "orange",
+            "diameter": 11,
+            "pins": [
+              { "id": 483, "x": 6.05, "y": 220 },
+              { "id": 484, "x": 6.88, "y": 149.27, "angle": -89.9 },
+              { "id": 485, "x": 6.88, "y": 91.52, "angle": -90 },
+              { "id": 486, "x": 14.37, "y": 35.07, "angle": -66.25 },
+              { "id": 487, "x": 36.1, "y": -71.42, "angle": -126.85 },
+              { "id": 488, "x": -45.33, "y": -42.1, "angle": 87.16 },
+              { "id": 489, "x": -10.04, "y": 1.37, "angle": 34.89 },
+              { "id": 490, "x": 31.04, "y": 39.41, "angle": 76.36 },
+              { "id": 491, "x": 31.26, "y": 40.36, "angle": 77.12 },
+              { "id": 492, "x": 3.33, "y": 75.58, "angle": 173.23 },
+              { "id": 493, "x": -31.34, "y": 48.6, "angle": -97.48 },
+              { "id": 494, "x": 2.96, "y": -42.31, "angle": -70.23 },
+              { "id": 495, "x": 38.46, "y": -133.32, "angle": -78.07 },
+              { "id": 496, "x": -3.87, "y": -205.28 },
+              { "id": 497, "x": -45.23, "y": -135.51, "angle": 67.33 },
+              { "id": 498, "link": { "pin": 494, "side": "left", "reverse": true } },
+              { "id": 499, "link": { "pin": 493, "side": "left", "reverse": true } },
+              { "id": 500, "link": { "pin": 492, "side": "left", "reverse": true } },
+              { "id": 501, "link": { "pin": 491, "side": "left", "reverse": true } },
+              { "id": 502, "link": { "pin": 490, "side": "left", "reverse": true } },
+              { "id": 503, "link": { "pin": 489, "side": "left", "reverse": true } },
+              { "id": 504, "link": { "pin": 488, "side": "left", "reverse": true } },
+              { "id": 505, "link": { "pin": 487, "side": "left", "reverse": true } },
+              { "id": 506, "link": { "pin": 486, "side": "left", "reverse": true } },
+              { "id": 507, "link": { "pin": 485, "side": "left", "reverse": true } },
+              { "id": 508, "link": { "pin": 484, "side": "left", "reverse": true } }
+            ],
+            "segments": [
+              { "id": 509, "tension": [1.01, 1.01] },
+              { "id": 510 },
+              { "id": 511, "tension": [0.88, 0.86] },
+              { "id": 512, "tension": [1.18, 0.96] },
+              { "id": 513, "tension": [1.01, 1.01] },
+              { "id": 514, "tension": [1.01, 1.13] },
+              { "id": 515, "tension": [1.33, 1.3] },
+              { "id": 516 },
+              { "id": 517, "tension": [1.05, 1.18] },
+              { "id": 518, "tension": [0.98, 1.01] },
+              { "id": 519, "tension": [1.3, 1.23] },
+              { "id": 520, "tension": [1, 0.99] },
+              { "id": 521, "tension": [1.04, 0.78] },
+              { "id": 522, "tension": [0.88, 1.06] },
+              { "id": 523, "tension": [1.34, 1.32] },
+              { "id": 524, "tension": [0.83, 1.14] },
+              { "id": 525, "tension": [1.02, 1.04] },
+              { "id": 526, "tension": [1.18, 1.04] },
+              { "id": 527 },
+              { "id": 528, "tension": [1.22, 0.93] },
+              { "id": 529, "tension": [1.22, 1.15] },
+              { "id": 530, "tension": [1.01, 1.02] },
+              { "id": 531, "tension": [1.1, 1.67] },
+              { "id": 532, "tension": [0.91, 0.75] },
+              { "id": 533 }
+            ]
+          }
+        ],
+        "crossings": [
+          { "over": 511, "under": 517 },
+          { "over": 511, "under": 526 },
+          { "over": 515, "under": 512 },
+          { "over": 528, "under": 512 },
+          { "over": 513, "under": 520 },
+          { "over": 513, "under": 523 },
+          { "over": 519, "under": 514 },
+          { "over": 524, "under": 514 },
+          { "over": 515, "under": 531 },
+          { "over": 532, "under": 518 },
+          { "over": 519, "under": 529 },
+          { "over": 530, "under": 520 },
+          { "over": 530, "under": 523 },
+          { "over": 524, "under": 529 },
+          { "over": 532, "under": 525 },
+          { "over": 528, "under": 531 }
+        ],
+        "props": [{ "id": 534, "kind": "bar", "x": -5.3, "y": -166.8, "r": 33 }]
+      }
+    }
+  ]
+}
