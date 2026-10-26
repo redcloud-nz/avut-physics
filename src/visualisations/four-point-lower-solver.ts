@@ -1,6 +1,6 @@
 import { clamp } from "@/lib/math";
 import { centralDifferences } from "@/lib/numeric/differences";
-import { leastSquares, withColumns } from "@/lib/numeric/linear";
+import { leastSquares, maxAbs, withColumns } from "@/lib/numeric/linear";
 import { nelderMead } from "@/lib/numeric/minimise";
 import { nonNegativeLeastSquares } from "@/lib/numeric/nonnegative";
 import { vec2 } from "@/lib/vector2";
@@ -540,7 +540,7 @@ export function settle(s: Setup, out: number[], q0: number[], also?: number[]): 
               ).map((v, k) => v * weight[k])
             : [];
         const left = rows.map((j) => b[j] - A[j].reduce((sum, a, k) => sum + a * f[k], 0));
-        const misfit = Math.max(...left.map(Math.abs));
+        const misfit = maxAbs(left);
         // Of those left doing nothing, the one whose pull (were it allowed to pull) would most help the balance.
         let wantsToPull = -1;
         let most = 0;
@@ -699,9 +699,9 @@ export function settle(s: Setup, out: number[], q0: number[], also?: number[]): 
             converged,
         });
         for (let iter = 0; iter < 60; iter++) {
-            if (Math.max(...r.map(Math.abs)) < 1e-9 * W) return done(true);
+            if (maxAbs(r) < 1e-9 * W) return done(true);
             // Closing in only slowly, which happens when something held should be let go: say so.
-            if (iter === 15 && Math.max(...r.map(Math.abs)) > 1e-6 * W) return done(false);
+            if (iter === 15 && maxAbs(r) > 1e-6 * W) return done(false);
             const dq = centralDifferences((x) => residual(x, l), q, steps);
             if (!dq) return null;
             const { held } = at(q);

@@ -108,9 +108,10 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     path over its edge.
   - `numeric/`: one file per kind of method, imported by file (there's no index, so a figure's hash
     covers only the methods it uses). `linear.ts`: the `Matrix` alias (row-major `number[][]`),
-    transposes, linear and least-squares solves. `nonnegative.ts`: least squares kept non-negative.
-    `minimise.ts`: Nelder–Mead, grid minima, golden-section search. `roots.ts`: bisection and a
-    quadratic's roots. `differences.ts`: central differences.
+    transposes, linear and least-squares solves, `maxAbs`. `nonnegative.ts`: least squares kept
+    non-negative. `minimise.ts`: Nelder–Mead, grid minima, golden-section search. `roots.ts`: bisection
+    and a quadratic's roots. `differences.ts`: central differences. `held-balance.ts`: Newton's method
+    on a balance with some constraints held exactly (the lowers' final solve).
   - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
     curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data
     (M, L, H, V, C, A) as points.

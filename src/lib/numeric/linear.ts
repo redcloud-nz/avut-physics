@@ -10,6 +10,9 @@ export const transpose = (A: Matrix): Matrix => (A[0] ?? []).map((_, j) => A.map
 export const withColumns = (A: Matrix, columns: number[][]): Matrix =>
     A.map((row, i) => [...row, ...columns.map((c) => c[i] ?? 0)]);
 
+/** The largest size of any entry in v. */
+export const maxAbs = (v: number[]) => Math.max(...v.map(Math.abs));
+
 /** Solve a small linear system by Gaussian elimination with partial pivoting. */
 export function solveLinear(A: Matrix, b: number[]): number[] | null {
     const n = b.length;

@@ -1,7 +1,7 @@
 import { nearestOnSegment, segmentsCross } from "@/lib/geometry";
 import { clamp, rad } from "@/lib/math";
-import { centralDifferences } from "@/lib/numeric/differences";
-import { leastSquares, solveLinear, transpose, withColumns } from "@/lib/numeric/linear";
+import { solveHeldBalance } from "@/lib/numeric/held-balance";
+import { solveLinear } from "@/lib/numeric/linear";
 import { gridMinima, nelderMead } from "@/lib/numeric/minimise";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { anchorOf, behindFaceFor, ropePathFor } from "@/lib/wall";
@@ -298,47 +298,20 @@ export function solveHeld(s: Setup, phi: number): HeldResult {
         q0: number[],
         keys: string[],
     ): { q: number[]; lambda: Map<string, number> } | null {
-        const m = keys.length;
-        const at = (q: number[]) => {
-            const map = new Map(pieces(q).map((p) => [p.key, p]));
-            return keys.map((k) => map.get(k));
-        };
-        const residual = (q: number[], l: number[]) => {
-            const ps = at(q);
-            if (ps.some((p) => !p)) return null;
-            const r = [0, -W, 0];
-            ps.forEach((p, i) => generalised(p!, q).forEach((v, j) => (r[j] += l[i] * v)));
-            // Constraint rows scaled to newtons, so the two kinds of row weigh alike.
-            return [...r, ...ps.map((p) => W * p!.g)];
-        };
-        // A first guess at the forces: least squares on the balance at the starting position.
-        const ps0 = at(q0);
-        if (ps0.some((p) => !p)) return null;
-        const cols = ps0.map((p) => generalised(p!, q0));
-        let l =
-            m === 0 ? [] : (leastSquares(transpose(cols), [0, W, 0], 1e-9) ?? keys.map(() => 0));
-        let q = [...q0];
-        for (let iter = 0; iter < 40; iter++) {
-            const r = residual(q, l);
-            if (!r) return null;
-            const size = Math.max(...r.map(Math.abs));
-            if (size < 1e-9 * W) return { q, lambda: new Map(keys.map((k, i) => [k, l[i]])) };
-            // Jacobian: numerically in the position, exactly in the forces (the balance is linear in them).
-            const dq = centralDifferences((q) => residual(q, l), q, [1e-7, 1e-7, 1e-7 / half]);
-            if (!dq) return null;
-            const forces = at(q).map((p) => generalised(p!, q));
-            const J = withColumns(dq, forces);
-            // Least squares (square and well-posed in the usual case; more contacts than freedoms otherwise).
-            const dx = leastSquares(
-                J,
-                r.map((v) => -v),
-                1e-12 * W * W,
-            );
-            if (!dx) return null;
-            q = q.map((v, j) => v + dx[j]);
-            l = l.map((v, i) => v + dx[3 + i]);
-        }
-        return null;
+        const solved = solveHeldBalance({
+            q0,
+            held: (q) => {
+                const map = new Map(pieces(q).map((p) => [p.key, p]));
+                return keys.map((k) => map.get(k));
+            },
+            column: generalised,
+            applied: () => [0, -W, 0],
+            steps: [1e-7, 1e-7, 1e-7 / half],
+            weight: W,
+        });
+        return (
+            solved && { q: solved.q, lambda: new Map(keys.map((k, i) => [k, solved.lambda[i]])) }
+        );
     }
 }
 

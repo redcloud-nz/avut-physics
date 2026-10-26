@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { seededPicker } from "../random";
 
-import { leastSquares, solveLinear, transpose, withColumns, type Matrix } from "./linear";
+import { leastSquares, maxAbs, solveLinear, transpose, withColumns, type Matrix } from "./linear";
 
 /** Ax, for checking a solution by putting it back in. */
 const times = (A: Matrix, x: number[]) =>
     A.map((row) => row.reduce((sum, v, j) => sum + v * x[j], 0));
-const maxAbs = (v: number[]) => Math.max(...v.map(Math.abs));
 
 /** A random n×n matrix whose diagonal outweighs the rest of its row, so it's never singular. */
 function dominantMatrix(pick: ReturnType<typeof seededPicker>, n: number): Matrix {

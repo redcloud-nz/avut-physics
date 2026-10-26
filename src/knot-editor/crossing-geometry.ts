@@ -11,6 +11,7 @@
 
 import { over, plain, type RopePath } from "@/knots/rope-path";
 import { boxesOverlap } from "@/lib/bezier";
+import { bisect } from "@/lib/numeric/roots";
 import type { Vector2 } from "@/lib/vector2";
 
 import {
@@ -292,12 +293,7 @@ function coverAround(
             }
             inside = next;
         }
-        for (let k = 0; k < 20; k++) {
-            const mid = (inside + outside) / 2;
-            if (holds(mid)) inside = mid;
-            else outside = mid;
-        }
-        return outside;
+        return bisect(holds, inside, outside, 20)[1];
     };
     return [edge(-1), edge(1)];
 }
