@@ -12,9 +12,10 @@ import { idsFor, type Ids } from "./ids";
 /** The finished knot, or a step (by its place in the file's list). */
 export type PictureId = "knot" | number;
 
-/** Pins and segments (any number, of any strands), or one prop. */
+/** Pins and segments (any number, of any strands), one whole strand, or one prop. */
 export type Selection =
     | { kind: "parts"; pins: PinRef[]; segments: SegmentRef[] }
+    | { kind: "strand"; strand: number }
     | { kind: "prop"; prop: number };
 
 export const NOTHING: Selection = { kind: "parts", pins: [], segments: [] };
@@ -93,9 +94,22 @@ function withPicture(file: KnotFile, id: PictureId, picture: Picture): KnotFile 
     return { ...file, steps };
 }
 
-/** The selection after an edit renumbered the pins and segments. */
-function renumbered(selection: Selection, renumbering: Renumbering): Selection {
-    if (selection.kind !== "parts") return selection;
+/**
+ * The selection after an edit. A whole strand is followed by its id, so it stays selected when strands before it go,
+ * and goes when it does. Pins and segments are followed by the edit's renumbering, when it has one.
+ */
+function selectionAfter(
+    selection: Selection,
+    before: Picture,
+    after: Picture,
+    renumbering: Renumbering | undefined,
+): Selection {
+    if (selection.kind === "strand") {
+        const id = before.strands[selection.strand]?.id;
+        const strand = after.strands.findIndex((s) => s.id === id);
+        return strand < 0 ? NOTHING : { kind: "strand", strand };
+    }
+    if (selection.kind !== "parts" || !renumbering) return selection;
     return {
         kind: "parts",
         pins: selection.pins.flatMap((ref) => {
@@ -141,9 +155,12 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
             return {
                 ...state,
                 file: withPicture(state.file, state.picture, edited.picture),
-                selection: edited.renumbering
-                    ? renumbered(state.selection, edited.renumbering)
-                    : state.selection,
+                selection: selectionAfter(
+                    state.selection,
+                    before,
+                    edited.picture,
+                    edited.renumbering,
+                ),
                 // A drag's moves go into the entry it began with.
                 undo: state.dragging ? state.undo : [...state.undo, snapshot(state)],
                 redo: state.dragging ? state.redo : [],

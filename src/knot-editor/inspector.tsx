@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * The panel on the right: the selected pin's or segment's values, to read and type. A typed value applies on Enter or
- * on leaving the field, as one history entry; Escape puts back what it was. Numbers are shown to three places.
- * A selected prop shows its kind's fields. Below them, whatever the selection, are the crossings and passes needing
+ * The panel on the right: the selected pin's, segment's or strand's values, to read and type. A typed value applies on
+ * Enter or on leaving the field, as one history entry; Escape puts back what it was. Numbers are shown to three
+ * places. A selected prop shows its kind's fields. Below them, whatever the selection, are the crossings and passes needing
  * attention: entries that are lost, to delete, and those to check, to confirm.
  */
 import { useState, type Dispatch } from "react";
@@ -45,9 +45,9 @@ import {
     type RopeColour,
     type SegmentRef,
     type Step,
-    type Strand,
 } from "./format";
 import type { LockStatus, PictureGeometry, PlacedPin } from "./geometry";
+import { propName, strandName } from "./names";
 import { kindOf, type Prop } from "./props";
 import type { EditorAction, Selection } from "./state";
 
@@ -117,9 +117,6 @@ function Shown(props: { label: string; value: string; unit?: string }) {
     );
 }
 
-const strandName = (strand: Strand, i: number) =>
-    strand.kind === "rope" ? (strand.name ?? `Rope ${i + 1}`) : `Arrow ${i + 1}`;
-
 const segmentName = (picture: Picture, [i, k]: SegmentRef) => {
     const strand = picture.strands[i];
     return strand
@@ -132,8 +129,6 @@ const atLetters = (letters: string[]) =>
     letters.length ? ` (at ${letters.join(letters.length === 2 ? " and " : ", ")})` : "";
 
 const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
-
-const propName = (prop: Prop, p: number) => `${kindOf(prop).label} ${p + 1}`;
 
 /** Lost crossing entries and passes, each to delete, and pairs and segments to check, each to confirm. */
 function CrossingProblems(props: {
@@ -500,6 +495,25 @@ function SelectionPanel(props: {
         );
     }
 
+    if (selection.kind === "strand") {
+        const i = selection.strand;
+        const strand = picture.strands[i];
+        const drawn = geometry.strands[i];
+        if (!strand || !drawn) return null;
+        const length = drawn.segments.reduce((sum, segment) => sum + segment.length, 0);
+        return (
+            <div>
+                {heading(strandName(strand, i))}
+                <Shown label="Pins" value={`${strand.pins.length}`} />
+                <Shown label="Length" value={shown(length)} unit="mm" />
+                <RopeFields picture={picture} strand={i} edit={edit} />
+                <div className="mt-2 text-xs text-ink-muted">
+                    Click one of its pins or segments to edit it.
+                </div>
+            </div>
+        );
+    }
+
     const pins = selection.kind === "parts" ? selection.pins : [];
     const segments = selection.kind === "parts" ? selection.segments : [];
 
@@ -574,7 +588,6 @@ function SelectionPanel(props: {
                         </div>
                     </div>
                 )}
-                <RopeFields picture={picture} strand={i} edit={edit} />
             </div>
         );
     }
@@ -639,7 +652,6 @@ function SelectionPanel(props: {
                     ))
                 )}
                 {problem && <p className="mt-2 text-danger">{problem}</p>}
-                <RopeFields picture={picture} strand={i} edit={edit} />
             </div>
         );
     }

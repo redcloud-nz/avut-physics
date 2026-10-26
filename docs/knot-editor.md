@@ -16,7 +16,7 @@ A picture's ropes and arrows are both strands. They're built and edited the same
 they're drawn: a rope as rope, with its end taped; an arrow as a thin shaft with a head at its last pin. Where any two
 strands cross, you choose which is on top, so an arrow can pass over one strand and under the next.
 
-Each rope has a colour from a fixed set (orange, green and a few more), always written in the file, so adding or deleting a rope never changes another's colour. A new rope gets the first colour not already used in its picture, so a knot joining two ropes is orange and green, as on the knot pages, without setting anything. A rope can also have a name, shown in the panel.
+Each rope has a colour from a fixed set (orange, green and a few more), always written in the file, so adding or deleting a rope never changes another's colour. A new rope gets the first colour not already used in its picture, so a knot joining two ropes is orange and green, as on the knot pages, without setting anything. A rope can also have a name, shown in the objects list and the panel.
 
 Each rope has a diameter, 11 mm by default; a new rope takes the diameter of the picture's last rope. Everything that
 goes with a rope's size is in its own diameters: how wide it's drawn (outline, body, weave, highlight and tape), the
@@ -74,9 +74,9 @@ as parallel ropes or the two legs of a bight do.
 - **Unlinking** (Edit > Unlink, or the panel) leaves the pin where it is, holding its direction. Deleting a leader
   unlinks its followers the same way.
 - **Between linked pins** the two curves are close to parallel, not exactly: a Bézier moved sideways isn't another
-  Bézier, so on a tight bend the gap narrows or widens a little. Linking more pins along the way holds it closer. If
-  that isn't enough, a doubled strand (one strand drawn as two ropes, as the figure-8 on a bight is) is the stronger
-  way, left for later.
+  Bézier, so on a tight bend the gap narrows or widens a little. Linking more pins along the way holds it closer.
+  Linked pins are how doubled rope is drawn (a bight, or a knot tied on one, as the figure-8 on a bight is): each
+  leg is a strand of its own, linked pin by pin to the other.
 
 ## Props
 
@@ -263,7 +263,10 @@ chrome for addresses that match no page.
 - **Left:** the knot, then each step as its number and the start of its instructions; choosing one puts its picture
   in the drawing. Insert > Step adds a step after the one shown, a copy of its picture numbered one more (with the
   knot shown, after the last step, a copy of the knot). The step shown can be duplicated (the copy keeps its number),
-  moved up or down, or deleted. The editor never numbers steps again: numbers are only typed.
+  moved up or down, or deleted. The editor never numbers steps again: numbers are only typed. Below them, the objects
+  in the picture shown: its ropes and arrows, each with its colour, then its props. Choosing one selects it whole.
+  Each list's heading has a + button: on Steps it adds a step as Insert > Step does, and on Objects it opens a menu
+  of a rope, an arrow and each kind of prop.
 - **Drawing:**
   - Click a pin, segment or prop to select it; shift-click pins and segments to select more.
   - Drag a pin or prop to move it; drag a pin's ring to turn its angle; drag a handle to change a tension; drag the
@@ -276,7 +279,8 @@ chrome for addresses that match no page.
   - pin: x, y, angle (blank for none), shift;
   - linked pin: its place and angle (shown, not typed), what it's linked to, its side, gap and direction, and Unlink;
   - segment: length, locked, both tensions;
-  - a rope's pin or segment: also the rope's colour, diameter and name;
+  - rope or arrow, chosen in the objects list: its pins and length (shown), and for a rope its colour, diameter and
+    name; Delete deletes it;
   - prop: its kind's fields;
   - nothing: the step's number and instructions (on the knot, a hint);
   - and below, whatever's selected: lost entries, each to delete, and crossings and passes to check, each to
@@ -329,5 +333,5 @@ chrome for addresses that match no page.
 5. Steps and the knot's details.
 6. Version 2: millimetres and rope sizes; the frame, the grid and snapping; ids and linked pins.
 
-Later: the bend limit as a setting, arrows with widths of their own, doubled strands, props beyond the bar, exporting
+Later: the bend limit as a setting, arrows with widths of their own, props beyond the bar, exporting
 SVG, porting the existing knots, and the knot pages reading these files (and their frames).

@@ -535,6 +535,7 @@ export function Canvas(props: {
     const pinsById = pinPlaces(picture);
     const isPin = (i: number, k: number) => parts.pins.some((r) => r[0] === i && r[1] === k);
     const isSegment = (i: number, k: number) =>
+        (selection.kind === "strand" && selection.strand === i) ||
         parts.segments.some((r) => r[0] === i && r[1] === k);
 
     const ready = view && size;

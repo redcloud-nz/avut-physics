@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * The knot editor: the menu bar, the knot and its steps on the left, the drawing in the middle, what's selected on the
- * right, and the status bar along the bottom. It fills the window; it's a desktop tool, with no phone layout.
+ * The knot editor: the menu bar, the knot, its steps and the picture's objects on the left, the drawing in the middle,
+ * what's selected on the right, and the status bar along the bottom. It fills the window; it's a desktop tool, with no
+ * phone layout.
  */
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -26,6 +27,7 @@ import {
     addStrand,
     deletePins,
     deleteProp,
+    deleteStrand,
     insertPin,
     insertStep,
     linkPins,
@@ -38,6 +40,7 @@ import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files
 import { isLinked, type KnotFile, type PinRef } from "./format";
 import { Inspector } from "./inspector";
 import { Menus, propCommand, useShortcuts, type CommandId } from "./menus";
+import { ObjectsList } from "./objects-list";
 import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
 import { editorReducer, isSaved, loaded, NOTHING, pictureOf } from "./state";
@@ -164,7 +167,7 @@ export default function KnotEditor() {
         details: true,
         undo: state.undo.length > 0,
         redo: state.redo.length > 0,
-        delete: pins.length > 0 || selection.kind === "prop",
+        delete: pins.length > 0 || selection.kind === "prop" || selection.kind === "strand",
         selectAll: picture.strands.length > 0,
         link: pins.length === 2,
         unlink: pins.some(([i, k]) => {
@@ -275,6 +278,9 @@ export default function KnotEditor() {
                 const p = selection.prop;
                 dispatch({ type: "edit", edit: (q) => deleteProp(q, p) });
                 dispatch({ type: "select", selection: NOTHING });
+            } else if (selection.kind === "strand") {
+                const i = selection.strand;
+                dispatch({ type: "edit", edit: (q) => deleteStrand(q, i) });
             } else dispatch({ type: "edit", edit: (q) => deletePins(q, pins) });
         } else if (id === "link") {
             // The second pin selected follows the first.
@@ -332,7 +338,18 @@ export default function KnotEditor() {
             </header>
             <div className="flex min-h-0 flex-1">
                 <aside className="w-48 shrink-0 overflow-y-auto border-r border-line-faint p-3">
-                    <StepsList file={state.file} shown={state.picture} dispatch={dispatch} />
+                    <StepsList
+                        file={state.file}
+                        shown={state.picture}
+                        dispatch={dispatch}
+                        addStep={() => run("insertStep")}
+                    />
+                    <ObjectsList
+                        picture={picture}
+                        selection={selection}
+                        dispatch={dispatch}
+                        run={run}
+                    />
                 </aside>
                 <main className="min-w-0 flex-1 bg-surface" aria-label="Drawing">
                     <Canvas

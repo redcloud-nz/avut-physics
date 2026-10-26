@@ -2,8 +2,9 @@
 
 /**
  * The list on the left: the knot, then each step as its number and the start of its instructions. Choosing one shows
- * its picture. The step shown can be duplicated (the copy keeps its number, as the same step shown twice), moved up or
- * down, or deleted; numbers are only ever typed, never counted again.
+ * its picture. The heading's + adds a step after the one shown, as Insert > Step does. The step shown can be duplicated
+ * (the copy keeps its number, as the same step shown twice), moved up or down, or deleted; numbers are only ever typed,
+ * never counted again.
  */
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode } from "react";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 
 import { deleteStep, duplicateStep, moveStep } from "./edits";
 import type { KnotFile } from "./format";
+import { ListHeading } from "./list-heading";
 import type { EditorAction, PictureId } from "./state";
 
 /** How much of a step's instructions the list shows. */
@@ -26,6 +28,8 @@ export function StepsList(props: {
     file: KnotFile;
     shown: PictureId;
     dispatch: Dispatch<EditorAction>;
+    /** Insert > Step: a step after the one shown. */
+    addStep: () => void;
 }) {
     const { file, shown, dispatch } = props;
     const show = (picture: PictureId) => dispatch({ type: "show", picture });
@@ -57,7 +61,7 @@ export function StepsList(props: {
     return (
         <nav aria-label="Knot and steps">
             {item("knot", "Knot")}
-            <div className="mt-3 mb-1 text-xs tracking-wide text-ink-muted uppercase">Steps</div>
+            <ListHeading label="Steps" add="Add a step" onAdd={props.addStep} />
             {file.steps.map((step, j) =>
                 item(
                     j,
