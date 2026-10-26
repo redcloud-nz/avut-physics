@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { Slider } from "@/components/diagram/controls";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
+import { G } from "@/lib/constants";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
@@ -28,10 +30,9 @@ export { COLORS };
 /** The load used to turn shares into kilograms. */
 const LOAD_KG = 200;
 
-const percent = (share: number) => `${Math.round(share * 100)}%`;
 /** A share of the load, as kilograms and kilonewtons of `kg`. */
 const ofLoad = (share: number, kg = LOAD_KG) =>
-    `${Math.round(share * kg)} kg (${((share * kg * 9.81) / 1000).toFixed(1)} kN)`;
+    `${teaching.mass(share * kg)} (${teaching.kN((share * kg * G) / 1000)})`;
 
 /** Text in a figure, with a halo in the page's colour so lines behind it don't run through it. */
 export function Tag(props: {
@@ -428,13 +429,13 @@ export function TwoLegsFigure() {
                     <strong className="text-ink-soft">Figure 2.</strong> A load hanging from two
                     anchors, one leg to each. The arrows at the anchors show how hard each leg pulls
                     on its anchor. Each leg holds{" "}
-                    <strong className="text-ink">{percent(share)}</strong> of the load: on a{" "}
-                    {LOAD_KG} kg load, {ofLoad(share)} in each leg.
+                    <strong className="text-ink">{teaching.percent(share)}</strong> of the load: on
+                    a {LOAD_KG} kg load, {ofLoad(share)} in each leg.
                     {angle > 0 && (
                         <>
                             {" "}
                             Each leg also pulls sideways, against the other, with{" "}
-                            {percent(share * Math.sin(half))} of the load.
+                            {teaching.percent(share * Math.sin(half))} of the load.
                         </>
                     )}
                 </>
@@ -481,7 +482,7 @@ export function TwoLegsFigure() {
                                 color={COLORS.pull}
                                 anchor={i === 0 ? "end" : "start"}
                             >
-                                {percent(share)}
+                                {teaching.percent(share)}
                             </Tag>
                         </g>
                     );
@@ -532,8 +533,8 @@ export function SwingFigure() {
                     anchors 1 m apart, each with a 1 m leg, so the legs are 60° apart. The main line
                     pulls {swing}° off straight down, to the right. The arrows at the anchors show
                     how hard each is pulled, as a share of the load: the left anchor takes{" "}
-                    <strong className="text-ink">{percent(s.shares[0])}</strong> and the right{" "}
-                    <strong className="text-ink">{percent(s.shares[1])}</strong>.
+                    <strong className="text-ink">{teaching.percent(s.shares[0])}</strong> and the
+                    right <strong className="text-ink">{teaching.percent(s.shares[1])}</strong>.
                     {moved > 0.005 && (
                         <>
                             {" "}
@@ -602,7 +603,7 @@ export function SwingFigure() {
                         <g key={i}>
                             <Arrow from={anchor} v={v} color={COLORS.pull} />
                             <Tag at={label} color={COLORS.pull} anchor={side}>
-                                {percent(s.shares[i])}
+                                {teaching.percent(s.shares[i])}
                             </Tag>
                         </g>
                     );
@@ -667,8 +668,8 @@ export function RedirectFigure() {
                     {LOAD_KG / 2} kg load turns round a karabiner on a redirect, with its two parts{" "}
                     {angle}° apart. Each part pulls on the karabiner with the rope’s tension. The
                     dashed arrow is the two together: the redirect holds{" "}
-                    <strong className="text-ink">{percent(share)}</strong> of the rope’s tension,{" "}
-                    {ofLoad(share, LOAD_KG / 2)}.
+                    <strong className="text-ink">{teaching.percent(share)}</strong> of the rope’s
+                    tension, {ofLoad(share, LOAD_KG / 2)}.
                 </>
             }
         >
@@ -708,7 +709,7 @@ export function RedirectFigure() {
                             at={k.add(pull.scale(T)).add(pull.unit().scale(16))}
                             color={COLORS.redirect}
                         >
-                            {percent(share)}
+                            {teaching.percent(share)}
                         </Tag>
                     </>
                 )}

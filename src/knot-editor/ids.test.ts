@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { insertStep } from "./edits";
-import type { KnotFile } from "./format";
 import { highestId, idsFor } from "./ids";
+import type { KnotFile } from "./knot-file";
 import { testPicture, testStrand } from "./test-pictures";
 
 const line = testStrand("rope", [

@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Slider } from "@/components/diagram/controls";
+import { teaching } from "@/lib/format";
 import { FallDrawing } from "@/visual/common/fall";
 import { fallSpeed, stoppingForce } from "@/visual/common/mechanics";
-import { kN, Layout, Readout } from "@/visual/frame";
+import { Layout, Readout } from "@/visual/frame";
 
 /** A 100 kg load, weighing 1 kN. */
 const WEIGHT = 1;
@@ -52,7 +53,7 @@ export function ShockLoadingFigure() {
                 <>
                     <Readout
                         label="speed when the stop starts"
-                        value={`${fallSpeed(fall).toFixed(1)} m/s`}
+                        value={teaching.speed(fallSpeed(fall))}
                     />
                     <Readout
                         label={
@@ -60,7 +61,7 @@ export function ShockLoadingFigure() {
                                 ? "rope pulls, on 100 kg: enough to injure"
                                 : "rope pulls, on 100 kg"
                         }
-                        value={kN(Math.round(force * 10) / 10)}
+                        value={teaching.kN(force)}
                         color={force > 6 ? "var(--overload)" : COLORS.pull}
                     />
                 </>

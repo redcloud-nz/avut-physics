@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import { COLORS, Figure, Tag } from "./gentle-introduction-figures";
@@ -38,7 +39,7 @@ const MARKS = 0.5;
 const GRAB_COLOR = "var(--grab)";
 
 const px = (x: number) => ANCHOR_X + x * PER_METRE;
-const kgOf = (share: number) => `${Math.round(share * LOAD_KG)} kg`;
+const kgOf = (share: number) => teaching.mass(share * LOAD_KG);
 
 /** A pull in units of the team's pull, T: whole numbers as they are, others to two places. */
 export function T(props: { t: number }) {
@@ -470,7 +471,7 @@ const FigureNumber = (props: { n: number }) => (
 function progress(sys: PulleySystem, pulled: number) {
     if (pulled < 0.05) return "Slide the rope in to see how far the load comes.";
     const cm = Math.round(pulled * loadPerMetre(sys) * 100);
-    return `The team has pulled in ${pulled.toFixed(1)} m of rope, and the load has come ${cm} cm.`;
+    return `The team has pulled in ${teaching.length(pulled)} of rope, and the load has come ${cm} cm.`;
 }
 
 export function RedirectHaulFigure() {
@@ -527,7 +528,7 @@ export function ZRigFigure() {
                     <FigureNumber n={3} /> A Z-rig, or 3:1. The main line runs from the load round a
                     pulley on the anchor, back round a travelling pulley, and on to the team. The
                     travelling pulley is clipped to a rope grab (green) on the main line. The team
-                    pulls with <Strong>{Math.round(LOAD_KG / 3)} kg</Strong>, a third of the load.{" "}
+                    pulls with <Strong>{teaching.mass(LOAD_KG / 3)}</Strong>, a third of the load.{" "}
                     {progress(Z_RIG, pulled)}
                     {pulled > Z_MAX - 0.3 &&
                         " The travelling pulley has nearly reached the anchor pulley: time to reset."}
@@ -548,7 +549,7 @@ export function SixToOneFigure() {
                     <FigureNumber n={4} /> A 2:1 on a 3:1, making a 6:1. The Z-rig from Figure 3 now
                     ends at a second rope grab, and a 2:1 pulls on that grab. The 2:1 doubles the
                     team’s pull and the Z-rig triples that, so the team pulls with only{" "}
-                    <Strong>{Math.round(LOAD_KG / 6)} kg</Strong>. The Z-rig’s rope carries on past
+                    <Strong>{teaching.mass(LOAD_KG / 6)}</Strong>. The Z-rig’s rope carries on past
                     its grab as a slack tail (dashed). {progress(SIX_TO_ONE, pulled)}
                 </>
             )}
@@ -688,7 +689,7 @@ export function FrictionFigure() {
                         {advantage.toFixed(2)}
                         <em>T</em>
                     </Strong>{" "}
-                    rather than 3<em>T</em>: a {advantage.toFixed(1)}:1. To haul a {LOAD_KG} kg
+                    rather than 3<em>T</em>: a {teaching.ratio(advantage)}. To haul a {LOAD_KG} kg
                     load, the team pulls with {kgOf(1 / advantage)} rather than {kgOf(1 / 3)}.
                 </>
             }

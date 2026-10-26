@@ -7,6 +7,7 @@ import { Rock, Tag } from "@/articles/gentle-introduction-figures";
 import { Choice } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 import { Layout, Readout, SVG } from "@/visual/frame";
 
@@ -112,7 +113,7 @@ export function MassFigure() {
                     <Readout label="mass" value="100 kg" />
                     <Readout
                         label="weight, against Earth"
-                        value={`${Math.round(heavy * 100)}%`}
+                        value={teaching.percent(heavy)}
                         color={COLORS.load}
                     />
                 </>

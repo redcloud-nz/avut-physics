@@ -24,6 +24,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
+import { readout } from "@/lib/format";
 import { clamp, deg, roundTo } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
@@ -318,17 +319,17 @@ export default function LadderHinge() {
         <>
             <Readout
                 label="Force on ladder's foot R"
-                value={R ? `${R.len().toFixed(0)} N` : NONE}
+                value={R ? readout.force(R.len()) : NONE}
                 color={COLORS.hinge}
             />
             {showComponents && (
                 <Readout
                     label="  Rx, Ry"
-                    value={R ? `${R.x.toFixed(0)}, ${R.y.toFixed(0)} N` : NONE}
+                    value={R ? readout.forceParts(R.x, R.y) : NONE}
                     color={COLORS.component}
                 />
             )}
-            <Readout label="  R direction" value={R ? `${deg(R.angle()).toFixed(1)}°` : NONE} />
+            <Readout label="  R direction" value={R ? readout.angle(R.angle()) : NONE} />
         </>
     );
     /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
@@ -353,13 +354,13 @@ export default function LadderHinge() {
         <>
             <Readout
                 label={`Tension, ${cable} ${name}`}
-                value={t === "slack" ? "slack" : t ? `${t.len().toFixed(0)} N` : NONE}
+                value={t === "slack" ? "slack" : t ? readout.force(t.len()) : NONE}
                 color={color}
             />
             {showComponents && (
                 <Readout
                     label={`  ${name}x, ${name}y`}
-                    value={t && t !== "slack" ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
+                    value={t && t !== "slack" ? readout.forceParts(t.x, t.y) : NONE}
                     color={COLORS.component}
                 />
             )}
@@ -785,32 +786,27 @@ export default function LadderHinge() {
             )}
             readouts={
                 <>
-                    <Readout
-                        label="Ladder angle"
-                        value={view ? `${deg(view.phi).toFixed(1)}°` : NONE}
-                    />
+                    <Readout label="Ladder angle" value={view ? readout.angle(view.phi) : NONE} />
                     <Readout
                         label="Stretcher tilt"
-                        value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE}
+                        value={view ? readout.angle(Math.abs(view.tilt)) : NONE}
                     />
                     {tensionReadouts("T₁", "rope", view?.t1 ?? null, COLORS.tensionWall)}
                     {tensionReadouts("T₂", "attachment", view?.t2 ?? null, COLORS.tensionBeam)}
                     {hingeReadouts(view?.hinge ?? null)}
                     <Readout
                         label="Ground team's hold F"
-                        value={hold ? `${holdPush.toFixed(0)} N` : NONE}
+                        value={hold ? readout.force(holdPush) : NONE}
                         color={COLORS.hold}
                     />
                     <Readout
                         label="Wall's edge on ladder N"
-                        value={
-                            view?.wallOnBeam ? `${view.wallOnBeam.force.len().toFixed(0)} N` : NONE
-                        }
+                        value={view?.wallOnBeam ? readout.force(view.wallOnBeam.force.len()) : NONE}
                         color={COLORS.contact}
                     />
                     <Readout
                         label="Ladder on stretcher N"
-                        value={view?.beamPush ? `${view.beamPush.len().toFixed(0)} N` : NONE}
+                        value={view?.beamPush ? readout.force(view.beamPush.len()) : NONE}
                         color={COLORS.contact}
                     />
                     {(["ground", "wall", "top", "edge"] as const).map((surface) => {
@@ -821,15 +817,12 @@ export default function LadderHinge() {
                             <Readout
                                 key={surface}
                                 label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on stretcher N`}
-                                value={f ? `${f.len().toFixed(0)} N` : NONE}
+                                value={f ? readout.force(f.len()) : NONE}
                                 color={COLORS.contact}
                             />
                         );
                     })}
-                    <Readout
-                        label="Total weight"
-                        value={`${(beamWeight + barWeight).toFixed(0)} N`}
-                    />
+                    <Readout label="Total weight" value={readout.force(beamWeight + barWeight)} />
                 </>
             }
             footer={

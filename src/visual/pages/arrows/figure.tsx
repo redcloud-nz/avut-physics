@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { deg } from "@/lib/math";
 import { vec2 } from "@/lib/vector2";
-import { DragGrid, dragHint, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kn, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 /** One force on a bolt as an arrow: how big, and which way. */
@@ -40,7 +41,7 @@ export function ArrowsFigure() {
             slider={dragHint()}
             readouts={
                 <>
-                    <Readout label="how big" value={kNText(f.len())} color={COLORS.pull} />
+                    <Readout label="how big" value={teaching.kN(f.len())} color={COLORS.pull} />
                     <Readout label="round from pointing right" value={`${angle}°`} />
                 </>
             }

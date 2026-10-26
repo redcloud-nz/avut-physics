@@ -9,10 +9,10 @@ import { deg, roundTo } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
 import { changeProp, movePin, setPinAngle } from "./edits";
-import type { Picture, PinRef } from "./format";
 import type { PictureGeometry } from "./geometry";
 import { FINE_GRID, GRID, MM_GRID, snapStep, STRONG_EVERY } from "./grid";
 import { headOf, pinPlaces } from "./ids";
+import type { Picture, PinRef } from "./knot-file";
 import { kindOf } from "./props";
 import type { Selection } from "./state";
 

@@ -4,9 +4,10 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
-import { DragGrid, dragHint, KN, kn, kNText, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, kn, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 /** How big a part has to be, in kilonewtons, to have room for its letter. */
@@ -52,12 +53,12 @@ export function SplitFigure() {
                 <>
                     <Readout
                         label={left ? "x, to the left" : "x, to the right"}
-                        value={kNText(Math.abs(f.x))}
+                        value={teaching.kN(Math.abs(f.x))}
                         color={COLORS.sideways}
                     />
                     <Readout
                         label={f.y < 0 ? "y, down" : "y, up"}
-                        value={kNText(Math.abs(f.y))}
+                        value={teaching.kN(Math.abs(f.y))}
                         color={COLORS.redirect}
                     />
                 </>

@@ -8,8 +8,8 @@ import type { Box } from "@/lib/bezier";
 import { clamp } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
-import type { Frame, Picture } from "./format";
 import type { PictureGeometry } from "./geometry";
+import type { Frame, Picture } from "./knot-file";
 import { kindOf } from "./props";
 import { MOST_SCALE, withinZoom } from "./zoom";
 

@@ -38,10 +38,10 @@ import {
     unlinkPin,
 } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
-import { isLinked, type KnotFile, type PinRef } from "./format";
 import { pictureGeometry } from "./geometry";
 import { Inspector } from "./inspector";
 import { FAR_TURN_STEP, moved, moveStep, nextPin, TURN_STEP, turned } from "./keyboard";
+import { isLinked, type KnotFile, type PinRef } from "./knot-file";
 import { Menus, propCommand, useShortcuts, type CommandId, type RunOptions } from "./menus";
 import { ObjectsList } from "./objects-list";
 import { PROP_KIND_NAMES, PROP_KINDS, type PropKindName } from "./props";

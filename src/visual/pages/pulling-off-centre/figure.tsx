@@ -7,9 +7,10 @@ import { swungDown, tiedOff } from "@/articles/gentle-introduction";
 import { Anchor, Rock, Rope } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
-import { GHOST, Layout, percent, Readout, SVG } from "@/visual/frame";
+import { GHOST, Layout, Readout, SVG } from "@/visual/frame";
 
 import { ANCHORS, DEPTH, OFFSET, SWING } from "./rig";
 
@@ -119,7 +120,7 @@ export function PullingOffCentreFigure() {
                         <Readout
                             key={side}
                             label={`${side} anchor`}
-                            value={percent(s.shares[i])}
+                            value={teaching.percent(s.shares[i])}
                             color={s.shares[i] > 1.0001 ? "var(--overload)" : COLORS.pull}
                         />
                     ))}

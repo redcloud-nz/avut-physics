@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
-import { clamp, deg } from "@/lib/math";
+import { readout } from "@/lib/format";
+import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -156,7 +157,7 @@ function moveTo(moves: Moves, paidOut: number[], holdLimit: number): Moves {
     const takingIn = [0, 1, 2, 3].filter((j) => paidOut[j] < moves.paidOut[j]);
     const overLimit = (p: Placed) => takingIn.find((j) => p.ropes[j].tension > holdLimit);
     const tooHard = (j: number, p: Placed) =>
-        `${ROPES[j].name} is pulling ${p.ropes[j].tension.toFixed(0)} N, more than its belayer can take in against (${holdLimit} N). Pay it out, or move the others, to ease it.`;
+        `${ROPES[j].name} is pulling ${readout.force(p.ropes[j].tension)}, more than its belayer can take in against (${holdLimit} N). Pay it out, or move the others, to ease it.`;
     const already = overLimit(moves.last);
     if (already !== undefined) return { ...moves, stopped: tooHard(already, moves.last) };
     const start = startOf(setup).out;
@@ -614,17 +615,15 @@ export default function FourPointLower() {
                 <>
                     <Readout
                         label="Stretcher below the floor"
-                        value={
-                            view ? `${Math.max(0, slotDepth - view.centre.y).toFixed(2)} m` : NONE
-                        }
+                        value={view ? readout.length(Math.max(0, slotDepth - view.centre.y)) : NONE}
                     />
                     <Readout
                         label="Tipped side to side"
-                        value={view ? `${Math.abs(deg(view.roll)).toFixed(1)}°` : NONE}
+                        value={view ? readout.angle(Math.abs(view.roll)) : NONE}
                     />
                     <Readout
                         label="Tipped end to end"
-                        value={view ? `${Math.abs(deg(view.pitch)).toFixed(1)}°` : NONE}
+                        value={view ? readout.angle(Math.abs(view.pitch)) : NONE}
                     />
                     <Separator />
                     <p className="text-xs text-ghost">Each rope&apos;s pull</p>
@@ -632,22 +631,22 @@ export default function FourPointLower() {
                         <Readout
                             key={r.name}
                             label={r.name}
-                            value={view ? `${view.ropes[i].tension.toFixed(0)} N` : NONE}
+                            value={view ? readout.force(view.ropes[i].tension) : NONE}
                             color={ropeColor(i)}
                         />
                     ))}
                     <Readout
                         label="Floor's and edges' push"
-                        value={view ? `${pushOf(view).toFixed(0)} N` : NONE}
+                        value={view ? readout.force(pushOf(view)) : NONE}
                         color={COLORS.push}
                     />
-                    <Readout label="Stretcher weight" value={`${barWeight.toFixed(0)} N`} />
+                    <Readout label="Stretcher weight" value={readout.force(barWeight)} />
                     <Separator />
                     <Readout
                         label="Hardest rope pull so far"
                         value={
                             hardest !== null
-                                ? `${hardest.toFixed(0)} N (${((100 * hardest) / barWeight).toFixed(0)}%)`
+                                ? `${readout.force(hardest)} (${readout.percent(hardest / barWeight)})`
                                 : NONE
                         }
                     />
@@ -705,7 +704,7 @@ function RopeSlider(props: {
                     {rope.name}
                 </span>
                 <span className="shrink-0 font-mono whitespace-nowrap text-ink-muted">
-                    {props.ropeOut.toFixed(2)} m
+                    {readout.length(props.ropeOut)}
                 </span>
                 {props.overLimit && (
                     <span className="w-full text-xs text-warning">Too hard to take in</span>
@@ -719,7 +718,7 @@ function RopeSlider(props: {
                 value={props.value}
                 disabled={props.disabled}
                 aria-label={`${rope.name}: rope out`}
-                aria-valuetext={`${props.ropeOut.toFixed(2)} m out`}
+                aria-valuetext={`${readout.length(props.ropeOut)} out`}
                 onChange={(e) => props.onChange(Number(e.target.value))}
                 className="rope-range"
                 style={

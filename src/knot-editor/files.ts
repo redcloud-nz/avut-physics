@@ -4,7 +4,7 @@
  * read, parsed or written is an error with the reason, for the editor to show.
  */
 
-import { parseKnotFile, writeKnotFile, type KnotFile } from "./format";
+import { parseKnotFile, writeKnotFile, type KnotFile } from "./knot-file";
 
 /** Whether this browser can open and save files on the computer. */
 export const canUseFiles = () =>

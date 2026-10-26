@@ -4,6 +4,7 @@
  * into the ids they name. Only the tests use this.
  */
 
+import { crossingsAt, passesAt, type Ids } from "./ids";
 import {
     isLinked,
     type CrossingAt,
@@ -13,8 +14,7 @@ import {
     type Pin,
     type Strand,
     type StrandSegment,
-} from "./format";
-import { crossingsAt, passesAt, type Ids } from "./ids";
+} from "./knot-file";
 import type { BarProp } from "./props/bar";
 
 /** The ids `testPicture` gives: strand i, its pin k and its segment k, and prop p. */

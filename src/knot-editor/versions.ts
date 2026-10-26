@@ -5,9 +5,9 @@
  *
  * 1. Bump `CURRENT_VERSION` by one.
  * 2. Add an upgrade to the end of `UPGRADES`, taking a file of the version before to the new one. It works on plain
- *    JSON: old versions' shapes aren't kept as types, and the file's checks (`format.ts`) run only after the last
+ *    JSON: old versions' shapes aren't kept as types, and the file's checks (`knot-file.ts`) run only after the last
  *    upgrade, against the current types.
- * 3. Change the types, checks and writer in `format.ts` to match.
+ * 3. Change the types, checks and writer in `knot-file.ts` to match.
  * 4. Add `samples/v<n>.json` for the new version, written by the editor. The samples of earlier versions are never
  *    edited once their version is out: the tests open every one, so each upgrade stays proven.
  */

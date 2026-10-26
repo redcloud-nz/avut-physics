@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { linkPins } from "./edits";
-import type { Picture } from "./format";
 import { pictureGeometry } from "./geometry";
 import { moved, moveStep, nextLine, nextPin, turned } from "./keyboard";
+import type { Picture } from "./knot-file";
 import type { Selection } from "./state";
 import { free, testPicture, testStrand } from "./test-pictures";
 import { scaleOf } from "./zoom";

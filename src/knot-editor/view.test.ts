@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { Vector2 } from "@/lib/vector2";
 
-import type { Frame } from "./format";
+import type { Frame } from "./knot-file";
 import { bounded, fitted, leastScale } from "./view";
 import { MOST_SCALE } from "./zoom";
 

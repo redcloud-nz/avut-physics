@@ -6,8 +6,8 @@
  */
 
 import type { Edited, Renumbering } from "./edits";
-import type { KnotFile, Picture, PinRef, SegmentRef } from "./format";
 import { idsFor, type Ids } from "./ids";
+import type { KnotFile, Picture, PinRef, SegmentRef } from "./knot-file";
 
 /** The finished knot, or a step (by its place in the file's list). */
 export type PictureId = "knot" | number;

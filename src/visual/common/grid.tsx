@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { teaching } from "@/lib/format";
 import { clamp } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { Note, SVG } from "@/visual/frame";
@@ -16,12 +17,11 @@ export const ORIGIN = vec2(150, 150);
 
 /** An arrow from the bolt to `tip`, in kilonewtons with up positive. */
 export const kn = (tip: Vector2) => vec2((tip.x - ORIGIN.x) / KN, (ORIGIN.y - tip.y) / KN);
-export const kNText = (v: number) => `${v.toFixed(1)} kN`;
 
 /** What a tip says to a screen reader: where its arrow points, and how to move it. */
 function tipLabel(i: number, count: number, f: Vector2) {
-    const across = `${kNText(Math.abs(f.x))} ${f.x < 0 ? "left" : "right"}`;
-    const up = `${kNText(Math.abs(f.y))} ${f.y < 0 ? "down" : "up"}`;
+    const across = `${teaching.kN(Math.abs(f.x))} ${f.x < 0 ? "left" : "right"}`;
+    const up = `${teaching.kN(Math.abs(f.y))} ${f.y < 0 ? "down" : "up"}`;
     return `${count > 1 ? `Arrow ${i + 1}` : "The arrow"}: ${across}, ${up}. Move its tip with the arrow keys.`;
 }
 

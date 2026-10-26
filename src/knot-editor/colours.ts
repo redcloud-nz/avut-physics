@@ -5,7 +5,7 @@
 
 import type { RopeColors } from "@/knots/rope-drawing";
 
-import { ROPE_COLOURS, type Picture, type RopeColour } from "./format";
+import { ROPE_COLOURS, type Picture, type RopeColour } from "./knot-file";
 
 const OUTLINE = "var(--knot-outline)";
 

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 
 import type { KnotDetails } from "./edits";
-import type { Frame } from "./format";
+import type { Frame } from "./knot-file";
 
 /** What OK gives: the details and the frame typed. */
 export type DetailsDone = { details: KnotDetails; frame: Frame };

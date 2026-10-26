@@ -5,8 +5,8 @@ import { hobbyControls } from "@/lib/hobby";
 import { rad } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
-import type { Picture, Rope } from "./format";
 import { pictureGeometry, strandDistance, strandPosition, TIGHTEST_BEND } from "./geometry";
+import type { Picture, Rope } from "./knot-file";
 import { free, testStrand, type TestPin, type TestSegment } from "./test-pictures";
 
 const rope = (pins: TestPin[], segments?: TestSegment[]) =>

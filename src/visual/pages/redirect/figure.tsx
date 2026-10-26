@@ -7,9 +7,10 @@ import { redirectShare } from "@/articles/gentle-introduction";
 import { Anchor, Rope } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
-import { Layout, percent, Readout, SVG } from "@/visual/frame";
+import { Layout, Readout, SVG } from "@/visual/frame";
 
 /** A rope turning round a redirect, running freely. */
 export function RedirectFigure() {
@@ -76,7 +77,7 @@ export function RedirectFigure() {
                 <>
                     <Readout
                         label="redirect holds, of the rope’s pull"
-                        value={percent(share)}
+                        value={teaching.percent(share)}
                         color={COLORS.redirect}
                     />
                 </>

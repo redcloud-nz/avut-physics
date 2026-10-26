@@ -1,5 +1,6 @@
 import { COLORS } from "@/articles/colors";
 import { Eq } from "@/components/tex";
+import { teaching } from "@/lib/format";
 import { ink, r, Section, Var } from "@/visual/common/details";
 import type { VisualPage } from "@/visual/pages";
 
@@ -64,11 +65,11 @@ function FrictionMore() {
                             {ROWS.map(({ e, what }) => (
                                 <tr key={e} className="border-t border-border">
                                     <td className="py-1 pr-3">
-                                        {Math.round(e * 100)}%{" "}
+                                        {teaching.percent(e)}{" "}
                                         <span className="text-ink-muted">({what})</span>
                                     </td>
-                                    <td className="py-1 pr-3">{advantage(3, e).toFixed(1)}:1</td>
-                                    <td className="py-1">{advantage(5, e).toFixed(1)}:1</td>
+                                    <td className="py-1 pr-3">{teaching.ratio(advantage(3, e))}</td>
+                                    <td className="py-1">{teaching.ratio(advantage(5, e))}</td>
                                 </tr>
                             ))}
                         </tbody>

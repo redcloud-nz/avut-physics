@@ -9,7 +9,7 @@ import { memo } from "react";
 import { svgNumber } from "@/lib/svg-path";
 
 import type { FrameSides } from "./edits";
-import type { Frame } from "./format";
+import type { Frame } from "./knot-file";
 
 /** How wide the frame's edges and corners are to pick up (pixels). */
 const EDGE = 8;

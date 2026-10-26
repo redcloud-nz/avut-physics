@@ -1,7 +1,7 @@
 import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
-import { newtons } from "@/lib/format";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 
 /*
@@ -115,7 +115,7 @@ export function BelayerForcesDiagram() {
                 {/* Their labels. */}
                 <g fill="currentColor" className="text-ink-soft print:text-black">
                     <text x={ropeEnd.x + 10} y={ropeEnd.y - 4}>
-                        Rope pulls, {newtons(tension)}
+                        Rope pulls, {teaching.force(tension)}
                     </text>
                     <text
                         x={waist.x - 10}
@@ -129,16 +129,16 @@ export function BelayerForcesDiagram() {
                         y={waist.y + (weight * PER_NEWTON) / 2 + 37}
                         textAnchor="end"
                     >
-                        {newtons(weight)}
+                        {teaching.force(weight)}
                     </text>
                     <text x={heel.x - 10} y={heel.y + 60} textAnchor="end">
-                        Ground pushes up, {newtons(up)}
+                        Ground pushes up, {teaching.force(up)}
                     </text>
                     <text x={FEET.x + most * PER_NEWTON + 12} y={gripY + 5}>
-                        Boots must grip, {newtons(grip)}
+                        Boots must grip, {teaching.force(grip)}
                     </text>
                     <text x={FEET.x + most * PER_NEWTON + 12} y={mostY + 5}>
-                        Most they can grip, {newtons(most)}
+                        Most they can grip, {teaching.force(most)}
                     </text>
                 </g>
             </svg>

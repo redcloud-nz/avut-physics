@@ -13,7 +13,7 @@ import {
 import { LINK, Section, SITE, STRONG, Table, Why } from "@/articles/prose";
 import { Eq } from "@/components/tex";
 import { G } from "@/lib/constants";
-import { kg } from "@/lib/format";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 
 const TITLE = "A Gentle Introduction to Rescue Physics";
@@ -32,10 +32,6 @@ const tagged = {
     side: TAGGED.mass * Math.tan(rad(TAGGED.lean)),
     rope: TAGGED.mass / Math.cos(rad(TAGGED.lean)),
 };
-
-const percent = (share: number) => `${Math.round(share * 100)}%`;
-/** A mass's weight in kilonewtons, to one place. */
-const kN = (mass: number) => `${((mass * G) / 1000).toFixed(1)} kN`;
 
 const LEG_ANGLES = [0, 30, 60, 90, 120, 150, 170];
 const REDIRECT_ANGLES = [0, 30, 60, 90, 120, 150, 180];
@@ -85,8 +81,8 @@ export default function Page() {
                     <li>
                         Two legs holding one load each take half of it only when they hang straight
                         down, side by side. The wider the angle between them, the harder each pulls:
-                        at 90° each takes {percent(legShare(rad(90)))} of the load, at 120° each
-                        takes the whole load, and past that each takes more than the load.
+                        at 90° each takes {teaching.percent(legShare(rad(90)))} of the load, at 120°
+                        each takes the whole load, and past that each takes more than the load.
                     </li>
                     <li>
                         When the main line pulls off to one side, a pre-equalised anchor puts more
@@ -229,11 +225,12 @@ export default function Page() {
                     </p>
                     <p>
                         In Figure 1 the rope leans 30°. For the triangle to close, the tag line must
-                        pull with {percent(Math.tan(rad(30)))} of the load’s weight and the rope
-                        with {percent(1 / Math.cos(rad(30)))} of it. So a tag line pulling a load
-                        out from a cliff adds to the main line’s load, more the further it pulls the
-                        load out. A tag line held from below, pulling down as well as out, adds even
-                        more, because the main line has to hold its downward pull too.
+                        pull with {teaching.percent(Math.tan(rad(30)))} of the load’s weight and the
+                        rope with {teaching.percent(1 / Math.cos(rad(30)))} of it. So a tag line
+                        pulling a load out from a cliff adds to the main line’s load, more the
+                        further it pulls the load out. A tag line held from below, pulling down as
+                        well as out, adds even more, because the main line has to hold its downward
+                        pull too.
                     </p>
                     <p>
                         The tag line is level and the weight pulls straight down, so the triangle
@@ -246,8 +243,8 @@ export default function Page() {
                     <p>
                         Here <em>a</em> is the weight, <em>b</em> the tag line and <em>c</em> the
                         rope. On a {TAGGED.mass} kg load with the rope leaning {TAGGED.lean}°, the
-                        tag line pulls with about {Math.round(tagged.side)} kg and the rope with
-                        about {Math.round(tagged.rope)} kg:
+                        tag line pulls with about {teaching.mass(tagged.side)} and the rope with
+                        about {teaching.mass(tagged.rope)}:
                     </p>
                     <Eq
                         tex={r`${TAGGED.mass}^2 + ${Math.round(tagged.side)}^2 \approx ${Math.round(tagged.rope)}^2`}
@@ -271,7 +268,7 @@ export default function Page() {
                 <div className="max-w-sm">
                     <Table
                         head={["Angle between the legs", "Each leg takes"]}
-                        rows={LEG_ANGLES.map((a) => [`${a}°`, percent(legShare(rad(a)))])}
+                        rows={LEG_ANGLES.map((a) => [`${a}°`, teaching.percent(legShare(rad(a)))])}
                     />
                 </div>
                 <p>
@@ -284,7 +281,8 @@ export default function Page() {
                     At 120°, <strong className={STRONG}>each leg holds the whole load</strong>, so
                     each anchor has to be strong enough to hold it alone. Past 120° each leg holds
                     more than the load, and it climbs fast: a {WIDE.mass} kg load on legs{" "}
-                    {WIDE.angle}° apart puts about {kg(wide * G)} ({kN(wide)}) on each anchor.
+                    {WIDE.angle}° apart puts about {teaching.mass(wide)} (
+                    {teaching.kN((wide * G) / 1000)}) on each anchor.
                 </p>
                 <p>
                     That’s why many rigging guides ask for less than 90° between anchor legs and
@@ -347,11 +345,12 @@ export default function Page() {
                 <SwingFigure />
                 <p>
                     With the main line pulling {SWING}° to the right, the left anchor takes{" "}
-                    {percent(pre.shares[0])} and the right only {percent(pre.shares[1])}. That’s the
-                    opposite of what many people expect. The main line pulls the master point down
-                    and to the right: away from the left anchor and towards the right one. So the
-                    left leg tightens and the right one eases off. The legs can’t change length, so
-                    the master point can’t move to even things up.
+                    {teaching.percent(pre.shares[0])} and the right only{" "}
+                    {teaching.percent(pre.shares[1])}. That’s the opposite of what many people
+                    expect. The main line pulls the master point down and to the right: away from
+                    the left anchor and towards the right one. So the left leg tightens and the
+                    right one eases off. The legs can’t change length, so the master point can’t
+                    move to even things up.
                 </p>
                 <p>
                     Pull further, past 30°, and the main line lines up with the left leg, carried on
@@ -394,7 +393,10 @@ export default function Page() {
                 <div className="max-w-sm">
                     <Table
                         head={["Angle between the rope’s parts", "The redirect takes"]}
-                        rows={REDIRECT_ANGLES.map((a) => [`${a}°`, percent(redirectShare(rad(a)))])}
+                        rows={REDIRECT_ANGLES.map((a) => [
+                            `${a}°`,
+                            teaching.percent(redirectShare(rad(a))),
+                        ])}
                     />
                 </div>
                 <ul className="flex list-disc flex-col gap-2 pl-5">
@@ -406,8 +408,8 @@ export default function Page() {
                     </li>
                     <li>
                         At 90°, a right-angled turn, the redirect takes{" "}
-                        {percent(redirectShare(rad(90)))} of the tension. At 120° it takes the same
-                        as the rope.
+                        {teaching.percent(redirectShare(rad(90)))} of the tension. At 120° it takes
+                        the same as the rope.
                     </li>
                     <li>A rope running nearly straight past it barely pulls on it at all.</li>
                 </ul>
@@ -437,11 +439,11 @@ export default function Page() {
                         ["Weight", "100 kg weighs about 1 kN"],
                         [
                             "Two legs",
-                            `Each takes ${percent(legShare(rad(60)))} at 60°, ${percent(legShare(rad(90)))} at 90°, the whole load at 120°`,
+                            `Each takes ${teaching.percent(legShare(rad(60)))} at 60°, ${teaching.percent(legShare(rad(90)))} at 90°, the whole load at 120°`,
                         ],
                         [
                             "Redirect",
-                            `Takes ${percent(redirectShare(rad(0)))} of the rope’s tension doubled back, ${percent(redirectShare(rad(90)))} at 90°, ${percent(redirectShare(rad(120)))} at 120°`,
+                            `Takes ${teaching.percent(redirectShare(rad(0)))} of the rope’s tension doubled back, ${teaching.percent(redirectShare(rad(90)))} at 90°, ${teaching.percent(redirectShare(rad(120)))} at 120°`,
                         ],
                         [
                             "Main line to one side",

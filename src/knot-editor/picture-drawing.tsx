@@ -15,8 +15,8 @@ import { svgPoint } from "@/lib/svg-path";
 
 import { ArrowDrawing, ArrowOverDrawing, arrowShape } from "./arrow-drawing";
 import { ROPE_TOKENS, TAPE_TOKENS } from "./colours";
-import { strandSize, type Picture, type Prop } from "./format";
 import type { PictureGeometry } from "./geometry";
+import { strandSize, type Picture, type Prop } from "./knot-file";
 import { kindOf } from "./props";
 
 const samePath = (a: RopePath, b: RopePath) =>

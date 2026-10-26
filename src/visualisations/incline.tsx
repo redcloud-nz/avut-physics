@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Readout, Slider, Toggle, VisualisationLayout } from "@/components/diagram/controls";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
 import { G } from "@/lib/constants";
-import { deg, rad } from "@/lib/math";
+import { readout } from "@/lib/format";
+import { rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import { InclineNotes } from "./incline-notes";
@@ -198,22 +199,18 @@ export default function Incline() {
                 <>
                     <Readout
                         label="Weight W = mg"
-                        value={`${weight.toFixed(1)} N`}
+                        value={readout.force(weight)}
                         color={COLORS.weight}
                     />
-                    <Readout
-                        label="Normal N"
-                        value={`${normal.toFixed(1)} N`}
-                        color={COLORS.normal}
-                    />
+                    <Readout label="Normal N" value={readout.force(normal)} color={COLORS.normal} />
                     <Readout
                         label={sliding ? "Friction f = μk·N" : "Friction f (static)"}
-                        value={`${friction.toFixed(1)} N`}
+                        value={readout.force(friction)}
                         color={COLORS.friction}
                     />
-                    <Readout label="Net force" value={`${net.toFixed(1)} N`} color={COLORS.net} />
+                    <Readout label="Net force" value={readout.force(net)} color={COLORS.net} />
                     <Readout label="Acceleration" value={`${accel.toFixed(2)} m/s²`} />
-                    <Readout label="Slips above" value={`${deg(slipsAbove).toFixed(1)}°`} />
+                    <Readout label="Slips above" value={readout.angle(slipsAbove)} />
                     <p
                         className={`mt-1 text-sm font-medium ${sliding ? "text-sliding" : "text-ink-soft"}`}
                     >

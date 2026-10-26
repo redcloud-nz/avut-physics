@@ -7,7 +7,8 @@ import { COLORS } from "@/articles/colors";
 import { SystemDrawing, T } from "@/articles/pulley-figures";
 import { loadPerMetre, pullsOf, type PulleySystem } from "@/articles/pulley-systems";
 import { Slider } from "@/components/diagram/controls";
-import { kN, Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
+import { teaching } from "@/lib/format";
+import { Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
 
 /*
  * Pulley systems drawn upright, for the pages on pulleys: hauled with a slider, or worked through with the T method
@@ -24,7 +25,7 @@ export function Haul(props: {
 }) {
     const [pulled, setPulled] = useState(0);
     const advantage = pullsOf(props.sys).advantage;
-    const force = (share: number) => kN(share * LOAD_KN);
+    const force = (share: number) => teaching.kN(share * LOAD_KN, 2);
     return (
         <Layout
             drawing={
@@ -63,7 +64,7 @@ export function Haul(props: {
                     />
                     <Readout
                         label="load has moved"
-                        value={`${(pulled * loadPerMetre(props.sys)).toFixed(1)} m`}
+                        value={teaching.length(pulled * loadPerMetre(props.sys))}
                         color={COLORS.load}
                     />
                 </>

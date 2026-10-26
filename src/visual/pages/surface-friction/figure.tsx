@@ -4,10 +4,11 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Slider } from "@/components/diagram/controls";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { slopeParts, slopePull } from "@/visual/common/mechanics";
 import { FRICTION, SlopeDrawing } from "@/visual/common/slope";
-import { Layout, percent, Readout } from "@/visual/frame";
+import { Layout, Readout } from "@/visual/frame";
 
 /** A load hauled up a slope, the surface's grip against it, with the slope and the grip on sliders. */
 export function SurfaceFrictionFigure() {
@@ -45,10 +46,14 @@ export function SurfaceFrictionFigure() {
             }
             readouts={
                 <>
-                    <Readout label="to haul it up" value={percent(hauling)} color={COLORS.pull} />
+                    <Readout
+                        label="to haul it up"
+                        value={teaching.percent(hauling)}
+                        color={COLORS.pull}
+                    />
                     <Readout
                         label="to lower it"
-                        value={lowering > 0 ? percent(lowering) : "holds itself"}
+                        value={lowering > 0 ? teaching.percent(lowering) : "holds itself"}
                         color={FRICTION}
                     />
                 </>

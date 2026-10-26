@@ -3,14 +3,14 @@ import { join } from "path";
 import * as prettier from "prettier";
 import { describe, expect, it } from "vitest";
 
+import { crossingsAt, passesAt } from "./ids";
 import {
     parseKnotFile,
     PRETTIER_OPTIONS,
     writeKnotFile,
     type KnotFile,
     type Picture,
-} from "./format";
-import { crossingsAt, passesAt } from "./ids";
+} from "./knot-file";
 import { free } from "./test-pictures";
 import { CURRENT_VERSION, UPGRADES, type JsonObject } from "./versions";
 

@@ -15,6 +15,8 @@ import { Vector2 } from "@/lib/vector2";
 
 import { firstUnusedColour } from "./colours";
 import { pictureCrossings } from "./crossing-geometry";
+import { pictureGeometry, placedPins, type PictureGeometry } from "./geometry";
+import { crossingEntry, passEntry, passesAt, segmentIdAt, segmentPlaces, type Ids } from "./ids";
 import {
     crossingPair,
     isLinked,
@@ -38,9 +40,7 @@ import {
     type Step,
     type Strand,
     type StrandSegment,
-} from "./format";
-import { pictureGeometry, placedPins, type PictureGeometry } from "./geometry";
-import { crossingEntry, passEntry, passesAt, segmentIdAt, segmentPlaces, type Ids } from "./ids";
+} from "./knot-file";
 import { kindOf } from "./props";
 
 /** Where an edit moved each pin and segment: none where it went, two where a segment was split. */

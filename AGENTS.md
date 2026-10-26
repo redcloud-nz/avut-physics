@@ -118,7 +118,9 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     numbers and points written for it (`svgNumber`, `svgPoint`), and paths (M, L, H, V, C, A) read back
     as points.
   - `math.ts` (`clamp`, `deg`, `rad`, `wrapDegrees`, `roundTo`, `linearScale`), `constants.ts` (`G`),
-    `format.ts` (units for display), `random.ts` (the seeded picker tests use for random setups).
+    `format.ts` (numbers for display: `readout` in the visualisations, `teaching` in the articles and
+    the visual introduction, each with its own default places), `random.ts` (the seeded picker tests
+    use for random setups).
 
 To add a visualisation: write the solver and its tests, the component and notes, register it in
 `src/visualisations/index.ts` (and its `href` type), and add its page under `src/app`.

@@ -12,8 +12,8 @@ import type { Vector2 } from "@/lib/vector2";
 
 import { ARROW_TOKENS } from "./colours";
 import { pathBetween } from "./crossing-geometry";
-import { ARROW_SIZE } from "./format";
 import type { StrandGeometry } from "./geometry";
+import { ARROW_SIZE } from "./knot-file";
 
 /**
  * How long the head is, how wide the shaft and its outline, and how thick the head's outline, as the knot pages'

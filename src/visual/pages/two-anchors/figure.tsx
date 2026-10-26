@@ -7,10 +7,11 @@ import { legShare } from "@/articles/gentle-introduction";
 import { Anchor, Rock, Rope } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
-import { Layout, percent, Readout, SVG } from "@/visual/frame";
+import { Layout, Readout, SVG } from "@/visual/frame";
 
 /** Drawing units for the whole load. */
 const W = 110;
@@ -120,12 +121,12 @@ export function TwoAnchorsFigure() {
                     <Readout label="y, each anchor" value="50%" color={COLORS.redirect} />
                     <Readout
                         label="x, each anchor"
-                        value={percent(sideways)}
+                        value={teaching.percent(sideways)}
                         color={COLORS.sideways}
                     />
                     <Readout
                         label="each anchor holds"
-                        value={percent(share)}
+                        value={teaching.percent(share)}
                         color={share > 1.0001 ? "var(--overload)" : COLORS.pull}
                     />
                 </>

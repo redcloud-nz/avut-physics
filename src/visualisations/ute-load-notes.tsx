@@ -1,4 +1,5 @@
 import { NotesCard, Part } from "@/components/notes";
+import { readout } from "@/lib/format";
 
 import {
     BALL_PAST_BUMPER,
@@ -27,7 +28,7 @@ const FIGURES: { key: keyof Ute; label: string; format: (u: Ute) => string }[] =
     {
         key: "unladenFrontShare",
         label: "Empty, on front axle",
-        format: (u) => `${Math.round(u.unladenFrontShare * 100)}%`,
+        format: (u) => readout.percent(u.unladenFrontShare),
     },
     { key: "wheelbase", label: "Wheelbase", format: (u) => `${u.wheelbase.toFixed(3)} m` },
     {
@@ -175,8 +176,8 @@ export function UteLoadNotes(props: { ute: Ute }) {
                         under the floor. Each percentage point moves about 21 kg between the axles
                         of a 2.1 tonne ute, so this matters most for the front axle. It matters most
                         of all for the {TIGHTEST.label}, with the least room on its front axle: at{" "}
-                        {Math.round(TIGHTEST.unladenFrontShare * 100)}% it carries{" "}
-                        {Math.round(TIGHTEST.tare * TIGHTEST.unladenFrontShare)} kg of its{" "}
+                        {readout.percent(TIGHTEST.unladenFrontShare)} it carries{" "}
+                        {readout.mass(TIGHTEST.tare * TIGHTEST.unladenFrontShare)} of its{" "}
                         {TIGHTEST.frontAxle} kg rating empty, so whether a fit-out overloads it
                         rests on that guess. It can be changed under “More settings”.
                     </li>

@@ -10,6 +10,7 @@ import {
     setPinAngle,
     unlinkPin,
 } from "./edits";
+import { pictureGeometry, placedPins } from "./geometry";
 import {
     isLinked,
     parseKnotFile,
@@ -18,8 +19,7 @@ import {
     type LinkedPin,
     type Picture,
     type PinLink,
-} from "./format";
-import { pictureGeometry, placedPins } from "./geometry";
+} from "./knot-file";
 import { free, newIds, pinId, testPicture, testStrand } from "./test-pictures";
 
 /** A rope running right along y = 0, its middle pin holding an angle of 0 (along x). */

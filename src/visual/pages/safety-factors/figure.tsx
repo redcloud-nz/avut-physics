@@ -4,8 +4,9 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Slider } from "@/components/diagram/controls";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
-import { kN, Layout, Note, Readout, SVG } from "@/visual/frame";
+import { Layout, Note, Readout, SVG } from "@/visual/frame";
 
 /** What the gear is rated to hold, in kilonewtons: a basic karabiner, which only just clears ten times a two-person load. */
 const RATED = 22;
@@ -61,7 +62,7 @@ export function SafetyFactorsFigure() {
                                 opacity={0.85}
                             />
                             <Note at={vec2(LEFT, b.y - 10)} anchor="start">
-                                {`${b.name}: ${kN(b.value)}`}
+                                {`${b.name}: ${teaching.kN(b.value)}`}
                             </Note>
                         </g>
                     ))}
@@ -84,12 +85,12 @@ export function SafetyFactorsFigure() {
                 <>
                     <Readout
                         label="safety factor"
-                        value={`${factor < 10 ? factor.toFixed(1) : Math.round(factor)}:1`}
+                        value={teaching.ratio(factor)}
                         color={factor < FACTOR ? "var(--overload)" : COLORS.pull}
                     />
                     <Readout
                         label="mass, at 10 N/kg"
-                        value={`${Math.round(load * 100)} kg`}
+                        value={teaching.mass(load * 100)}
                         color={COLORS.load}
                     />
                 </>

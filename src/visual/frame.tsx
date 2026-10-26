@@ -75,8 +75,3 @@ export function Note(props: {
  * 1, 2, 3 and 6, so every pulley system's pulls come out as round numbers.
  */
 export const LOAD_KN = 1.2;
-
-/** A force in kilonewtons, to two places at most: 0.4 kN, 0.44 kN. */
-export const kN = (v: number) => `${Number(v.toFixed(2))} kN`;
-
-export const percent = (share: number) => `${Math.round(share * 100)}%`;

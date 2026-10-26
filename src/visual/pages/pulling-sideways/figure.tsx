@@ -6,10 +6,10 @@ import { COLORS } from "@/articles/colors";
 import { Anchor, Rock, Rope } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { AngleArc, Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { deg } from "@/lib/math";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
-import { kNText } from "@/visual/common/grid";
 import { Layout, Readout, SVG } from "@/visual/frame";
 
 /** The load's weight, in kilonewtons: about 240 kg. */
@@ -123,9 +123,13 @@ export function PullingSidewaysFigure() {
             }
             readouts={
                 <>
-                    <Readout label="x, tag line" value={kNText(tag)} color={COLORS.sideways} />
-                    <Readout label="y, weight" value={kNText(WEIGHT)} color={COLORS.redirect} />
-                    <Readout label="T, rope" value={kNText(rope)} color={COLORS.pull} />
+                    <Readout label="x, tag line" value={teaching.kN(tag)} color={COLORS.sideways} />
+                    <Readout
+                        label="y, weight"
+                        value={teaching.kN(WEIGHT)}
+                        color={COLORS.redirect}
+                    />
+                    <Readout label="T, rope" value={teaching.kN(rope)} color={COLORS.pull} />
                 </>
             }
         />

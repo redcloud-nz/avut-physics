@@ -1,4 +1,5 @@
 import { NotesCard, Part } from "@/components/notes";
+import { readout } from "@/lib/format";
 
 import { SNUG, START_GAP } from "./four-point-lower-solver";
 
@@ -74,7 +75,7 @@ export function FourPointLowerNotes() {
                 <p>
                     The floor has no friction, so on its own nothing would keep the stretcher where
                     it is on the floor. Instead each belayer keeps a light pull on their rope,{" "}
-                    {Math.round(SNUG * 100)}% of the stretcher’s weight, taking up any slack. Those
+                    {readout.percent(SNUG)} of the stretcher’s weight, taking up any slack. Those
                     pulls hold it against the ropes’ lengths.
                 </p>
                 <p>

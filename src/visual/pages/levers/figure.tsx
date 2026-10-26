@@ -5,10 +5,11 @@ import { useState } from "react";
 import { COLORS } from "@/articles/colors";
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 import { Letter } from "@/visual/common/details";
 import { leverPush } from "@/visual/common/mechanics";
-import { kN, Layout, Note, Readout, SVG } from "@/visual/frame";
+import { Layout, Note, Readout, SVG } from "@/visual/frame";
 
 /** The bar's length in metres, and drawing units to the metre and to the kilonewton. */
 const BAR = 2;
@@ -119,8 +120,12 @@ export function LeversFigure() {
             }
             readouts={
                 <>
-                    <Readout label="you push, for 100 kg" value={kN(push)} color={COLORS.pull} />
-                    <Readout label="pivot holds" value={kN(1 + push)} />
+                    <Readout
+                        label="you push, for 100 kg"
+                        value={teaching.kN(push, 2)}
+                        color={COLORS.pull}
+                    />
+                    <Readout label="pivot holds" value={teaching.kN(1 + push, 2)} />
                 </>
             }
         />

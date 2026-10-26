@@ -18,7 +18,7 @@ import {
     type Picture,
     type PinRef,
     type SegmentRef,
-} from "./format";
+} from "./knot-file";
 import { kindOf } from "./props";
 
 /** Gives a new id each time it's called. */

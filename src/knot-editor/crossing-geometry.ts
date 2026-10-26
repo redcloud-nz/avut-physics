@@ -16,6 +16,14 @@ import { svgPoint } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 
 import {
+    DRAWN_WIDTH,
+    strandDistance,
+    strandPosition,
+    type PictureGeometry,
+    type StrandGeometry,
+} from "./geometry";
+import { crossingsAt, passesAt, segmentPlaces } from "./ids";
+import {
     crossingPair,
     sameSegment,
     segmentBefore,
@@ -25,15 +33,7 @@ import {
     type PassSide,
     type Picture,
     type SegmentRef,
-} from "./format";
-import {
-    DRAWN_WIDTH,
-    strandDistance,
-    strandPosition,
-    type PictureGeometry,
-    type StrandGeometry,
-} from "./geometry";
-import { crossingsAt, passesAt, segmentPlaces } from "./ids";
+} from "./knot-file";
 import { kindOf } from "./props";
 
 export type MatchStatus = "set" | "unset" | "to-check";

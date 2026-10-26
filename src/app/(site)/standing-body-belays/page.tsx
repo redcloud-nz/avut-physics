@@ -7,7 +7,7 @@ import { SetupDiagram } from "@/articles/setup-diagram";
 import { DEFAULTS, FIGURES } from "@/articles/standing-body-belays-figures";
 import { StretcherWeightGraph } from "@/articles/stretcher-weight-graph";
 import { Eq, M } from "@/components/tex";
-import { degrees, kg, newtons } from "@/lib/format";
+import { teaching } from "@/lib/format";
 import { SURFACES } from "@/visualisations/body-belay-surfaces";
 
 const TITLE = "Standing Body Belays";
@@ -17,9 +17,6 @@ const DESCRIPTION =
 export const metadata: Metadata = { title: TITLE, description: DESCRIPTION };
 
 const r = String.raw;
-
-/** A safety factor, to two places. */
-const sf = (x: number) => x.toFixed(2);
 
 /** A list, joined with commas and a final "and". */
 const listed = (items: string[]) =>
@@ -76,16 +73,16 @@ export default function Page() {
                         For a common case, two {DEFAULTS.belayerMass} kg belayers on a high cube
                         container holding a {DEFAULTS.stretcherMass} kg stretcher, the safety factor
                         (how many times over their boots could give the grip needed; below 1, they
-                        slide) is at best about {sf(hold.safety)} on a clean, dry roof. On a wet one
-                        it’s about {sf(wetHold)}, and their feet slide.
+                        slide) is at best about {teaching.factor(hold.safety)} on a clean, dry roof.
+                        On a wet one it’s about {teaching.factor(wetHold)}, and their feet slide.
                     </li>
                     <li>
                         It seems to work in training because the belayers are usually heavier than
                         the mock casualty. A {trainingPair.belayer} kg belayer holding a{" "}
                         {trainingPair.stretcher} kg stretcher has a safety factor of about{" "}
-                        {sf(trainingPair.safety)}. A {real.belayer} kg belayer holding a{" "}
-                        {real.stretcher} kg casualty and stretcher has about {sf(real.safety)}:
-                        their feet slide even on a dry roof.
+                        {teaching.factor(trainingPair.safety)}. A {real.belayer} kg belayer holding
+                        a {real.stretcher} kg casualty and stretcher has about{" "}
+                        {teaching.factor(real.safety)}: their feet slide even on a dry roof.
                     </li>
                     <li>
                         Changing where they stand, leaning harder or adding a backup belayer doesn’t
@@ -138,8 +135,9 @@ export default function Page() {
                     Figure 1 shows the lower, off a high cube shipping container. Each belayer has
                     the rope round their waist. Seen from above, the two ropes run from belayers{" "}
                     {DEFAULTS.gap} m apart to the one point at the stretcher’s head, so they splay
-                    apart in a V. The ground team pulls steadily, about {kg(DEFAULTS.teamPull)}, to
-                    keep the stretcher off the wall. The roof is dry painted steel.
+                    apart in a V. The ground team pulls steadily, about{" "}
+                    {teaching.massHeldBy(DEFAULTS.teamPull)}, to keep the stretcher off the wall.
+                    The roof is dry painted steel.
                 </p>
                 <p>
                     The belayers are holding the stretcher still, just after it has gone over the
@@ -193,13 +191,14 @@ export default function Page() {
                     is the same, and a wide or staggered stance doesn’t change it either.
                 </p>
                 <p>
-                    In the common case, each rope holds {newtons(hold.loadTension)} (about{" "}
-                    {kg(hold.loadTension)}): a little more than half the stretcher, because the
-                    ropes splay apart and the ground team’s pull adds to it. The ground pushes up on
-                    each belayer with {newtons(hold.up)} and their boots must grip with{" "}
-                    {newtons(hold.sideways)}, so the grip needed is {hold.gripNeeded.toFixed(2)}.
-                    Dry painted steel gives about {DEFAULTS.grip} (see Footing), for a safety factor
-                    of {sf(hold.safety)}.
+                    In the common case, each rope holds {teaching.force(hold.loadTension)} (about{" "}
+                    {teaching.massHeldBy(hold.loadTension)}): a little more than half the stretcher,
+                    because the ropes splay apart and the ground team’s pull adds to it. The ground
+                    pushes up on each belayer with {teaching.force(hold.up)} and their boots must
+                    grip with {teaching.force(hold.sideways)}, so the grip needed is{" "}
+                    {teaching.factor(hold.gripNeeded)}. Dry painted steel gives about{" "}
+                    {DEFAULTS.grip} (see Footing), for a safety factor of{" "}
+                    {teaching.factor(hold.safety)}.
                 </p>
             </Section>
 
@@ -214,8 +213,8 @@ export default function Page() {
                     <li>
                         <strong className={STRONG}>Toppling.</strong> The figures take the belayer
                         to lean at exactly the right angle, in the common case about{" "}
-                        {degrees(hold.lean)} back from upright, and to hold it. Leaning less, the
-                        rope pulls them over towards the edge; leaning more, they fall back.
+                        {teaching.angle(hold.lean)} back from upright, and to hold it. Leaning less,
+                        the rope pulls them over towards the edge; leaning more, they fall back.
                         Standing like that is a balancing act, and when the load changes, as it does
                         with every jerk on the rope, the lean it needs changes at once. A belayer
                         pulled forward has to step to catch themselves, and a foot in the air grips
@@ -265,14 +264,15 @@ export default function Page() {
                     head={["Surface", "Dry", "Wet"]}
                     rows={SURFACES.map((s) => [
                         s.label,
-                        sf(s.dry / hold.gripNeeded),
-                        sf(s.wet / hold.gripNeeded),
+                        teaching.factor(s.dry / hold.gripNeeded),
+                        teaching.factor(s.wet / hold.gripNeeded),
                     ])}
                     highlight={(cell) => Number(cell) < 1}
                 />
                 <p>
                     Holding still, {listed(slipping)} are all below 1. Even the best, dry concrete
-                    or rough rock, gives only {sf(best)}: none reaches 2, even in the best case.
+                    or rough rock, gives only {teaching.factor(best)}: none reaches 2, even in the
+                    best case.
                 </p>
             </Section>
 
@@ -286,18 +286,19 @@ export default function Page() {
                 <StretcherWeightGraph />
                 <p>
                     In Figure 3, on dry steel, a training load of {training.from}–{training.to} kg
-                    gives a safety factor of about {sf(training.safety[1])} to{" "}
-                    {sf(training.safety[0])}, and only loads up to about {heaviest.reachesTwo} kg
-                    reach 2. A real casualty in a stretcher, {DEFAULTS.stretcherMass} kg or more,
-                    gives about {sf(hold.safety)} or less, and from about {heaviest.slides + 1} kg
-                    the belayer’s feet slide even on a dry roof. On wet steel, only loads up to
-                    about {heaviest.wetHolds} kg stay above 1.
+                    gives a safety factor of about {teaching.factor(training.safety[1])} to{" "}
+                    {teaching.factor(training.safety[0])}, and only loads up to about{" "}
+                    {heaviest.reachesTwo} kg reach 2. A real casualty in a stretcher,{" "}
+                    {DEFAULTS.stretcherMass} kg or more, gives about {teaching.factor(hold.safety)}{" "}
+                    or less, and from about {heaviest.slides + 1} kg the belayer’s feet slide even
+                    on a dry roof. On wet steel, only loads up to about {heaviest.wetHolds} kg stay
+                    above 1.
                 </p>
                 <p>
                     When the belayers and stretcher weigh the same, the safety factor stays between
-                    about {sf(equal.least)} and {sf(equal.most)}, from {equal.from} kg to {equal.to}{" "}
-                    kg. A team that has only ever held light mock casualties has trained with a
-                    margin a real casualty won’t give them.
+                    about {teaching.factor(equal.least)} and {teaching.factor(equal.most)}, from{" "}
+                    {equal.from} kg to {equal.to} kg. A team that has only ever held light mock
+                    casualties has trained with a margin a real casualty won’t give them.
                 </p>
                 <p>
                     For other weights, the table below gives the safety factor on dry painted steel,
@@ -311,7 +312,7 @@ export default function Page() {
                     ]}
                     rows={weightTable.belayers.map((b, i) => [
                         `${b} kg`,
-                        ...weightTable.safety[i].map(sf),
+                        ...weightTable.safety[i].map((x) => teaching.factor(x)),
                     ])}
                     highlight={(cell) => Number(cell) < 1}
                 />
@@ -330,15 +331,15 @@ export default function Page() {
                     head={["Back from edge ↓ / apart →", ...placingTable.gaps.map((g) => `${g} m`)]}
                     rows={placingTable.backs.map((b, i) => [
                         `${b} m`,
-                        ...placingTable.safety[i].map(sf),
+                        ...placingTable.safety[i].map((x) => teaching.factor(x)),
                     ])}
                     highlight={(cell) => Number(cell) < 1}
                 />
                 <p>
                     The best placing, shoulder to shoulder and {placingTable.backs[0]} m from the
-                    edge, gives {sf(bestPlacing)}: still short of 2. And rescuers within 2 m of the
-                    edge should be tied off anyway, and an anchor good enough to tie off to is good
-                    enough for a hard belay.
+                    edge, gives {teaching.factor(bestPlacing)}: still short of 2. And rescuers
+                    within 2 m of the edge should be tied off anyway, and an anchor good enough to
+                    tie off to is good enough for a hard belay.
                 </p>
                 <p>Nor do these:</p>
                 <ul className="flex list-disc flex-col gap-2 pl-5">
@@ -358,16 +359,17 @@ export default function Page() {
                         <strong className={STRONG}>A backup belayer.</strong> A second rescuer in
                         front, leaning back into the belayer, adds their grip. If they add half as
                         much grip as the belayer, the safety factor rises by half, to about{" "}
-                        {sf(hold.safety * backup)}. That only just reaches 2, and only in the common
-                        case on a dry roof. It relies on two people’s footing and on the backup
-                        staying pressed into the belayer. With a {real.stretcher} kg casualty it’s
-                        about {sf(real.safety * backup)}, and on a wet roof about{" "}
-                        {sf(wetHold * backup)}: well short of 2.
+                        {teaching.factor(hold.safety * backup)}. That only just reaches 2, and only
+                        in the common case on a dry roof. It relies on two people’s footing and on
+                        the backup staying pressed into the belayer. With a {real.stretcher} kg
+                        casualty it’s about {teaching.factor(real.safety * backup)}, and on a wet
+                        roof about {teaching.factor(wetHold * backup)}: well short of 2.
                     </li>
                     <li>
                         <strong className={STRONG}>Heavier belayers.</strong> This helps, but only
                         compared with the load. A {heavy.belayer} kg belayer holding a{" "}
-                        {heavy.stretcher} kg casualty is back down to {sf(heavy.safety)}.
+                        {heavy.stretcher} kg casualty is back down to{" "}
+                        {teaching.factor(heavy.safety)}.
                     </li>
                 </ul>
                 <p>

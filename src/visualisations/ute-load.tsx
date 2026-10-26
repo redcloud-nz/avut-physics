@@ -13,6 +13,7 @@ import {
 } from "@/components/diagram/controls";
 import { Arrow, Label } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
+import { readout } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 
 import { UteLoadNotes } from "./ute-load-notes";
@@ -223,7 +224,7 @@ export default function UteLoad() {
                     at={tip.sub(v).add(vec2(0, 14))}
                     color={check ? statusColor(check) : COLORS.ok}
                 >
-                    {`${Math.round(load)} kg`}
+                    {readout.mass(load)}
                 </Label>
             </g>
         );
@@ -318,7 +319,7 @@ export default function UteLoad() {
                     from={ballS.add(vec2(0, -view.ball * PX_PER_KG - 8))}
                     v={vec2(0, view.ball * PX_PER_KG)}
                     color={checkFor("towBall") ? statusColor(checkFor("towBall")!) : COLORS.ok}
-                    label={`${Math.round(view.ball)} kg`}
+                    label={readout.mass(view.ball)}
                     width={2.5}
                 />
             )}
@@ -359,7 +360,7 @@ export default function UteLoad() {
                         fill={COLORS.load}
                         fillOpacity={0.75}
                     >
-                        <title>{`${l.label}: ${Math.round(l.mass)} kg`}</title>
+                        <title>{`${l.label}: ${readout.mass(l.mass)}`}</title>
                     </circle>
                 );
             });
@@ -567,28 +568,22 @@ export default function UteLoad() {
                 <>
                     <Readout
                         label="Room left under GVM"
-                        value={room !== null ? `${Math.round(room)} kg` : NONE}
+                        value={room !== null ? readout.mass(room) : NONE}
                         color={gvm ? statusColor(gvm) : undefined}
                     />
-                    <Readout
-                        label="Front axle"
-                        value={view ? `${Math.round(view.front)} kg` : NONE}
-                    />
-                    <Readout
-                        label="Rear axle"
-                        value={view ? `${Math.round(view.rear)} kg` : NONE}
-                    />
+                    <Readout label="Front axle" value={view ? readout.mass(view.front) : NONE} />
+                    <Readout label="Rear axle" value={view ? readout.mass(view.rear) : NONE} />
                     <Readout
                         label="Weight on the front"
-                        value={view ? `${(100 * view.frontShare).toFixed(0)}%` : NONE}
+                        value={view ? readout.percent(view.frontShare) : NONE}
                     />
                     <Readout
                         label="Tow ball on rear axle"
-                        value={view && view.ball > 0 ? `${Math.round(view.ballOnRear)} kg` : NONE}
+                        value={view && view.ball > 0 ? readout.mass(view.ballOnRear) : NONE}
                     />
                     <Readout
                         label="  lifted off front axle"
-                        value={view && view.ball > 0 ? `${Math.round(view.ballOffFront)} kg` : NONE}
+                        value={view && view.ball > 0 ? readout.mass(view.ballOffFront) : NONE}
                     />
                     <Readout label="Heaviest trailer at full GVM" value={`${towLimit} kg`} />
                 </>

@@ -1,4 +1,4 @@
-import { readKnotJson, type KnotFile } from "../knot-editor/format";
+import { readKnotJson, type KnotFile } from "../knot-editor/knot-file";
 import type { JsonValue } from "../knot-editor/versions";
 
 import FIGURE_8_ON_A_BIGHT from "./files/figure-8-on-a-bight.json";

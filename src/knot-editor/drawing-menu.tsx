@@ -33,8 +33,8 @@ import {
     setRopeColour,
     unlockSegment,
 } from "./edits";
-import { isLinked, ROPE_COLOURS, type Picture, type PinRef, type SegmentRef } from "./format";
 import type { PictureGeometry } from "./geometry";
+import { isLinked, ROPE_COLOURS, type Picture, type PinRef, type SegmentRef } from "./knot-file";
 import { COMMANDS, shortcutLabel, type CommandId } from "./menus";
 import { strandName } from "./names";
 import { kindOf, PROP_KIND_NAMES, PROP_KINDS, type PropKindName } from "./props";

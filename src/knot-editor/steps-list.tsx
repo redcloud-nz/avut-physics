@@ -12,7 +12,7 @@ import type { Dispatch, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 import { deleteStep, duplicateStep, moveStep } from "./edits";
-import type { KnotFile } from "./format";
+import type { KnotFile } from "./knot-file";
 import { ListHeading } from "./list-heading";
 import type { EditorAction, PictureId } from "./state";
 

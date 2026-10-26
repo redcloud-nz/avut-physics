@@ -16,6 +16,7 @@ import { Arrow, Cable, forceScale, Label, Pull, worldToSvg } from "@/components/
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
+import { readout } from "@/lib/format";
 import { deg } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
@@ -432,7 +433,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
           : !sol.b.holds
             ? {
                   title: "The belayers would slide towards the edge",
-                  detail: `Their feet need a grip of ${sol.b.gripNeeded.toFixed(2)} to hold, more than the ${input.grip.toFixed(2)} of ${footingLabel}.`,
+                  detail: `Their feet need a grip of ${readout.factor(sol.b.gripNeeded)} to hold, more than the ${readout.factor(input.grip)} of ${footingLabel}.`,
               }
             : null;
 
@@ -445,13 +446,13 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
         <>
             <Readout
                 label="Ropes' pull on stretcher"
-                value={!view ? NONE : t && t.len() > 1e-6 ? `${t.len().toFixed(0)} N` : "slack"}
+                value={!view ? NONE : t && t.len() > 1e-6 ? readout.force(t.len()) : "slack"}
                 color={COLORS.rope}
             />
             {showComponents && (
                 <Readout
                     label="  x, y"
-                    value={t && t.len() > 1e-6 ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
+                    value={t && t.len() > 1e-6 ? readout.forceParts(t.x, t.y) : NONE}
                     color={COLORS.component}
                 />
             )}
@@ -534,7 +535,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             label: w === "dry" ? "Dry" : "Wet",
                             options: SURFACES.map((s) => ({
                                 value: `${s.key}-${w}` as Footing,
-                                label: `${w === "dry" ? "Dry" : "Wet"} ${s.label.toLowerCase()} (${s[w].toFixed(2)})`,
+                                label: `${w === "dry" ? "Dry" : "Wet"} ${s.label.toLowerCase()} (${readout.factor(s[w])})`,
                             })),
                         }))}
                         onChange={setFooting}
@@ -546,7 +547,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             {
                                 options: EDGES.map((e) => ({
                                     value: e.key,
-                                    label: `${e.label} (${e.friction.toFixed(2)})`,
+                                    label: `${e.label} (${readout.factor(e.friction)})`,
                                 })),
                             },
                         ]}
@@ -597,17 +598,17 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 <>
                     <Readout
                         label="Each rope's length"
-                        value={belayed ? `${belayed.rope.toFixed(2)} m` : NONE}
+                        value={belayed ? readout.length(belayed.rope) : NONE}
                         color={COLORS.rope}
                     />
                     <Readout
                         label="Angle between ropes"
-                        value={belayed ? `${deg(belayed.ropeAngle).toFixed(1)}°` : NONE}
+                        value={belayed ? readout.angle(belayed.ropeAngle) : NONE}
                         color={COLORS.rope}
                     />
                     <Readout
                         label="Each rope's turn over edge"
-                        value={belayed ? `${deg(belayed.wrap).toFixed(0)}°` : NONE}
+                        value={belayed ? readout.angle(belayed.wrap) : NONE}
                         color={COLORS.rope}
                     />
                     <Readout
@@ -615,7 +616,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                         value={
                             belayed
                                 ? belayed.loadTension > 1e-6
-                                    ? `${belayed.loadTension.toFixed(0)} N`
+                                    ? readout.force(belayed.loadTension)
                                     : "slack"
                                 : NONE
                         }
@@ -626,7 +627,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                         value={
                             belayed
                                 ? belayed.tension > 1e-6
-                                    ? `${belayed.tension.toFixed(0)} N`
+                                    ? readout.force(belayed.tension)
                                     : "slack"
                                 : NONE
                         }
@@ -639,26 +640,22 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                     />
                     <Readout
                         label="Each belayer's lean"
-                        value={belayer ? `${deg(belayer.lean).toFixed(1)}°` : NONE}
+                        value={belayer ? readout.angle(belayer.lean) : NONE}
                         color={COLORS.belayer}
                     />
                     <Readout
                         label="Grip needed"
-                        value={belayer ? belayer.gripNeeded.toFixed(2) : NONE}
+                        value={belayer ? readout.factor(belayer.gripNeeded) : NONE}
                         color={belayer && !belayer.holds ? COLORS.slipping : COLORS.belayer}
                     />
                     <Readout
                         label="Footing safety factor"
-                        value={
-                            belayer
-                                ? `${Number.isFinite(belayer.safety) ? belayer.safety.toFixed(2) : "∞"} : 1`
-                                : NONE
-                        }
+                        value={belayer ? readout.ratio(belayer.safety) : NONE}
                         color={belayer && !belayer.holds ? COLORS.slipping : COLORS.belayer}
                     />
                     <Readout
                         label="Ground on each belayer R"
-                        value={belayer ? `${belayer.ground.len().toFixed(0)} N` : NONE}
+                        value={belayer ? readout.force(belayer.ground.len()) : NONE}
                         color={COLORS.contact}
                     />
                     {showComponents && (
@@ -666,37 +663,37 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             label="  N, F"
                             value={
                                 belayer
-                                    ? `${belayer.ground.y.toFixed(0)}, ${belayer.ground.horizontalLen().toFixed(0)} N`
+                                    ? readout.forceParts(
+                                          belayer.ground.y,
+                                          belayer.ground.horizontalLen(),
+                                      )
                                     : NONE
                             }
                             color={COLORS.component}
                         />
                     )}
-                    <Readout
-                        label="Each belayer's weight"
-                        value={`${belayerWeight.toFixed(0)} N`}
-                    />
+                    <Readout label="Each belayer's weight" value={readout.force(belayerWeight)} />
                     <Separator />
                     <Readout
                         label="Stretcher tilt"
-                        value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE}
+                        value={view ? readout.angle(Math.abs(view.tilt)) : NONE}
                     />
                     <Readout
                         label="Clearance from wall"
-                        value={clearance !== null ? `${clearance.toFixed(2)} m` : NONE}
+                        value={clearance !== null ? readout.length(clearance) : NONE}
                     />
                     {pullReadouts(view?.t1 ?? null)}
                     <Readout
                         label="Each rope on wall's edge"
-                        value={ropeOnEdge !== null ? `${ropeOnEdge.toFixed(0)} N` : NONE}
+                        value={ropeOnEdge !== null ? readout.force(ropeOnEdge) : NONE}
                         color={COLORS.rope}
                     />
                     <Readout
                         label="Ground on stretcher N"
-                        value={groundOnStretcher ? `${groundOnStretcher.len().toFixed(0)} N` : NONE}
+                        value={groundOnStretcher ? readout.force(groundOnStretcher.len()) : NONE}
                         color={COLORS.contact}
                     />
-                    <Readout label="Stretcher weight" value={`${barWeight.toFixed(0)} N`} />
+                    <Readout label="Stretcher weight" value={readout.force(barWeight)} />
                 </>
             }
             footer={

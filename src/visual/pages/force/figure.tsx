@@ -6,6 +6,7 @@ import { COLORS } from "@/articles/colors";
 import { Tag } from "@/articles/gentle-introduction-figures";
 import { Slider } from "@/components/diagram/controls";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 import { GHOST, Layout, Note, Readout, SVG } from "@/visual/frame";
 
@@ -90,7 +91,7 @@ export function ForceFigure() {
             readouts={
                 <>
                     <Readout label="push" value={`${force} N`} color={COLORS.pull} />
-                    <Readout label="faster every second" value={`${accel.toFixed(1)} m/s`} />
+                    <Readout label="faster every second" value={teaching.speed(accel)} />
                 </>
             }
         />

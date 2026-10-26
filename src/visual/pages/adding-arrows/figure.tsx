@@ -4,8 +4,9 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
-import { DragGrid, dragHint, KN, kNText, onGrid, ORIGIN } from "@/visual/common/grid";
+import { DragGrid, dragHint, KN, onGrid, ORIGIN } from "@/visual/common/grid";
 import { Layout, Readout } from "@/visual/frame";
 
 const TOGETHER = "var(--ink-strong)";
@@ -39,9 +40,17 @@ export function AddingFigure() {
             slider={dragHint(true)}
             readouts={
                 <>
-                    <Readout label="one" value={kNText(a.len() / KN)} color={COLORS.pull} />
-                    <Readout label="other" value={kNText(b.len() / KN)} color={COLORS.redirect} />
-                    <Readout label="together" value={kNText(sum.len() / KN)} color={TOGETHER} />
+                    <Readout label="one" value={teaching.kN(a.len() / KN)} color={COLORS.pull} />
+                    <Readout
+                        label="other"
+                        value={teaching.kN(b.len() / KN)}
+                        color={COLORS.redirect}
+                    />
+                    <Readout
+                        label="together"
+                        value={teaching.kN(sum.len() / KN)}
+                        color={TOGETHER}
+                    />
                 </>
             }
         />

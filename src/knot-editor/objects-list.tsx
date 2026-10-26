@@ -19,7 +19,7 @@ import {
 
 import { ARROW_TOKENS, ROPE_TOKENS } from "./colours";
 import type { MenuTarget } from "./drawing-menu";
-import type { Picture } from "./format";
+import type { Picture } from "./knot-file";
 import { ListHeading } from "./list-heading";
 import { COMMANDS, propCommand, shortcutLabel, type CommandId } from "./menus";
 import { propName, strandName } from "./names";

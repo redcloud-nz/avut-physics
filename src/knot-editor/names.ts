@@ -1,6 +1,6 @@
 /** What the editor calls a strand or a prop, in the panel and the objects list. */
 
-import type { Strand } from "./format";
+import type { Strand } from "./knot-file";
 import { kindOf, type Prop } from "./props";
 
 /** A rope's name, or "Rope 2", "Arrow 3" by its place in the picture. */

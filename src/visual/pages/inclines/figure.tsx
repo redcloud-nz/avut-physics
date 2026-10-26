@@ -4,10 +4,11 @@ import { useState } from "react";
 
 import { COLORS } from "@/articles/colors";
 import { Slider } from "@/components/diagram/controls";
+import { teaching } from "@/lib/format";
 import { rad } from "@/lib/math";
 import { slopeParts } from "@/visual/common/mechanics";
 import { SlopeDrawing } from "@/visual/common/slope";
-import { Layout, percent, Readout } from "@/visual/frame";
+import { Layout, Readout } from "@/visual/frame";
 
 /** A load on a slope, held by a rope up it, with the slope's angle on the slider. */
 export function InclinesFigure() {
@@ -30,10 +31,14 @@ export function InclinesFigure() {
             }
             readouts={
                 <>
-                    <Readout label="rope holds" value={percent(along)} color={COLORS.pull} />
+                    <Readout
+                        label="rope holds"
+                        value={teaching.percent(along)}
+                        color={COLORS.pull}
+                    />
                     <Readout
                         label="presses into ground"
-                        value={percent(into)}
+                        value={teaching.percent(into)}
                         color={COLORS.redirect}
                     />
                 </>

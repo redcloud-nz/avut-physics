@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deleteStrand, movePin, setRopeColour } from "./edits";
-import type { KnotFile } from "./format";
+import type { KnotFile } from "./knot-file";
 import { editorReducer, loaded, NOTHING } from "./state";
 import { free, testPicture, testStrand } from "./test-pictures";
 

@@ -7,7 +7,7 @@
 import { Vector2 } from "@/lib/vector2";
 
 import type { FrameSides } from "./edits";
-import type { Frame } from "./format";
+import type { Frame } from "./knot-file";
 import { percentOf } from "./zoom";
 
 /** How far apart the grid's lines are (millimetres). */

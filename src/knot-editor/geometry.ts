@@ -25,7 +25,7 @@ import {
     type Pin,
     type Strand,
     type StrandSegment,
-} from "./format";
+} from "./knot-file";
 
 /**
  * Bends tighter than this radius (rope diameters, to the rope's centre line) are shaded on ropes as a warning: about as

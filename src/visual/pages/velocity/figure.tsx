@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Slider } from "@/components/diagram/controls";
+import { teaching } from "@/lib/format";
 import { Track, VELOCITY } from "@/visual/common/track";
 import { Layout, Readout } from "@/visual/frame";
 
@@ -35,7 +36,7 @@ export function VelocityFigure() {
             }
             readouts={
                 <>
-                    <Readout label="gone" value={`${(speed * time).toFixed(1)} m`} />
+                    <Readout label="gone" value={teaching.length(speed * time)} />
                     <Readout label="velocity" value={`${speed} m/s`} color={VELOCITY} />
                 </>
             }

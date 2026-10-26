@@ -13,8 +13,8 @@ import {
     strandPaths,
     type PictureCrossings,
 } from "./crossing-geometry";
-import { parseKnotFile, type CrossingAt, type Picture, type Strand } from "./format";
 import { pictureGeometry } from "./geometry";
+import { parseKnotFile, type CrossingAt, type Picture, type Strand } from "./knot-file";
 import { free, testPicture, testStrand, type TestBar, type TestPin } from "./test-pictures";
 
 const strand = (pins: TestPin[], kind: "rope" | "arrow" = "rope"): Strand => testStrand(kind, pins);

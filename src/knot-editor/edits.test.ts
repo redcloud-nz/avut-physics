@@ -39,8 +39,14 @@ import {
     shiftAt,
     unlockSegment,
 } from "./edits";
-import { parseKnotFile, writeKnotFile, type KnotFile, type Picture, type Strand } from "./format";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
+import {
+    parseKnotFile,
+    writeKnotFile,
+    type KnotFile,
+    type Picture,
+    type Strand,
+} from "./knot-file";
 import { kindOf } from "./props";
 import { BAR, type BarProp } from "./props/bar";
 import {

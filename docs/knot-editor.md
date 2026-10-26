@@ -326,7 +326,7 @@ chrome for addresses that match no page.
 
 ## How it's built
 
-- `src/knot-editor/`: the editor, apart from `src/knots`. The file format and its checks in `format.ts`, its versions
+- `src/knot-editor/`: the editor, apart from `src/knots`. The file format and its checks in `knot-file.ts`, its versions
   and upgrades in `versions.ts`, ids in `ids.ts`, prop kinds in `props/`, the grid in `grid.ts`, the view's limits in
   `view.ts`, and its state in a reducer (the document, selection and undo history; each change makes a new document
   that shares what it didn't change, so undo keeps whole documents). Edits that make things are given new ids by the

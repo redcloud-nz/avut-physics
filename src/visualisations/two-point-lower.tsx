@@ -15,7 +15,7 @@ import { Arrow, Cable, forceScale, Label, Pull, worldToSvg } from "@/components/
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
-import { deg } from "@/lib/math";
+import { readout } from "@/lib/format";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import { TwoPointLowerNotes } from "./two-point-lower-notes";
@@ -243,13 +243,13 @@ export default function TwoPointLower() {
         <>
             <Readout
                 label={`Tension, ${what} ${name}`}
-                value={!view ? NONE : t && t.len() > 1e-6 ? `${t.len().toFixed(0)} N` : "slack"}
+                value={!view ? NONE : t && t.len() > 1e-6 ? readout.force(t.len()) : "slack"}
                 color={color}
             />
             {showComponents && (
                 <Readout
                     label={`  ${name}x, ${name}y`}
-                    value={t && t.len() > 1e-6 ? `${t.x.toFixed(0)}, ${t.y.toFixed(0)} N` : NONE}
+                    value={t && t.len() > 1e-6 ? readout.forceParts(t.x, t.y) : NONE}
                     color={COLORS.component}
                 />
             )}
@@ -357,11 +357,11 @@ export default function TwoPointLower() {
                 <>
                     <Readout
                         label="Stretcher tilt"
-                        value={view ? `${Math.abs(deg(view.tilt)).toFixed(1)}°` : NONE}
+                        value={view ? readout.angle(Math.abs(view.tilt)) : NONE}
                     />
                     <Readout
                         label="Clearance from wall"
-                        value={clearance !== null ? `${clearance.toFixed(2)} m` : NONE}
+                        value={clearance !== null ? readout.length(clearance) : NONE}
                     />
                     {tensionReadouts("T₁", "rope", view?.t1 ?? null, COLORS.rope)}
                     {tensionReadouts("T₂", "line", view?.t2 ?? null, COLORS.line)}
@@ -372,7 +372,7 @@ export default function TwoPointLower() {
                     />
                     <Readout
                         label="Rope on wall's edge"
-                        value={ropeOnEdge ? `${ropeOnEdge.len().toFixed(0)} N` : NONE}
+                        value={ropeOnEdge ? readout.force(ropeOnEdge.len()) : NONE}
                         color={COLORS.rope}
                     />
                     {(["ground", "wall", "top", "edge"] as const).map((surface) => {
@@ -381,12 +381,12 @@ export default function TwoPointLower() {
                             <Readout
                                 key={surface}
                                 label={`${{ ground: "Ground", wall: "Wall", top: "Wall top", edge: "Wall's edge" }[surface]} on stretcher N`}
-                                value={f ? `${f.len().toFixed(0)} N` : NONE}
+                                value={f ? readout.force(f.len()) : NONE}
                                 color={COLORS.contact}
                             />
                         );
                     })}
-                    <Readout label="Stretcher weight" value={`${barWeight.toFixed(0)} N`} />
+                    <Readout label="Stretcher weight" value={readout.force(barWeight)} />
                 </>
             }
             footer={

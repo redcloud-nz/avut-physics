@@ -40,13 +40,13 @@ import {
     setTensions,
     type FrameSides,
 } from "./edits";
-import type { Frame, Picture, PinRef, Prop, SegmentRef } from "./format";
 import { FrameDrawing, FrameHandles } from "./frame";
 import { pictureGeometry, type PictureGeometry } from "./geometry";
 import { snappedFrame, snappedMove, snapStep } from "./grid";
 import { GridDrawing, GridNumbers } from "./grid-drawing";
 import { hitAt, PinHandle, PinTools, SegmentHandle } from "./handles";
 import { headOf, leaderOf, pinPlaces } from "./ids";
+import type { Frame, Picture, PinRef, Prop, SegmentRef } from "./knot-file";
 import { PictureDrawing } from "./picture-drawing";
 import { kindOf } from "./props";
 import { NOTHING, type EditorAction, type Selection } from "./state";

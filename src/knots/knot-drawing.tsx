@@ -9,8 +9,8 @@ import {
     strandPaths,
     type PictureCrossings,
 } from "@/knot-editor/crossing-geometry";
-import type { Frame, Picture } from "@/knot-editor/format";
 import { pictureGeometry, type PictureGeometry } from "@/knot-editor/geometry";
+import type { Frame, Picture } from "@/knot-editor/knot-file";
 import { PictureDrawing } from "@/knot-editor/picture-drawing";
 import { kindOf } from "@/knot-editor/props";
 import { roundTo } from "@/lib/math";

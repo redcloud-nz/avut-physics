@@ -20,6 +20,7 @@ import {
     Z_RIG,
 } from "@/articles/pulley-systems";
 import { Eq } from "@/components/tex";
+import { teaching } from "@/lib/format";
 
 const TITLE = "A Gentle Introduction to Rescue Physics";
 const SUBTITLE = "Part 2: Pulleys and mechanical advantage";
@@ -45,9 +46,6 @@ const SYSTEMS = [
     { name: "Z-rig, 3:1", sys: Z_RIG },
     { name: "2:1 on a 3:1, 6:1", sys: SIX_TO_ONE },
 ];
-
-/** A mechanical advantage to one place, as "2.7:1". */
-const ratio = (a: number) => `${Number.isInteger(a) ? a : a.toFixed(1)}:1`;
 
 export default function Page() {
     const zGood = pullsOf(Z_RIG, GOOD).advantage;
@@ -98,8 +96,8 @@ export default function Page() {
                     </li>
                     <li>
                         Friction eats into it at every pulley. A Z-rig with good pulleys gives about{" "}
-                        {ratio(Math.round(zGood * 10) / 10)} rather than 3:1, and a karabiner in
-                        place of a pulley loses far more.
+                        {teaching.ratio(zGood)} rather than 3:1, and a karabiner in place of a
+                        pulley loses far more.
                     </li>
                 </ul>
             </section>
@@ -333,12 +331,11 @@ export default function Page() {
                 </p>
                 <FrictionFigure />
                 <p>
-                    With every pulley passing on {Math.round(GOOD * 100)}%, a Z-rig is a{" "}
-                    {ratio(Math.round(zGood * 10) / 10)}, and the losses build up in bigger systems:
-                    the 6:1 comes out at about{" "}
-                    {ratio(Math.round(pullsOf(SIX_TO_ONE, GOOD).advantage * 10) / 10)}. That still
-                    takes 6 m of rope for each metre the load rises; it’s the force you get for it
-                    that’s less.
+                    With every pulley passing on {teaching.percent(GOOD)}, a Z-rig is a{" "}
+                    {teaching.ratio(zGood)}, and the losses build up in bigger systems: the 6:1
+                    comes out at about {teaching.ratio(pullsOf(SIX_TO_ONE, GOOD).advantage)}. That
+                    still takes 6 m of rope for each metre the load rises; it’s the force you get
+                    for it that’s less.
                 </p>
                 <p>
                     Friction always works against the way the rope runs. Hauling, the team has to
@@ -348,9 +345,9 @@ export default function Page() {
                 <Why>
                     <p>
                         Work back from the team. The haul line carries 1<em>T</em>. The travelling
-                        pulley passes on {Math.round(GOOD * 100)}% of that, so the next part carries{" "}
+                        pulley passes on {teaching.percent(GOOD)} of that, so the next part carries{" "}
                         {GOOD}
-                        <em>T</em>, and the anchor pulley passes on {Math.round(GOOD * 100)}% of
+                        <em>T</em>, and the anchor pulley passes on {teaching.percent(GOOD)} of
                         that, {(GOOD * GOOD).toFixed(2)}
                         <em>T</em>. The rope grab adds the travelling pulley’s two parts to the main
                         line’s, so the load gets:
@@ -361,9 +358,8 @@ export default function Page() {
                     <p>
                         The pulley nearest the team matters most, because its loss carries on into
                         every part of the rope after it. With a karabiner in place of the travelling
-                        pulley, the Z-rig gives about{" "}
-                        {ratio(Math.round(zKarabinerTravelling * 10) / 10)}; with it at the anchor
-                        instead, about {ratio(Math.round(zKarabinerAnchor * 10) / 10)}.
+                        pulley, the Z-rig gives about {teaching.ratio(zKarabinerTravelling)}; with
+                        it at the anchor instead, about {teaching.ratio(zKarabinerAnchor)}.
                     </p>
                 </Why>
             </Section>
@@ -374,7 +370,7 @@ export default function Page() {
                         "System",
                         "Rope pulled per metre the load moves",
                         `Team pulls, for a ${LOAD} kg load`,
-                        `With ${Math.round(GOOD * 100)}% pulleys`,
+                        `With ${teaching.percent(GOOD)} pulleys`,
                     ]}
                     rows={SYSTEMS.map(({ name, sys }) => {
                         const ideal = pullsOf(sys).advantage;
@@ -382,8 +378,8 @@ export default function Page() {
                         return [
                             name,
                             `${Math.round(1 / loadPerMetre(sys))} m`,
-                            `${Math.round(LOAD / ideal)} kg`,
-                            `${Math.round(LOAD / real)} kg (${ratio(Math.round(real * 10) / 10)})`,
+                            teaching.mass(LOAD / ideal),
+                            `${teaching.mass(LOAD / real)} (${teaching.ratio(real)})`,
                         ];
                     })}
                 />

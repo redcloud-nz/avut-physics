@@ -1,5 +1,6 @@
 import { Tag } from "@/articles/gentle-introduction-figures";
 import { Arrow } from "@/components/diagram/svg";
+import { teaching } from "@/lib/format";
 import { vec2 } from "@/lib/vector2";
 import { GHOST, Note, SVG } from "@/visual/frame";
 
@@ -81,7 +82,7 @@ export function Track(props: {
             />
             <Arrow from={vec2(x, lane)} v={vec2(v * props.arrow, 0)} color={VELOCITY} />
             <Tag at={vec2(x + (v * props.arrow) / 2, lane - 34)} color={VELOCITY}>
-                {v.toFixed(1)} m/s
+                {teaching.speed(v)}
             </Tag>
         </svg>
     );

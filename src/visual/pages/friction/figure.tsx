@@ -6,7 +6,8 @@ import { COLORS } from "@/articles/colors";
 import { SystemDrawing, T } from "@/articles/pulley-figures";
 import { pullsOf, Z_RIG } from "@/articles/pulley-systems";
 import { Slider } from "@/components/diagram/controls";
-import { kN, Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
+import { teaching } from "@/lib/format";
+import { Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
 
 export function FrictionFigure() {
     const [efficiency, setEfficiency] = useState(90);
@@ -41,12 +42,12 @@ export function FrictionFigure() {
                 <>
                     <Readout
                         label="advantage"
-                        value={`${advantage.toFixed(1)}:1`}
+                        value={teaching.ratio(advantage)}
                         color={COLORS.load}
                     />
                     <Readout
                         label={`you pull, for a ${LOAD_KN} kN load`}
-                        value={kN(LOAD_KN / advantage)}
+                        value={teaching.kN(LOAD_KN / advantage, 2)}
                         color={COLORS.pull}
                     />
                 </>

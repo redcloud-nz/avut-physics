@@ -34,6 +34,7 @@ import {
     unlinkPin,
     unlockSegment,
 } from "./edits";
+import type { LockStatus, PictureGeometry, PlacedPin } from "./geometry";
 import {
     isLinked,
     ROPE_COLOURS,
@@ -46,8 +47,7 @@ import {
     type RopeColour,
     type SegmentRef,
     type Step,
-} from "./format";
-import type { LockStatus, PictureGeometry, PlacedPin } from "./geometry";
+} from "./knot-file";
 import { propName, strandName } from "./names";
 import { kindOf, type Prop } from "./props";
 import type { EditorAction, Selection } from "./state";

@@ -15,6 +15,7 @@ import { AngleArc, Arrow, Label, worldToSvg } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
+import { readout } from "@/lib/format";
 import { deg, rad } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
@@ -424,9 +425,9 @@ export default function MultiPointAnchor() {
                                     const f = s.legs[i].force.len();
                                     return (
                                         <>
-                                            {((f / load) * 100).toFixed(0)}%
+                                            {readout.percent(f / load)}
                                             <span className="block text-xs text-ghost">
-                                                {f.toFixed(0)} N
+                                                {readout.force(f)}
                                             </span>
                                         </>
                                     );
@@ -442,7 +443,7 @@ export default function MultiPointAnchor() {
                         )}
                     </div>
                     <Separator />
-                    <Readout label="Load W" value={`${load.toFixed(0)} N`} color={COLORS.load} />
+                    <Readout label="Load W" value={readout.force(load)} color={COLORS.load} />
                     <Readout
                         label="Load's swing from straight down"
                         value={`${Math.abs(direction).toFixed(0)}°`}
