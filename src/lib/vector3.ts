@@ -29,7 +29,12 @@ export class Vector3 {
 
     /** The point `t` of the way from this to `b` (0 here, 1 at b). */
     lerp(b: Vector3, t: number): Vector3 {
-        return this.add(b.sub(this).scale(t));
+        // this + (b - this) * t
+        return new Vector3(
+            this.x + (b.x - this.x) * t,
+            this.y + (b.y - this.y) * t,
+            this.z + (b.z - this.z) * t,
+        );
     }
 
     neg(): Vector3 {

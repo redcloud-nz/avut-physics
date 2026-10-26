@@ -18,7 +18,14 @@ export class Vector2 {
 
     /** The sum of `vs` (zero for none). */
     static sum(vs: readonly Vector2[]): Vector2 {
-        return vs.reduce((sum, v) => sum.add(v), Vector2.ZERO);
+        let sumX = 0;
+        let sumY = 0;
+
+        for (const v of vs) {
+            sumX += v.x;
+            sumY += v.y;
+        }
+        return new Vector2(sumX, sumY);
     }
 
     add(b: Vector2): Vector2 {
@@ -35,12 +42,14 @@ export class Vector2 {
 
     /** The point `t` of the way from this to `b` (0 here, 1 at b). */
     lerp(b: Vector2, t: number): Vector2 {
-        return this.add(b.sub(this).scale(t));
+        // this + (b - this) * t
+        return new Vector2(this.x + (b.x - this.x) * t, this.y + (b.y - this.y) * t);
     }
 
     /** The point halfway between this and `b`. */
     mid(b: Vector2): Vector2 {
-        return this.add(b).scale(0.5);
+        // (this + b) / 2
+        return new Vector2((this.x + b.x) / 2, (this.y + b.y) / 2);
     }
 
     neg(): Vector2 {
