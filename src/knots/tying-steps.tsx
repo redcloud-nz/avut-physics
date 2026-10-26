@@ -2,35 +2,27 @@
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ARROW_KEYED, swipe } from "@/visual/card";
-
-import type { Bar } from "./bar";
-import type { TyingStep } from "./figure-eight-tying";
-import { PAGE_SCALE, stepsView, TyingDrawing } from "./tying-drawing";
 
 export const BACK =
     "flex items-center justify-center gap-1 rounded-xl border border-line-faint py-2 text-sm font-medium text-ink hover:border-action disabled:opacity-40 disabled:hover:border-line-faint";
 export const NEXT =
     "flex items-center justify-center gap-1 rounded-xl bg-action py-2 text-sm font-medium text-primary-foreground hover:bg-action-hover disabled:opacity-40 disabled:hover:bg-action";
 
+/** A step drawn on the server: its label ("Step 2 of 5"), what to do, and its drawing. */
+export type DrawnStep = { label: string; caption: string; drawing: ReactNode };
+
 /**
  * Tying a knot a figure at a time, laid out like a page of the visual introduction: where it is in the tying, what to
  * do in this step, and the rope. Back and Next (or swiping sideways, or the arrow keys) move a step at a time, and
  * stop at the first step and the last. It's shown in a dialog, and starts at the first step each time it opens.
  */
-export function TyingSteps(props: {
-    name: string;
-    steps: TyingStep[];
-    /** Something the knot's tied round, drawn in every step. */
-    bar?: Bar;
-    onClose: () => void;
-}) {
+export function TyingSteps(props: { name: string; steps: DrawnStep[]; onClose: () => void }) {
     const { steps } = props;
     const touch = useRef<{ x: number; y: number } | null>(null);
     const [k, setK] = useState(0);
-    const [view] = useState(() => stepsView(steps, props.bar));
     const step = steps[k];
     const first = k === 0;
     const last = k === steps.length - 1;
@@ -94,13 +86,7 @@ export function TyingSteps(props: {
                 minimum. The rope is drawn as thick as on the knots' pages, shrinking only where it doesn't fit. */}
             <div className="relative min-h-48 flex-1 contain-size">
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <TyingDrawing
-                        step={step}
-                        bar={props.bar}
-                        view={view}
-                        label={`${step.label}: ${step.caption}`}
-                        scale={PAGE_SCALE}
-                    />
+                    {step.drawing}
                 </div>
             </div>
 

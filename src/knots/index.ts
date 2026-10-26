@@ -1,20 +1,16 @@
-import type { Bar } from "./bar";
-import {
-    FIGURE_EIGHT_BAR,
-    FIGURE_EIGHT_JOINED,
-    FIGURE_EIGHT_JOINED_TYING,
-    FIGURE_EIGHT_ON_A_BIGHT,
-    FIGURE_EIGHT_ON_A_BIGHT_TYING,
-    FIGURE_EIGHT_RETHREADED,
-    FIGURE_EIGHT_RETHREADED_TYING,
-} from "./figure-eight-doubled";
-import { FIGURE_EIGHT_TYING, type TyingStep } from "./figure-eight-tying";
-import type { RopePath } from "./rope-path";
-import { ROUND_TURN, ROUND_TURN_BAR } from "./round-turn";
+import { readKnotJson, type KnotFile } from "../knot-editor/format";
+import type { JsonValue } from "../knot-editor/versions";
+
+import FIGURE_8_ON_A_BIGHT from "./files/figure-8-on-a-bight.json";
+import FIGURE_8_RETHREADED from "./files/figure-8-rethreaded.json";
+import FIGURE_8 from "./files/figure-8.json";
+import JOINING_8 from "./files/joining-8.json";
+import ROUND_TURN from "./files/round-turn-and-two-half-hitches.json";
 
 /*
  * The knots, in the order they're listed. Each has its own page at /knots/<slug>, showing it finished and, for knots
- * that have them, the steps to tie it.
+ * that have them, the steps to tie it. Each is a knot file in `files/`, made and edited in the knot editor
+ * (/knot-editor), which holds its description, its details, the knot finished and its steps.
  */
 
 export const KNOTS_TITLE = "Knots";
@@ -28,75 +24,51 @@ export type Knot = {
     name: string;
     /** Which variant of the knot it is, where it is one, shown smaller under its name ("on a bight"). */
     variant?: string;
-    /** What it's for, in a sentence, under the name on its page. */
-    description: string;
-    /** More on how it's used, in a paragraph or two, under the finished knot on its page. */
-    about: string[];
-    /** The knot finished: its rope, or for a knot joining two ropes, both. */
-    drawing: RopePath[];
-    /** Something it's tied round, drawn as a bar through it, seen end on or side on. */
-    bar?: Bar;
-    /** Tying it, a figure at a time, where it has steps. */
-    steps?: TyingStep[];
     /** Lie the knot on its side in the list of knots, where a long, upright knot would be too small to see. */
     turned?: boolean;
+    file: KnotFile;
 };
 
 /** The knot's whole name, its variant and all ("Figure-8 on a bight"), for the page's title and labels. */
-export const fullName = (knot: Knot) => (knot.variant ? `${knot.name} ${knot.variant}` : knot.name);
+export const fullName = (knot: Pick<Knot, "name" | "variant">) =>
+    knot.variant ? `${knot.name} ${knot.variant}` : knot.name;
+
+/** A knot file as it's imported, read and checked, failing the build where it isn't a knot file. */
+function knotFile(slug: string, json: unknown): KnotFile {
+    const read = readKnotJson(json as JsonValue);
+    if (read.kind === "error") throw new Error(`files/${slug}.json: ${read.reason}`);
+    return read.file;
+}
+
+const knot = (slug: string, json: unknown, rest: Omit<Knot, "slug" | "file">): Knot => ({
+    slug,
+    ...rest,
+    file: knotFile(slug, json),
+});
 
 export const KNOTS: Knot[] = [
-    {
-        slug: "figure-8",
-        name: "Figure-8",
-        description: "Tied by twisting a loop into an 8 and passing the end through it.",
-        about: ["More on how the figure-8 is used goes here."],
-        drawing: [FIGURE_EIGHT_TYING[FIGURE_EIGHT_TYING.length - 1].path],
-        steps: FIGURE_EIGHT_TYING,
-        turned: true,
-    },
-    {
-        slug: "figure-8-on-a-bight",
+    knot("figure-8", FIGURE_8, { name: "Figure-8", turned: true }),
+    knot("figure-8-on-a-bight", FIGURE_8_ON_A_BIGHT, {
         name: "Figure-8",
         variant: "on a bight",
-        description: "A figure-8 tied in the rope doubled, leaving a loop.",
-        about: ["More on how the figure-8 on a bight is used goes here."],
-        drawing: [FIGURE_EIGHT_ON_A_BIGHT],
-        steps: FIGURE_EIGHT_ON_A_BIGHT_TYING,
         turned: true,
-    },
-    {
-        slug: "figure-8-rethreaded",
+    }),
+    knot("figure-8-rethreaded", FIGURE_8_RETHREADED, {
         name: "Figure-8",
         variant: "rethreaded",
-        description:
-            "A figure-8 tied in a single strand, with the end followed back through it to leave a loop.",
-        about: ["More on how the figure-8 rethreaded is used goes here."],
-        // Finished, it's the same knot as the figure-8 on a bight, but tied round something.
-        drawing: [FIGURE_EIGHT_RETHREADED],
-        bar: FIGURE_EIGHT_BAR,
-        steps: FIGURE_EIGHT_RETHREADED_TYING,
         turned: true,
-    },
-    {
-        slug: "joining-8",
-        name: "Joining-8",
-        description:
-            "Two ropes joined by a figure-8 tied in one, with the other's end followed back through it.",
-        about: ["More on how the joining-8 is used goes here."],
-        drawing: FIGURE_EIGHT_JOINED,
-        steps: FIGURE_EIGHT_JOINED_TYING,
-        turned: true,
-    },
-    {
-        slug: "round-turn-and-two-half-hitches",
+    }),
+    knot("joining-8", JOINING_8, { name: "Joining-8", turned: true }),
+    knot("round-turn-and-two-half-hitches", ROUND_TURN, {
         name: "Round turn",
         variant: "and two half hitches",
-        description:
-            "The rope taken round something one and a half times, with its tail tied round the standing part in two half hitches.",
-        about: ["More on how the round turn and two half hitches is used goes here."],
-        drawing: [ROUND_TURN],
-        bar: ROUND_TURN_BAR,
         turned: true,
-    },
+    }),
 ];
+
+/** The knot's details, a paragraph for each run of text between blank lines. */
+export const aboutParagraphs = (file: KnotFile) =>
+    (file.about ?? "")
+        .split(/\n\s*\n/)
+        .map((text) => text.trim())
+        .filter(Boolean);

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { it } from "vitest";
 
 import { writeKnotFile } from "../../knot-editor/format";
-import { KNOTS } from "../index";
+import { DRAWN_KNOTS } from "../drawn-knots";
 import { ROUND_TURN_FILE } from "../round-turn";
 
 import { convertKnot } from "./convert";
@@ -22,7 +22,7 @@ it.runIf(process.env.PORT_KNOTS)(
     async () => {
         mkdirSync(DIR, { recursive: true });
         const lines: string[] = [];
-        for (const knot of KNOTS) {
+        for (const knot of DRAWN_KNOTS) {
             // The round turn's finished knot is a pinned rope of its own, not one of its steps.
             const pins = knot.slug.startsWith("round-turn")
                 ? ROUND_TURN_FILE.steps[0].pins

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { KNOTS_DESCRIPTION as DESCRIPTION, KNOTS, KNOTS_TITLE as TITLE } from "@/knots";
-import { ropeView, TyingDrawing } from "@/knots/tying-drawing";
+import { KnotDrawing, knotView, workedPicture } from "@/knots/knot-drawing";
 
 export const metadata: Metadata = {
     title: TITLE,
@@ -13,14 +13,18 @@ export const metadata: Metadata = {
 /** The box each knot's small drawing sits in (pixels). */
 const BOX = { w: 144, h: 48 };
 
-const VIEWS = new Map(
-    KNOTS.map((knot) => [knot.slug, ropeView(knot.drawing, knot.drawing.length > 1, knot.bar)]),
+const DRAWN = new Map(
+    KNOTS.map((knot) => {
+        const worked = workedPicture(knot.file.knot);
+        const ropes = knot.file.knot.strands.filter((strand) => strand.kind === "rope").length;
+        return [knot.slug, { worked, view: knotView(worked, ropes > 1) }];
+    }),
 );
 
-/** Pixels per rope diameter for every knot in the list: the most that still fits the biggest one in the box. */
+/** Pixels per millimetre for every knot in the list: the most that still fits the biggest one in the box. */
 const LIST_SCALE = Math.min(
     ...KNOTS.map((knot) => {
-        const view = VIEWS.get(knot.slug)!;
+        const { view } = DRAWN.get(knot.slug)!;
         const [w, h] = knot.turned ? [view.h, view.w] : [view.w, view.h];
         return Math.min(BOX.w / w, BOX.h / h);
     }),
@@ -28,7 +32,7 @@ const LIST_SCALE = Math.min(
 
 /**
  * The list of knots, each linking to its page, with a small drawing of it finished. The drawings are all at the same
- * size per rope diameter, so their ropes look as thick, each starting at the box's left so the knots line up.
+ * size per millimetre, so their ropes look as thick, each starting at the box's left so the knots line up.
  */
 export default function Page() {
     return (
@@ -61,10 +65,8 @@ export default function Page() {
                                     className="flex shrink-0 items-center"
                                     style={{ width: BOX.w, height: BOX.h }}
                                 >
-                                    <TyingDrawing
-                                        step={{ ropes: knot.drawing }}
-                                        bar={knot.bar}
-                                        view={VIEWS.get(knot.slug)!}
+                                    <KnotDrawing
+                                        {...DRAWN.get(knot.slug)!}
                                         turned={knot.turned}
                                         label={null}
                                         scale={LIST_SCALE}

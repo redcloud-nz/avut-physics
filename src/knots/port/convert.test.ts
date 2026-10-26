@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { pictureCrossings, strandPaths } from "../../knot-editor/crossing-geometry";
 import { parseKnotFile, writeKnotFile, type Picture } from "../../knot-editor/format";
 import { pictureGeometry } from "../../knot-editor/geometry";
-import { KNOTS } from "../index";
+import { DRAWN_KNOTS } from "../drawn-knots";
 import { ROUND_TURN_FILE } from "../round-turn";
 
 import { convertKnot, TOLERANCE } from "./convert";
 
-const knot = (slug: string) => KNOTS.find((k) => k.slug === slug)!;
+const knot = (slug: string) => DRAWN_KNOTS.find((k) => k.slug === slug)!;
 
 /** What the editor would warn of in a picture: crossings or passes unset, lost, to check, or too close to draw. */
 function warnings(picture: Picture) {

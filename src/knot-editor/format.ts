@@ -176,6 +176,17 @@ export function parseKnotFile(
     } catch (e) {
         return { kind: "error", reason: `This isn't JSON: ${(e as Error).message}` };
     }
+    return readKnotJson(json, { current, upgrades });
+}
+
+/** A knot file already read as JSON (as a page imports one), checked and upgraded as `parseKnotFile` does. */
+export function readKnotJson(
+    json: JsonValue,
+    { current, upgrades }: { current: number; upgrades: Upgrade[] } = {
+        current: CURRENT_VERSION,
+        upgrades: UPGRADES,
+    },
+): ParseResult {
     try {
         let file = readObject(json, "");
         if (file.format !== FORMAT)

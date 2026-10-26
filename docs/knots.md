@@ -4,10 +4,38 @@ Exploring knots drawn in 2D SVG: how they look, how they're tied (with props lik
 they tighten. Work in progress, not listed on the home page: `/knots` lists the knots (`src/knots/index.ts`), and
 each has a page at `/knots/<slug>`: the knot finished and how it's used (`knot-page.tsx`), with a button that
 brings up tying it over the page, a figure at a time, laid out like a page of the visual introduction
-(`tying-steps.tsx`). Knots without steps, like the figure-8 on a bight, show only the finished knot. Finished knots
-are drawn on their pages at a fixed size per rope diameter (`PAGE_SCALE` in `tying-drawing.tsx`), so the rope looks
-as thick in every illustration and a bigger knot takes more room. The list of knots draws them all smaller, but again at
-one size per rope diameter: the most that still fits the biggest in its box.
+(`tying-steps.tsx`). Knots without steps, like the round turn and two half hitches, show only the finished knot.
+
+## The knot files
+
+Each knot is a knot file, `src/knots/files/<slug>.json`, made and edited in the knot editor (`/knot-editor`, see
+`docs/knot-editor.md`): its description, its details (paragraphs split at blank lines), the knot finished, its steps
+and their frame. `index.ts` imports each file and reads it with `readKnotJson`, failing the build where one doesn't
+read, and adds what the file doesn't hold: the knot's slug, its name split from its variant for the headline, and
+whether the list lays it on its side (`turned`). To change a knot, open its file in the editor, save it back over the
+file, and commit it.
+
+The pages draw every picture with the editor's own drawing (`PictureDrawing`, through `KnotDrawing` in
+`knot-drawing.tsx`), worked out on the server where the page renders, so only the drawn SVG reaches the browser and
+it hydrates without a mismatch. Each step is drawn in the file's frame, so the rope stays put as the steps change, and
+labelled from its number ("Step 2 of 5", or "Step 2 (cont.)" for a number shown again). The finished knot has a view of
+its own (`knotView`), fitted to it: across the knot with a margin, from its top to 8 diameters below its lowest
+crossing, where its ends run out of the bottom (and as far above it, for a knot joining two ropes). Every knot is drawn
+at a fixed size per millimetre (`PAGE_SCALE`, 11 pixels across an 11 mm rope), so the rope looks as thick in every
+illustration and a bigger knot takes more room. The list of knots draws them all smaller, but again at one size per
+millimetre: the most that still fits the biggest in its box.
+
+The files were made from the drawings that came before them by a converter (`src/knots/port/`, `npm run port-knots`),
+which fits the editor's curves to each rope as drawn, links pins where two stretches run side by side, and sets over and
+under from the drawing. It leaves a file that's there already alone (`PORT_KNOTS=overwrite` writes it again), and isn't
+needed again now the files are the source.
+
+## Before the knot files
+
+What follows is the old code, kept until it's removed: the knots as pinned ropes and doubled paths in rope diameters
+(`drawn-knots.ts`, `pinned-rope.ts`, `doubled.ts`, `figure-eight-doubled.ts`, `round-turn.ts` and their JSON), the
+rope editor at `/knots/edit`, and the drawing they used (`tying-drawing.tsx`). The pages no longer use any of it; only
+the converter does.
 
 Knots with two strands through them (`doubled.ts`) are drawn from the same knot tied in a single strand: its
 centreline scaled (by 1 for the figure-8, the same size as the single one) and two strands laid side by side along it.

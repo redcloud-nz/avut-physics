@@ -2,24 +2,29 @@
 
 import Link from "next/link";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import { fullName, KNOTS, KNOTS_TITLE } from ".";
-import type { RopePath } from "./rope-path";
-import { PAGE_SCALE, TyingDrawing, type View } from "./tying-drawing";
-import { TyingSteps } from "./tying-steps";
+import { KNOTS_TITLE } from ".";
+import { TyingSteps, type DrawnStep } from "./tying-steps";
 
 /**
  * A knot's page: what it's for, the knot finished, and more on how it's used. Where the knot has steps, an Instructions
  * button brings up tying it a step at a time over the page.
  *
- * The finished knot comes from the server, `drawing` and its `view`, worked out there: solving a pinned rope again in the
- * browser can come out different in the last digits, and the page wouldn't then match as it hydrates.
+ * The drawings, the knot finished (`drawing`) and each step's, come from the server, drawn there (see
+ * `knot-drawing.tsx`), so the browser only shows them.
  */
-export function KnotPage(props: { slug: string; drawing: RopePath[]; view: View }) {
-    const knot = KNOTS.find((knot) => knot.slug === props.slug)!;
-    const { drawing, view } = props;
-    const { steps } = knot;
+export function KnotPage(props: {
+    name: string;
+    variant?: string;
+    /** The whole name, its variant and all. */
+    fullName: string;
+    description?: string;
+    about: string[];
+    drawing: ReactNode;
+    steps?: DrawnStep[];
+}) {
+    const { name, variant, steps } = props;
     const [tying, setTying] = useState(false);
 
     // Next keeps a page that's been left, hidden, for coming back to, and its effects are cleaned up as it's hidden:
@@ -35,12 +40,12 @@ export function KnotPage(props: { slug: string; drawing: RopePath[]; view: View 
             {/* The name with the instructions' button beside it, as in a card's header. */}
             <div className="flex items-center justify-between gap-3">
                 <h1 className="text-3xl leading-tight font-semibold text-ink-bright">
-                    {knot.name}
-                    {knot.variant && (
+                    {name}
+                    {variant && (
                         <>
                             {" "}
                             <span className="block text-xl font-normal text-ink-muted">
-                                {knot.variant}
+                                {variant}
                             </span>
                         </>
                     )}
@@ -55,19 +60,11 @@ export function KnotPage(props: { slug: string; drawing: RopePath[]; view: View 
                     </button>
                 )}
             </div>
-            <p className="text-ink-soft">{knot.description}</p>
+            {props.description && <p className="text-ink-soft">{props.description}</p>}
 
-            {/* Drawn at the same size per rope diameter as every other knot, so their ropes all look as thick. */}
-            <TyingDrawing
-                step={{ ropes: drawing }}
-                bar={knot.bar}
-                view={view}
-                label={`${fullName(knot)}, finished`}
-                scale={PAGE_SCALE}
-                className="mx-auto block"
-            />
+            {props.drawing}
 
-            {knot.about.map((text, i) => (
+            {props.about.map((text, i) => (
                 <p key={i} className="text-ink-soft">
                     {text}
                 </p>
@@ -81,9 +78,8 @@ export function KnotPage(props: { slug: string; drawing: RopePath[]; view: View 
                             className="fixed inset-0 z-50 bg-background text-base outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
                         >
                             <TyingSteps
-                                name={fullName(knot)}
+                                name={props.fullName}
                                 steps={steps}
-                                bar={knot.bar}
                                 onClose={() => setTying(false)}
                             />
                         </DialogPrimitive.Content>

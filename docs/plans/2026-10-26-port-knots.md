@@ -108,6 +108,10 @@ there.
   millimetres, at `PAGE_SCALE` pixels per 11 mm, so the rope is as thick on the page as now.
 - **Worked out on the server, as now:** a picture's geometry, crossings and path data are worked out where the page
   renders and handed to the drawing rounded (as `RopeDrawing` rounds), so the page hydrates without a mismatch.
+- **The finished knot has its own fitted view** (`knotView`, as `ropeView` fitted it: ends running 8 diameters past
+  its lowest crossing), not the file's frame, which is the steps' and takes in their long tails; the steps use the
+  frame. Drawings reach the browser drawn (server components handed to the client page), so none of the editor's
+  working ships to it. (Settled in the build.)
 - **The tying overlay and the list of knots** draw from the files too, with their layouts unchanged (`turned`, the
   list's one size per rope diameter, the step labels from the numbers).
 - **The old code stays** (pinned rope, rope editor, `/knots/edit`, `doubled.ts`, the old JSON), unused by the pages,
@@ -147,11 +151,11 @@ there.
 
 ### Review group 2: the pages read the files (visual checkpoint: every knot page before and after)
 
-- [ ] **5. Pages from files** — Draw the knot pages, the tying overlay and the list from the knot files
+- [x] **5. Pages from files** — Draw the knot pages, the tying overlay and the list from the knot files
   - `index.ts` reads the files; the page, overlay and list draw each picture with `PictureDrawing`, worked out on
     the server.
   - Screenshots of every page, overlay step and the list, before and after, compared.
-- [ ] **6. Docs** — `docs/knots.md` says the knots are knot files, edited in the knot editor, and what the old code
+- [x] **6. Docs** — `docs/knots.md` says the knots are knot files, edited in the knot editor, and what the old code
       still there is for; `docs/knot-editor.md`'s "Later" loses porting and the pages reading the files.
 
 ## Docs impact

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { aboutParagraphs, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { KnotDrawing, knotView, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
 import { KnotPage } from "@/knots/knot-page";
-import { ropeView } from "@/knots/tying-drawing";
 
 export function generateStaticParams() {
     return KNOTS.map((knot) => ({ slug: knot.slug }));
@@ -15,10 +15,10 @@ export async function generateMetadata(props: PageProps<"/knots/[slug]">): Promi
     if (!knot) return {};
     return {
         title: `${fullName(knot)}, ${KNOTS_TITLE}`,
-        description: knot.description,
+        description: knot.file.description,
         openGraph: {
             title: fullName(knot),
-            description: knot.description,
+            description: knot.file.description,
             url: `/knots/${slug}`,
             type: "website",
         },
@@ -33,7 +33,47 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
     const { slug } = await props.params;
     const knot = KNOTS.find((k) => k.slug === slug);
     if (!knot) notFound();
-    // The finished knot is worked out here and handed over, so the browser draws the same numbers (see `KnotPage`).
-    const view = ropeView(knot.drawing, knot.drawing.length > 1, knot.bar);
-    return <KnotPage key={slug} slug={slug} drawing={knot.drawing} view={view} />;
+    // The drawings are worked out here and handed over drawn, so the browser shows the same numbers (see `KnotDrawing`).
+    const { file } = knot;
+    const name = fullName(knot);
+    const finished = workedPicture(file.knot);
+    const ropes = file.knot.strands.filter((strand) => strand.kind === "rope").length;
+    const labels = stepLabels(file.steps.map((step) => step.number));
+    return (
+        <KnotPage
+            key={slug}
+            name={knot.name}
+            variant={knot.variant}
+            fullName={name}
+            description={file.description}
+            about={aboutParagraphs(file)}
+            // Drawn at the same size per millimetre as every other knot, so their ropes all look as thick.
+            drawing={
+                <KnotDrawing
+                    worked={finished}
+                    view={knotView(finished, ropes > 1)}
+                    label={`${name}, finished`}
+                    scale={PAGE_SCALE}
+                    className="mx-auto block"
+                />
+            }
+            steps={
+                file.steps.length
+                    ? file.steps.map((step, k) => ({
+                          label: labels[k],
+                          caption: step.instructions,
+                          // Every step in the file's frame, so the rope stays put as the steps change.
+                          drawing: (
+                              <KnotDrawing
+                                  worked={workedPicture(step.picture)}
+                                  view={file.frame}
+                                  label={`${labels[k]}: ${step.instructions}`}
+                                  scale={PAGE_SCALE}
+                              />
+                          ),
+                      }))
+                    : undefined
+            }
+        />
+    );
 }

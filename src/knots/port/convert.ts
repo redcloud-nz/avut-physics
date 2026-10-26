@@ -21,8 +21,8 @@ import type {
 } from "../../knot-editor/format";
 import { pictureGeometry, type PictureGeometry } from "../../knot-editor/geometry";
 import type { Bar } from "../bar";
+import type { DrawnKnot } from "../drawn-knots";
 import type { TyingStep } from "../figure-eight-tying";
-import { fullName, type Knot } from "../index";
 import type { Pin as OldPin } from "../pinned-rope";
 import { centreline, laySegments, type RopePath } from "../rope-path";
 import type { Arrow } from "../tying-arrow";
@@ -237,7 +237,7 @@ const frameOf = (view: { x: number; y: number; w: number; h: number }): Frame =>
  * pinned rope and not one of its steps.
  */
 export function convertKnot(
-    knot: Knot,
+    knot: DrawnKnot,
     knotPins?: OldPin[],
 ): { file: KnotFile; reports: PictureReport[] } {
     let next = 1;
@@ -267,7 +267,7 @@ export function convertKnot(
         : ropeView(knot.drawing, knot.drawing.length > 1, knot.bar);
     return {
         file: {
-            name: fullName(knot),
+            name: knot.variant ? `${knot.name} ${knot.variant}` : knot.name,
             description: knot.description,
             about: knot.about.join("\n\n"),
             frame: frameOf(view),

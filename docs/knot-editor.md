@@ -355,4 +355,4 @@ chrome for addresses that match no page.
 6. Version 2: millimetres and rope sizes; the frame, the grid and snapping; ids and linked pins.
 
 Later: the bend limit as a setting, arrows with widths of their own, props beyond the bar, exporting
-SVG, porting the existing knots, and the knot pages reading these files (and their frames).
+SVG.
