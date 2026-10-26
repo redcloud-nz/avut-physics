@@ -176,7 +176,7 @@ export default function TwoPointLower() {
                 {cableLine(linePath, lineTaut)}
                 {!l.ropeTaut && (
                     <Label
-                        at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))}
+                        at={toSvg(ropePath.at(-2)!).mid(end1S).add(vec2(0, -14))}
                         color="var(--ink-muted)"
                     >
                         slack
@@ -192,7 +192,7 @@ export default function TwoPointLower() {
                     strokeLinecap="round"
                 />
                 <Arrow
-                    from={toSvg(l.barEnd1.add(l.barEnd2).scale(0.5))}
+                    from={toSvg(l.barEnd1.mid(l.barEnd2))}
                     v={force(vec2(0, -barWeight))}
                     color={COLORS.bar}
                     label="W"
@@ -237,7 +237,7 @@ export default function TwoPointLower() {
 
     const sumForces = (surface: string) => {
         const cs = view?.contacts.filter((c) => c.surface === surface) ?? [];
-        return cs.length ? cs.reduce((sum, c) => sum.add(c.force), Vector2.ZERO) : null;
+        return cs.length ? Vector2.sum(cs.map((c) => c.force)) : null;
     };
     const tensionReadouts = (name: "T₁" | "T₂", what: string, t: Vector2 | null, color: string) => (
         <>

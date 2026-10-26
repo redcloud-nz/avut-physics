@@ -10,7 +10,7 @@
 
 import type { Cubic } from "@/lib/bezier";
 import { hobbyTensions, MAX_TENSION, MIN_TENSION } from "@/lib/hobby";
-import { clamp, deg } from "@/lib/math";
+import { clamp, deg, wrapDegrees } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
 import { firstUnusedColour } from "./colours";
@@ -98,14 +98,8 @@ const tensionsWithin = ([a, b]: readonly [number, number]): [number, number] => 
     tensionWithin(b),
 ];
 
-/** An angle in degrees, brought into (−180, 180]. */
-const angleWithin = (angle: number) => {
-    const turned = (((angle + 180) % 360) + 360) % 360;
-    return turned === 0 ? 180 : turned - 180;
-};
-
 /** A direction as a pin's angle (degrees). */
-const angleOf = (direction: Vector2) => angleWithin(deg(direction.angle()));
+const angleOf = (direction: Vector2) => wrapDegrees(deg(direction.angle()));
 
 // Pins and segments
 
@@ -132,7 +126,7 @@ export const setPinAngle = (picture: Picture, ref: PinRef, angle: number | undef
             return pin.angle === undefined || leads(picture, pin.id)
                 ? pin
                 : { id: pin.id, x: pin.x, y: pin.y };
-        const held = angleWithin(angle);
+        const held = wrapDegrees(angle);
         return pin.angle === held ? pin : { id: pin.id, x: pin.x, y: pin.y, angle: held };
     });
 
@@ -171,7 +165,7 @@ const freed = (id: Id, at: { x: number; y: number; angle?: number }): Pin => ({
     id,
     x: at.x,
     y: at.y,
-    ...(at.angle !== undefined && { angle: angleWithin(at.angle) }),
+    ...(at.angle !== undefined && { angle: wrapDegrees(at.angle) }),
 });
 
 /**

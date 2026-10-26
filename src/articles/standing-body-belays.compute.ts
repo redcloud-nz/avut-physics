@@ -82,7 +82,7 @@ function load(b: Belayed) {
         /** The ground's push up on each belayer's feet (N). */
         up: b.b.ground.y,
         /** The friction each belayer's feet must supply (N). */
-        sideways: Math.hypot(b.b.ground.x, b.b.ground.z),
+        sideways: b.b.ground.horizontalLen(),
         /** The rope's pull down on each belayer (N). */
         ropeDown: -b.b.pull.y,
         gripNeeded: b.b.gripNeeded,

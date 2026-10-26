@@ -95,7 +95,7 @@ function RigDrawing() {
 
 /** Where to put a side's name: off the middle of the side from `a` to `b`, on the far side from `inside`. */
 const outside = (a: Vector2, b: Vector2, inside: Vector2, by: number) => {
-    const mid = a.add(b).scale(0.5);
+    const mid = a.mid(b);
     const n = b.sub(a).perp().unit();
     return mid.add(n.scale(n.dot(inside.sub(mid)) > 0 ? -by : by));
 };

@@ -23,6 +23,11 @@ export class Vector3 {
         return new Vector3(this.x * k, this.y * k, this.z * k);
     }
 
+    /** The point `t` of the way from this to `b` (0 here, 1 at b). */
+    lerp(b: Vector3, t: number): Vector3 {
+        return this.add(b.sub(this).scale(t));
+    }
+
     neg(): Vector3 {
         return new Vector3(-this.x, -this.y, -this.z);
     }
@@ -41,6 +46,11 @@ export class Vector3 {
 
     len(): number {
         return Math.hypot(this.x, this.y, this.z);
+    }
+
+    /** The length across the ground (x and z), leaving out the height. */
+    horizontalLen(): number {
+        return Math.hypot(this.x, this.z);
     }
 
     distanceTo(b: Vector3): number {

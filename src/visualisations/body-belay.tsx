@@ -232,7 +232,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                 {cableLine(linePath, lineTaut)}
                 {!l.ropeTaut && (
                     <Label
-                        at={toSvg(ropePath.at(-2)!).add(end1S).scale(0.5).add(vec2(0, -14))}
+                        at={toSvg(ropePath.at(-2)!).mid(end1S).add(vec2(0, -14))}
                         color="var(--ink-muted)"
                     >
                         slack
@@ -248,7 +248,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                     strokeLinecap="round"
                 />
                 <Arrow
-                    from={toSvg(l.barEnd1.add(l.barEnd2).scale(0.5))}
+                    from={toSvg(l.barEnd1.mid(l.barEnd2))}
                     v={force(vec2(0, -input.barWeight))}
                     color={COLORS.bar}
                     label="W"
@@ -439,9 +439,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
     // With the rope just past the edge, the stretcher hangs over it: it only touches the ground, on the lowest
     // walls, and the line is always at the team's steady pull, so neither the other surfaces nor T₂ get a row.
     const onGround = view?.contacts.filter((c) => c.surface === "ground") ?? [];
-    const groundOnStretcher = onGround.length
-        ? onGround.reduce((sum, c) => sum.add(c.force), Vector2.ZERO)
-        : null;
+    const groundOnStretcher = onGround.length ? Vector2.sum(onGround.map((c) => c.force)) : null;
     /** Both ropes' pull on the stretcher together (their sideways pulls cancel). */
     const pullReadouts = (t: Vector2 | null) => (
         <>
@@ -668,7 +666,7 @@ export default function BodyBelay(props: { maths?: React.ReactNode }) {
                             label="  N, F"
                             value={
                                 belayer
-                                    ? `${belayer.ground.y.toFixed(0)}, ${Math.hypot(belayer.ground.x, belayer.ground.z).toFixed(0)} N`
+                                    ? `${belayer.ground.y.toFixed(0)}, ${belayer.ground.horizontalLen().toFixed(0)} N`
                                     : NONE
                             }
                             color={COLORS.component}

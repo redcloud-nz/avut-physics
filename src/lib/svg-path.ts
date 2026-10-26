@@ -4,13 +4,14 @@
  * ones worth writing by hand.
  */
 
+import { roundTo } from "./math";
 import { Vector2 } from "./vector2";
 
 /**
  * A coordinate or length as written in path data, rounded to 0.0001. Worked out along curves, its last digits can
  * differ between the server and the browser, and the page wouldn't then match as it hydrates.
  */
-export const svgNumber = (value: number) => Math.round(value * 1e4) / 1e4;
+export const svgNumber = (value: number) => roundTo(value, 4);
 
 /** A point as written in path data: its rounded x and y, separated by a space. */
 export const svgPoint = (p: Vector2) => `${svgNumber(p.x)} ${svgNumber(p.y)}`;
@@ -57,7 +58,7 @@ function arcPoints(from: Vector2, args: number[], step: number): Vector2[] {
     const den = rx * rx * y1 * y1 + ry * ry * x1 * x1;
     const k = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den));
     const [cx1, cy1] = [(k * rx * y1) / ry, (-k * ry * x1) / rx];
-    const mid = from.add(to).scale(0.5);
+    const mid = from.mid(to);
     const centre = new Vector2(cos * cx1 - sin * cy1 + mid.x, sin * cx1 + cos * cy1 + mid.y);
     const angle = (ux: number, uy: number) => Math.atan2(uy, ux);
     const start = angle((x1 - cx1) / rx, (y1 - cy1) / ry);
@@ -112,7 +113,7 @@ export function pathPoints(d: string, from?: Vector2, step = 0.05): Vector2[] {
                       ? new Vector2(a.x, args[0])
                       : new Vector2(args[0], args[1]);
             const n = Math.max(1, Math.ceil(a.distanceTo(to) / step));
-            next = Array.from({ length: n }, (_, j) => a.add(to.sub(a).scale((j + 1) / n)));
+            next = Array.from({ length: n }, (_, j) => a.lerp(to, (j + 1) / n));
         }
         points.push(...next);
         at = next[next.length - 1];

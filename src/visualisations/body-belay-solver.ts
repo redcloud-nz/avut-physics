@@ -139,7 +139,7 @@ function belayedFor(
     const pull = along.scale(tension / along.len());
     // Their feet balance the pull and their weight (taken at their waist, where the strut meets the rope).
     const ground = vec3(-pull.x, s.belayerWeight - pull.y, -pull.z);
-    const sideways = Math.hypot(ground.x, ground.z);
+    const sideways = ground.horizontalLen();
     const gripNeeded = ground.y > 0 ? sideways / ground.y : Infinity;
     return {
         l,
@@ -174,7 +174,7 @@ export function solveBelay(s: Setup): BelayResult {
         if (r.kind === "none") return r;
         const result = belayedFor(s, ls, r.l, lean, facing);
         const g = result.b.ground;
-        const sideways = Math.hypot(g.x, g.z);
+        const sideways = g.horizontalLen();
         // Their body lines up with the push into their feet, leaning away from the pull.
         if (sideways > 1e-9) facing = { x: -g.x / sideways, z: -g.z / sideways };
         const needed = Math.atan2(sideways, g.y);

@@ -21,7 +21,7 @@ import {
 
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Cubic } from "@/lib/bezier";
-import { deg } from "@/lib/math";
+import { deg, roundTo } from "@/lib/math";
 import { svgPoint } from "@/lib/svg-path";
 import { Vector2 } from "@/lib/vector2";
 
@@ -113,8 +113,8 @@ export type CanvasControls = {
     scale(): number;
 };
 
-/** What a drag rounds places to (millimetres). */
-const DRAG_STEP = 0.1;
+/** How many decimal places a drag rounds places to (millimetres). */
+const DRAG_PLACES = 1;
 /** How far (pixels) the pointer moves before a press becomes a drag. */
 const DRAG = 3;
 
@@ -139,8 +139,6 @@ type Gesture = { from: { x: number; y: number }; moved: boolean } & (
 );
 
 const same = (a: readonly number[], b: readonly number[]) => a[0] === b[0] && a[1] === b[1];
-/** A value rounded to a step (0.1 or 0.01), written as it reads: 0.3, not 0.30000000000000004. */
-const rounded = (v: number, step: number) => Math.round(v / step) / Math.round(1 / step);
 
 export function Canvas(props: {
     picture: Picture;
@@ -310,8 +308,8 @@ export function Canvas(props: {
                             movePin(
                                 pic,
                                 ref,
-                                rounded(g.origins[k].x + d.x, DRAG_STEP),
-                                rounded(g.origins[k].y + d.y, DRAG_STEP),
+                                roundTo(g.origins[k].x + d.x, DRAG_PLACES),
+                                roundTo(g.origins[k].y + d.y, DRAG_PLACES),
                             ),
                         q,
                     ),
@@ -319,8 +317,8 @@ export function Canvas(props: {
         } else if (g.kind === "prop") {
             const pulled = at.sub(g.start);
             const box = kindOf(g.origin).bounds(g.origin);
-            const d = snap ? snappedMove(box.min.add(box.max).scale(0.5), pulled, step) : pulled;
-            const by = new Vector2(rounded(d.x, DRAG_STEP), rounded(d.y, DRAG_STEP));
+            const d = snap ? snappedMove(box.min.mid(box.max), pulled, step) : pulled;
+            const by = new Vector2(roundTo(d.x, DRAG_PLACES), roundTo(d.y, DRAG_PLACES));
             const { index, origin } = g;
             dispatch({
                 type: "edit",
@@ -328,23 +326,23 @@ export function Canvas(props: {
             });
         } else if (g.kind === "frame") {
             const d = at.sub(g.start);
-            const by = new Vector2(rounded(d.x, DRAG_STEP), rounded(d.y, DRAG_STEP));
+            const by = new Vector2(roundTo(d.x, DRAG_PLACES), roundTo(d.y, DRAG_PLACES));
             const { sides, origin } = g;
             const dragged = draggedFrame(origin, sides, by);
             const moved = snap ? snappedFrame(dragged, sides, step) : dragged;
             const rect = {
-                x: rounded(moved.x, DRAG_STEP),
-                y: rounded(moved.y, DRAG_STEP),
-                w: rounded(moved.w, DRAG_STEP),
-                h: rounded(moved.h, DRAG_STEP),
+                x: roundTo(moved.x, DRAG_PLACES),
+                y: roundTo(moved.y, DRAG_PLACES),
+                w: roundTo(moved.w, DRAG_PLACES),
+                h: roundTo(moved.h, DRAG_PLACES),
             };
             dispatch({ type: "edit-file", edit: (f) => setFrame(f, rect) });
         } else if (g.kind === "angle") {
-            const angle = rounded(deg(at.sub(g.centre).angle()) + g.turn, 0.1);
+            const angle = roundTo(deg(at.sub(g.centre).angle()) + g.turn, 1);
             dispatch({ type: "edit", edit: (q) => setPinAngle(q, g.ref, angle) });
         } else {
             const along = (g.end === 0 ? at.sub(g.pin) : g.pin.sub(at)).dot(g.direction);
-            const t = rounded((g.tension[g.end] * g.distance) / Math.max(along, 1e-3), 0.01);
+            const t = roundTo((g.tension[g.end] * g.distance) / Math.max(along, 1e-3), 2);
             const tension: [number, number] = g.end === 0 ? [t, g.tension[1]] : [g.tension[0], t];
             dispatch({ type: "edit", edit: (q) => setTensions(q, g.segment, tension) });
         }

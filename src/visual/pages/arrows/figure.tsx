@@ -14,7 +14,7 @@ export function ArrowsFigure() {
     const [tips, setTips] = useState([vec2(3, -2).scale(KN).add(ORIGIN)]);
     const f = kn(tips[0]);
     // Anticlockwise from pointing right, all the way round: 0° to 359°.
-    const angle = Math.round((deg(Math.atan2(f.y, f.x)) + 360) % 360) % 360;
+    const angle = Math.round((deg(f.angle()) + 360) % 360) % 360;
     return (
         <Layout
             drawing={

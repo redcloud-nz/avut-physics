@@ -13,6 +13,7 @@ import type { Frame, Picture } from "@/knot-editor/format";
 import { pictureGeometry, type PictureGeometry } from "@/knot-editor/geometry";
 import { PictureDrawing } from "@/knot-editor/picture-drawing";
 import { kindOf } from "@/knot-editor/props";
+import { roundTo } from "@/lib/math";
 import type { Vector2 } from "@/lib/vector2";
 
 /** The knots' ropes' diameter (millimetres), which their pages' sizes are in. */
@@ -88,11 +89,11 @@ export function KnotDrawing(props: {
         : [view.x, view.y, view.w, view.h];
     return (
         <svg
-            viewBox={box.map((v) => Math.round(v * 100) / 100).join(" ")}
+            viewBox={box.map((v) => roundTo(v, 2)).join(" ")}
             className={props.className}
             {...(scale && {
-                width: Math.round(box[2] * scale * 100) / 100,
-                height: Math.round(box[3] * scale * 100) / 100,
+                width: roundTo(box[2] * scale, 2),
+                height: roundTo(box[3] * scale, 2),
                 style: { maxWidth: "100%", maxHeight: "100%", height: "auto" },
             })}
             {...(label === null ? { "aria-hidden": true } : { role: "img", "aria-label": label })}

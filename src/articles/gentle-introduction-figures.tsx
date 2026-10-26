@@ -318,7 +318,7 @@ export function PythagorasFigure() {
                     bottom="Tag line"
                 />
                 <TwoLines
-                    at={r.add(p).scale(0.5).add(out.scale(0.5))}
+                    at={r.mid(p).add(out.scale(0.5))}
                     color={COLORS.pull}
                     top="c²"
                     bottom="Rope"
@@ -375,10 +375,7 @@ export function LegPartsFigure() {
                             <Arrow from={master} v={tip.sub(master)} color={COLORS.pull} />
                             <Arrow from={master} v={corner.sub(master)} color={COLORS.sideways} />
                             <Arrow from={corner} v={tip.sub(corner)} color={COLORS.load} />
-                            <Tag
-                                at={master.add(tip.sub(master).scale(0.7)).add(vec2(0, -16))}
-                                color={COLORS.pull}
-                            >
+                            <Tag at={master.lerp(tip, 0.7).add(vec2(0, -16))} color={COLORS.pull}>
                                 <tspan fontStyle="italic">T</tspan>
                             </Tag>
                             <Tag

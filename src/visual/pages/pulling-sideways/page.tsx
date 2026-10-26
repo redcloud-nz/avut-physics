@@ -18,7 +18,7 @@ function SideSquare(props: {
     area: string;
 }) {
     const pts = [props.a, props.b, props.b.add(props.out), props.a.add(props.out)];
-    const centre = props.a.add(props.b).scale(0.5).add(props.out.scale(0.5));
+    const centre = props.a.mid(props.b).add(props.out.scale(0.5));
     return (
         <>
             <polygon

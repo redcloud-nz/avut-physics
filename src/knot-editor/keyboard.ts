@@ -5,7 +5,7 @@
  * step; with it off, they go by their step.
  */
 
-import { deg } from "@/lib/math";
+import { deg, roundTo } from "@/lib/math";
 import { Vector2 } from "@/lib/vector2";
 
 import { changeProp, movePin, setPinAngle } from "./edits";
@@ -39,7 +39,7 @@ export function moveStep(scale: number, snap: boolean, far: boolean): number {
 }
 
 /** A value rounded to a tenth, written as it reads: 0.3, not 0.30000000000000004. */
-const tenths = (v: number) => Math.round(v * 10) / 10;
+const tenths = (v: number) => roundTo(v, 1);
 
 /** The next value past `value` that's a multiple of `step`, going up (`sign` 1) or down (−1). */
 export function nextLine(value: number, step: number, sign: 1 | -1): number {
@@ -95,7 +95,7 @@ export function moved(
         const prop = picture.props[selection.prop];
         if (!prop) return picture;
         const box = kindOf(prop).bounds(prop);
-        const d = by(box.min.add(box.max).scale(0.5));
+        const d = by(box.min.mid(box.max));
         const shift = new Vector2(tenths(d.x), tenths(d.y));
         return changeProp(picture, selection.prop, (p) => kindOf(p).moved(p, shift));
     }

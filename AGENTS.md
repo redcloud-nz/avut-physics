@@ -104,7 +104,7 @@ that a diagram draws correctly. The article's first load compiles for around 20 
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
-    `a.distanceTo(b)`); every operation returns a new vector.
+    `a.distanceTo(b)`, `a.mid(b)`, `a.lerp(b, t)`, `Vector2.sum(vs)`); every operation returns a new vector.
   - `geometry.ts`: segment geometry. `wall.ts`: the wall the lowers share, its anchor and the rope's
     path over its edge.
   - `numeric/`: one file per kind of method, imported by file (there's no index, so a figure's hash
@@ -117,8 +117,8 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data:
     numbers and points written for it (`svgNumber`, `svgPoint`), and paths (M, L, H, V, C, A) read back
     as points.
-  - `math.ts` (`clamp`, `deg`, `rad`, `linearScale`), `constants.ts` (`G`), `format.ts` (units
-    for display), `random.ts` (the seeded picker tests use for random setups).
+  - `math.ts` (`clamp`, `deg`, `rad`, `wrapDegrees`, `roundTo`, `linearScale`), `constants.ts` (`G`),
+    `format.ts` (units for display), `random.ts` (the seeded picker tests use for random setups).
 
 To add a visualisation: write the solver and its tests, the component and notes, register it in
 `src/visualisations/index.ts` (and its `href` type), and add its page under `src/app`.

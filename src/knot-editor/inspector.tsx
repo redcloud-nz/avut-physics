@@ -9,6 +9,7 @@
 import { useState, type Dispatch } from "react";
 
 import { Button } from "@/components/ui/button";
+import { roundTo } from "@/lib/math";
 
 import type { PictureCrossings } from "./crossing-geometry";
 import { crossingLetter } from "./crossings";
@@ -51,7 +52,7 @@ import { propName, strandName } from "./names";
 import { kindOf, type Prop } from "./props";
 import type { EditorAction, Selection } from "./state";
 
-const shown = (value: number) => String(Math.round(value * 1000) / 1000);
+const shown = (value: number) => String(roundTo(value, 3));
 
 /** A row of the panel: its label, then its field and the field's unit at the right. */
 const ROW = "flex items-center gap-2 py-0.5";

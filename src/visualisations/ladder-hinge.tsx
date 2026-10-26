@@ -24,7 +24,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
-import { clamp, deg } from "@/lib/math";
+import { clamp, deg, roundTo } from "@/lib/math";
 import { vec2, Vector2 } from "@/lib/vector2";
 
 import {
@@ -71,7 +71,7 @@ const ABOVE_TOP = 0.3;
 
 /** The total of some contact forces, or null if there are none. */
 const sumForces = (contacts: { force: Vector2 }[]) =>
-    contacts.length ? contacts.reduce((sum, c) => sum.add(c.force), Vector2.ZERO) : null;
+    contacts.length ? Vector2.sum(contacts.map((c) => c.force)) : null;
 
 /**
  * A ladder hinged at the base of a wall, with a 2 m stretcher hanging from it: a rope from the wall holds one
@@ -101,21 +101,20 @@ export default function LadderHinge() {
     /** Keeping it level, the team only takes hold of the ladder once it's below this angle (degrees). */
     const [takeHoldBelow, setTakeHoldBelow] = useState(45);
 
-    const round = (v: number) => Math.round(v * 10) / 10;
-    const minBeam = round(wallHeight + MIN_CLEARANCE);
+    const minBeam = roundTo(wallHeight + MIN_CLEARANCE, 1);
 
     // The attachment keeps its height above the wall as the wall moves. Raising the wall pushes the ladder
     // length up so it stays past the wall height, and the attachment comes down if the ladder no longer
     // reaches it; shortening the ladder does the same.
     const changeWallHeight = (h: number) => {
-        const l = Math.max(beamLength, round(h + MIN_CLEARANCE));
+        const l = Math.max(beamLength, roundTo(h + MIN_CLEARANCE, 1));
         setWallHeight(h);
         setBeamLength(l);
-        setAttachAbove((a) => Math.min(a, round(l - h)));
+        setAttachAbove((a) => Math.min(a, roundTo(l - h, 1)));
     };
     const changeBeamLength = (l: number) => {
         setBeamLength(l);
-        setAttachAbove((a) => Math.min(a, round(l - wallHeight)));
+        setAttachAbove((a) => Math.min(a, roundTo(l - wallHeight, 1)));
     };
     const attachDistance = Math.min(beamLength, wallHeight + attachAbove);
 
@@ -329,10 +328,7 @@ export default function LadderHinge() {
                     color={COLORS.component}
                 />
             )}
-            <Readout
-                label="  R direction"
-                value={R ? `${deg(Math.atan2(R.y, R.x)).toFixed(1)}°` : NONE}
-            />
+            <Readout label="  R direction" value={R ? `${deg(R.angle()).toFixed(1)}°` : NONE} />
         </>
     );
     /** A cable's pull on the hanging beam, with its x/y components when they're shown. */
@@ -386,7 +382,7 @@ export default function LadderHinge() {
         const attachS = toSvg(eq.beamAttach);
         const end1S = toSvg(eq.barEnd1);
         const end2S = toSvg(eq.barEnd2);
-        const barCentreS = toSvg(eq.barEnd1.add(eq.barEnd2).scale(0.5));
+        const barCentreS = toSvg(eq.barEnd1.mid(eq.barEnd2));
 
         diagram = (
             <>
@@ -461,7 +457,7 @@ export default function LadderHinge() {
                 />
                 {!h.cableTaut && (
                     <Label
-                        at={wallPath[last - 1].add(wallPath[last]).scale(0.5).add(vec2(0, -14))}
+                        at={wallPath[last - 1].mid(wallPath[last]).add(vec2(0, -14))}
                         color="var(--ink-muted)"
                     >
                         slack
@@ -480,7 +476,7 @@ export default function LadderHinge() {
                 {barLine(end1S, end2S)}
 
                 <Arrow
-                    from={toSvg(h.barEnd1.add(h.barEnd2).scale(0.5))}
+                    from={toSvg(h.barEnd1.mid(h.barEnd2))}
                     v={force(vec2(0, -barWeight))}
                     color={COLORS.bar}
                     label="W"
@@ -529,7 +525,7 @@ export default function LadderHinge() {
                 {barLine(end1S, end2S)}
 
                 <Arrow
-                    from={toSvg(h.barEnd1.add(h.barEnd2).scale(0.5))}
+                    from={toSvg(h.barEnd1.mid(h.barEnd2))}
                     v={force(vec2(0, -barWeight))}
                     color={COLORS.bar}
                     label="W"
@@ -711,7 +707,7 @@ export default function LadderHinge() {
                         label="Attachment height"
                         value={attachAbove}
                         min={MIN_CLEARANCE}
-                        max={round(beamLength - wallHeight)}
+                        max={roundTo(beamLength - wallHeight, 1)}
                         step={0.1}
                         unit="m"
                         onChange={setAttachAbove}

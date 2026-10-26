@@ -82,7 +82,7 @@ export function Tape(props: { path: RopePath; colors: RopeColors; width?: number
         const [a, b] = [points[i - 1], points[i]];
         const step = a.distanceTo(b);
         if (step >= left) {
-            along.push(b.add(a.sub(b).scale(left / step)));
+            along.push(b.lerp(a, left / step));
             left = 0;
         } else {
             along.push(a);

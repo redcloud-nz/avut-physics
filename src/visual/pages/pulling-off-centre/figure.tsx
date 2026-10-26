@@ -23,7 +23,7 @@ const draw = (p: Vector2) => vec2(160 + p.x * PER_M, TOP - p.y * PER_M);
 
 /** A slack rope, sagging a little below the straight line between its ends. */
 function Slack(props: { from: Vector2; to: Vector2 }) {
-    const mid = props.from.add(props.to).scale(0.5).add(vec2(0, 18));
+    const mid = props.from.mid(props.to).add(vec2(0, 18));
     return (
         <path
             d={`M ${props.from.x} ${props.from.y} Q ${mid.x} ${mid.y} ${props.to.x} ${props.to.y}`}

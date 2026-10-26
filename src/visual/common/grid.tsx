@@ -75,7 +75,7 @@ export function DragGrid(props: {
         const from = props.tips[i];
         // The tips with tip i moved a fraction `f` of the way from where it is to p.
         const at = (f: number) => {
-            const q = from.add(p.sub(from).scale(f));
+            const q = from.lerp(p, f);
             return props.tips.map((t, j) => (j === i ? vec2(snap(q.x), snap(q.y)) : t));
         };
         const fits = props.fits ?? (() => true);

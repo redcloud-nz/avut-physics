@@ -377,7 +377,7 @@ function piecesAt(s: Setup, out: number[], q: number[], keep = new Set<string>()
                 key,
                 kind: "edge",
                 g: rel.dot(up),
-                at: over.add(inSlot.sub(over).scale(t)),
+                at: over.lerp(inSlot, t),
                 m: vec3(up.x, up.y, 0),
                 valid: spans,
             });

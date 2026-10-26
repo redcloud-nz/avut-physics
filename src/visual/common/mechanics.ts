@@ -3,7 +3,7 @@
  * distances in metres, with gravity rounded to 10 m/s² as the series does, so 100 kg weighs 1 kN.
  */
 
-/** Gravity, rounded as on Weight. */
+/** Gravity, rounded as on Weight (the rest of the site uses `G`, 9.81, from `@/lib/constants`). */
 export const g = 10;
 
 /** On a slope `angle` radians from flat, the shares of a load's weight along the slope and into it. */

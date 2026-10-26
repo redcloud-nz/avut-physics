@@ -90,10 +90,13 @@ export class Cubic {
 
     /** The curve split at t (de Casteljau): the part before and the part after, meeting at the point at t. */
     split(t: number): [Cubic, Cubic] {
-        const lerp = (a: Vector2, b: Vector2) => a.add(b.sub(a).scale(t));
-        const [a, b, c] = [lerp(this.p0, this.p1), lerp(this.p1, this.p2), lerp(this.p2, this.p3)];
-        const [d, e] = [lerp(a, b), lerp(b, c)];
-        const f = lerp(d, e);
+        const [a, b, c] = [
+            this.p0.lerp(this.p1, t),
+            this.p1.lerp(this.p2, t),
+            this.p2.lerp(this.p3, t),
+        ];
+        const [d, e] = [a.lerp(b, t), b.lerp(c, t)];
+        const f = d.lerp(e, t);
         return [new Cubic(this.p0, a, d, f), new Cubic(f, e, c, this.p3)];
     }
 

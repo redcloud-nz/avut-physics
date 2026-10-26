@@ -12,6 +12,11 @@ export class Vector2 {
         return new Vector2(Math.cos(angle) * length, Math.sin(angle) * length);
     }
 
+    /** The sum of `vs` (zero for none). */
+    static sum(vs: readonly Vector2[]): Vector2 {
+        return vs.reduce((sum, v) => sum.add(v), Vector2.ZERO);
+    }
+
     add(b: Vector2): Vector2 {
         return new Vector2(this.x + b.x, this.y + b.y);
     }
@@ -22,6 +27,16 @@ export class Vector2 {
 
     scale(k: number): Vector2 {
         return new Vector2(this.x * k, this.y * k);
+    }
+
+    /** The point `t` of the way from this to `b` (0 here, 1 at b). */
+    lerp(b: Vector2, t: number): Vector2 {
+        return this.add(b.sub(this).scale(t));
+    }
+
+    /** The point halfway between this and `b`. */
+    mid(b: Vector2): Vector2 {
+        return this.add(b).scale(0.5);
     }
 
     neg(): Vector2 {

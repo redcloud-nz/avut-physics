@@ -408,7 +408,7 @@ export function solveLevel(s: Setup): LevelResult {
             const result = solveHeld(s, 0);
             return { result, level: result.kind === "held" && Math.abs(result.h.tilt) < rad(0.5) };
         }
-        const centre = P1.add(P2).scale(0.5);
+        const centre = P1.mid(P2);
         const contact: HeldContact = {
             surface: "ladder",
             point: centre,
@@ -456,7 +456,7 @@ function levelAt(s: Setup, phi: number): LevelResult {
     const along = Vector2.fromAngle(phi);
     const u2 = along.scale(s.attachDistance).sub(P2).unit();
     const n = along.perp();
-    const centre = P1.add(P2).scale(0.5);
+    const centre = P1.mid(P2);
     const x = solveLinear(
         [
             [u1.x, u2.x, n.x],

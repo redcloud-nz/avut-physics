@@ -247,7 +247,7 @@ export function SystemDrawing(props: {
     const anchorEnds = [Math.min(...boltLanes), Math.max(...boltLanes)].map((y) =>
         vec2(ANCHOR_X, y),
     );
-    const anchorMid = anchorEnds[0].add(anchorEnds[1]).scale(0.5);
+    const anchorMid = anchorEnds[0].mid(anchorEnds[1]);
 
     return (
         <svg
@@ -386,7 +386,7 @@ export function SystemDrawing(props: {
                     const label = props.labels.sling!(s.id, Math.abs(pulls.pull[s.id]));
                     if (!label) return null;
                     const level = Math.abs(s.a.y - s.b.y) < 1;
-                    const mid = P(s.a.add(s.b).scale(0.5));
+                    const mid = P(s.a.mid(s.b));
                     // Upright, a travelling pulley's label goes beside it, past the rope on its far side.
                     const at = level ? mid : up ? P(s.a).add(vec2(r + 8, 0)) : mid.add(vec2(8, 0));
                     return (

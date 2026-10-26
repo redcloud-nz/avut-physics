@@ -104,10 +104,7 @@ export function PullingSidewaysFigure() {
                     >
                         y
                     </Letter>
-                    <Letter
-                        at={load.add(tip.sub(load).scale(0.5)).add(vec2(14, 4))}
-                        color={COLORS.pull}
-                    >
+                    <Letter at={load.lerp(tip, 0.5).add(vec2(14, 4))} color={COLORS.pull}>
                         T
                     </Letter>
                 </svg>

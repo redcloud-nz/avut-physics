@@ -75,7 +75,7 @@ export function layoutFor(p: {
     const anchors = xs.map((x, i) =>
         vec2(x - xs.at(-1)! / 2, i === 0 ? 0 : (p.heights[i - 1] ?? 0)),
     );
-    const centre = anchors.reduce((sum, a) => sum.add(a), Vector2.ZERO).scale(1 / p.count);
+    const centre = Vector2.sum(anchors).scale(1 / p.count);
     const y = Math.min(...anchors.map((a) => a.y)) - p.drop;
     return { anchors, tiedAt: vec2(centre.x + (centre.y - y) * Math.tan(p.tieDirection), y) };
 }

@@ -53,7 +53,7 @@ function Dimension(props: {
     dy?: number;
     anchor?: "start" | "middle";
 }) {
-    const mid = props.a.add(props.b).scale(0.5);
+    const mid = props.a.mid(props.b);
     return (
         <g>
             <line
@@ -95,7 +95,7 @@ export function SetupDiagram() {
     const rope = [waist, ...(l.wrapEdge ? [l.wrapEdge] : []), l.barEnd1];
     const line = [l.barEnd2, ...(l.lineEdge ? [l.lineEdge] : []), l.team];
     const teamFeet = vec2(l.team.x + 0.35, 0);
-    const stretcherMid = l.barEnd1.add(l.barEnd2).scale(0.5);
+    const stretcherMid = l.barEnd1.mid(l.barEnd2);
 
     return (
         <figure className="flex flex-col gap-2 print:break-inside-avoid">

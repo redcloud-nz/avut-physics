@@ -12,6 +12,7 @@ import * as estree from "prettier/plugins/estree";
 import { format as prettierFormat } from "prettier/standalone";
 
 import { MAX_TENSION, MIN_TENSION } from "@/lib/hobby";
+import { roundTo } from "@/lib/math";
 
 import { kindOf, PROP_KIND_NAMES, PROP_KINDS, type Prop } from "./props";
 import {
@@ -478,7 +479,7 @@ function readStrand(value: JsonValue, at: string): Strand {
 // Writing
 
 /** A number as it's written: to 0.01 (a hundredth of a millimetre, for coordinates and sizes). */
-const round = (value: number) => Math.round(value * 100) / 100 || 0;
+const round = (value: number) => roundTo(value, 2);
 
 /** Objects written with each field on its own line, however short: the file, its pictures, steps and strands. */
 type Expanded = WeakSet<object>;

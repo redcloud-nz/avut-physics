@@ -72,7 +72,7 @@ export function crossings(path: RopePath): Crossing[] {
             if (!hit) continue;
             const [a, b] = [over[i] && over[i + 1], over[j] && over[j + 1]];
             found.push({
-                at: points[i].add(points[i + 1].sub(points[i]).scale(hit.t)),
+                at: points[i].lerp(points[i + 1], hit.t),
                 s: [s[i] + (s[i + 1] - s[i]) * hit.t, s[j] + (s[j + 1] - s[j]) * hit.u],
                 over: a === b ? null : a ? 0 : 1,
             });

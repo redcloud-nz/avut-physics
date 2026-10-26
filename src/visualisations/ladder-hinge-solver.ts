@@ -207,7 +207,7 @@ function beamFrom(P2: Vector2, branch: Branch, s: Setup): { phi: number; B: Vect
     const h = Math.sqrt(Math.max(0, r1 * r1 - along * along));
     const u = P2.scale(1 / dist);
     const B = u.scale(along).add(u.perp().scale(branch * h));
-    const phi = Math.atan2(B.y, B.x);
+    const phi = B.angle();
     return phi >= 0 && phi <= phiMax(s) ? { phi, B } : null;
 }
 
@@ -484,7 +484,7 @@ function checkHanging(g: Geometry, s: Setup, down: boolean): TautResult {
     const C = anchorOf(s);
     const u1 = (g.wrapEdge ?? C).sub(P1).unit(); // the wall cable pulls towards the anchor, or the edge it wraps over
     const u2 = g.B.sub(P2).unit();
-    const centre = P1.add(P2).scale(0.5);
+    const centre = P1.mid(P2);
     const contact = contacts[0];
     const x = contact
         ? solveLinear(
@@ -594,7 +594,7 @@ function checkOnTop(g: Geometry, s: Setup): TautResult {
         return slack(
             "The rope or attachment would go slack, so the stretcher can't be held by both.",
         );
-    const centre = P1.add(P2).scale(0.5);
+    const centre = P1.mid(P2);
     const atEdge = (W * (centre.x - P1.x) - P2.sub(P1).cross(u2.scale(T2))) / (edge.x - P1.x);
     const atEnd1 = W - T1 * u1.y - T2 * u2.y - atEdge;
     if (atEdge < 0 || atEnd1 < 0) return fail("The stretcher would tip over the wall's edge.");
@@ -831,7 +831,7 @@ function barForces(
     if (!b) return null;
     const end2 = bar.pinAt(phi);
     const end1 = bar.end1At(end2, b.angle);
-    const centre = end1.add(end2).scale(0.5);
+    const centre = end1.mid(end2);
     const path = wallCablePath(end1, s);
     const W = s.barWeight;
     const base = {
@@ -901,7 +901,7 @@ function splitAtFullLength(s: Setup, h: BarForces, phi: number): BarForces {
     const W = s.barWeight;
     const end1 = h.barEnd1;
     const end2 = h.barEnd2;
-    const centre = end1.add(end2).scale(0.5);
+    const centre = end1.mid(end2);
     const u1 = (h.wrapEdge ?? anchorOf(s)).sub(end1).unit();
     const n = h.barContact.force.unit();
     const at = h.barContact.point;

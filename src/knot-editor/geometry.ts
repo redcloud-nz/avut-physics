@@ -13,7 +13,7 @@
 
 import { Cubic, type Box } from "@/lib/bezier";
 import { hobbyControls, hobbyDirections, MAX_TENSION, MIN_TENSION, type RunEnd } from "@/lib/hobby";
-import { rad } from "@/lib/math";
+import { rad, wrapDegrees } from "@/lib/math";
 import { bisect } from "@/lib/numeric/roots";
 import { Vector2 } from "@/lib/vector2";
 
@@ -89,12 +89,6 @@ const pinAt = (pin: PlacedPin) => new Vector2(pin.x, pin.y);
 const held = (pin: PlacedPin) =>
     pin.angle === undefined ? undefined : Vector2.fromAngle(rad(pin.angle));
 
-/** An angle in degrees, brought into (−180, 180]. */
-const angleWithin = (angle: number) => {
-    const turned = (((angle + 180) % 360) + 360) % 360;
-    return turned === 0 ? 180 : turned - 180;
-};
-
 /**
  * Every pin of the picture where it is. A free pin is where it's placed. A linked pin is beside its leader (placed
  * first): across the way the leader runs, to the side its link names, the two strands' half-widths and the link's
@@ -122,7 +116,7 @@ export function placedPins(picture: Picture): PlacedPin[][] {
         const result = {
             x: at.x,
             y: at.y,
-            angle: pin.link.reverse ? angleWithin(angle + 180) : angle,
+            angle: pin.link.reverse ? wrapDegrees(angle + 180) : angle,
         };
         placed.set(pin.id, result);
         return result;

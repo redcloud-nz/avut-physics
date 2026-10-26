@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { arcLengths } from "./curve";
 import { nearestOnSegment, segmentDistance, segmentGap, segmentIntersection } from "./geometry";
-import { clamp, linearScale } from "./math";
-import { pathPoints } from "./svg-path";
-import { vec2 } from "./vector2";
+import { clamp, linearScale, roundTo, wrapDegrees } from "./math";
+import { pathPoints, svgPoint } from "./svg-path";
+import { vec2, Vector2 } from "./vector2";
 import { vec3 } from "./vector3";
 
 describe("Vector2", () => {
@@ -28,6 +28,15 @@ describe("Vector2", () => {
     });
 });
 
+describe("Vector2 between points", () => {
+    it("goes part way, halfway and adds up", () => {
+        expect(vec2(0, 0).lerp(vec2(4, 8), 0.25)).toEqual(vec2(1, 2));
+        expect(vec2(1, 1).mid(vec2(3, 5))).toEqual(vec2(2, 3));
+        expect(Vector2.sum([vec2(1, 2), vec2(3, 4), vec2(-1, 0)])).toEqual(vec2(3, 6));
+        expect(Vector2.sum([])).toEqual(Vector2.ZERO);
+    });
+});
+
 describe("Vector3", () => {
     it("crosses, measures angles and projects", () => {
         expect(vec3(1, 0, 0).cross(vec3(0, 1, 0))).toEqual(vec3(0, 0, 1));
@@ -35,6 +44,8 @@ describe("Vector3", () => {
         expect(vec3(1, 1, 0).angleTo(vec3(2, 2, 0))).toBeCloseTo(0, 6);
         expect(vec3(1, 2, 3).mirrorZ()).toEqual(vec3(1, 2, -3));
         expect(vec3(1, 2, 3).xy()).toEqual(vec2(1, 2));
+        expect(vec3(3, 100, 4).horizontalLen()).toBe(5);
+        expect(vec3(0, 0, 0).lerp(vec3(2, 4, 6), 0.5)).toEqual(vec3(1, 2, 3));
     });
 });
 
@@ -59,6 +70,22 @@ describe("math", () => {
         expect(clamp(5, 0, 1)).toBe(1);
         expect(clamp(-5, 0, 1)).toBe(0);
         expect(linearScale([0, 10], [100, 0])(2.5)).toBe(75);
+    });
+});
+
+describe("wrapDegrees and roundTo", () => {
+    it("brings angles into (−180, 180]", () => {
+        expect(wrapDegrees(190)).toBe(-170);
+        expect(wrapDegrees(-180)).toBe(180);
+        expect(wrapDegrees(180)).toBe(180);
+        expect(wrapDegrees(720 + 45)).toBe(45);
+    });
+
+    it("rounds to decimal places as the number reads, without −0", () => {
+        expect(roundTo(0.1 + 0.2, 1)).toBe(0.3);
+        expect(roundTo(1.23456, 2)).toBe(1.23);
+        expect(Object.is(roundTo(-0.00001, 2), 0)).toBe(true);
+        expect(svgPoint(vec2(1.000049, -2.5))).toBe("1 -2.5");
     });
 });
 
