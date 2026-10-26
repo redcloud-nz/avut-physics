@@ -12,6 +12,7 @@
 import { over, plain, type RopePath } from "@/knots/rope-path";
 import { boxesOverlap } from "@/lib/bezier";
 import { bisect } from "@/lib/numeric/roots";
+import { svgPoint } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 
 import {
@@ -346,10 +347,6 @@ export type StrandPaths = {
     tooClosePasses: number[];
 };
 
-/** A coordinate as written in path data, rounded as `rope-drawing.tsx` rounds for drawing. */
-const coordinate = (value: number) => Math.round(value * 1e4) / 1e4 || 0;
-const pointText = (p: Vector2) => `${coordinate(p.x)} ${coordinate(p.y)}`;
-
 /** The strand from one distance along it to another, as `C` commands, one per piece of each segment. */
 function curvesBetween(strand: StrandGeometry, from: number, to: number): string {
     const [a, b] = [strandPosition(strand, from), strandPosition(strand, to)];
@@ -358,14 +355,14 @@ function curvesBetween(strand: StrandGeometry, from: number, to: number): string
         const [t0, t1] = [k === a.segment ? a.t : 0, k === b.segment ? b.t : 1];
         if (t1 - t0 < 1e-9) continue;
         const piece = strand.segments[k].cubic.between(t0, t1);
-        commands.push(`C ${pointText(piece.p1)}, ${pointText(piece.p2)}, ${pointText(piece.p3)}`);
+        commands.push(`C ${svgPoint(piece.p1)}, ${svgPoint(piece.p2)}, ${svgPoint(piece.p3)}`);
     }
     return commands.join(" ");
 }
 
 /** The strand from one distance along it to another, as path data from its `M`. */
 export const pathBetween = (strand: StrandGeometry, from: number, to: number) =>
-    `M ${pointText(pointAlong(strand, from))} ${curvesBetween(strand, from, to)}`;
+    `M ${svgPoint(pointAlong(strand, from))} ${curvesBetween(strand, from, to)}`;
 
 /**
  * Each strand as a `RopePath`: one `C` per Bézier, split where an over stretch starts and ends. A strand is marked
@@ -453,7 +450,7 @@ export function strandPaths(
             else merged.push([...r]);
 
         const path: RopePath = [];
-        const start = `M ${pointText(strand.segments[0].cubic.p0)} `;
+        const start = `M ${svgPoint(strand.segments[0].cubic.p0)} `;
         const add = (from: number, to: number, isOver: boolean) => {
             if (to - from < 1e-9) return;
             const d = (path.length ? "" : start) + curvesBetween(strand, from, to);

@@ -124,6 +124,15 @@ export function Label({
 }
 
 /**
+ * Where a point in the physics (metres, y up) is drawn: `ppm` SVG units per metre from `origin` (the SVG point for
+ * the physics' origin), flipped so up is up.
+ */
+export const worldToSvg =
+    (origin: Vector2, ppm: number) =>
+    (p: Vector2): Vector2 =>
+        vec2(origin.x + p.x * ppm, origin.y - p.y * ppm);
+
+/**
  * How forces are drawn: `k` SVG units per newton, flipped so up is up, and cut short at `max`. `tag` marks the name of
  * a force whose arrow is cut short with ≫.
  */

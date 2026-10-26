@@ -8,6 +8,7 @@ import { BarDrawing } from "@/knots/bar";
 import { POLYLINE_TOLERANCE, type Box, type Cubic } from "@/lib/bezier";
 import { segmentIntersection } from "@/lib/geometry";
 import { clamp } from "@/lib/math";
+import { svgNumber } from "@/lib/svg-path";
 import { Vector2 } from "@/lib/vector2";
 
 import { FileError, onlyFields, readId, readNumber, readObject, readPositive } from "../read-json";
@@ -36,8 +37,6 @@ const [RADIUS, LENGTH] = [17.6, 220];
 /** The bar's lines are drawn as thick as beside an 11 mm rope, whatever passes it. */
 const LINE_UNIT = 11;
 
-const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-
 export const BAR = {
     kind: "bar" as const,
     label: "Bar",
@@ -56,8 +55,8 @@ export const BAR = {
 
     outline({ x, y, r, length }: BarProp): string {
         if (length)
-            return `M ${r4(x - length / 2)} ${r4(y - r)} h ${r4(length)} v ${r4(2 * r)} h ${r4(-length)} Z`;
-        return `M ${r4(x - r)} ${r4(y)} a ${r4(r)} ${r4(r)} 0 1 0 ${r4(2 * r)} 0 a ${r4(r)} ${r4(r)} 0 1 0 ${r4(-2 * r)} 0 Z`;
+            return `M ${svgNumber(x - length / 2)} ${svgNumber(y - r)} h ${svgNumber(length)} v ${svgNumber(2 * r)} h ${svgNumber(-length)} Z`;
+        return `M ${svgNumber(x - r)} ${svgNumber(y)} a ${svgNumber(r)} ${svgNumber(r)} 0 1 0 ${svgNumber(2 * r)} 0 a ${svgNumber(r)} ${svgNumber(r)} 0 1 0 ${svgNumber(-2 * r)} 0 Z`;
     },
 
     /** Where it is and how big; whether it's seen end on or side on, and side on, how long. End on, it has no passes. */

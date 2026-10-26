@@ -1,9 +1,19 @@
 /**
- * SVG path data as points, for measuring a path outside a browser. Handles the absolute commands M, L, H, V, C
- * and A (lines, cubic Béziers and elliptical arcs), the ones worth writing by hand.
+ * SVG path data: numbers and points written for it, and paths read back as points, for measuring a path outside a
+ * browser. Reading handles the absolute commands M, L, H, V, C and A (lines, cubic Béziers and elliptical arcs), the
+ * ones worth writing by hand.
  */
 
 import { Vector2 } from "./vector2";
+
+/**
+ * A coordinate or length as written in path data, rounded to 0.0001. Worked out along curves, its last digits can
+ * differ between the server and the browser, and the page wouldn't then match as it hydrates.
+ */
+export const svgNumber = (value: number) => Math.round(value * 1e4) / 1e4;
+
+/** A point as written in path data: its rounded x and y, separated by a space. */
+export const svgPoint = (p: Vector2) => `${svgNumber(p.x)} ${svgNumber(p.y)}`;
 
 /** How many numbers each command takes. */
 const ARITY: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, A: 7 };

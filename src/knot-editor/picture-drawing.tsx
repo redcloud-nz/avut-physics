@@ -11,6 +11,7 @@ import { memo } from "react";
 
 import { Stretch, Tape, type RopeColors } from "@/knots/rope-drawing";
 import { laySegments, type RopePath } from "@/knots/rope-path";
+import { svgPoint } from "@/lib/svg-path";
 
 import { ArrowDrawing, ArrowOverDrawing, arrowShape } from "./arrow-drawing";
 import { ROPE_TOKENS, TAPE_TOKENS } from "./colours";
@@ -36,7 +37,7 @@ const RopeOver = memo(
                 seg.over && (
                     <Stretch
                         key={k}
-                        d={`M ${Math.round(seg.from.x * 1e4) / 1e4} ${Math.round(seg.from.y * 1e4) / 1e4} ${seg.d}`}
+                        d={`M ${svgPoint(seg.from)} ${seg.d}`}
                         offset={seg.start}
                         length={seg.length}
                         colors={props.colors}

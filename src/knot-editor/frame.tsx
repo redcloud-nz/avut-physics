@@ -6,17 +6,17 @@
 
 import { memo } from "react";
 
+import { svgNumber } from "@/lib/svg-path";
+
 import type { FrameSides } from "./edits";
 import type { Frame } from "./format";
 
 /** How wide the frame's edges and corners are to pick up (pixels). */
 const EDGE = 8;
 
-const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-
 /** A rectangle as path data, clockwise from its top left. */
 const rectangle = (x: number, y: number, w: number, h: number) =>
-    `M ${r4(x)} ${r4(y)} h ${r4(w)} v ${r4(h)} h ${r4(-w)} Z`;
+    `M ${svgNumber(x)} ${svgNumber(y)} h ${svgNumber(w)} v ${svgNumber(h)} h ${svgNumber(-w)} Z`;
 
 /**
  * The frame's outline, and the dimming outside it: one path from the edges of `view` (the visible area, in

@@ -22,6 +22,7 @@ import {
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
 import type { Cubic } from "@/lib/bezier";
 import { deg } from "@/lib/math";
+import { svgPoint } from "@/lib/svg-path";
 import { Vector2 } from "@/lib/vector2";
 
 import type { PictureCrossings, StrandPaths } from "./crossing-geometry";
@@ -62,8 +63,8 @@ export function useGeometry(picture: Picture): PictureGeometry {
     return next.geometry;
 }
 
-const point = (p: Vector2) => `${Math.round(p.x * 1e4) / 1e4} ${Math.round(p.y * 1e4) / 1e4}`;
-const curve = (c: Cubic) => `M ${point(c.p0)} C ${point(c.p1)} ${point(c.p2)} ${point(c.p3)}`;
+const curve = (c: Cubic) =>
+    `M ${svgPoint(c.p0)} C ${svgPoint(c.p1)} ${svgPoint(c.p2)} ${svgPoint(c.p3)}`;
 
 /**
  * Warnings on the drawing: ropes' bends tighter than `TIGHTEST_BEND` shaded (when shown), and a red line along each

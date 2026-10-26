@@ -11,7 +11,7 @@ import {
     Slider,
     VisualisationLayout,
 } from "@/components/diagram/controls";
-import { AngleArc, Arrow, Label } from "@/components/diagram/svg";
+import { AngleArc, Arrow, Label, worldToSvg } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
@@ -143,7 +143,7 @@ export default function MultiPointAnchor() {
     const H = Math.round((frame.maxY - frame.minY) * PPM + ABOVE + LOAD_ARROW + MARGIN);
     const origin = vec2(W / 2 - ((frame.minX + frame.maxX) / 2) * PPM, ABOVE + frame.maxY * PPM);
     /** World (metres, y up) → SVG (y down). */
-    const toSvg = (p: Vector2): Vector2 => vec2(origin.x + p.x * PPM, origin.y - p.y * PPM);
+    const toSvg = worldToSvg(origin, PPM);
     const k = LOAD_ARROW / load; // px per newton
     const force = (f: Vector2) => vec2(f.x * k, -f.y * k).clampLen(MAX_ARROW);
 

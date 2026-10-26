@@ -6,6 +6,8 @@
  * so they read over anything. Sizes are in screen pixels, turned into millimetres by `px`.
  */
 
+import { svgNumber } from "@/lib/svg-path";
+
 import {
     everyFineLineNumbered,
     everyLineNumbered,
@@ -18,8 +20,6 @@ import {
 
 /** The visible view (millimetres). */
 type ViewBox = { x: number; y: number; w: number; h: number };
-
-const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
 /** How wide the strong lines are drawn (pixels); the others are 1. */
 const STRONG_WIDTH = 1.5;
@@ -37,10 +37,16 @@ export function GridDrawing(props: { view: ViewBox; px: number }) {
         [
             ...across
                 .filter((l) => l.weight === weight)
-                .map((l) => `M ${r4(l.at)} ${r4(view.y)} V ${r4(view.y + view.h)}`),
+                .map(
+                    (l) =>
+                        `M ${svgNumber(l.at)} ${svgNumber(view.y)} V ${svgNumber(view.y + view.h)}`,
+                ),
             ...down
                 .filter((l) => l.weight === weight)
-                .map((l) => `M ${r4(view.x)} ${r4(l.at)} H ${r4(view.x + view.w)}`),
+                .map(
+                    (l) =>
+                        `M ${svgNumber(view.x)} ${svgNumber(l.at)} H ${svgNumber(view.x + view.w)}`,
+                ),
         ].join(" ");
     return (
         <g pointerEvents="none" fill="none">

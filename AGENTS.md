@@ -89,10 +89,11 @@ that a diagram draws correctly. The article's first load compiles for around 20 
   folder in `pages/`: `page.tsx` (server) holds its name, headline, text and any details, and
   `figure.tsx` (client) its figure. `pages/index.ts` sets the order. Pieces several pages share
   are in `common/`, and `card.tsx` and `frame.tsx` are the chrome around every page and figure.
-- `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`), slider
-  controls, `Notice` and `NONE`. Drawing only, no maths. `src/components/notes.tsx` has the notes card
-  (`NotesCard`, `Part`), and `use-in-browser.ts` the hook pages wait on before running a solver, since
-  solvers' last digits can differ between the server and the browser.
+- `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`, and
+  `worldToSvg` for placing physics points), slider controls, `Notice` and `NONE`. Drawing only, no
+  maths. `src/components/notes.tsx` has the notes card (`NotesCard`, `Part`), and `use-in-browser.ts`
+  the hook pages wait on before running a solver, since solvers' last digits can differ between the
+  server and the browser.
 - Colours come from the tokens in `src/app/globals.css`, named for what they show (`ink-muted`, `pull`, `mass`,
   `warning`): token classes (`text-ink-muted`, `fill-surface`) in `className`, and `var(--pull)` in SVG attributes and
   styles (the base name: a `--color-*` variable exists only once a class uses it). No hex values or Tailwind palette
@@ -113,8 +114,9 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     and a quadratic's roots. `differences.ts`: central differences. `held-balance.ts`: Newton's method
     on a balance with some constraints held exactly (the lowers' final solve).
   - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
-    curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data
-    (M, L, H, V, C, A) as points.
+    curves through points. `curve.ts`: arc lengths along a polyline. `svg-path.ts`: SVG path data:
+    numbers and points written for it (`svgNumber`, `svgPoint`), and paths (M, L, H, V, C, A) read back
+    as points.
   - `math.ts` (`clamp`, `deg`, `rad`, `linearScale`), `constants.ts` (`G`), `format.ts` (units
     for display), `random.ts` (the seeded picker tests use for random setups).
 

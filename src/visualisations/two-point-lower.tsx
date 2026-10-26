@@ -11,7 +11,7 @@ import {
     Toggle,
     VisualisationLayout,
 } from "@/components/diagram/controls";
-import { Arrow, Cable, forceScale, Label, Pull } from "@/components/diagram/svg";
+import { Arrow, Cable, forceScale, Label, Pull, worldToSvg } from "@/components/diagram/svg";
 import { Separator } from "@/components/ui/separator";
 import { useInBrowser, WAITING } from "@/components/use-in-browser";
 import { G } from "@/lib/constants";
@@ -98,7 +98,7 @@ export default function TwoPointLower() {
     const H = Math.round((wallHeight + anchorUp + ABOVE_TOP + BELOW_GROUND) * PPM);
     const origin = vec2(anchorBack * PPM, H - BELOW_GROUND * PPM); // the base of the wall's face
     /** World (metres, y up) → SVG (y down). */
-    const toSvg = (p: Vector2): Vector2 => vec2(origin.x + p.x * PPM, origin.y - p.y * PPM);
+    const toSvg = worldToSvg(origin, PPM);
 
     const O = toSvg(Vector2.ZERO);
     const wallS = toSvg(vec2(0, wallHeight));

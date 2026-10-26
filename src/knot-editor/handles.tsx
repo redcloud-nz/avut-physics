@@ -9,6 +9,8 @@
 
 import { memo } from "react";
 
+import { svgNumber } from "@/lib/svg-path";
+
 import type { FrameSides } from "./edits";
 
 const PIN = 5;
@@ -41,8 +43,6 @@ export function hitAt(target: EventTarget | null): Hit {
     if (kind === "frame") return { kind, sides: [Math.sign(a), Math.sign(b)] as FrameSides };
     return { kind: "background" };
 }
-
-const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
 /** A segment's hit area: a wide invisible stroke along its curve, with a line along it when it's selected. */
 export const SegmentHandle = memo(function SegmentHandle(props: {
@@ -101,13 +101,13 @@ export const PinHandle = memo(function PinHandle(props: {
         angle !== undefined &&
         [-1, 1].map((s) => {
             const a = (angle * Math.PI) / 180;
-            return `${r4(x + s * 9 * px * Math.cos(a))} ${r4(y + s * 9 * px * Math.sin(a))}`;
+            return `${svgNumber(x + s * 9 * px * Math.cos(a))} ${svgNumber(y + s * 9 * px * Math.sin(a))}`;
         });
     return (
         <g data-hit="pin" data-ref={`${props.strand},${props.pin}`} className="cursor-move">
             {linked && (
                 <path
-                    d={`M ${r4(x)} ${r4(y)} L ${r4(leaderX)} ${r4(leaderY)}`}
+                    d={`M ${svgNumber(x)} ${svgNumber(y)} L ${svgNumber(leaderX)} ${svgNumber(leaderY)}`}
                     stroke={colour}
                     strokeWidth={px}
                     strokeOpacity={0.7}
@@ -211,7 +211,7 @@ export const PinTools = memo(
                         })}
                     >
                         <path
-                            d={`M ${r4(x)} ${r4(y)} L ${r4(h.x)} ${r4(h.y)}`}
+                            d={`M ${svgNumber(x)} ${svgNumber(y)} L ${svgNumber(h.x)} ${svgNumber(h.y)}`}
                             stroke="var(--ink-muted)"
                             strokeWidth={1 * px}
                             pointerEvents="none"

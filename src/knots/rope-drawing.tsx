@@ -5,7 +5,7 @@
  * outline just short of its ends, so it joins the rope without a seam.
  */
 
-import type { Vector2 } from "@/lib/vector2";
+import { svgNumber, svgPoint } from "@/lib/svg-path";
 
 import { centreline, type RopePath } from "./rope-path";
 
@@ -16,12 +16,6 @@ const TAPE_LENGTH = 1.2;
 
 /** How far short of a redrawn segment's ends its outline stops (rope widths). */
 const TRIM = 0.1;
-
-/**
- * A length or coordinate rounded for drawing: worked out along arcs, its last digits can differ between the server and
- * the browser, and the page wouldn't then match as it hydrates.
- */
-const rounded = (value: number) => Math.round(value * 1e4) / 1e4;
 
 /**
  * One stretch of rope along path data `d`: outline, body, weave and highlight, the weave `offset` along. Given
@@ -38,7 +32,7 @@ export function Stretch(props: {
 }) {
     const { d, colors, width = 1 } = props;
     const trim = TRIM * width;
-    const [offset, length] = [rounded(props.offset), props.length && rounded(props.length)];
+    const [offset, length] = [svgNumber(props.offset), props.length && svgNumber(props.length)];
     const common = {
         d,
         fill: "none",
@@ -96,12 +90,11 @@ export function Tape(props: { path: RopePath; colors: RopeColors; width?: number
         }
     }
     along.reverse();
-    const point = (p: Vector2) => `${rounded(p.x)} ${rounded(p.y)}`;
     return (
         <Stretch
-            d={`M ${point(along[0])} ${along
+            d={`M ${svgPoint(along[0])} ${along
                 .slice(1)
-                .map((p) => `L ${point(p)}`)
+                .map((p) => `L ${svgPoint(p)}`)
                 .join(" ")}`}
             offset={0}
             length={tape - left}
