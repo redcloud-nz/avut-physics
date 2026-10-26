@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { deleteStrand, setRopeColour } from "./edits";
+import { deleteStrand, movePin, setRopeColour } from "./edits";
 import type { KnotFile } from "./format";
 import { editorReducer, loaded, NOTHING } from "./state";
-import { testPicture, testStrand } from "./test-pictures";
+import { free, testPicture, testStrand } from "./test-pictures";
 
 const line = (y: number) =>
     testStrand("rope", [
@@ -40,5 +40,27 @@ describe("a whole strand selected", () => {
     it("goes when its strand does", () => {
         const after = editorReducer(selected, { type: "edit", edit: (q) => deleteStrand(q, 1) });
         expect(after.selection).toEqual(NOTHING);
+    });
+});
+
+describe("merged edits", () => {
+    const start = loaded(file, "three.json");
+    const nudge = (state: typeof start, merge = "move") =>
+        editorReducer(state, {
+            type: "edit",
+            edit: (q) => movePin(q, [0, 0], free(q.strands[0].pins[0]).x + 1, 0),
+            merge,
+        });
+
+    it("go into one history entry, one after another", () => {
+        const after = nudge(nudge(nudge(start)));
+        expect(after.undo).toHaveLength(1);
+        expect(editorReducer(after, { type: "undo" }).file).toBe(file);
+    });
+
+    it("start a new entry after anything else, or a different merge", () => {
+        const selected = editorReducer(nudge(start), { type: "select", selection: NOTHING });
+        expect(nudge(selected).undo).toHaveLength(2);
+        expect(nudge(nudge(start), "turn").undo).toHaveLength(2);
     });
 });

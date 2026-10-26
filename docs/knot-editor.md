@@ -254,9 +254,11 @@ chrome for addresses that match no page.
 └───────────────────────────────────────────────────────────────┘
 ```
 
-- **Menu bar** (shadcn's Menubar, on Radix), each item with its keyboard shortcut:
+- **Menu bar** (shadcn's Menubar, on Radix), each item with its keyboard shortcut if it has one. Inserting has none,
+  and of the View toggles only Grid (G) and Snap to Grid (F) do:
   - File: New, Open…, Save, Save As…, Knot Details… (a dialog for the name, description, about text and frame)
-  - Edit: Undo, Redo, Delete, Select All, Link Pins, Unlink
+  - Edit: Undo, Redo, Delete, Select All, Select None, Select Next Pin, Select Previous Pin, Move (Up, Left, Down,
+    Right, Turn Anticlockwise, Turn Clockwise), Link Pins, Unlink
   - Insert: Pin, Rope, Arrow, Prop (each kind), Step
   - View: Zoom In, Zoom Out, Fit, Pin Numbers, Handles, Crossings, Bend Warnings, Grid, Snap to Grid
   - Help: Shortcuts
@@ -275,6 +277,16 @@ chrome for addresses that match no page.
     prop to move it in front or behind.
   - A linked pin's handle is a ring rather than a dot, with a thin line to its leader.
   - Scroll to zoom, drag the background to pan.
+- **Keyboard**, so the right hand can stay on the mouse:
+  - W, A, S and D (or the arrow keys) move what's selected: pins, a segment's two pins, a whole strand, or a prop.
+    Each press goes 1 mm, or 10 mm with Shift. With snap on, it takes the first pin (or the prop's centre) to the
+    next line of the grid that way, the finest drawn at the zoom, or with Shift the level above; the rest go with it.
+  - Q and E turn the selected pins anticlockwise and clockwise on the screen: 5°, or 15° with Shift, and with snap
+    on, to the next multiple of that. A pin holding no angle starts from the way its curve runs.
+  - Moves and turns go as drags do: a linked pin moves or turns the free pin heading its chain. A run of presses is
+    one entry in the history, so one undo takes it all back.
+  - Tab and Shift+Tab select the next or previous pin, along its strand and on into the next; Escape selects nothing.
+    On a button, slider or menu, Tab, Escape and the arrow keys are its own; clicking the drawing gives them back.
 - **Right:** what's selected, every value typed or changed there, with its unit:
   - pin: x, y, angle (blank for none), shift;
   - linked pin: its place and angle (shown, not typed), what it's linked to, its side, gap and direction, and Unlink;

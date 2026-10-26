@@ -43,21 +43,27 @@ function Rows(props: { rows: [string, string][] }) {
 export function ShortcutsDialog(props: { open: boolean; onOpenChange: (open: boolean) => void }) {
     const keys = MENUS.flatMap((menu) =>
         menu.items
-            .flatMap((item): CommandId[] =>
-                item === null ? [] : typeof item === "string" ? [item] : item.items,
+            .flatMap((item): [CommandId, string?][] =>
+                item === null
+                    ? []
+                    : typeof item === "string"
+                      ? [[item]]
+                      : item.items.map((id): [CommandId, string] => [id, item.submenu]),
             )
-            .flatMap((id): [string, string][] => {
+            .flatMap(([id, submenu]): [string, string][] => {
                 const command: Command = COMMANDS[id];
                 if (!command.shortcut) return [];
                 const label = command.label.replace("…", "");
-                // Out of its menu, a label like "Rope" says what it does with the menu's name.
-                const what =
-                    menu.name === "Insert"
-                        ? `Insert ${label.toLowerCase()}`
-                        : command.toggle
-                          ? `Show or hide ${label.toLowerCase()}`
-                          : label;
-                return [[what, shortcutLabel(command.shortcut)]];
+                // Out of its submenu, a label like "Up" says what it does with the submenu's name.
+                const what = command.toggle
+                    ? `${label} on or off`
+                    : submenu && !label.startsWith("Turn")
+                      ? `${submenu} ${label}`
+                      : label;
+                const keys = [command.shortcut, ...(command.also ?? [])].map((key) =>
+                    shortcutLabel(key),
+                );
+                return [[what, keys.join(" or ")]];
             }),
     );
     return (
@@ -66,8 +72,9 @@ export function ShortcutsDialog(props: { open: boolean; onOpenChange: (open: boo
                 <DialogHeader>
                     <DialogTitle>Shortcuts</DialogTitle>
                     <DialogDescription>
-                        While you&apos;re typing in a field, keys without ⌘ (Ctrl off a Mac) type
-                        there, and so do undo, redo and select all.
+                        Hold Shift with a move or a turn for a bigger step. While you&apos;re typing
+                        in a field, keys without ⌘ (Ctrl off a Mac) type there, and so do undo, redo
+                        and select all.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-6">

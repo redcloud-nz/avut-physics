@@ -38,8 +38,10 @@ import {
 } from "./edits";
 import { canUseFiles, openKnotFile, saveKnotFile, saveKnotFileAs } from "./files";
 import { isLinked, type KnotFile, type PinRef } from "./format";
+import { pictureGeometry } from "./geometry";
 import { Inspector } from "./inspector";
-import { Menus, propCommand, useShortcuts, type CommandId } from "./menus";
+import { FAR_TURN_STEP, moved, moveStep, nextPin, TURN_STEP, turned } from "./keyboard";
+import { Menus, propCommand, useShortcuts, type CommandId, type RunOptions } from "./menus";
 import { ObjectsList } from "./objects-list";
 import { PROP_KIND_NAMES, PROP_KINDS } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
@@ -75,6 +77,16 @@ export function untitledKnot(): KnotFile {
 }
 
 const UNTITLED = "untitled.json";
+
+/** Which way each move goes, y down. */
+const MOVE_DIRECTIONS = {
+    moveUp: { x: 0, y: -1 },
+    moveLeft: { x: -1, y: 0 },
+    moveDown: { x: 0, y: 1 },
+    moveRight: { x: 1, y: 0 },
+} as const;
+const MOVES = Object.keys(MOVE_DIRECTIONS) as (keyof typeof MOVE_DIRECTIONS)[];
+const isMove = (id: CommandId): id is (typeof MOVES)[number] => id in MOVE_DIRECTIONS;
 
 /** A message shown in a dialog: what went wrong, or what happened opening a file. */
 type Message = { title: string; text: string };
@@ -159,6 +171,12 @@ export default function KnotEditor() {
         dispatch({ type: "saved", file, handle: result.handle, fileName: result.handle.name });
     }
 
+    // Pins, segments, a strand or a prop can be moved; only pins turn.
+    const movable =
+        pins.length > 0 ||
+        segments.length > 0 ||
+        selection.kind === "strand" ||
+        selection.kind === "prop";
     const enabled: Partial<Record<CommandId, boolean>> = {
         new: true,
         open: files,
@@ -169,6 +187,12 @@ export default function KnotEditor() {
         redo: state.redo.length > 0,
         delete: pins.length > 0 || selection.kind === "prop" || selection.kind === "strand",
         selectAll: picture.strands.length > 0,
+        selectNone: selection.kind !== "parts" || pins.length > 0 || segments.length > 0,
+        nextPin: picture.strands.length > 0,
+        previousPin: picture.strands.length > 0,
+        ...Object.fromEntries(MOVES.map((id) => [id, movable])),
+        turnAnticlockwise: pins.length > 0,
+        turnClockwise: pins.length > 0,
         link: pins.length === 2,
         unlink: pins.some(([i, k]) => {
             const pin = picture.strands[i]?.pins[k];
@@ -264,7 +288,7 @@ export default function KnotEditor() {
             [n, 1],
         ]);
     }
-    const run = (id: CommandId) => {
+    const run = (id: CommandId, { far = false }: RunOptions = {}) => {
         if (id === "new") {
             if (mayDiscard())
                 dispatch({ type: "load", file: untitledKnot(), fileName: UNTITLED, saved: true });
@@ -288,7 +312,28 @@ export default function KnotEditor() {
             dispatch({ type: "edit", edit: (q) => linkPins(q, geometry, leader, follower) });
         } else if (id === "unlink")
             dispatch({ type: "edit", edit: (q) => pins.reduce(unlinkPin, q) });
-        else if (id === "selectAll")
+        else if (id === "selectNone") dispatch({ type: "select", selection: NOTHING });
+        else if (id === "nextPin" || id === "previousPin") {
+            const ref = nextPin(picture, selection, id === "nextPin" ? 1 : -1);
+            if (ref) selectPins([ref]);
+        } else if (isMove(id)) {
+            // From the picture as it is when the edit runs, so a key held down can't run ahead of the drawing.
+            const step = moveStep(canvas.current?.scale() ?? 1, show.snap, far);
+            const direction = MOVE_DIRECTIONS[id];
+            dispatch({
+                type: "edit",
+                edit: (q) => moved(q, pictureGeometry(q), selection, direction, step, show.snap),
+                merge: "move",
+            });
+        } else if (id === "turnAnticlockwise" || id === "turnClockwise") {
+            const step = far ? FAR_TURN_STEP : TURN_STEP;
+            const sign = id === "turnClockwise" ? 1 : -1;
+            dispatch({
+                type: "edit",
+                edit: (q) => turned(q, pictureGeometry(q), selection, sign, step, show.snap),
+                merge: "turn",
+            });
+        } else if (id === "selectAll")
             selectPins(picture.strands.flatMap((s, i) => s.pins.map((_, k): PinRef => [i, k])));
         else if (id === "insertPin") {
             // At the middle (by length) of the first segment selected.

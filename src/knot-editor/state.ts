@@ -35,6 +35,8 @@ export type EditorState = Snapshot & {
     dragging: boolean;
     /** How many files have been opened or made, so the view can start afresh for each. */
     loads: number;
+    /** The `merge` of the last action, if it was an edit with one: the next edit with the same goes into its entry. */
+    merging?: string;
 };
 
 export type EditorAction =
@@ -48,8 +50,11 @@ export type EditorAction =
       }
     /** This file written to the handle (it may be older than the file now, if edits came while it saved). */
     | { type: "saved"; file: KnotFile; handle: FileSystemFileHandle; fileName: string }
-    /** An edit to the picture being edited, given new ids from the file for anything it makes. */
-    | { type: "edit"; edit: (picture: Picture, ids: Ids) => Picture | Edited }
+    /**
+     * An edit to the picture being edited, given new ids from the file for anything it makes. Edits with the same
+     * `merge`, one straight after another, go into one history entry: a run of moves from the keyboard undoes at once.
+     */
+    | { type: "edit"; edit: (picture: Picture, ids: Ids) => Picture | Edited; merge?: string }
     /**
      * An edit to the file as a whole (its steps, details or frame), showing `show` after it where given. During a drag
      * it goes into the drag's entry, as `edit` does.
@@ -136,7 +141,12 @@ const returnTo = (state: EditorState, entry: Snapshot): Snapshot => ({
     selection: state.picture === entry.picture ? state.selection : NOTHING,
 });
 
-export function editorReducer(state: EditorState, action: EditorAction): EditorState {
+export function editorReducer(previous: EditorState, action: EditorAction): EditorState {
+    const merge = action.type === "edit" ? action.merge : undefined;
+    const merged = merge !== undefined && previous.merging === merge;
+    // Anything else ends a run of merged edits.
+    const state =
+        previous.merging !== undefined && !merged ? { ...previous, merging: undefined } : previous;
     switch (action.type) {
         case "load":
             return { ...loaded(action.file, action.fileName, action), loads: state.loads + 1 };
@@ -161,9 +171,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
                     edited.picture,
                     edited.renumbering,
                 ),
-                // A drag's moves go into the entry it began with.
-                undo: state.dragging ? state.undo : [...state.undo, snapshot(state)],
-                redo: state.dragging ? state.redo : [],
+                // A drag's moves go into the entry it began with, as do merged edits.
+                undo: state.dragging || merged ? state.undo : [...state.undo, snapshot(state)],
+                redo: state.dragging || merged ? state.redo : [],
+                ...(merge !== undefined && { merging: merge }),
             };
         }
         case "edit-file": {

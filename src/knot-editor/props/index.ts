@@ -35,9 +35,8 @@ export type PropField<P> = { label: string } & (
 /** What every kind of prop gives the editor. */
 export type PropKind<P extends Prop> = {
     kind: P["kind"];
-    /** Its name in Insert > Prop and the panel, and the letter that inserts one (the key, on a QWERTY keyboard). */
+    /** Its name in Insert > Prop and the panel. */
     label: string;
-    key: string;
     /** A new one, centred here, with this id. */
     create(at: Vector2, id: number): P;
     /** It moved by this much (millimetres). */

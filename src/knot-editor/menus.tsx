@@ -35,11 +35,28 @@ export type Shortcut = {
     alt?: boolean;
 };
 
-export type Command = { label: string; shortcut?: Shortcut; toggle?: boolean };
+/**
+ * `also` are more keys for the same command (the arrow keys, beside W, A, S and D). A `far` command's keys work with
+ * Shift held too, for a bigger step.
+ */
+export type Command = {
+    label: string;
+    shortcut?: Shortcut;
+    also?: Shortcut[];
+    far?: boolean;
+    toggle?: boolean;
+};
+
+/** How a command was asked for: `far` when it was a `far` command's key with Shift. */
+export type RunOptions = { far?: boolean };
 
 const letter = (l: string) => ({ code: `Key${l}`, label: l });
+const arrow = (way: string, label: string) => ({ code: `Arrow${way}`, label });
 
-/** Every command but the props', with its shortcut. Chrome keeps ⌘N, ⌘T and ⌘W for itself, so New is ⌥⌘N. */
+/**
+ * Every command but the props', with its shortcut if it has one. Inserting has none. Chrome keeps ⌘N, ⌘T and ⌘W for
+ * itself, so New is ⌥⌘N.
+ */
 const BASE_COMMANDS = {
     new: { label: "New", shortcut: { ...letter("N"), mod: true, alt: true } },
     open: { label: "Open…", shortcut: { ...letter("O"), mod: true } },
@@ -50,25 +67,33 @@ const BASE_COMMANDS = {
     redo: { label: "Redo", shortcut: { ...letter("Z"), mod: true, shift: true } },
     delete: { label: "Delete", shortcut: { code: "Backspace", label: "⌫" } },
     selectAll: { label: "Select All", shortcut: { ...letter("A"), mod: true } },
+    selectNone: { label: "Select None", shortcut: { code: "Escape", label: "Esc" } },
+    nextPin: { label: "Select Next Pin", shortcut: { code: "Tab", label: "⇥" } },
+    previousPin: {
+        label: "Select Previous Pin",
+        shortcut: { code: "Tab", label: "⇥", shift: true },
+    },
+    moveUp: { label: "Up", shortcut: letter("W"), also: [arrow("Up", "↑")], far: true },
+    moveLeft: { label: "Left", shortcut: letter("A"), also: [arrow("Left", "←")], far: true },
+    moveDown: { label: "Down", shortcut: letter("S"), also: [arrow("Down", "↓")], far: true },
+    moveRight: { label: "Right", shortcut: letter("D"), also: [arrow("Right", "→")], far: true },
+    turnAnticlockwise: { label: "Turn Anticlockwise", shortcut: letter("Q"), far: true },
+    turnClockwise: { label: "Turn Clockwise", shortcut: letter("E"), far: true },
     link: { label: "Link Pins", shortcut: letter("L") },
     unlink: { label: "Unlink", shortcut: { ...letter("L"), shift: true } },
-    insertPin: { label: "Pin", shortcut: letter("P") },
-    insertRope: { label: "Rope", shortcut: letter("R") },
-    insertArrow: { label: "Arrow", shortcut: letter("A") },
-    insertStep: { label: "Step", shortcut: letter("S") },
+    insertPin: { label: "Pin" },
+    insertRope: { label: "Rope" },
+    insertArrow: { label: "Arrow" },
+    insertStep: { label: "Step" },
     zoomIn: { label: "Zoom In", shortcut: { code: "Equal", label: "=", mod: true } },
     zoomOut: { label: "Zoom Out", shortcut: { code: "Minus", label: "−", mod: true } },
     fit: { label: "Fit", shortcut: { code: "Digit0", label: "0", mod: true } },
-    pinNumbers: { label: "Pin Numbers", shortcut: { code: "Digit1", label: "1" }, toggle: true },
-    handles: { label: "Handles", shortcut: { code: "Digit2", label: "2" }, toggle: true },
-    crossings: { label: "Crossings", shortcut: { code: "Digit3", label: "3" }, toggle: true },
-    bendWarnings: {
-        label: "Bend Warnings",
-        shortcut: { code: "Digit4", label: "4" },
-        toggle: true,
-    },
-    grid: { label: "Grid", shortcut: { code: "Digit5", label: "5" }, toggle: true },
-    snap: { label: "Snap to Grid", shortcut: { code: "Digit6", label: "6" }, toggle: true },
+    pinNumbers: { label: "Pin Numbers", toggle: true },
+    handles: { label: "Handles", toggle: true },
+    crossings: { label: "Crossings", toggle: true },
+    bendWarnings: { label: "Bend Warnings", toggle: true },
+    grid: { label: "Grid", shortcut: letter("G"), toggle: true },
+    snap: { label: "Snap to Grid", shortcut: letter("F"), toggle: true },
     shortcuts: { label: "Shortcuts", shortcut: { code: "Slash", label: "?", shift: true } },
 } satisfies Record<string, Command>;
 
@@ -81,10 +106,7 @@ export type CommandId = keyof typeof BASE_COMMANDS | PropCommandId;
 export const COMMANDS: Record<CommandId, Command> = {
     ...BASE_COMMANDS,
     ...(Object.fromEntries(
-        PROP_KIND_NAMES.map((kind) => [
-            propCommand(kind),
-            { label: PROP_KINDS[kind].label, shortcut: letter(PROP_KINDS[kind].key) },
-        ]),
+        PROP_KIND_NAMES.map((kind) => [propCommand(kind), { label: PROP_KINDS[kind].label }]),
     ) as Record<PropCommandId, Command>),
 };
 
@@ -94,7 +116,35 @@ export type MenuItem = CommandId | null | { submenu: string; items: CommandId[] 
 /** The menus, their items in order. */
 export const MENUS: { name: string; items: MenuItem[] }[] = [
     { name: "File", items: ["new", "open", null, "save", "saveAs", null, "details"] },
-    { name: "Edit", items: ["undo", "redo", null, "delete", "selectAll", null, "link", "unlink"] },
+    {
+        name: "Edit",
+        items: [
+            "undo",
+            "redo",
+            null,
+            "delete",
+            null,
+            "selectAll",
+            "selectNone",
+            "nextPin",
+            "previousPin",
+            null,
+            {
+                submenu: "Move",
+                items: [
+                    "moveUp",
+                    "moveLeft",
+                    "moveDown",
+                    "moveRight",
+                    "turnAnticlockwise",
+                    "turnClockwise",
+                ],
+            },
+            null,
+            "link",
+            "unlink",
+        ],
+    },
     {
         name: "Insert",
         items: [
@@ -133,8 +183,8 @@ export function shortcutLabel(s: Shortcut, mac = isMac()): string {
     return [s.mod && "Ctrl", s.alt && "Alt", s.shift && "Shift", s.label].filter(Boolean).join("+");
 }
 
-/** Whether a key press is this shortcut. */
-function matches(s: Shortcut, e: KeyboardEvent, mac: boolean): boolean {
+/** Whether a key press is this shortcut; with `far`, held with Shift or not. */
+function matches(s: Shortcut, e: KeyboardEvent, mac: boolean, far = false): boolean {
     const mod = mac ? e.metaKey : e.ctrlKey;
     const other = mac ? e.ctrlKey : e.metaKey;
     const code = s.code === "Backspace" && e.code === "Delete" ? "Backspace" : e.code;
@@ -143,7 +193,7 @@ function matches(s: Shortcut, e: KeyboardEvent, mac: boolean): boolean {
         mod === !!s.mod &&
         !other &&
         e.altKey === !!s.alt &&
-        e.shiftKey === !!s.shift
+        (far || e.shiftKey === !!s.shift)
     );
 }
 
@@ -156,6 +206,13 @@ const typing = (target: EventTarget | null) =>
     !(target instanceof HTMLInputElement && NOT_TYPED.includes(target.type)) &&
     (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
+/** Keys a focused control uses itself: to move focus, close, or step its value. */
+const CONTROL_KEYS = /^(Tab|Escape|Arrow\w+)$/;
+
+/** Whether the key went to a control (a button, a slider, a menu item) rather than the page as a whole. */
+const onControl = (target: EventTarget | null) =>
+    target instanceof HTMLElement && target !== document.body;
+
 /** Shortcuts a field being typed in keeps for itself: undoing and selecting its own text. */
 const FIELD_COMMANDS: CommandId[] = ["undo", "redo", "selectAll"];
 
@@ -166,7 +223,7 @@ const FIELD_COMMANDS: CommandId[] = ["undo", "redo", "selectAll"];
  */
 export function useShortcuts(
     enabled: Partial<Record<CommandId, boolean>>,
-    run: (id: CommandId) => void,
+    run: (id: CommandId, options?: RunOptions) => void,
 ) {
     const latest = useRef({ enabled, run });
     useEffect(() => {
@@ -176,11 +233,16 @@ export function useShortcuts(
         const mac = isMac();
         const onKey = (e: KeyboardEvent) => {
             for (const [id, command] of Object.entries(COMMANDS) as [CommandId, Command][]) {
-                const s = command.shortcut;
-                if (!s || !matches(s, e, mac)) continue;
+                const s = [command.shortcut ?? [], command.also ?? []]
+                    .flat()
+                    .find((key) => matches(key, e, mac, command.far));
+                if (!s) continue;
                 if (typing(e.target) && ((!s.mod && !s.alt) || FIELD_COMMANDS.includes(id))) return;
+                // On a control (a button, a slider, a menu), Tab, Escape and the arrow keys are its own.
+                if (CONTROL_KEYS.test(s.code) && onControl(e.target)) return;
                 e.preventDefault();
-                if (latest.current.enabled[id]) latest.current.run(id);
+                if (latest.current.enabled[id])
+                    latest.current.run(id, command.far ? { far: e.shiftKey } : undefined);
                 return;
             }
         };

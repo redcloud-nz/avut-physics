@@ -41,7 +41,6 @@ const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 export const BAR = {
     kind: "bar" as const,
     label: "Bar",
-    key: "B",
 
     create: (at: Vector2, id: number): BarProp => ({
         id,

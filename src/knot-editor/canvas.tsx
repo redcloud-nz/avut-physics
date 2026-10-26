@@ -105,6 +105,8 @@ export type CanvasControls = {
     setScale(scale: number): void;
     fit(): void;
     centre(): Vector2;
+    /** The zoom (pixels per millimetre). */
+    scale(): number;
 };
 
 /** What a drag rounds places to (millimetres). */
@@ -224,6 +226,7 @@ export function Canvas(props: {
                 const v = latest.current.view;
                 return v ? new Vector2(v.cx, v.cy) : Vector2.ZERO;
             },
+            scale: () => latest.current.view?.scale ?? 1,
         }),
         [],
     );
@@ -343,6 +346,8 @@ export function Canvas(props: {
 
     const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
         if (e.button !== 0 || !latest.current.view) return;
+        // Keys go to the drawing once it's clicked, not to a button or field clicked before.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         const { picture, geometry, selection } = latest.current;
         const parts = selection.kind === "parts" ? selection : { pins: [], segments: [] };
         const hit = hitAt(e.target);
