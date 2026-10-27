@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { aboutParagraphs, fullName, KNOTS, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
+import { aboutParagraphs, fullName, KNOTS, KNOTS_IMAGE, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
 import { KnotPage } from "@/knots/knot-page";
@@ -24,6 +24,7 @@ export async function generateMetadata(
             description: knot.file.description,
             url: `${KNOTS_PATH}/${slug}`,
             type: "website",
+            images: [KNOTS_IMAGE],
         },
     };
 }

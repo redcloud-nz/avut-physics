@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { Picture } from "@/knot-editor/knot-file";
-import { endsBothWays, fullName, KNOTS, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
+import { endsBothWays, fullName, KNOTS, KNOTS_IMAGE, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, knotView, workedPicture } from "@/knots/knot-drawing";
 import { KnotsMenu } from "@/knots/knots-menu";
@@ -45,7 +45,13 @@ const SCALE = Math.min(
 export const metadata: Metadata = {
     title: `${TITLE}, ${KNOTS_TITLE}`,
     description: DESCRIPTION,
-    openGraph: { title: TITLE, description: DESCRIPTION, url: HREF, type: "website" },
+    openGraph: {
+        title: TITLE,
+        description: DESCRIPTION,
+        url: HREF,
+        type: "website",
+        images: [KNOTS_IMAGE],
+    },
 };
 
 /**

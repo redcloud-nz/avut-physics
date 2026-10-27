@@ -2,7 +2,8 @@
 
 Exploring knots drawn in 2D SVG: how they look, how they're tied (with props like a bar and hands), and how
 they tighten. Work in progress, not listed on the home page: Rescue Knots, at `/rescue-knots`, lists the knots
-(`src/knots/index.ts`), laid out like the visual introduction's first page, and each has a page at
+(`src/knots/index.ts`), laid out like the visual introduction's first page, with a share picture of its own (`share-image.tsx`), and each has
+a page at
 `/rescue-knots/<slug>`: the knot finished and how it's used (`knot-page.tsx`), with a button that
 brings up tying it over the page, a figure at a time, laid out like a page of the visual introduction
 (`tying-steps.tsx`). Knots without steps, like the round turn and two half hitches, show only the finished knot.
@@ -13,8 +14,9 @@ Each knot is a knot file, `src/knots/files/<slug>.json`, made and edited in the 
 `docs/knot-editor.md`): its description, its details (paragraphs split at blank lines), the knot finished, its steps
 and their frame. `index.ts` imports each file and reads it with `readKnotJson`, failing the build where one doesn't
 read, and adds what the file doesn't hold: the knot's slug, its name split from its variant for the headline, and
-whether the list lays it on its side (`turned`). A knot marked `hidden` (the alpine butterfly, for now) has no page and
-isn't listed, but is still in the knot editor's library. To change a knot, open its file in the editor, save it back over the
+whether the list lays it on its side (`turned`). Knots still to come are listed too, greyed out as
+coming soon, with no page: those with no file yet (`soon` in `index.ts`), and those with a file marked `comingSoon`
+while their drawing's worked on (the alpine butterfly), which are still in the knot editor's library. To change a knot, open its file in the editor, save it back over the
 file, and commit it.
 
 The pages draw every picture with the editor's own drawing (`PictureDrawing`, through `KnotDrawing` in
@@ -40,6 +42,11 @@ The files were first made by a converter from the knots' earlier drawings (pinne
 an older rope editor at `/knots/edit`), which fitted the editor's curves to each rope as drawn and linked pins where two
 stretches run side by side. That code is gone (it's in git history before the commit that removed it); the files are
 the source now.
+
+The share picture draws two knots as their pages do. Next won't let a route import `react-dom/server`, so
+`share-image.test.ts` draws them to SVG and keeps that in `share-knots.json`, a file snapshot: when a knot or the drawing
+changes, the test fails until it's drawn again with `npx vitest run src/knots/share-image.test.ts -u`. The picture swaps
+the colour tokens in that SVG for their values in `globals.css`, since next/og draws without the stylesheet.
 
 ## Next
 

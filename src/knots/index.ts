@@ -21,6 +21,17 @@ export const KNOTS_TITLE = "Rescue Knots";
 /** Where the knots' pages are: the list of them, and each knot's page under it. */
 export const KNOTS_PATH = "/rescue-knots";
 
+/**
+ * The knots' share picture (see `share-image.tsx`), for pages among the knots that set their own Open Graph details,
+ * which would otherwise leave out the picture their first page has.
+ */
+export const KNOTS_IMAGE = {
+    url: `${KNOTS_PATH}/preview.png`,
+    width: 1200,
+    height: 630,
+    alt: KNOTS_TITLE,
+};
+
 /** What the knots pages are, in a sentence, for the list and for links to it. */
 export const KNOTS_DESCRIPTION = "How to tie the knots used in rope rescue, a step at a time.";
 
@@ -41,10 +52,24 @@ export type Knot = {
     midline?: boolean;
     /** Lie the knot on its side in the list of knots, where a long, upright knot would be too small to see. */
     turned?: boolean;
-    /** Left off the site for now, while its drawing's worked on: it has no page and isn't listed. */
-    hidden?: boolean;
+    /**
+     * Not ready yet, while its drawing's worked on: listed, greyed out, as coming soon, with no page. It's still in the
+     * knot editor's library.
+     */
+    comingSoon?: boolean;
     file: KnotFile;
 };
+
+/** A knot to come that has no file yet: listed, greyed out, as coming soon, with no page or drawing. */
+export type ComingSoon = { name: string; variant?: string; comingSoon: true };
+
+/** A knot in the list: one with a file, ready or not, or one to come. */
+export type KnotEntry = Knot | ComingSoon;
+
+/** Whether a knot in the list is ready, with its page and drawing. */
+export const isReady = (entry: KnotEntry): entry is Knot => "file" in entry && !entry.comingSoon;
+
+const soon = (name: string): ComingSoon => ({ name, comingSoon: true });
 
 /** The knot's whole name, its variant and all ("Figure-8 on a bight"), for the page's title and labels. */
 export const fullName = (knot: Pick<Knot, "name" | "variant">) =>
@@ -70,8 +95,8 @@ const knot = (slug: string, json: unknown, rest: Omit<Knot, "slug" | "file">): K
     file: knotFile(slug, json),
 });
 
-/** Every knot in its family, hidden ones too. */
-const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
+/** The knots in their families, in the order they're listed, those to come too. */
+export const KNOT_SECTIONS: { title: string; knots: KnotEntry[] }[] = [
     {
         title: "Figure-8s",
         knots: [
@@ -101,7 +126,12 @@ const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
                 abok: 1411,
                 turned: true,
             }),
+            soon("Double figure-8"),
         ],
+    },
+    {
+        title: "Stoppers",
+        knots: [soon("Barrel knot")],
     },
     {
         title: "Loops",
@@ -112,7 +142,7 @@ const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
                 abok: 1053,
                 midline: true,
                 turned: true,
-                hidden: true,
+                comingSoon: true,
             }),
         ],
     },
@@ -125,6 +155,8 @@ const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
                 abok: 1204,
                 turned: true,
             }),
+            soon("Double fisherman's"),
+            soon("Tape knot"),
         ],
     },
     {
@@ -143,20 +175,30 @@ const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
                 abok: 1818,
                 turned: true,
             }),
+            soon("Munter mule overhand"),
+            soon("Clove hitch"),
+            soon("Girth hitch"),
+            soon("Tensionless hitch"),
+        ],
+    },
+    {
+        title: "Friction hitches",
+        knots: [
+            soon("Prusik"),
+            soon("Klemheist"),
+            soon("Valdotain tresse"),
+            soon("Radium release hitch"),
         ],
     },
 ];
 
-/** Every knot file, hidden knots' too, for the knot editor's library. */
-export const ALL_KNOTS: Knot[] = ALL_SECTIONS.flatMap((section) => section.knots);
+/** Every knot with a file, those not ready too, for the knot editor's library. */
+export const ALL_KNOTS: Knot[] = KNOT_SECTIONS.flatMap((section) =>
+    section.knots.filter((entry): entry is Knot => "file" in entry),
+);
 
-/** The knots shown on the site in their families, in the order they're listed, leaving out families with none. */
-export const KNOT_SECTIONS = ALL_SECTIONS.map((section) => ({
-    ...section,
-    knots: section.knots.filter((knot) => !knot.hidden),
-})).filter((section) => section.knots.length);
-
-export const KNOTS: Knot[] = KNOT_SECTIONS.flatMap((section) => section.knots);
+/** The knots that are ready, each with its page. */
+export const KNOTS: Knot[] = KNOT_SECTIONS.flatMap((section) => section.knots.filter(isReady));
 
 /** The knot's details, a paragraph for each run of text between blank lines. */
 export const aboutParagraphs = (file: KnotFile) =>

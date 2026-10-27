@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import type { ReactNode } from "react";
 
 import { SITE } from "@/articles/prose";
 import { vec2, type Vector2 } from "@/lib/vector2";
@@ -110,7 +111,16 @@ function Icon() {
     );
 }
 
-export function shareImage(props: { eyebrow: string; title: string; text: string }) {
+/**
+ * A share picture: the eyebrow, title and text down the left, the site at the foot, and a picture on the right (by
+ * default, the forces on a bolt).
+ */
+export function shareImage(props: {
+    eyebrow: string;
+    title: string;
+    text: string;
+    picture?: ReactNode;
+}) {
     return new ImageResponse(
         <div
             style={{
@@ -156,7 +166,7 @@ export function shareImage(props: { eyebrow: string; title: string; text: string
                     {SITE}
                 </div>
             </div>
-            <Forces />
+            {props.picture ?? <Forces />}
         </div>,
         SHARE_IMAGE_SIZE,
     );

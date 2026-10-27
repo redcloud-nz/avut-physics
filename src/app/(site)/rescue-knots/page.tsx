@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * The knots' first page, laid out like the visual introduction's: what they are, a button to the first page in the
- * list, the list of knots in their families, each with a small drawing of it finished, and ways to pass the page on. On
+ * The knots' first page, laid out like the visual introduction's: what they are (on a wide screen, the picture a shared
+ * link shows, which says it), a button to the first page in the list (the terminology), the list of knots in their families, each with a small drawing of it finished, and ways to pass the page on. On
  * a wide screen the list is in the column to the left already, so it's left out here, as is the link home, and the
  * link to the source goes at the foot of this column.
  */
@@ -27,10 +27,22 @@ export default function Page() {
                 <Link href="/" className="text-sm text-link hover:text-highlight lg:hidden">
                     ← Physics Visualisations
                 </Link>
-                <h1 className="text-3xl leading-tight font-semibold text-ink-bright">{TITLE}</h1>
-                <p className="text-ink-soft">{DESCRIPTION}</p>
+                {/* The picture a shared link shows. */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- already a sized PNG, with nothing to optimise */}
+                <img
+                    src={`${KNOTS_PATH}/preview.png`}
+                    alt=""
+                    width={1200}
+                    height={630}
+                    className="hidden h-auto w-full rounded-xl border border-line-faint lg:block"
+                />
+                {/* Beside the picture it would say the same again, so there it's left to screen readers. */}
+                <h1 className="text-3xl leading-tight font-semibold text-ink-bright lg:sr-only">
+                    {TITLE}
+                </h1>
+                <p className="text-ink-soft lg:sr-only">{DESCRIPTION}</p>
                 <Link
-                    href={contents[0].knots[0].href}
+                    href={`${KNOTS_PATH}/terminology`}
                     className="rounded-xl bg-action py-2 text-center text-sm font-medium text-primary-foreground hover:bg-action-hover"
                 >
                     Start

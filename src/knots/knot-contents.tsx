@@ -4,7 +4,7 @@
  * server (see `KnotDrawing`).
  */
 
-import { endsBothWays, KNOT_SECTIONS, KNOTS, KNOTS_PATH } from ".";
+import { endsBothWays, isReady, KNOT_SECTIONS, KNOTS, KNOTS_PATH } from ".";
 import { KnotDrawing, knotView, workedPicture } from "./knot-drawing";
 import type { KnotContents } from "./knot-list";
 import { TERMINOLOGY_TITLE } from "./terminology";
@@ -33,7 +33,8 @@ const BOX = { w: Math.ceil(Math.max(...SIZES.map((size) => size.w)) * LIST_SCALE
 
 /**
  * The terminology page, on its own ahead of the knots, then the knots in their sections, each drawn at the same size per
- * millimetre, so their ropes look as thick, and starting at its box's left, so the knots line up.
+ * millimetre, so their ropes look as thick, and starting at its box's left, so the knots line up. Knots to come have no
+ * page or drawing.
  */
 export function knotContents(): KnotContents {
     const terminology = {
@@ -44,24 +45,28 @@ export function knotContents(): KnotContents {
         terminology,
         ...KNOT_SECTIONS.map((section) => ({
             title: section.title,
-            knots: section.knots.map((knot) => ({
-                href: `${KNOTS_PATH}/${knot.slug}`,
-                name: knot.name,
-                variant: knot.variant,
-                drawing: (
-                    <div
-                        className="flex shrink-0 items-center"
-                        style={{ width: BOX.w, height: BOX.h }}
-                    >
-                        <KnotDrawing
-                            {...DRAWN.get(knot.slug)!}
-                            turned={knot.turned}
-                            label={null}
-                            scale={LIST_SCALE}
-                        />
-                    </div>
-                ),
-            })),
+            knots: section.knots.map((knot) =>
+                !isReady(knot)
+                    ? { name: knot.name, variant: knot.variant, comingSoon: true as const }
+                    : {
+                          href: `${KNOTS_PATH}/${knot.slug}`,
+                          name: knot.name,
+                          variant: knot.variant,
+                          drawing: (
+                              <div
+                                  className="flex shrink-0 items-center"
+                                  style={{ width: BOX.w, height: BOX.h }}
+                              >
+                                  <KnotDrawing
+                                      {...DRAWN.get(knot.slug)!}
+                                      turned={knot.turned}
+                                      label={null}
+                                      scale={LIST_SCALE}
+                                  />
+                              </div>
+                          ),
+                      },
+            ),
         })),
     ];
 }

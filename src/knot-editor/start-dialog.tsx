@@ -21,7 +21,7 @@ import type { KnotFile } from "./knot-file";
 export const LIBRARY = ALL_KNOTS.map((knot) => ({
     slug: knot.slug,
     name: fullName(knot),
-    hidden: knot.hidden,
+    comingSoon: knot.comingSoon,
     file: knot.file,
 }));
 
@@ -83,7 +83,7 @@ export function StartDialog(props: {
                                     className="flex w-full items-baseline justify-between gap-3 rounded-md px-2 py-1.5 text-left hover:bg-surface-raised"
                                 >
                                     {knot.name}
-                                    {knot.hidden && (
+                                    {knot.comingSoon && (
                                         <span className="text-xs text-ink-muted">
                                             not on the site
                                         </span>
