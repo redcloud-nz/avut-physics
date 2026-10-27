@@ -41,9 +41,9 @@ export const fullName = (knot: Pick<Knot, "name" | "variant">) =>
     knot.variant ? `${knot.name} ${knot.variant}` : knot.name;
 
 /** A knot file as it's imported, read and checked, failing the build where it isn't a knot file. */
-function knotFile(slug: string, json: unknown): KnotFile {
+export function knotFile(path: string, json: unknown): KnotFile {
     const read = readKnotJson(json as JsonValue);
-    if (read.kind === "error") throw new Error(`files/${slug}.json: ${read.reason}`);
+    if (read.kind === "error") throw new Error(`files/${path}.json: ${read.reason}`);
     return read.file;
 }
 

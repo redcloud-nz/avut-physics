@@ -7,6 +7,7 @@
 import { KNOT_SECTIONS, KNOTS } from ".";
 import { KnotDrawing, knotView, workedPicture } from "./knot-drawing";
 import type { KnotContents } from "./knot-list";
+import { TERMINOLOGY_TITLE } from "./terminology";
 
 /** The most room each knot's small drawing can have (pixels). */
 const ROOM = { w: 144, h: 48 };
@@ -32,26 +33,36 @@ const LIST_SCALE = Math.min(...SIZES.map((size) => Math.min(ROOM.w / size.w, ROO
 const BOX = { w: Math.ceil(Math.max(...SIZES.map((size) => size.w)) * LIST_SCALE), h: ROOM.h };
 
 /**
- * The knots in their sections, each drawn at the same size per millimetre, so their ropes look as thick, and starting
- * at its box's left, so the knots line up.
+ * The terminology page, on its own ahead of the knots, then the knots in their sections, each drawn at the same size per
+ * millimetre, so their ropes look as thick, and starting at its box's left, so the knots line up.
  */
 export function knotContents(): KnotContents {
-    return KNOT_SECTIONS.map((section) => ({
-        title: section.title,
-        knots: section.knots.map((knot) => ({
-            href: `/knots/${knot.slug}`,
-            name: knot.name,
-            variant: knot.variant,
-            drawing: (
-                <div className="flex shrink-0 items-center" style={{ width: BOX.w, height: BOX.h }}>
-                    <KnotDrawing
-                        {...DRAWN.get(knot.slug)!}
-                        turned={knot.turned}
-                        label={null}
-                        scale={LIST_SCALE}
-                    />
-                </div>
-            ),
+    const terminology = {
+        title: TERMINOLOGY_TITLE,
+        knots: [{ href: "/knots/terminology", name: TERMINOLOGY_TITLE }],
+    };
+    return [
+        terminology,
+        ...KNOT_SECTIONS.map((section) => ({
+            title: section.title,
+            knots: section.knots.map((knot) => ({
+                href: `/knots/${knot.slug}`,
+                name: knot.name,
+                variant: knot.variant,
+                drawing: (
+                    <div
+                        className="flex shrink-0 items-center"
+                        style={{ width: BOX.w, height: BOX.h }}
+                    >
+                        <KnotDrawing
+                            {...DRAWN.get(knot.slug)!}
+                            turned={knot.turned}
+                            label={null}
+                            scale={LIST_SCALE}
+                        />
+                    </div>
+                ),
+            })),
         })),
-    }));
+    ];
 }

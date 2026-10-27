@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-/** The knots in their sections, each with its page and its small drawing (drawn on the server: see `knotContents`). */
+/**
+ * The knots in their sections, each with its page and its small drawing (drawn on the server: see `knotContents`). Pages
+ * that aren't knots, such as the terminology, have no drawing.
+ */
 export type KnotContents = {
     title: string;
-    knots: { href: string; name: string; variant?: string; drawing: ReactNode }[];
+    knots: { href: string; name: string; variant?: string; drawing?: ReactNode }[];
 }[];
 
 /**
