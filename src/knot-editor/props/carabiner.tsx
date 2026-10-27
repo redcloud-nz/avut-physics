@@ -26,12 +26,12 @@ import { readPasses, type PassEntry } from "./passes";
 export type CarabinerProp = {
     id: number;
     kind: "carabiner";
-    /** Where its bottom end's centre is (millimetres, y down). */
+    /** Where its bottom end's centre is, on the rod's outer edge (millimetres, y down). */
     x: number;
     y: number;
     /** Its rod's radius (millimetres). */
     r: number;
-    /** How wide and tall it is, to the rod's middle line (millimetres). */
+    /** How wide and tall it is outside, to the rod's outer edges, as a real carabiner's size is given (millimetres). */
     width: number;
     height: number;
     /** Whether its gate is open, swung in about its hinge (closed if left out). */
@@ -40,7 +40,7 @@ export type CarabinerProp = {
     passes: PassEntry[];
 };
 
-/** A new carabiner's rod radius, width and height (millimetres). */
+/** A new carabiner's rod radius, and its width and height outside (millimetres): a real HMS's, a 12 mm rod. */
 const [RADIUS, WIDTH, HEIGHT] = [6, 72, 115];
 
 /** Its lines are drawn as thick as beside an 11 mm rope, whatever passes it. */

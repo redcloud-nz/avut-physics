@@ -345,11 +345,13 @@ html {
   --knot-bar: #94a3b8;
   --knot-bar-shade: #475569;
   --knot-bar-highlight: #f1f5f9;
-  /* The carabiner a knot's tied round: its body (dark grey anodised metal, its shading and highlight) and its locking
-     sleeve (violet, as on the Beal HMS it's drawn from). Its gate's bar is bare metal, the bar's colours. */
+  /* The carabiner a knot's tied round: its body (dark grey anodised metal, its shading and highlight, and its label
+     plate) and its locking sleeve (violet, as on the Beal HMS it's drawn from). Its gate's bar is bare metal, the bar's
+     colours. */
   --knot-carabiner: #64748b;
   --knot-carabiner-shade: #334155;
   --knot-carabiner-highlight: #cbd5e1;
+  --knot-carabiner-plate: #94a3b8;
   --knot-sleeve: #7c3aed;
   --knot-sleeve-shade: #4c1d95;
   --knot-sleeve-highlight: #c4b5fd;

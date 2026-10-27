@@ -89,14 +89,19 @@ A prop is drawn behind every strand, unless strands pass both in front of it and
 The first kind is the bar: end on (a circle, behind the rope) or side on (with a length, passes in front and behind).
 A new one is 17.6 mm in radius and 220 mm long. The second is the carabiner: a pear-shaped (HMS) carabiner seen face
 on, its wide end at the bottom, with passes in front and behind anywhere round that end (the rest of it takes no
-passes). It has a rod radius, a width and a height (to the rod's middle line), and its `x` and `y` are its bottom end's
-centre; a new one is the size of a real one: 6 mm in radius, 72 mm wide and 115 mm tall. It's drawn from a Beal HMS
-screw-gate, turned upside down, as filled parts: the body (spine, both ends and the keylock nose, with a channel and a
-label plate on the spine), the gate's bar, its locking sleeve and its hinge rivet. Its Gate field opens it (written
-`"open": true`, and left out when closed, so older files read as closed): the gate swings inwards about its rivet by
-33°, clear of the nose. Opening it changes no passes, which are all round the wide end. To come later: a ring, with
-passes in front and behind; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and
-flip, in front of or behind the strands.
+passes). It has a rod radius, a width and a height, and its `x` and `y` are its bottom end's centre. The width and
+height are its outside size, to the rod's outer edges, as a real carabiner's size is given, and `y` is on the rod's
+outer edge; a new one is the size of a real one: 72 mm wide and 115 mm tall, with a 12 mm rod (6 mm in radius). It's
+drawn from photos of a Beal HMS screw-gate, turned upside down, as filled parts: the body (spine, both ends and the
+keylock nose, with a channel along it and a label plate on the spine), the gate's bar, its locking sleeve (a knurled
+grip between two smooth ends: the top one with a window over the hinge rivet, the bottom one with a rounded slot the
+bar shows through and a longer tab on its inner side) and the rivet. The nose is a flat hook with a slot in its inner
+side, which the gate's end closes over. The rod is shaded as a round bar, with soft graded bands and a highlight, and
+the gate's parts with gradients across them. Its Gate field opens it (written `"open": true`, and left out when closed,
+so older files read as closed): the gate swings inwards about its rivet by 46°, as far as the real one's does, clear of
+the nose. Opening it changes no passes, which are all round the wide end. To come later: a ring, with passes in front
+and behind; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and flip, in front
+of or behind the strands.
 
 ## The frame
 
