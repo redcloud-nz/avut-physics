@@ -8,7 +8,7 @@ import { SystemDrawing, T } from "@/articles/pulley-figures";
 import { loadPerMetre, pullsOf, type PulleySystem } from "@/articles/pulley-systems";
 import { Slider } from "@/components/diagram/controls";
 import { teaching } from "@/lib/format";
-import { Layout, LOAD_KN, Readout, SVG } from "@/visual/frame";
+import { fraction, Layout, Readout, SVG } from "@/visual/frame";
 
 /*
  * Pulley systems drawn upright, for the pages on pulleys: hauled with a slider, or worked through with the T method
@@ -25,7 +25,6 @@ export function Haul(props: {
 }) {
     const [pulled, setPulled] = useState(0);
     const advantage = pullsOf(props.sys).advantage;
-    const force = (share: number) => teaching.kN(share * LOAD_KN, 2);
     return (
         <Layout
             drawing={
@@ -37,9 +36,9 @@ export function Haul(props: {
                     stretch={props.stretch}
                     className={SVG}
                     labels={{
-                        part: (_, t) => force(t / advantage),
+                        part: (_, t) => fraction(t / advantage),
                         sling: (id, pull) =>
-                            (props.sling?.(id) ?? true) ? force(pull / advantage) : null,
+                            (props.sling?.(id) ?? true) ? fraction(pull / advantage) : null,
                     }}
                 />
             }
@@ -58,8 +57,8 @@ export function Haul(props: {
             readouts={
                 <>
                     <Readout
-                        label={`you pull, for a ${LOAD_KN} kN load`}
-                        value={force(1 / advantage)}
+                        label="you pull, of the load"
+                        value={fraction(1 / advantage)}
                         color={COLORS.pull}
                     />
                     <Readout

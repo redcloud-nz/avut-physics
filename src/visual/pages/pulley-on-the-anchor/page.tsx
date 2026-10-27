@@ -52,7 +52,7 @@ function PulleyOnTheAnchorMore() {
                     <Var color={COLORS.load}>W</Var>, so:
                 </p>
                 <Eq tex={r`${HOLDS} = 2${W}`} />
-                <p>For the 1.2 kN load, you pull with 1.2 kN, and the anchor holds 2.4 kN.</p>
+                <p>The anchor holds twice what the load weighs.</p>
                 <p>
                     Seen from the anchor, that makes sense. It’s holding up the load, and it’s also
                     what you’re pulling against. Without the pulley, you’d be pulling on the anchor

@@ -70,8 +70,16 @@ export function Note(props: {
     );
 }
 
+/** The bottoms a pulley system's shares of its load are tried over, smallest first. */
+const DENOMINATORS = [2, 3, 4, 5, 6, 8, 9, 10, 12];
+
 /**
- * The load the pulley pages share out, in kilonewtons: about 120 kg, one person and their gear. It divides evenly by
- * 1, 2, 3 and 6, so every pulley system's pulls come out as round numbers.
+ * A share of the load, as the pulley pages give their pulls rather than in kilonewtons: "1/2" for half of it, "2" for
+ * twice it, in the smallest terms. A share that isn't a whole number or such a fraction is given to 0.01.
  */
-export const LOAD_KN = 1.2;
+export function fraction(share: number) {
+    const near = (x: number) => Math.abs(x - Math.round(x)) < 1e-9;
+    if (near(share)) return String(Math.round(share));
+    const d = DENOMINATORS.find((d) => near(share * d));
+    return d ? `${Math.round(share * d)}/${d}` : share.toFixed(2);
+}

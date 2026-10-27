@@ -23,9 +23,9 @@ function TwoToOneMore() {
                 </p>
                 <Eq tex={r`2${T} = ${W} \qquad\text{so}\qquad ${T} = \frac{${W}}{2}`} />
                 <p>
-                    One part is tied to the anchor and the other is you, so each holds half. For the
-                    1.2 kN load, that’s 0.6 kN each. On the anchor, the pulley’s doubling made the
-                    anchor hold more. Here, it makes the load get more than you put in.
+                    One part is tied to the anchor and the other is you, so each holds half the
+                    load. On the anchor, the pulley’s doubling made the anchor hold more. Here, it
+                    makes the load get more than you put in.
                 </p>
             </Section>
             <Section title="Twice the rope">
@@ -42,13 +42,13 @@ function TwoToOneMore() {
                     work done lifting the load:
                 </p>
                 <Eq
-                    tex={r`\underbrace{0.6\,\text{kN} \times 2\,\text{m}}_\text{you} = \underbrace{1.2\,\text{kN} \times 1\,\text{m}}_\text{the load} = 1.2\,\text{kJ}`}
+                    tex={r`\underbrace{\frac{${W}}{2} \times 2\,\text{m}}_\text{you} = \underbrace{${W} \times 1\,\text{m}}_\text{the load}`}
                 />
                 <p>
-                    A kilonewton pulled through a metre is a kilojoule. Every pulley system trades
-                    like this: it can make the pull smaller only by making the distance longer, by
-                    the same amount. That amount is the advantage. Pulleys don’t make the work any
-                    less; friction makes it a little more.
+                    Half the pull through twice the distance is the same work. Every pulley system
+                    trades like this: it can make the pull smaller only by making the distance
+                    longer, by the same amount. That amount is the advantage. Pulleys don’t make the
+                    work any less; friction makes it a little more.
                 </p>
             </Section>
         </>
