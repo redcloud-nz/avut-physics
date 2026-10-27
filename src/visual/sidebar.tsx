@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { ContentsList } from "./contents";
+import { ContentsList, type Contents } from "./contents";
 import { SERIES } from "./series";
 
 /**
@@ -12,9 +12,11 @@ import { SERIES } from "./series";
  * itself to keep the page being read in sight. Phones go without it: they bring the contents down from the page's
  * title instead.
  */
-export function Sidebar(props: { contents: { name: string; href: string }[] }) {
+export function Sidebar(props: { contents: Contents }) {
     const path = usePathname();
-    const current = props.contents.findIndex((page) => page.href === path);
+    const current = props.contents
+        .flatMap((section) => section.pages)
+        .findIndex((page) => page.href === path);
     const box = useRef<HTMLElement>(null);
 
     useEffect(() => {

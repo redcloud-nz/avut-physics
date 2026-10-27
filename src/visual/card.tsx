@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 
-import { ContentsList } from "./contents";
+import { ContentsList, pageCount, type Contents } from "./contents";
 import { useDetailsPanel } from "./details-panel";
 import { SERIES } from "./series";
 
@@ -47,8 +47,8 @@ export function swipe(start: { x: number; y: number }, end: { clientX: number; c
  */
 export function Card(props: {
     index: number;
-    /** Every page in the series, in order, for the contents. */
-    contents: { name: string; href: string }[];
+    /** Every page in the series, in its sections, for the contents. */
+    contents: Contents;
     title: string;
     text: React.ReactNode;
     prev: string;
@@ -63,7 +63,7 @@ export function Card(props: {
     const [contents, setContents] = useState(false);
     const [panel, setPanel] = useDetailsPanel();
     const { prev, next } = props;
-    const total = props.contents.length;
+    const total = pageCount(props.contents);
     const hasDetails = !!props.details;
     // The server's page is drawn narrow; a wide screen puts the details beside the page once it's in the browser.
     const wide = useSyncExternalStore(

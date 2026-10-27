@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Card } from "@/visual/card";
-import { PAGES, SERIES } from "@/visual/pages";
+import { CONTENTS, PAGES, SERIES } from "@/visual/pages";
 import { SERIES_DESCRIPTION } from "@/visual/series";
 
 export function generateStaticParams() {
@@ -44,7 +44,7 @@ export default async function Page(props: PageProps<"/visual/[slug]">) {
         <Card
             key={slug}
             index={index}
-            contents={PAGES.map((p, i) => ({ name: p.name, href: href(i) }))}
+            contents={CONTENTS}
             title={page.title}
             text={page.text}
             prev={href(index - 1)}

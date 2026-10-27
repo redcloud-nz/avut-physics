@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Footer } from "@/components/SiteFooter";
-import { PAGES, SERIES } from "@/visual/pages";
+import { ContentsList } from "@/visual/contents";
+import { CONTENTS, PAGES, SERIES } from "@/visual/pages";
 import { SERIES_DESCRIPTION as DESCRIPTION } from "@/visual/series";
 import { Share } from "@/visual/share";
 
@@ -40,21 +41,9 @@ export default function Page() {
                 >
                     Start
                 </Link>
-                <ol className="flex flex-col gap-1 lg:hidden">
-                    {PAGES.map((p, i) => (
-                        <li key={p.slug}>
-                            <Link
-                                href={`/visual/${p.slug}`}
-                                className="flex gap-3 rounded-lg px-2 py-2 text-ink hover:bg-surface"
-                            >
-                                <span className="w-5 shrink-0 text-right text-ghost tabular-nums">
-                                    {i + 1}
-                                </span>
-                                {p.name}
-                            </Link>
-                        </li>
-                    ))}
-                </ol>
+                <nav aria-label="Contents" className="text-ink lg:hidden">
+                    <ContentsList contents={CONTENTS} />
+                </nav>
                 <Share title={SERIES} text={DESCRIPTION} path="/visual" />
             </main>
             <Footer />

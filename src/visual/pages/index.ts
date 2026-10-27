@@ -1,3 +1,5 @@
+import type { Contents } from "@/visual/contents";
+
 import twoToOne from "./2-to-1/page";
 import fiveToOne from "./5-to-1/page";
 import acceleration from "./acceleration/page";
@@ -53,36 +55,45 @@ export type VisualPage = {
     More?: () => React.ReactNode;
 };
 
-export const PAGES: VisualPage[] = [
-    introduction,
-    velocity,
-    acceleration,
-    mass,
-    force,
-    weight,
-    units,
-    arrows,
-    addingArrows,
-    equilibrium,
-    splittingArrows,
-    pullingSideways,
-    twoAnchors,
-    pullingOffCentre,
-    redirect,
-    pulleyOnTheAnchor,
-    twoToOne,
-    zRig,
-    fiveToOne,
-    counting,
-    compound,
-    tMethod,
-    tMethodCompound,
-    friction,
-    inclines,
-    surfaceFriction,
-    levers,
-    safetyFactors,
-    shockLoading,
-    ropeStretch,
-    theEnd,
+/** The pages in their sections. The introduction and the end stand apart, with no section's title. */
+export const SECTIONS: { title?: string; pages: VisualPage[] }[] = [
+    { pages: [introduction] },
+    { title: "Motion and force", pages: [velocity, acceleration, mass, force, weight, units] },
+    {
+        title: "Forces as arrows",
+        pages: [
+            arrows,
+            addingArrows,
+            equilibrium,
+            splittingArrows,
+            pullingSideways,
+            twoAnchors,
+            pullingOffCentre,
+            redirect,
+        ],
+    },
+    {
+        title: "Pulleys",
+        pages: [
+            pulleyOnTheAnchor,
+            twoToOne,
+            zRig,
+            fiveToOne,
+            counting,
+            compound,
+            tMethod,
+            tMethodCompound,
+        ],
+    },
+    { title: "Friction, slopes and levers", pages: [friction, inclines, surfaceFriction, levers] },
+    { title: "Falls and strength", pages: [safetyFactors, shockLoading, ropeStretch] },
+    { pages: [theEnd] },
 ];
+
+export const PAGES: VisualPage[] = SECTIONS.flatMap((section) => section.pages);
+
+/** The contents the series' page lists show: each section's pages by name and address. */
+export const CONTENTS: Contents = SECTIONS.map((section) => ({
+    title: section.title,
+    pages: section.pages.map((p) => ({ name: p.name, href: `/visual/${p.slug}` })),
+}));
