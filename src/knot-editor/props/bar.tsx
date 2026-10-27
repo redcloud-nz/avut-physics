@@ -137,31 +137,10 @@ export const BAR = {
      * Where a segment passes across the bar seen side on: where its curve crosses the bar's middle line within the
      * bar's length. None seen end on.
      */
-    passesAcross(bar: BarProp, cubic: Cubic, samples: Vector2[]): number[] {
-        if (!bar.length) return [];
-        const middle = new Segment(
-            new Vector2(bar.x - bar.length / 2, bar.y),
-            new Vector2(bar.x + bar.length / 2, bar.y),
-        );
-        const pieces = Segment.along(samples);
-        const n = pieces.length;
-        const found: number[] = [];
-        for (let i = 0; i < n; i++) {
-            const hit = pieces[i].intersection(middle, POLYLINE_TOLERANCE);
-            if (!hit) continue;
-            // Newton's method on the curve's height, from where the polyline crossed.
-            const from = clamp((i + hit.t) / n, 0, 1);
-            let t = from;
-            for (let k = 0; k < 8; k++) {
-                const dy = cubic.derivativeAt(t).y;
-                if (Math.abs(dy) < 1e-12) break;
-                t -= (cubic.pointAt(t).y - bar.y) / dy;
-            }
-            if (!(t >= 0 && t < 1) || Math.abs(t - from) > 1 / n) t = from;
-            if (t < 1 && !found.some((f) => Math.abs(f - t) < 1e-9)) found.push(t);
-        }
-        return found.sort((p, q) => p - q);
-    },
+    passesAcross: (bar: BarProp, cubic: Cubic, samples: Vector2[]): number[] =>
+        bar.length
+            ? passesAcrossRod(cubic, samples, bar.y, bar.x - bar.length / 2, bar.x + bar.length / 2)
+            : [],
 
     /**
      * Whether a pass in front must be over at this point of the strand: within the bar's radius of its middle line,
@@ -187,5 +166,37 @@ export const BAR = {
     },
 };
 
-/** How far past the bar's edge (the passing strand's sizes, across it) a pass in front is drawn over. */
-const PASS_MARGIN = 0.6;
+/** How far past a rod's edge (the passing strand's sizes, across it) a pass in front is drawn over. */
+export const PASS_MARGIN = 0.6;
+
+/**
+ * Where a segment passes across a rod running across, seen side on (t along the segment, in order): where its curve
+ * crosses the rod's middle line, at height `y`, between `left` and `right`. Found on the polyline through `samples`,
+ * then refined by Newton's method on the curve's height.
+ */
+function passesAcrossRod(
+    cubic: Cubic,
+    samples: Vector2[],
+    y: number,
+    left: number,
+    right: number,
+): number[] {
+    const middle = new Segment(new Vector2(left, y), new Vector2(right, y));
+    const pieces = Segment.along(samples);
+    const n = pieces.length;
+    const found: number[] = [];
+    for (let i = 0; i < n; i++) {
+        const hit = pieces[i].intersection(middle, POLYLINE_TOLERANCE);
+        if (!hit) continue;
+        const from = clamp((i + hit.t) / n, 0, 1);
+        let t = from;
+        for (let k = 0; k < 8; k++) {
+            const dy = cubic.derivativeAt(t).y;
+            if (Math.abs(dy) < 1e-12) break;
+            t -= (cubic.pointAt(t).y - y) / dy;
+        }
+        if (!(t >= 0 && t < 1) || Math.abs(t - from) > 1 / n) t = from;
+        if (t < 1 && !found.some((f) => Math.abs(f - t) < 1e-9)) found.push(t);
+    }
+    return found.sort((p, q) => p - q);
+}

@@ -4,7 +4,7 @@
   "name": "Munter hitch",
   "description": "The rope taken round a carabiner, back over itself, and round again the other way.",
   "about": "More on how the munter hitch is used goes here.",
-  "frame": { "x": -101.5, "y": -68.5, "w": 203, "h": 156.5 },
+  "frame": { "x": -120.5, "y": -342.5, "w": 245, "h": 430.5 },
   "knot": {
     "strands": [
       {
@@ -13,23 +13,18 @@
         "colour": "blue",
         "diameter": 11,
         "pins": [
-          { "id": 2, "x": -9, "y": 220, "angle": -90 },
-          { "id": 3, "x": -9, "y": 50 },
-          { "id": 4, "x": -9, "y": 4, "angle": -90 },
-          { "id": 5, "x": -20, "y": -19.5, "angle": 180 },
-          { "id": 6, "x": -31, "y": -4, "angle": 90 },
-          { "id": 7, "x": -42, "y": 19.5, "angle": 180 },
-          { "id": 8, "x": -53, "y": 4, "angle": -90 },
-          { "id": 9, "x": -53, "y": -30 },
-          { "id": 10, "x": -22, "y": -52, "angle": 0 },
-          { "id": 11, "x": 9, "y": -30, "angle": 90 },
-          { "id": 12, "x": 9, "y": -4, "angle": 90 },
-          { "id": 13, "x": 20, "y": 19.5, "angle": 0 },
-          { "id": 14, "x": 31, "y": 4, "angle": -90 },
-          { "id": 15, "x": 42, "y": -19.5, "angle": 0 },
-          { "id": 16, "x": 53, "y": -4, "angle": 90 },
-          { "id": 17, "x": 53, "y": 50 },
-          { "id": 18, "x": 53, "y": 220, "angle": 90 }
+          { "id": 2, "x": -5.85, "y": 220, "angle": -90 },
+          { "id": 3, "x": -5.85, "y": 28.05 },
+          { "id": 4, "x": -5.85, "y": 2.24, "angle": -90 },
+          { "id": 5, "x": -14.75, "y": -15.37, "angle": 180 },
+          { "id": 6, "x": -22.17, "y": -2.02, "angle": 90 },
+          { "id": 7, "x": -21.38, "y": 10.21, "angle": 79.2 },
+          { "id": 10, "x": -4.61, "y": 21.09, "angle": 0 },
+          { "id": 14, "x": 6.57, "y": 6.79, "angle": -90 },
+          { "id": 15, "x": 13.13, "y": -13.86, "angle": 0 },
+          { "id": 16, "x": 22.43, "y": -0.79, "angle": 90 },
+          { "id": 17, "x": 23.79, "y": 31.86 },
+          { "id": 18, "x": 34.45, "y": 220, "angle": 90 }
         ],
         "segments": [
           { "id": 19 },
@@ -37,13 +32,8 @@
           { "id": 21 },
           { "id": 22 },
           { "id": 23 },
-          { "id": 24 },
-          { "id": 25 },
-          { "id": 26 },
+          { "id": 24, "tension": [1.45, 1] },
           { "id": 27 },
-          { "id": 28 },
-          { "id": 29 },
-          { "id": 30 },
           { "id": 31 },
           { "id": 32 },
           { "id": 33 },
@@ -51,22 +41,21 @@
         ]
       }
     ],
-    "crossings": [],
+    "crossings": [{ "over": 24, "under": 20 }],
     "props": [
       {
         "id": 35,
-        "kind": "bar",
+        "kind": "carabiner",
         "x": 0,
         "y": 0,
-        "r": 14,
-        "length": 170,
+        "r": 6,
+        "width": 72,
+        "height": 115,
         "passes": [
           [21, 1, "front"],
-          [23, 1, "behind"],
-          [25, 1, "front"],
-          [29, 1, "front"],
+          [22, 1, "behind"],
           [31, 1, "behind"],
-          [33, 1, "front"]
+          [32, 1, "front"]
         ]
       }
     ]

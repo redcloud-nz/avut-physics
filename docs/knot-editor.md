@@ -87,9 +87,12 @@ kind touches nothing else.
 A prop is drawn behind every strand, unless strands pass both in front of it and behind it. Then it's drawn over the strands but under their over stretches. It lists every pass across it with its side, front or behind, as crossings are listed, and you click a pass to swap it. A pass in front is drawn as an over stretch long enough to cover the prop, ending where the strand turns back across it (as a rope wrapped round a bar does at its edge), since the next pass begins there.
 
 The first kind is the bar: end on (a circle, behind the rope) or side on (with a length, passes in front and behind).
-A new one is 17.6 mm in radius and 220 mm long. To come later: a carabiner and a ring, with passes in front and behind
-like the side-on bar; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and flip,
-in front of or behind the strands.
+A new one is 17.6 mm in radius and 220 mm long. The second is the carabiner: a pear-shaped (HMS) carabiner seen face
+on, its wide end at the bottom, with passes in front and behind anywhere round that end (the rest of it takes no
+passes). It has a rod radius, a width and a height (to the rod's middle line), and its `x` and `y` are its bottom end's
+centre; a new one is the size of a real one: 6 mm in radius, 72 mm wide and 115 mm tall. To come later: a ring, with
+passes in front and behind; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and
+flip, in front of or behind the strands.
 
 ## The frame
 
