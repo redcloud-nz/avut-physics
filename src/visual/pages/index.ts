@@ -46,7 +46,10 @@ export type VisualPage = {
     /** The text as plain words, for search results and links, where `text` isn't plain already. */
     description?: string;
     Figure: () => React.ReactNode;
-    /** Further reading, such as the maths, in a drawer that the pill between the buttons brings up. */
+    /**
+     * Further reading, such as the maths, in a drawer (or on a wide screen a column beside the page) that the page's
+     * question mark brings up.
+     */
     More?: () => React.ReactNode;
 };
 

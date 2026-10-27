@@ -3,6 +3,8 @@ import { ImageResponse } from "next/og";
 import { SITE } from "@/articles/prose";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
+import { SERIES, SERIES_DESCRIPTION } from "./series";
+
 /*
  * The picture a link to the visual introduction shows when it's shared: the page's headline beside two forces on a
  * bolt and the one they make together, on the series' dark background.
@@ -158,4 +160,13 @@ export function shareImage(props: { eyebrow: string; title: string; text: string
         </div>,
         SHARE_IMAGE_SIZE,
     );
+}
+
+/** The series' own picture: for links to its first page, and on that page beside the contents on a wide screen. */
+export function seriesImage() {
+    return shareImage({
+        eyebrow: "Physics Visualisations",
+        title: SERIES,
+        text: SERIES_DESCRIPTION,
+    });
 }

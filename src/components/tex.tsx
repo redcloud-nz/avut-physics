@@ -84,7 +84,7 @@ export function M(props: { tex: string }) {
 /** Displayed maths, on its own line(s), scrolling sideways if it's too wide. */
 export function Eq(props: { tex: string }) {
     return (
-        <div className="overflow-x-auto py-1 text-center text-ink-soft">
+        <div className="panel-scroll overflow-x-auto py-1 text-center text-ink-soft">
             <div
                 aria-hidden
                 className="[&>svg]:inline-block"

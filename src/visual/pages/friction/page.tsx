@@ -52,7 +52,7 @@ function FrictionMore() {
                 </p>
             </Section>
             <Section title="Worse pulleys, more pulleys">
-                <div className="overflow-x-auto">
+                <div className="panel-scroll overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="text-ink-muted">
                             <tr>

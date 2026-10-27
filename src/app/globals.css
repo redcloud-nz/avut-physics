@@ -139,6 +139,33 @@ html {
   background: var(--line);
 }
 
+/* The same scrollbar on a panel that scrolls by itself (a drawer, the visual introduction's contents, maths too wide
+   for the page), with no track so it sits on whatever the panel's background is. The thumb's border is clear rather
+   than the background's colour, for the same reason. */
+@supports (-moz-appearance: none) {
+  .panel-scroll {
+    scrollbar-color: var(--line-faint) transparent;
+    scrollbar-width: thin;
+  }
+}
+.panel-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-faint);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 6px;
+}
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--line);
+  background-clip: padding-box;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

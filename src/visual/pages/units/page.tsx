@@ -23,7 +23,7 @@ function UnitsMore() {
                     The same prefixes go on any unit. Most go up or down in steps of a thousand;
                     centi, a hundredth, is the odd one out, and mostly turns up in centimetres.
                 </p>
-                <div className="overflow-x-auto">
+                <div className="panel-scroll overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="text-ink-muted">
                             <tr>
