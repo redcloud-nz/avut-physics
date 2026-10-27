@@ -36,7 +36,10 @@ export function workedPicture(picture: Picture): WorkedPicture {
     return { picture, geometry, crossings, paths: strandPaths(picture, geometry, crossings).paths };
 }
 
-/** How far below a finished knot's lowest crossing its view reaches, showing its ends leaving it (millimetres). */
+/**
+ * How far below a finished knot's lowest crossing (or pass across a prop) its view reaches, showing its ends leaving it
+ * (millimetres).
+ */
 const ENDS = 8 * DIAMETER;
 
 /** How far round the knot its view leaves (millimetres). */
@@ -58,9 +61,12 @@ export function knotView(worked: WorkedPicture, bothWays = false): Frame {
         const box = kindOf(prop).bounds(prop);
         points.push(box.min, box.max);
     }
-    const ys = crossings.crossings
-        .filter((c) => c.pair.every(([i]) => ropes.includes(i)))
-        .map((c) => c.at.y);
+    const ys = [
+        ...crossings.crossings
+            .filter((c) => c.pair.every(([i]) => ropes.includes(i)))
+            .map((c) => c.at.y),
+        ...crossings.passes.filter((p) => ropes.includes(p.strand)).map((p) => p.at.y),
+    ];
     const xs = points.map((p) => p.x);
     const [left, right] = [Math.min(...xs) - MARGIN, Math.max(...xs) + MARGIN];
     const top = bothWays ? Math.min(...ys) - ENDS : Math.min(...points.map((p) => p.y)) - MARGIN;

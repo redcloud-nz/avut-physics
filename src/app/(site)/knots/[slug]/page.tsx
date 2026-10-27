@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { aboutParagraphs, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { aboutParagraphs, endsBothWays, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, knotView, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
 import { KnotPage } from "@/knots/knot-page";
@@ -38,7 +38,6 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
     const { file } = knot;
     const name = fullName(knot);
     const finished = workedPicture(file.knot);
-    const ropes = file.knot.strands.filter((strand) => strand.kind === "rope").length;
     const labels = stepLabels(file.steps.map((step) => step.number));
     return (
         <KnotPage
@@ -55,7 +54,7 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
             drawing={
                 <KnotDrawing
                     worked={finished}
-                    view={knotView(finished, ropes > 1)}
+                    view={knotView(finished, endsBothWays(knot))}
                     label={`${name}, finished`}
                     scale={PAGE_SCALE}
                     className="mx-auto block"

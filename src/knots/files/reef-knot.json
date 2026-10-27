@@ -1,0 +1,82 @@
+{
+  "format": "avut-knot",
+  "version": 3,
+  "name": "Reef knot",
+  "description": "Two ends tied together in two half knots, right over left and then left over right.",
+  "about": "More on how the reef knot is used goes here.",
+  "frame": { "x": -50.2, "y": -149.5, "w": 100.3, "h": 298.9 },
+  "knot": {
+    "strands": [
+      {
+        "id": 1,
+        "kind": "rope",
+        "colour": "red",
+        "diameter": 11,
+        "pins": [
+          { "id": 2, "x": 13, "y": 260, "angle": -90 },
+          { "id": 3, "x": 13, "y": 80 },
+          { "id": 4, "x": 14, "y": 40 },
+          { "id": 5, "x": 23, "y": 8 },
+          { "id": 6, "x": 33, "y": -36 },
+          { "id": 7, "x": 0, "y": -64, "angle": 180 },
+          { "id": 8, "x": -33, "y": -36 },
+          { "id": 9, "x": -23, "y": 8 },
+          { "id": 10, "x": -14, "y": 40 },
+          { "id": 11, "x": -13, "y": 80 },
+          { "id": 12, "x": -13, "y": 135, "angle": 90 }
+        ],
+        "segments": [
+          { "id": 13 },
+          { "id": 14 },
+          { "id": 15 },
+          { "id": 16 },
+          { "id": 17 },
+          { "id": 18 },
+          { "id": 19 },
+          { "id": 20 },
+          { "id": 21 },
+          { "id": 22 }
+        ]
+      },
+      {
+        "id": 23,
+        "kind": "rope",
+        "colour": "blue",
+        "diameter": 11,
+        "pins": [
+          { "id": 24, "x": 13, "y": -260, "angle": 90 },
+          { "id": 25, "x": 13, "y": -80 },
+          { "id": 26, "x": 14, "y": -40 },
+          { "id": 27, "x": 23, "y": -8 },
+          { "id": 28, "x": 33, "y": 36 },
+          { "id": 29, "x": 0, "y": 64, "angle": 180 },
+          { "id": 30, "x": -33, "y": 36 },
+          { "id": 31, "x": -23, "y": -8 },
+          { "id": 32, "x": -14, "y": -40 },
+          { "id": 33, "x": -13, "y": -80 },
+          { "id": 34, "x": -13, "y": -135, "angle": -90 }
+        ],
+        "segments": [
+          { "id": 35 },
+          { "id": 36 },
+          { "id": 37 },
+          { "id": 38 },
+          { "id": 39 },
+          { "id": 40 },
+          { "id": 41 },
+          { "id": 42 },
+          { "id": 43 },
+          { "id": 44 }
+        ]
+      }
+    ],
+    "crossings": [
+      { "over": 14, "under": 39 },
+      { "over": 38, "under": 16 },
+      { "over": 17, "under": 36 },
+      { "over": 18, "under": 43 },
+      { "over": 41, "under": 19 },
+      { "over": 21, "under": 40 }
+    ]
+  }
+}

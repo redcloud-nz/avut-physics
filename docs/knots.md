@@ -20,10 +20,11 @@ The pages draw every picture with the editor's own drawing (`PictureDrawing`, th
 it hydrates without a mismatch. Each step is drawn in the file's frame, so the rope stays put as the steps change, and
 labelled from its number ("Step 2 of 5", or "Step 2 (cont.)" for a number shown again). The finished knot has a view of
 its own (`knotView`), fitted to it: across the knot with a margin, from its top to 8 diameters below its lowest
-crossing, where its ends run out of the bottom (and as far above it, for a knot joining two ropes). Every knot is drawn
-at a fixed size per millimetre (`PAGE_SCALE`, 11 pixels across an 11 mm rope), so the rope looks as thick in every
-illustration and a bigger knot takes more room. The list of knots draws them all smaller, but again at one size per
-millimetre: the most that still fits the biggest in its box.
+crossing or pass across a prop, where its ends run out of the bottom (and as far above it where the rope runs on out of
+the top too, `endsBothWays`: a bend, or a knot tied in the middle of a rope). Every knot is drawn at a fixed size per
+millimetre (`PAGE_SCALE`, 11 pixels across an 11 mm rope), so the rope looks as thick in every illustration and a
+bigger knot takes more room. The list of knots draws them all smaller, but again at one size per millimetre: the most
+that still fits the biggest in its box.
 
 The files were first made by a converter from the knots' earlier drawings (pinned ropes and doubled paths, laid out in
 an older rope editor at `/knots/edit`), which fitted the editor's curves to each rope as drawn and linked pins where two

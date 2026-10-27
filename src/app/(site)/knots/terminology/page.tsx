@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { Picture } from "@/knot-editor/knot-file";
-import { fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { endsBothWays, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, knotView, workedPicture } from "@/knots/knot-drawing";
 import { KnotsMenu } from "@/knots/knots-menu";
@@ -18,21 +18,22 @@ const HREF = "/knots/terminology";
 /** The most room a term's picture can have (pixels). */
 const ROOM = { w: 112, h: 144 };
 
-/** A term's picture: from its own file, or one of a knot's. */
-function pictureOf(picture: NonNullable<Term["picture"]>): Picture {
-    if ("file" in picture) return picture.file.knot;
-    const { file } = KNOTS.find((knot) => knot.slug === picture.knot)!;
-    return picture.step === undefined ? file.knot : file.steps[picture.step].picture;
+/** A term's picture, from its own file or one of a knot's, and whether its ends run out of it both ways. */
+function pictureOf(picture: NonNullable<Term["picture"]>): { shown: Picture; bothWays: boolean } {
+    if ("file" in picture) return { shown: picture.file.knot, bothWays: false };
+    const knot = KNOTS.find((k) => k.slug === picture.knot)!;
+    const { file } = knot;
+    const shown = picture.step === undefined ? file.knot : file.steps[picture.step].picture;
+    return { shown, bothWays: endsBothWays(knot) };
 }
 
 /** Each term's picture, where it has one, worked out with its view: around the rope, as on the knots' pages. */
 const PICTURES = new Map(
     TERMS.flatMap((term) => {
         if (!term.picture) return [];
-        const picture = pictureOf(term.picture);
-        const worked = workedPicture(picture);
-        const ropes = picture.strands.filter((strand) => strand.kind === "rope").length;
-        return [[term.term, { worked, view: knotView(worked, ropes > 1) }]];
+        const { shown, bothWays } = pictureOf(term.picture);
+        const worked = workedPicture(shown);
+        return [[term.term, { worked, view: knotView(worked, bothWays) }]];
     }),
 );
 

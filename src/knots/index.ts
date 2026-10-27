@@ -1,10 +1,13 @@
 import { readKnotJson, type KnotFile } from "../knot-editor/knot-file";
 import type { JsonValue } from "../knot-editor/versions";
 
+import ALPINE_BUTTERFLY from "./files/alpine-butterfly.json";
 import FIGURE_8_ON_A_BIGHT from "./files/figure-8-on-a-bight.json";
 import FIGURE_8_RETHREADED from "./files/figure-8-rethreaded.json";
 import FIGURE_8 from "./files/figure-8.json";
 import JOINING_8 from "./files/joining-8.json";
+import MUNTER_HITCH from "./files/munter-hitch.json";
+import REEF_KNOT from "./files/reef-knot.json";
 import ROUND_TURN from "./files/round-turn-and-two-half-hitches.json";
 
 /*
@@ -31,6 +34,8 @@ export type Knot = {
     name: string;
     /** Which variant of the knot it is, where it is one, shown smaller under its name ("on a bight"). */
     variant?: string;
+    /** Tied in the middle of a rope, so the rope runs on out of the knot both ways. */
+    midline?: boolean;
     /** Lie the knot on its side in the list of knots, where a long, upright knot would be too small to see. */
     turned?: boolean;
     file: KnotFile;
@@ -39,6 +44,13 @@ export type Knot = {
 /** The knot's whole name, its variant and all ("Figure-8 on a bight"), for the page's title and labels. */
 export const fullName = (knot: Pick<Knot, "name" | "variant">) =>
     knot.variant ? `${knot.name} ${knot.variant}` : knot.name;
+
+/**
+ * Whether the knot's rope runs on out of it both ways, out of the top of its drawing as well as the bottom: in a bend,
+ * where the two ropes leave it in opposite directions, and in a knot tied in the middle of a rope.
+ */
+export const endsBothWays = (knot: Pick<Knot, "type" | "midline">) =>
+    knot.type === "Bend" || knot.midline === true;
 
 /** A knot file as it's imported, read and checked, failing the build where it isn't a knot file. */
 export function knotFile(path: string, json: unknown): KnotFile {
@@ -87,6 +99,29 @@ export const KNOT_SECTIONS: { title: string; knots: Knot[] }[] = [
         ],
     },
     {
+        title: "Loops",
+        knots: [
+            knot("alpine-butterfly", ALPINE_BUTTERFLY, {
+                name: "Alpine butterfly",
+                type: "Loop",
+                abok: 1053,
+                midline: true,
+                turned: true,
+            }),
+        ],
+    },
+    {
+        title: "Bends",
+        knots: [
+            knot("reef-knot", REEF_KNOT, {
+                name: "Reef knot",
+                type: "Bend",
+                abok: 1204,
+                turned: true,
+            }),
+        ],
+    },
+    {
         title: "Hitches",
         knots: [
             knot("round-turn-and-two-half-hitches", ROUND_TURN, {
@@ -95,6 +130,11 @@ export const KNOT_SECTIONS: { title: string; knots: Knot[] }[] = [
                 type: "Hitch",
                 abok: 1720,
                 turned: true,
+            }),
+            knot("munter-hitch", MUNTER_HITCH, {
+                name: "Munter hitch",
+                type: "Hitch",
+                abok: 1818,
             }),
         ],
     },
