@@ -41,9 +41,10 @@ export function swipe(start: { x: number; y: number }, end: { clientX: number; c
  *
  * Between the buttons is a question mark. When the page has details, tapping it brings them up in a drawer over the
  * page; dragging it down puts it away. On a screen wide enough, the question mark is at the end of the progress bar
- * instead, and opens and closes a column to the right of the page, which stays open from page to page until closed. Tapping the series' name at the top brings its
- * contents down from the top like the details, except on a wide screen, where the contents are beside the page
- * already. On a screen too short for the page, the page grows and scrolls rather than running under the buttons.
+ * instead, and opens and closes a column to the right of the page, which stays open from page to page until closed.
+ * Tapping the series' name at the top brings its contents down from the top like the details, except on a wide
+ * screen, where the contents are beside the page already. On a screen too short for the page, the page grows and
+ * scrolls rather than running under the buttons.
  */
 export function Card(props: {
     index: number;
@@ -228,12 +229,12 @@ export function Card(props: {
                 </aside>
             )}
 
-            {/* As wide as the page, and on a wide screen over the page's column: clear of the contents to its left (as
-                wide as the sidebar) and of the page's scrollbar to its right (as wide as globals.css draws it). */}
+            {/* As wide as the page, and on a wide screen over the page's column, clear of the contents to its left
+                (as wide as the sidebar). */}
             <Drawer open={drawer} onOpenChange={setOpen}>
                 <DrawerContent
                     aria-describedby={undefined}
-                    className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface text-base text-ink-soft lg:max-w-2xl data-[vaul-drawer-direction=bottom]:lg:right-3 data-[vaul-drawer-direction=bottom]:lg:left-72"
+                    className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface text-base text-ink-soft lg:max-w-2xl data-[vaul-drawer-direction=bottom]:lg:left-72"
                 >
                     <DrawerTitle className="sr-only">More on: {props.title}</DrawerTitle>
                     <div

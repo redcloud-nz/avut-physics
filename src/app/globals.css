@@ -117,6 +117,12 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Except round a page that fills the screen and scrolls its own columns (the visual introduction): it rarely scrolls
+   as a whole, so the room would be an empty strip down its right edge, pushing in the scrollbar of a column there. */
+.page-scroll:has(.fills-screen) {
+  scrollbar-gutter: auto;
+}
+
 /* The page's scrollbar, in the page's own colours. Firefox uses the standard properties; Chrome and
    Safari use the -webkit- pseudo-elements, which Chrome ignores if scrollbar-color is also set. */
 @supports (-moz-appearance: none) {
