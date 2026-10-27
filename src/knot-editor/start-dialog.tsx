@@ -31,6 +31,8 @@ export function StartDialog(props: {
     start: boolean;
     /** Whether this browser can open files. */
     canOpen: boolean;
+    /** Whether it's known that this browser can't open or save files, so the dialog says so. */
+    noFiles: boolean;
     onNew: () => void;
     onOpen: () => void;
     onLibrary: (file: KnotFile, fileName: string) => void;
@@ -47,6 +49,12 @@ export function StartDialog(props: {
                             : "Start from a copy of one of the site's knots. Saving it saves a new file."}
                     </DialogDescription>
                 </DialogHeader>
+                {props.noFiles && (
+                    <p className="text-sm text-warning">
+                        Opening and saving files needs Chrome or Edge. In this browser you can draw,
+                        but not keep your work.
+                    </p>
+                )}
                 {props.start && (
                     <div className="flex gap-2">
                         <Button className="flex-1" onClick={props.onNew}>
@@ -84,9 +92,7 @@ export function StartDialog(props: {
                                 >
                                     {knot.name}
                                     {knot.comingSoon && (
-                                        <span className="text-xs text-ink-muted">
-                                            not on the site
-                                        </span>
+                                        <span className="text-xs text-ink-muted">coming soon</span>
                                     )}
                                 </button>
                             </li>

@@ -6,7 +6,9 @@ The editor for drawing knots and their tying steps. Every knot on the knots' pag
 `docs/plans/2026-10-25-knot-editor.md` (the editor) and `docs/plans/2026-10-26-knot-editor-v2.md` (millimetres, rope
 sizes, the frame, the grid, ids and linked pins).
 
-It's only for development for now, at `/knot-editor`, and only in Chrome or Edge (see Files).
+It's at `/knot-editor` on the live site, but not linked from it or indexed. It's a desktop tool: on a screen narrower
+than `md` it's covered by a note saying to use a computer. Opening and saving files only work in Chrome or Edge (see
+Files); elsewhere a line under the menu bar, and the dialog it opens with, say so.
 
 Everything is in millimetres, with y down as in SVG: places, lengths, sizes and the frame. Angles are in degrees.
 

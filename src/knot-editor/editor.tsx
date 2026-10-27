@@ -3,8 +3,9 @@
 /**
  * The knot editor: the menu bar, the knot, its steps and the picture's objects on the left, the drawing in the middle,
  * what's selected on the right, and the status bar along the bottom. It fills the window; it's a desktop tool, with no
- * phone layout.
+ * phone layout, so a small screen gets a note saying so instead.
  */
+import Link from "next/link";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useInBrowser } from "@/components/use-in-browser";
+import { KNOTS_PATH, KNOTS_TITLE } from "@/knots";
 import { Vector2 } from "@/lib/vector2";
 
 import { Canvas, useGeometry, type CanvasControls } from "./canvas";
@@ -126,8 +128,11 @@ export default function KnotEditor() {
     const [message, setMessage] = useState<Message | null>(null);
     // Where to start, as the editor opens (`start`), or the library alone, from the File menu.
     const [starting, setStarting] = useState<"start" | "library" | null>("start");
-    // Whether this browser can open and save files: the File menu explains, until it's known and where it can't.
-    const files = useInBrowser() && canUseFiles();
+    // Whether this browser can open and save files: the File menu explains, until it's known and where it can't, and
+    // where it's known it can't, a line under the menu bar says so.
+    const inBrowser = useInBrowser();
+    const files = inBrowser && canUseFiles();
+    const noFiles = inBrowser && !files;
 
     const title = `${state.fileName}${saved ? "" : " •"}`;
     useEffect(() => {
@@ -411,6 +416,13 @@ export default function KnotEditor() {
                 <Menus enabled={enabled} checked={checked} run={run} notes={notes} />
                 <div className="ml-auto truncate pr-2 text-ink-muted">{title}</div>
             </header>
+            {noFiles && (
+                <p className="border-b border-line-faint px-3 py-1.5 text-warning">
+                    {
+                        "This browser can't open or save files on your computer, so your work can't be kept: use Chrome or Edge for that. You can still draw, and start from a knot in the library."
+                    }
+                </p>
+            )}
             <div className="flex min-h-0 flex-1">
                 <aside className="w-48 shrink-0 overflow-y-auto border-r border-line-faint p-3">
                     <StepsList
@@ -469,6 +481,7 @@ export default function KnotEditor() {
                 open={starting !== null}
                 start={starting === "start"}
                 canOpen={files}
+                noFiles={noFiles}
                 onNew={() => setStarting(null)}
                 onOpen={() => void open()}
                 onLibrary={openFromLibrary}
@@ -487,6 +500,16 @@ export default function KnotEditor() {
                         });
                 }}
             />
+            {/* A desktop tool: on a small screen it's covered, over its dialogs too, by a note saying so. */}
+            <div className="fixed inset-0 z-60 flex flex-col items-center justify-center gap-3 bg-background p-6 text-center md:hidden">
+                <h1 className="text-xl font-semibold text-ink-bright">Knot editor</h1>
+                <p className="max-w-xs text-base text-ink-soft">
+                    The knot editor needs a bigger screen. Open it on a computer, in Chrome or Edge.
+                </p>
+                <Link href={KNOTS_PATH} className="text-base text-link hover:text-highlight">
+                    {`← ${KNOTS_TITLE}`}
+                </Link>
+            </div>
             <Dialog open={message !== null} onOpenChange={(open) => !open && setMessage(null)}>
                 <DialogContent>
                     <DialogHeader>

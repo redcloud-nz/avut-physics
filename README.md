@@ -78,7 +78,7 @@ MathJax. The diagrams are plain SVG.
 ```
 src/
   app/(site)/           One folder per page; each page is a thin wrapper, in the site's chrome
-  app/(editor)/         The knot editor (in development only), with no site chrome
+  app/(editor)/         The knot editor (live, but not linked or indexed), with no site chrome
   visualisations/       Each visualisation's component, solver, notes and tests
   articles/             The articles' figures
   visual/               A Visual Introduction to Rescue Physics: one folder per page, and its shared parts
