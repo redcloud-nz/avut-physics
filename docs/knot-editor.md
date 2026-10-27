@@ -222,6 +222,10 @@ editor finds where segments cross from the curves and matches them to this list:
   (an amber ring) until you confirm them, since `n` may no longer name the same crossing. That includes a pair
   crossing twice with only one of them set so far. Confirming replaces the pair's entries with its crossings as
   they're drawn now, numbered afresh; one drawn with no side yet gets the pair's first segment on top.
+- Over stretches are drawn in layers. A stretch runs on under another strand's crossing nearby, with the stretch on
+  top there drawn in a later layer, so three strands stacked close together each cover the one below. Where layers
+  can't be ordered (stretches looping, each over the next, or a stretch that would have to be above itself), or the
+  strand on top is an arrow, the stretch underneath stops short of the crossing instead.
 - Crossings too close for both over stretches to fit get the amber ring too. View > Crossings letters every crossing
   (A, B…), so the panel can name them.
 - Adding a pin moves the entries on the segment it splits to the half their crossing is on. Deleting one moves the
@@ -360,7 +364,7 @@ chrome for addresses that match no page.
   screen; matching crossings and passes works by position too, turned to and from ids at the picture's edge.
 - Dragging reads the pointer straight from its events and applies at most one change a frame. Nothing else is held
   in state on pointer moves.
-- A picture draws as the knot pages do: props behind, every strand whole, props with passes, the over stretches, then the ropes' taped ends. Ropes are drawn with the
+- A picture draws as the knot pages do: props behind, every strand whole, props with passes, the over stretches layer by layer, then the ropes' taped ends. Ropes are drawn with the
   same pieces as `RopeDrawing` (`Stretch` and `Tape`, given each rope's width), so a ported knot draws the same on its
   page as in the editor; the knot pages pass no width, and draw exactly as before.
 

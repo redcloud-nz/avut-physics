@@ -364,22 +364,29 @@ function curvesBetween(strand: StrandGeometry, from: number, to: number): string
 export const pathBetween = (strand: StrandGeometry, from: number, to: number) =>
     `M ${svgPoint(pointAlong(strand, from))} ${curvesBetween(strand, from, to)}`;
 
+/** A stretch marked over, from and to (distances along its strand), and the layer it's drawn in (from 0). */
+type Stretch = { from: number; to: number; level: number };
+
 /**
  * Each strand as a `RopePath`: one `C` per Bézier, split where an over stretch starts and ends. A strand is marked
  * over the angle-dependent reach either side of each crossing where it's on top, and across each prop it passes in
- * front of. A stretch stops short of any crossing where its strand goes under and of any pass where it goes behind,
- * and stretches that overlap are merged. Where a stretch can't then reach as far as it must, its crossing (and the
- * one that cut it short) is too close.
+ * front of, and stretches that overlap are merged.
+ *
+ * Over stretches are drawn in layers. A stretch may run on across a crossing where its strand goes under, as long as
+ * the stretch on top there is drawn in a later layer, so three strands stacked close together each cover the one
+ * below. Where the layers can't be ordered (a stretch would have to be above itself, or stretches loop, each over the
+ * next), or the strand on top is an arrow (drawn in the first layer), the stretch underneath stops short of the
+ * crossing instead, as it does behind a prop. Where a stretch then can't reach as far as it must, its crossing (and
+ * the one that cut it short) is too close.
  */
 export function strandPaths(
     picture: Picture,
     geometry: PictureGeometry,
     crossings: PictureCrossings,
 ): StrandPaths {
-    const tooClose = new Set<number>();
-    const tooClosePasses = new Set<number>();
     const sizes = picture.strands.map(strandSize);
-    const paths = geometry.strands.map((strand, i) => {
+    const isArrow = picture.strands.map((strand) => strand.kind === "arrow");
+    const marks = geometry.strands.map((strand, i) => {
         const wants: Want[] = [];
         const unders: (Under & { crossing?: number; pass?: number })[] = [];
         crossings.crossings.forEach((c, index) =>
@@ -416,58 +423,134 @@ export function strandPaths(
                 });
             else unders.push({ from: p.cover[0], to: p.cover[1], pass: index });
         });
+        return { strand, wants, unders };
+    });
 
+    /** Each strand's over stretches, stopping short of props it's behind and of the crossings in `cut`. */
+    const stretchesFor = (cut: Set<number>) => {
+        const tooClose = new Set<number>();
+        const tooClosePasses = new Set<number>();
         const flag = (item: { crossing?: number; pass?: number }) => {
             if (item.crossing !== undefined) tooClose.add(item.crossing);
             if (item.pass !== undefined) tooClosePasses.add(item.pass);
         };
-        const stretches: [number, number][] = [];
-        for (const want of wants) {
-            let [from, to] = [Math.max(0, want.from), Math.min(strand.length, want.to)];
-            const [needFrom, needTo] = [
-                Math.max(0, want.need[0]),
-                Math.min(strand.length, want.need[1]),
-            ];
-            // Where it's under within the stretch it must have, it doesn't fit. Two passes meeting where a strand turns
-            // back round a prop share only their ends, found by bisection, so they're allowed that much.
-            const inTheWay = unders.filter(
-                (u) => u.from < needTo - SHARED && u.to > needFrom + SHARED,
-            );
-            let inside = false;
-            for (const under of unders) {
-                if (under.to <= want.at) from = Math.max(from, under.to);
-                else if (under.from >= want.at) to = Math.min(to, under.from);
-                else inside = true;
+        const stretches = marks.map(({ strand, wants, unders: all }) => {
+            const unders = all.filter((u) => u.crossing === undefined || cut.has(u.crossing));
+            const found: [number, number][] = [];
+            for (const want of wants) {
+                let [from, to] = [Math.max(0, want.from), Math.min(strand.length, want.to)];
+                const [needFrom, needTo] = [
+                    Math.max(0, want.need[0]),
+                    Math.min(strand.length, want.need[1]),
+                ];
+                // Where it's under within the stretch it must have, it doesn't fit. Two passes meeting where a strand
+                // turns back round a prop share only their ends, found by bisection, so they're allowed that much.
+                const inTheWay = unders.filter(
+                    (u) => u.from < needTo - SHARED && u.to > needFrom + SHARED,
+                );
+                let inside = false;
+                for (const under of unders) {
+                    if (under.to <= want.at) from = Math.max(from, under.to);
+                    else if (under.from >= want.at) to = Math.min(to, under.from);
+                    else inside = true;
+                }
+                if (inTheWay.length) [want, ...inTheWay].forEach(flag);
+                if (!inside && to > from) found.push([from, to]);
             }
-            if (inTheWay.length) [want, ...inTheWay].forEach(flag);
-            if (!inside && to > from) stretches.push([from, to]);
-        }
-        stretches.sort((a, b) => a[0] - b[0]);
-        const merged: [number, number][] = [];
-        for (const r of stretches)
-            if (merged.length && r[0] <= merged[merged.length - 1][1])
-                merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], r[1]);
-            else merged.push([...r]);
-
-        const path: RopePath = [];
-        const start = `M ${svgPoint(strand.segments[0].cubic.p0)} `;
-        const add = (from: number, to: number, isOver: boolean) => {
-            if (to - from < 1e-9) return;
-            const d = (path.length ? "" : start) + curvesBetween(strand, from, to);
-            path.push(isOver ? over(d) : plain(d));
-        };
-        let at = 0;
-        for (const [from, to] of merged) {
-            add(at, from, false);
-            add(from, to, true);
-            at = to;
-        }
-        add(at, strand.length, false);
-        return path;
-    });
-    return {
-        paths,
-        tooClose: [...tooClose].sort((a, b) => a - b),
-        tooClosePasses: [...tooClosePasses].sort((a, b) => a - b),
+            found.sort((a, b) => a[0] - b[0]);
+            const merged: Stretch[] = [];
+            for (const [from, to] of found) {
+                const last = merged[merged.length - 1];
+                if (last && from <= last.to) last.to = Math.max(last.to, to);
+                else merged.push({ from, to, level: 0 });
+            }
+            return merged;
+        });
+        return { stretches, tooClose, tooClosePasses };
     };
+
+    // Lay the stretches out, cutting one more crossing each time the layers can't be ordered, until they can.
+    const cut = new Set(
+        crossings.crossings.flatMap((c, index) =>
+            c.over !== undefined && c.pair.some(([i]) => isArrow[i]) ? [index] : [],
+        ),
+    );
+    for (;;) {
+        const laid = stretchesFor(cut);
+        const nodes = laid.stretches.flatMap((list) => list);
+        /** Each stretch's index in `nodes`, by strand and place in its list. */
+        const offsets = laid.stretches.map((_, i) =>
+            laid.stretches.slice(0, i).reduce((n, list) => n + list.length, 0),
+        );
+        // Where a stretch runs on across a crossing its strand goes under, the stretch on top must come after it.
+        const edges: { crossing: number; below: number; above: number }[] = [];
+        let unorderable: number | undefined;
+        crossings.crossings.forEach((c, index) => {
+            if (c.over === undefined || cut.has(index) || unorderable !== undefined) return;
+            const [top, bottom] = [c.pair[c.over][0], c.pair[1 - c.over][0]];
+            const [sTop, sBottom] = [c.s[c.over], c.s[1 - c.over]];
+            const gap = clearance(c.sin, sizes[bottom], sizes[top]);
+            const below = laid.stretches[bottom].findIndex(
+                (r) => r.from < sBottom + gap && r.to > sBottom - gap,
+            );
+            if (below < 0) return;
+            const above = laid.stretches[top].findIndex((r) => r.from <= sTop && r.to >= sTop);
+            if (above < 0 || (top === bottom && above === below)) unorderable = index;
+            else
+                edges.push({
+                    crossing: index,
+                    below: offsets[bottom] + below,
+                    above: offsets[top] + above,
+                });
+        });
+        if (unorderable !== undefined) {
+            cut.add(unorderable);
+            continue;
+        }
+        // Each stretch's layer: one above the highest it must cover, taken in order (Kahn's).
+        const into = nodes.map(() => 0);
+        for (const e of edges) into[e.above]++;
+        const ready = nodes.flatMap((_, k) => (into[k] === 0 ? [k] : []));
+        for (let n = 0; n < ready.length; n++)
+            for (const e of edges.filter((e) => e.below === ready[n])) {
+                nodes[e.above].level = Math.max(nodes[e.above].level, nodes[e.below].level + 1);
+                if (--into[e.above] === 0) ready.push(e.above);
+            }
+        // Whatever's left is on or after a loop. Back from one of them, through what's left, the way comes round to
+        // a stretch it's been to: cut a crossing on that loop.
+        let stuck = into.findIndex((n) => n > 0);
+        if (stuck >= 0) {
+            const from = new Map<number, number>();
+            while (!from.has(stuck)) {
+                const e = edges.find((e) => e.above === stuck && into[e.below] > 0)!;
+                from.set(stuck, e.crossing);
+                stuck = e.below;
+            }
+            cut.add(from.get(stuck)!);
+            continue;
+        }
+
+        const paths = marks.map(({ strand }, i) => {
+            const path: RopePath = [];
+            const start = `M ${svgPoint(strand.segments[0].cubic.p0)} `;
+            const add = (from: number, to: number, level?: number) => {
+                if (to - from < 1e-9) return;
+                const d = (path.length ? "" : start) + curvesBetween(strand, from, to);
+                path.push(level === undefined ? plain(d) : over(d, level));
+            };
+            let at = 0;
+            for (const { from, to, level } of laid.stretches[i]) {
+                add(at, from);
+                add(from, to, level);
+                at = to;
+            }
+            add(at, strand.length);
+            return path;
+        });
+        return {
+            paths,
+            tooClose: [...laid.tooClose].sort((a, b) => a - b),
+            tooClosePasses: [...laid.tooClosePasses].sort((a, b) => a - b),
+        };
+    }
 }

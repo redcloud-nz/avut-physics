@@ -31,9 +31,11 @@ towards it, a hint that the rope goes on.
 
 The list of knots and the terminology page draw the finished knots smaller, each in a view of its own (`knotView`),
 fitted to it: across the knot with a margin, from its top to 8 diameters below its lowest crossing or pass across a
-prop, where its ends run out of the bottom (and as far above it where the rope runs on out of the top too,
-`endsBothWays`: a bend, or a knot tied in the middle of a rope). They're again at one size per millimetre: the most
-that still fits the biggest in its box.
+prop, where its ends run out of the bottom (and as far above it where the rope runs on out of the top too: a bend, or
+a knot tied in the middle of a rope). A knot drawn lying across (`sideways`, as the alpine butterfly is) has its ends
+running out of both sides instead: its view goes round the rope from top to bottom, and 8 diameters either side of
+its crossings (`knotEnds` says which). They're again at one size per millimetre: the most that still fits the biggest
+in its box.
 
 Ropes are shaded as tubes, dark at their edges and light along their middle, in bands of stroke (an SVG gradient
 can't follow a stroke round a bend), with a highlight a little up and to the left; bars are shaded with gradients.

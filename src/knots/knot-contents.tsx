@@ -4,7 +4,7 @@
  * server (see `KnotDrawing`).
  */
 
-import { endsBothWays, isReady, KNOT_SECTIONS, KNOTS, KNOTS_PATH } from ".";
+import { isReady, KNOT_SECTIONS, knotEnds, KNOTS, KNOTS_PATH } from ".";
 import { KnotDrawing, knotView, workedPicture } from "./knot-drawing";
 import type { KnotContents } from "./knot-list";
 import { TERMINOLOGY_TITLE } from "./terminology";
@@ -15,7 +15,7 @@ const ROOM = { w: 144, h: 48 };
 const DRAWN = new Map(
     KNOTS.map((knot) => {
         const worked = workedPicture(knot.file.knot);
-        return [knot.slug, { worked, view: knotView(worked, endsBothWays(knot)) }];
+        return [knot.slug, { worked, view: knotView(worked, knotEnds(knot)) }];
     }),
 );
 

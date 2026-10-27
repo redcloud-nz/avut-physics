@@ -10,14 +10,18 @@ import { Segment } from "@/lib/segment";
 import { pathPoints } from "@/lib/svg-path";
 import type { Vector2 } from "@/lib/vector2";
 
-/** A piece of a rope's path: SVG path data, and whether it goes over what crosses it. */
-export type PathSegment = { d: string; over?: boolean };
+/**
+ * A piece of a rope's path: SVG path data, whether it goes over what crosses it, and if so, the layer it's drawn in
+ * (from 0, the first; a later layer covers an earlier one).
+ */
+export type PathSegment = { d: string; over?: boolean; level?: number };
 export type RopePath = PathSegment[];
 
 /** A segment that goes under whatever crosses it, or crosses nothing. */
 export const plain = (d: string): PathSegment => ({ d });
-/** A segment that goes over whatever crosses it. */
-export const over = (d: string): PathSegment => ({ d, over: true });
+/** A segment that goes over whatever crosses it, drawn in the layer given (the first by default). */
+export const over = (d: string, level = 0): PathSegment =>
+    level ? { d, over: true, level } : { d, over: true };
 
 /** A segment laid out: where it starts, its points, and how far along the rope it starts and how long it is. */
 export type LaidSegment = PathSegment & {

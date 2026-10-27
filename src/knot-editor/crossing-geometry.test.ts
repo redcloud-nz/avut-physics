@@ -67,6 +67,24 @@ function between(first: RopePath, second: RopePath) {
 
 const statuses = (c: PictureCrossings) => c.crossings.map((x) => x.status);
 
+/** The layer a path is drawn in at a distance along it, or null where it isn't marked over. */
+function levelAt(path: RopePath, s: number): number | null {
+    const seg = laySegments(path).find((seg) => seg.start <= s && s <= seg.start + seg.length);
+    return seg?.over ? (seg.level ?? 0) : null;
+}
+
+/** That at every crossing set, the strand on top is marked over, in a later layer than the other if it's over too. */
+function expectOnTop(paths: RopePath[], c: PictureCrossings) {
+    for (const x of c.crossings) {
+        if (x.over === undefined) continue;
+        const [top, bottom] = [x.over, 1 - x.over].map((side) =>
+            levelAt(paths[x.pair[side][0]], x.s[side]),
+        );
+        expect(top).not.toBeNull();
+        if (bottom !== null) expect(top!).toBeGreaterThan(bottom);
+    }
+}
+
 describe("pictureCrossings", () => {
     it("matches a pair crossing twice to its two entries", () => {
         const { crossings: c } = found(
@@ -331,28 +349,52 @@ describe("strandPaths", () => {
         for (const [a, b] of stretches) expect(under.s[0] < a || under.s[0] > b).toBe(true);
     });
 
-    it("clips a stretch short of a crossing where its strand goes under, warning when they're too close", () => {
+    it("runs a stretch on under the strand on top of it nearby, drawn in a later layer", () => {
         const across = (x: number) =>
             strand([
                 { x, y: -6 },
                 { x, y: 6 },
             ]);
-        // Over at x = 0 and under at x = gap: clipped at the clearance short of it.
-        for (const gap of [2, 3.5]) {
-            const entries: CrossingAt[] = [
-                { over: [0, 0], under: [1, 0], n: 1 },
-                { over: [2, 0], under: [0, 0], n: 1 },
+        // The line over a rope at x = 0 and under one at x = 1.5: stacked too close for its stretch to stop short.
+        const entries: CrossingAt[] = [
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [2, 0], under: [0, 0], n: 1 },
+        ];
+        const { paths, crossings: c } = found(picture([LINE, across(0), across(1.5)], entries));
+        expect(paths.tooClose).toEqual([]);
+        const [stretch, ...rest] = overStretches(paths.paths[0]);
+        expect(rest).toEqual([]);
+        expect(stretch[1]).toBeCloseTo(10 + overReach(1), 2);
+        expect(paths.paths[2].find((seg) => seg.over)?.level).toBe(1);
+        expectOnTop(paths.paths, c);
+    });
+
+    it("clips a stretch short of a crossing where layers would loop, warning when they're too close", () => {
+        // Three ropes round a triangle, each over the next: the line, then up to the left, then up to the right.
+        const triangle = (side: number) => {
+            const h = (side * Math.sqrt(3)) / 2;
+            const through = (a: TestPin, b: TestPin) =>
+                strand([
+                    { x: a.x - 3 * (b.x - a.x), y: a.y - 3 * (b.y - a.y) },
+                    { x: b.x + 3 * (b.x - a.x), y: b.y + 3 * (b.y - a.y) },
+                ]);
+            const [left, right, top] = [
+                { x: -side / 2, y: 0 },
+                { x: side / 2, y: 0 },
+                { x: 0, y: -h },
             ];
-            const { paths, crossings: c } = found(picture([LINE, across(0), across(gap)], entries));
-            const [stretch, ...rest] = overStretches(paths.paths[0]);
-            expect(rest).toEqual([]);
-            const under = c.crossings.find((x) => x.over === 1)!;
-            expect(stretch[1]).toBeCloseTo(
-                Math.min(10 + overReach(1), under.s[0] - clearance(1)),
-                2,
-            );
-            // It must reach the clearance past its own crossing at 10; with the under crossing 2 away, it can't.
-            expect(paths.tooClose.length > 0).toBe(gap < 2 * clearance(1));
+            return [LINE, through(left, top), through(right, top)];
+        };
+        const entries: CrossingAt[] = [
+            { over: [0, 0], under: [1, 0], n: 1 },
+            { over: [1, 0], under: [2, 0], n: 1 },
+            { over: [2, 0], under: [0, 0], n: 1 },
+        ];
+        for (const side of [2, 4]) {
+            const { paths, crossings: c } = found(picture(triangle(side), entries));
+            expectOnTop(paths.paths, c);
+            // Only where the stretches reach each other do the layers loop, and one stops short, too close.
+            expect(paths.tooClose.length > 0).toBe(side < 2 * clearance(Math.sqrt(3) / 2));
         }
     });
 
@@ -429,7 +471,7 @@ describe("strandPaths", () => {
 });
 
 describe("samples/v1.json", () => {
-    it("has every crossing and pass set, and room for every over stretch", () => {
+    it("has every crossing and pass set, room for every over stretch, and each strand on top drawn on top", () => {
         const read = parseKnotFile(
             readFileSync(join(import.meta.dirname, "samples", "v1.json"), "utf8"),
         );
@@ -441,6 +483,7 @@ describe("samples/v1.json", () => {
             expect([c.lost, c.toCheck, c.lostPasses, c.passesToCheck]).toEqual([[], [], [], []]);
             expect(c.crossings.length).toBe(p.crossings.length);
             expect([paths.tooClose, paths.tooClosePasses]).toEqual([[], []]);
+            expectOnTop(paths.paths, c);
         }
         const knot = found(read.file.knot);
         // Crossings between all three strands, and passes in front and behind.

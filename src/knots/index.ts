@@ -9,6 +9,7 @@ import JOINING_8 from "./files/joining-8.json";
 import MUNTER_HITCH from "./files/munter-hitch.json";
 import REEF_KNOT from "./files/reef-knot.json";
 import ROUND_TURN from "./files/round-turn-and-two-half-hitches.json";
+import type { KnotEnds } from "./knot-drawing";
 
 /*
  * The knots, in the order they're listed. Each has its own page at /rescue-knots/<slug>, showing it finished and, for knots
@@ -50,6 +51,8 @@ export type Knot = {
     variant?: string;
     /** Tied in the middle of a rope, so the rope runs on out of the knot both ways. */
     midline?: boolean;
+    /** Drawn lying across, its rope running on out of the knot to the left and right rather than up and down. */
+    sideways?: boolean;
     /** Lie the knot on its side in the list of knots, where a long, upright knot would be too small to see. */
     turned?: boolean;
     /**
@@ -76,11 +79,12 @@ export const fullName = (knot: Pick<Knot, "name" | "variant">) =>
     knot.variant ? `${knot.name} ${knot.variant}` : knot.name;
 
 /**
- * Whether the knot's rope runs on out of it both ways, out of the top of its drawing as well as the bottom: in a bend,
- * where the two ropes leave it in opposite directions, and in a knot tied in the middle of a rope.
+ * Which way the knot's rope runs on out of its drawing: out of both sides where it's drawn lying across; out of the top
+ * as well as the bottom in a bend, where the two ropes leave it in opposite directions, and in a knot tied in the middle
+ * of a rope; otherwise out of the bottom.
  */
-export const endsBothWays = (knot: Pick<Knot, "type" | "midline">) =>
-    knot.type === "Bend" || knot.midline === true;
+export const knotEnds = (knot: Pick<Knot, "type" | "midline" | "sideways">): KnotEnds =>
+    knot.sideways ? "across" : knot.type === "Bend" || knot.midline ? "both" : "down";
 
 /** A knot file as it's imported, read and checked, failing the build where it isn't a knot file. */
 export function knotFile(path: string, json: unknown): KnotFile {
@@ -141,8 +145,7 @@ export const KNOT_SECTIONS: { title: string; knots: KnotEntry[] }[] = [
                 type: "Loop",
                 abok: 1053,
                 midline: true,
-                turned: true,
-                comingSoon: true,
+                sideways: true,
             }),
         ],
     },

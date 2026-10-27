@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { Picture } from "@/knot-editor/knot-file";
-import { endsBothWays, fullName, KNOTS, KNOTS_IMAGE, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
+import { fullName, knotEnds, KNOTS, KNOTS_IMAGE, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
-import { KnotDrawing, knotView, workedPicture } from "@/knots/knot-drawing";
+import { KnotDrawing, knotView, workedPicture, type KnotEnds } from "@/knots/knot-drawing";
 import { KnotsMenu } from "@/knots/knots-menu";
 import {
     TERMINOLOGY_DESCRIPTION as DESCRIPTION,
@@ -18,22 +18,22 @@ const HREF = `${KNOTS_PATH}/terminology`;
 /** The most room a term's picture can have (pixels). */
 const ROOM = { w: 112, h: 144 };
 
-/** A term's picture, from its own file or one of a knot's, and whether its ends run out of it both ways. */
-function pictureOf(picture: NonNullable<Term["picture"]>): { shown: Picture; bothWays: boolean } {
-    if ("file" in picture) return { shown: picture.file.knot, bothWays: false };
+/** A term's picture, from its own file or one of a knot's, and which way its ends run out of it. */
+function pictureOf(picture: NonNullable<Term["picture"]>): { shown: Picture; ends: KnotEnds } {
+    if ("file" in picture) return { shown: picture.file.knot, ends: "down" };
     const knot = KNOTS.find((k) => k.slug === picture.knot)!;
     const { file } = knot;
     const shown = picture.step === undefined ? file.knot : file.steps[picture.step].picture;
-    return { shown, bothWays: endsBothWays(knot) };
+    return { shown, ends: knotEnds(knot) };
 }
 
 /** Each term's picture, where it has one, worked out with its view: around the rope, as on the knots' pages. */
 const PICTURES = new Map(
     TERMS.flatMap((term) => {
         if (!term.picture) return [];
-        const { shown, bothWays } = pictureOf(term.picture);
+        const { shown, ends } = pictureOf(term.picture);
         const worked = workedPicture(shown);
-        return [[term.term, { worked, view: knotView(worked, bothWays) }]];
+        return [[term.term, { worked, view: knotView(worked, ends) }]];
     }),
 );
 

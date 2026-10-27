@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { endsBothWays, KNOTS } from ".";
+import { knotEnds, KNOTS } from ".";
 import { KnotDrawing, knotView, workedPicture } from "./knot-drawing";
 
 /*
@@ -18,7 +18,7 @@ describe("the share picture's knots", () => {
         const drawn = SHARE_KNOTS.map((slug) => {
             const knot = KNOTS.find((k) => k.slug === slug)!;
             const worked = workedPicture(knot.file.knot);
-            const view = knotView(worked, endsBothWays(knot));
+            const view = knotView(worked, knotEnds(knot));
             const svg = renderToStaticMarkup(
                 createElement(KnotDrawing, { worked, view, label: null }),
             );

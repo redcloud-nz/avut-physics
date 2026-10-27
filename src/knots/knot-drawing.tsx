@@ -48,12 +48,19 @@ const ENDS = 8 * DIAMETER;
 const MARGIN = 1.5 * DIAMETER;
 
 /**
- * The view fitted to a knot finished: across the knot with a margin each side, from the top of the rope to a little
- * way below the knot, where its ends run on out of the bottom. Where its ends run out of the top too (`bothWays`, as
- * in a bend), it stops as far above the knot as below. It takes in any prop the knot's tied round. Drawn at a fixed
- * size per millimetre, every knot's rope is as thick as every other's, and a bigger knot takes more room.
+ * Which way a knot's rope runs on out of it: out of the bottom of its drawing (`down`), out of the top as well
+ * (`both`, as in a bend), or out of both sides (`across`, as in a knot tied in the middle of a rope drawn lying across).
  */
-export function knotView(worked: WorkedPicture, bothWays = false): Frame {
+export type KnotEnds = "down" | "both" | "across";
+
+/**
+ * The view fitted to a knot finished: across the knot with a margin each side, from the top of the rope to a little
+ * way below the knot, where its ends run on out of the bottom. Where its ends run out of the top too, it stops as far
+ * above the knot as below; where they run out of the sides, it's around the rope from top to bottom, and stops as far
+ * either side of the knot as it would below. It takes in any prop the knot's tied round. Drawn at a fixed size per
+ * millimetre, every knot's rope is as thick as every other's, and a bigger knot takes more room.
+ */
+export function knotView(worked: WorkedPicture, ends: KnotEnds = "down"): Frame {
     const { picture, geometry, crossings } = worked;
     const ropes = picture.strands.flatMap((strand, i) => (strand.kind === "rope" ? [i] : []));
     const points: Vector2[] = ropes.flatMap((i) =>
@@ -63,16 +70,24 @@ export function knotView(worked: WorkedPicture, bothWays = false): Frame {
         const box = kindOf(prop).bounds(prop);
         points.push(box.min, box.max);
     }
-    const ys = [
+    /** Where the rope crosses itself and passes across props. */
+    const knotted = [
         ...crossings.crossings
             .filter((c) => c.pair.every(([i]) => ropes.includes(i)))
-            .map((c) => c.at.y),
-        ...crossings.passes.filter((p) => ropes.includes(p.strand)).map((p) => p.at.y),
+            .map((c) => c.at),
+        ...crossings.passes.filter((p) => ropes.includes(p.strand)).map((p) => p.at),
     ];
-    const xs = points.map((p) => p.x);
+    const [xs, ys] = [points.map((p) => p.x), points.map((p) => p.y)];
+    if (ends === "across") {
+        const at = knotted.map((p) => p.x);
+        const [left, right] = [Math.min(...at) - ENDS, Math.max(...at) + ENDS];
+        const [top, bottom] = [Math.min(...ys) - MARGIN, Math.max(...ys) + MARGIN];
+        return { x: left, y: top, w: right - left, h: bottom - top };
+    }
+    const at = knotted.map((p) => p.y);
     const [left, right] = [Math.min(...xs) - MARGIN, Math.max(...xs) + MARGIN];
-    const top = bothWays ? Math.min(...ys) - ENDS : Math.min(...points.map((p) => p.y)) - MARGIN;
-    const bottom = ys.length ? Math.max(...ys) + ENDS : Math.max(...points.map((p) => p.y));
+    const top = ends === "both" ? Math.min(...at) - ENDS : Math.min(...ys) - MARGIN;
+    const bottom = at.length ? Math.max(...at) + ENDS : Math.max(...ys);
     return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
