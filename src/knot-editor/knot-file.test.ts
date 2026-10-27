@@ -162,6 +162,30 @@ describe("writeKnotFile and parseKnotFile", () => {
         expect(Object.keys(full.steps[2].picture)).toEqual(["strands", "crossings"]);
     });
 
+    it("writes a carabiner's gate only when it's open, and reads one without it as closed", async () => {
+        const carabiner = {
+            id: 5,
+            kind: "carabiner" as const,
+            x: 0,
+            y: 2,
+            r: 6,
+            width: 72,
+            height: 115,
+        };
+        const file = structuredClone(BARE);
+        file.knot.props = [{ ...carabiner, passes: [] }];
+        expect(JSON.parse(await writeKnotFile(file)).knot.props[0]).toEqual(carabiner);
+        const read = parseKnotFile(await writeKnotFile(file));
+        expect(read.kind === "ok" && read.file.knot.props[0]).toEqual({ ...carabiner, passes: [] });
+
+        file.knot.props = [{ ...carabiner, open: true, passes: [] }];
+        const text = await writeKnotFile(file);
+        expect(JSON.parse(text).knot.props[0]).toEqual({ ...carabiner, open: true });
+        expect(parseKnotFile(text)).toEqual({ kind: "ok", file });
+        const wrong = await edited(file, (json) => (json.knot.props[0].open = "yes"));
+        expect(parseKnotFile(wrong).kind).not.toBe("ok");
+    });
+
     it("rounds numbers to 0.01", async () => {
         const file = structuredClone(BARE);
         file.knot.strands[0].pins[1] = { id: 3, x: 1 / 3, y: -1e-9, angle: 45.0049 };

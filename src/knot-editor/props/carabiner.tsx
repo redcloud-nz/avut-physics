@@ -4,12 +4,19 @@
  * drawn over the strands and takes no passes.
  */
 
-import { CarabinerDrawing, carabinerPath, wideEnd } from "@/knots/carabiner";
+import { carabinerBounds, CarabinerDrawing, carabinerOutline, wideEnd } from "@/knots/carabiner";
 import { POLYLINE_TOLERANCE, type Box, type Cubic } from "@/lib/bezier";
 import { Segment } from "@/lib/segment";
 import { Vector2 } from "@/lib/vector2";
 
-import { onlyFields, readId, readNumber, readObject, readPositive } from "../read-json";
+import {
+    onlyFields,
+    readBoolean,
+    readId,
+    readNumber,
+    readObject,
+    readPositive,
+} from "../read-json";
 import type { JsonObject, JsonValue } from "../versions";
 
 import { PASS_MARGIN } from "./bar";
@@ -27,6 +34,8 @@ export type CarabinerProp = {
     /** How wide and tall it is, to the rod's middle line (millimetres). */
     width: number;
     height: number;
+    /** Whether its gate is open, swung in about its hinge (closed if left out). */
+    open?: boolean;
     /** Every pass across its bottom end. */
     passes: PassEntry[];
 };
@@ -58,7 +67,7 @@ export const CARABINER = {
         y: c.y + by.y,
     }),
 
-    outline: (c: CarabinerProp): string => carabinerPath(c),
+    outline: (c: CarabinerProp): string => carabinerOutline(c),
 
     fields(c: CarabinerProp): PropField<CarabinerProp>[] {
         const positive =
@@ -88,13 +97,28 @@ export const CARABINER = {
                 value: c.height,
                 set: positive((height) => ({ height })),
             },
+            {
+                kind: "choice",
+                label: "Gate",
+                value: c.open ? "open" : "closed",
+                options: [
+                    { value: "closed", label: "Closed" },
+                    { value: "open", label: "Open" },
+                ],
+                set(p, gate) {
+                    if (gate === "open") return { ...p, open: true };
+                    const closed = { ...p };
+                    delete closed.open;
+                    return closed;
+                },
+            },
         ];
     },
 
     read(value: JsonValue, at: string): CarabinerProp {
         const json = readObject(value, at);
-        onlyFields(json, at, ["id", "kind", "x", "y", "r", "width", "height", "passes"]);
-        return {
+        onlyFields(json, at, ["id", "kind", "x", "y", "r", "width", "height", "open", "passes"]);
+        const carabiner: CarabinerProp = {
             id: readId(json.id, `${at}.id`),
             kind: "carabiner",
             x: readNumber(json.x, `${at}.x`),
@@ -104,6 +128,8 @@ export const CARABINER = {
             height: readPositive(json.height, `${at}.height`),
             passes: json.passes === undefined ? [] : readPasses(json.passes, `${at}.passes`),
         };
+        if (json.open !== undefined && readBoolean(json.open, `${at}.open`)) carabiner.open = true;
+        return carabiner;
     },
 
     write: (c: CarabinerProp): JsonObject => ({
@@ -114,6 +140,7 @@ export const CARABINER = {
         r: c.r,
         width: c.width,
         height: c.height,
+        ...(c.open && { open: true }),
         ...(c.passes.length > 0 && { passes: c.passes }),
     }),
 
@@ -153,8 +180,5 @@ export const CARABINER = {
 
     draw: (c: CarabinerProp) => <CarabinerDrawing carabiner={c} unit={LINE_UNIT} />,
 
-    bounds: (c: CarabinerProp): Box => ({
-        min: new Vector2(c.x - c.width / 2 - c.r, c.y - c.height - c.r),
-        max: new Vector2(c.x + c.width / 2 + c.r, c.y + c.r),
-    }),
+    bounds: (c: CarabinerProp): Box => carabinerBounds(c),
 };
