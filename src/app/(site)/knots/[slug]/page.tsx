@@ -49,7 +49,6 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
             abok={knot.abok}
             name={knot.name}
             variant={knot.variant}
-            fullName={name}
             description={file.description}
             about={aboutParagraphs(file)}
             // Drawn at the same size per millimetre as every other knot, so their ropes all look as thick.

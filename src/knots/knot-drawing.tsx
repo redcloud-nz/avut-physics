@@ -110,12 +110,11 @@ export function KnotDrawing(props: {
 }
 
 /**
- * Each step's label, from the numbers: "Step 2 of 5", or "Step 2 (cont.)" for a step showing the same number again
- * (a step shown in two pictures).
+ * Each step's label, from the numbers: "Step 2", or "Step 2 (cont.)" for a step showing the same number again (a step
+ * shown in two pictures).
  */
 export function stepLabels(numbers: number[]): string[] {
-    const most = Math.max(0, ...numbers);
     return numbers.map((n, k) =>
-        k > 0 && numbers[k - 1] === n ? `Step ${n} (cont.)` : `Step ${n} of ${most}`,
+        k > 0 && numbers[k - 1] === n ? `Step ${n} (cont.)` : `Step ${n}`,
     );
 }

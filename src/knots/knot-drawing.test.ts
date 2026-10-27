@@ -4,13 +4,8 @@ import { KNOTS } from ".";
 import { knotView, stepLabels, workedPicture } from "./knot-drawing";
 
 describe("stepLabels", () => {
-    it("numbers each step out of the last, and marks a number shown again as continued", () => {
-        expect(stepLabels([1, 2, 2, 3])).toEqual([
-            "Step 1 of 3",
-            "Step 2 of 3",
-            "Step 2 (cont.)",
-            "Step 3 of 3",
-        ]);
+    it("numbers each step, and marks a number shown again as continued", () => {
+        expect(stepLabels([1, 2, 2, 3])).toEqual(["Step 1", "Step 2", "Step 2 (cont.)", "Step 3"]);
     });
 });
 

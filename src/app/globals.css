@@ -426,3 +426,10 @@ html {
     display: contents;
   }
 }
+
+/* A bar filling from its left, as a knot's tying steps wait to move on while playing. */
+@keyframes fill-across {
+  from {
+    transform: scaleX(0);
+  }
+}

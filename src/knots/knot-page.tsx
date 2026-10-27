@@ -34,8 +34,6 @@ export function KnotPage(props: {
     abok?: number;
     name: string;
     variant?: string;
-    /** The whole name, its variant and all. */
-    fullName: string;
     description?: string;
     about: string[];
     drawing: ReactNode;
@@ -131,7 +129,8 @@ export function KnotPage(props: {
                             className="fixed inset-0 z-50 bg-background text-base outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[min(56rem,calc(100dvh-4rem))] sm:w-[calc(100%-2rem)] sm:max-w-md md:h-[min(44rem,calc(100dvh-4rem))] md:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:border sm:border-line-faint sm:bg-surface sm:data-open:zoom-in-95 sm:data-closed:zoom-out-95"
                         >
                             <TyingSteps
-                                name={props.fullName}
+                                name={name}
+                                variant={variant}
                                 steps={steps}
                                 onClose={() => setTying(false)}
                             />
