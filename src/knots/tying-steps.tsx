@@ -42,7 +42,9 @@ export function TyingSteps(props: { name: string; steps: DrawnStep[]; onClose: (
 
     return (
         <div
-            className="mx-auto flex h-full w-full max-w-md flex-col gap-3 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)]"
+            // From `md`, the rope fills a column on the right and the rest stacks on the left, its caption taking up
+            // the slack so Back and Next sit at the foot.
+            className="mx-auto flex h-full w-full max-w-md flex-col gap-3 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)] md:grid md:max-w-none md:grid-cols-[18rem_minmax(0,1fr)] md:grid-rows-[auto_auto_auto_1fr_auto] md:gap-x-6 md:py-4"
             onTouchStart={(e) => {
                 touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             }}
@@ -55,18 +57,19 @@ export function TyingSteps(props: { name: string; steps: DrawnStep[]; onClose: (
                 if (way === "right" && !first) setK(k - 1);
             }}
         >
-            <header className="flex items-center gap-3 text-xs text-ink-muted">
+            <header className="flex items-center gap-3 text-xs text-ink-muted md:col-start-1">
                 <span className="tabular-nums">{step.label}</span>
+                {/* From `md`, in the dialog's corner, over the rope's column. */}
                 <button
                     type="button"
                     onClick={props.onClose}
                     aria-label="Close"
-                    className="-mr-1 ml-auto rounded-md p-1 hover:text-highlight"
+                    className="-mr-1 ml-auto rounded-md p-1 hover:text-highlight md:absolute md:top-3 md:right-4 md:z-10"
                 >
                     <X className="size-5" aria-hidden />
                 </button>
             </header>
-            <div className="flex gap-1" aria-hidden>
+            <div className="flex gap-1 md:col-start-1" aria-hidden>
                 {steps.map((_, i) => (
                     <span
                         key={i}
@@ -74,23 +77,23 @@ export function TyingSteps(props: { name: string; steps: DrawnStep[]; onClose: (
                     />
                 ))}
             </div>
-            <DialogPrimitive.Title className="text-xl leading-tight font-semibold text-ink-bright">
+            <DialogPrimitive.Title className="text-xl leading-tight font-semibold text-ink-bright md:col-start-1">
                 Tying a {props.name.toLowerCase()}
             </DialogPrimitive.Title>
             {/* Room for three lines, so the rope doesn't jump as captions of different lengths come and go. */}
-            <p className="min-h-[3lh] text-ink-soft" aria-live="polite">
+            <p className="min-h-[3lh] text-ink-soft md:col-start-1" aria-live="polite">
                 {step.caption}
             </p>
 
             {/* Sized by the room it's given, not by its drawing, so a short screen squeezes it no smaller than its
                 minimum. The rope is drawn as thick as on the knots' pages, shrinking only where it doesn't fit. */}
-            <div className="relative min-h-48 flex-1 contain-size">
+            <div className="relative min-h-48 flex-1 contain-size md:col-start-2 md:row-span-5 md:row-start-1">
                 <div className="absolute inset-0 flex items-center justify-center">
                     {step.drawing}
                 </div>
             </div>
 
-            <nav className="grid grid-cols-2 gap-2">
+            <nav className="grid grid-cols-2 gap-2 md:col-start-1">
                 <button type="button" onClick={() => setK(k - 1)} disabled={first} className={BACK}>
                     <ChevronLeft className="size-5" aria-hidden />
                     Back

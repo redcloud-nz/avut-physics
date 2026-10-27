@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { aboutParagraphs, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, knotView, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
 import { KnotPage } from "@/knots/knot-page";
 
@@ -42,6 +43,10 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
     return (
         <KnotPage
             key={slug}
+            href={`/knots/${slug}`}
+            contents={knotContents()}
+            type={knot.type}
+            abok={knot.abok}
             name={knot.name}
             variant={knot.variant}
             fullName={name}

@@ -288,6 +288,6 @@ export function Card(props: {
 }
 
 /** The grab handle drawn on the button that puts the contents away. */
-function Pill(props: { className: string }) {
+export function Pill(props: { className: string }) {
     return <span className={`h-1.5 w-10 rounded-full transition-colors ${props.className}`} />;
 }
