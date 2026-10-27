@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { KNOTS_TITLE } from ".";
+import { KNOTS_PATH, KNOTS_TITLE } from ".";
 import { KnotList, type KnotContents } from "./knot-list";
 
 /**
@@ -28,8 +28,8 @@ export function Sidebar(props: { contents: KnotContents }) {
                 ← Physics Visualisations
             </Link>
             <Link
-                href="/knots"
-                aria-current={path === "/knots" ? "page" : undefined}
+                href={KNOTS_PATH}
+                aria-current={path === KNOTS_PATH ? "page" : undefined}
                 className="px-2 font-semibold text-ink-strong hover:text-highlight"
             >
                 {KNOTS_TITLE}

@@ -1,6 +1,8 @@
 /**
  * The pieces a rope is drawn with (see `picture-drawing.tsx` in the knot editor): a stretch of rope as a tube with an
- * outline, its sheath's weave and a highlight along the top, and the tape round its end, so it's plain which end it is.
+ * outline, shaded round from dark at its edges to light along its middle, its sheath's weave over that, and a highlight
+ * a little up and to the left of its middle, where light from the top left would catch it; and the tape round its end,
+ * so it's plain which end it is.
  * A stretch redrawn over the rope has square ends, picks up the weave where the rope underneath has it, and stops its
  * outline just short of its ends, so it joins the rope without a seam.
  */
@@ -16,6 +18,28 @@ const TAPE_LENGTH = 1.2;
 
 /** How far short of a redrawn segment's ends its outline stops (rope widths). */
 const TRIM = 0.1;
+
+/**
+ * The tube's shading, from its edges in: each band's width (rope widths), and how much of the rope's highlight is mixed
+ * into its body (negative: how much of its outline, for shade). Bands this close together read as a smooth gradient
+ * across the rope, which an SVG gradient can't give a stroke that bends.
+ */
+const SHADING: [width: number, light: number][] = [
+    [1, -0.4],
+    [0.85, -0.2],
+    [0.7, 0],
+    [0.5, 0.15],
+    [0.3, 0.3],
+];
+
+/** How far the highlight sits up and to the left of the rope's middle (rope widths). */
+const GLINT = 0.12;
+
+/** The rope's body, lightened towards its highlight or darkened towards its outline. */
+const shaded = (colors: RopeColors, light: number) =>
+    light === 0
+        ? colors.body
+        : `color-mix(in oklab, ${colors.body}, ${light > 0 ? colors.highlight : colors.outline} ${Math.abs(light) * 100}%)`;
 
 /**
  * One stretch of rope along path data `d`: outline, body, weave and highlight, the weave `offset` along. Given
@@ -48,7 +72,14 @@ export function Stretch(props: {
                 strokeDasharray={length ? `${length - 2 * trim} ${length}` : undefined}
                 strokeDashoffset={length ? -trim : undefined}
             />
-            <path {...common} stroke={colors.body} strokeWidth={width} />
+            {SHADING.map(([band, light]) => (
+                <path
+                    key={band}
+                    {...common}
+                    stroke={shaded(colors, light)}
+                    strokeWidth={band * width}
+                />
+            ))}
             <path
                 {...common}
                 stroke={colors.weave}
@@ -59,9 +90,10 @@ export function Stretch(props: {
             />
             <path
                 {...common}
+                transform={`translate(${svgNumber(-GLINT * width)} ${svgNumber(-GLINT * width)})`}
                 stroke={colors.highlight}
-                strokeOpacity={0.55}
-                strokeWidth={0.22 * width}
+                strokeOpacity={0.5}
+                strokeWidth={0.18 * width}
             />
         </>
     );

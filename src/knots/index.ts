@@ -11,12 +11,15 @@ import REEF_KNOT from "./files/reef-knot.json";
 import ROUND_TURN from "./files/round-turn-and-two-half-hitches.json";
 
 /*
- * The knots, in the order they're listed. Each has its own page at /knots/<slug>, showing it finished and, for knots
+ * The knots, in the order they're listed. Each has its own page at /rescue-knots/<slug>, showing it finished and, for knots
  * that have them, the steps to tie it. Each is a knot file in `files/`, made and edited in the knot editor
  * (/knot-editor), which holds its description, its details, the knot finished and its steps.
  */
 
-export const KNOTS_TITLE = "Knots";
+export const KNOTS_TITLE = "Rescue Knots";
+
+/** Where the knots' pages are: the list of them, and each knot's page under it. */
+export const KNOTS_PATH = "/rescue-knots";
 
 /** What the knots pages are, in a sentence, for the list and for links to it. */
 export const KNOTS_DESCRIPTION = "How to tie the knots used in rope rescue, a step at a time.";
@@ -38,6 +41,8 @@ export type Knot = {
     midline?: boolean;
     /** Lie the knot on its side in the list of knots, where a long, upright knot would be too small to see. */
     turned?: boolean;
+    /** Left off the site for now, while its drawing's worked on: it has no page and isn't listed. */
+    hidden?: boolean;
     file: KnotFile;
 };
 
@@ -65,8 +70,8 @@ const knot = (slug: string, json: unknown, rest: Omit<Knot, "slug" | "file">): K
     file: knotFile(slug, json),
 });
 
-/** The knots in their families, in the order they're listed. */
-export const KNOT_SECTIONS: { title: string; knots: Knot[] }[] = [
+/** Every knot in its family, hidden ones too. */
+const ALL_SECTIONS: { title: string; knots: Knot[] }[] = [
     {
         title: "Figure-8s",
         knots: [
@@ -107,6 +112,7 @@ export const KNOT_SECTIONS: { title: string; knots: Knot[] }[] = [
                 abok: 1053,
                 midline: true,
                 turned: true,
+                hidden: true,
             }),
         ],
     },
@@ -135,10 +141,20 @@ export const KNOT_SECTIONS: { title: string; knots: Knot[] }[] = [
                 name: "Munter hitch",
                 type: "Hitch",
                 abok: 1818,
+                turned: true,
             }),
         ],
     },
 ];
+
+/** Every knot file, hidden knots' too, for the knot editor's library. */
+export const ALL_KNOTS: Knot[] = ALL_SECTIONS.flatMap((section) => section.knots);
+
+/** The knots shown on the site in their families, in the order they're listed, leaving out families with none. */
+export const KNOT_SECTIONS = ALL_SECTIONS.map((section) => ({
+    ...section,
+    knots: section.knots.filter((knot) => !knot.hidden),
+})).filter((section) => section.knots.length);
 
 export const KNOTS: Knot[] = KNOT_SECTIONS.flatMap((section) => section.knots);
 

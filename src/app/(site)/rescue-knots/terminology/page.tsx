@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import type { Picture } from "@/knot-editor/knot-file";
-import { endsBothWays, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
+import { endsBothWays, fullName, KNOTS, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
 import { knotContents } from "@/knots/knot-contents";
 import { KnotDrawing, knotView, workedPicture } from "@/knots/knot-drawing";
 import { KnotsMenu } from "@/knots/knots-menu";
@@ -13,7 +13,7 @@ import {
     type Term,
 } from "@/knots/terminology";
 
-const HREF = "/knots/terminology";
+const HREF = `${KNOTS_PATH}/terminology`;
 
 /** The most room a term's picture can have (pixels). */
 const ROOM = { w: 112, h: 144 };
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 /**
  * The words used about knots, each with what it means and, where there is one, a knot that shows it and a small picture
  * beside it. The pictures are all drawn at the same size per millimetre, so their ropes look as thick. Laid out like a
- * knot's page, so the list of knots is beside it on a wide screen and brought down from "Knots" on a phone.
+ * knot's page, so the list of knots is beside it on a wide screen and brought down from its title on a phone.
  */
 export default function Page() {
     return (
@@ -82,7 +82,7 @@ export default function Page() {
                                     <>
                                         {" "}
                                         <Link
-                                            href={`/knots/${example.slug}`}
+                                            href={`${KNOTS_PATH}/${example.slug}`}
                                             className="text-link hover:text-highlight"
                                         >
                                             {`See the ${fullName(example).toLowerCase()}.`}

@@ -17,14 +17,14 @@ const BADGE =
 /**
  * A knot's page: what type of knot it is and its ABOK number (badges over its name), what it's for, the knot finished,
  * and more on how it's used. Where the knot has steps, an Instructions button brings up tying it a step at a time: over
- * the whole page on a phone, in a dialog in the middle of a bigger screen. On a phone, tapping "Knots" at the top
+ * the whole page on a phone, in a dialog in the middle of a bigger screen. On a phone, tapping the title at the top
  * brings the list of knots down over the page; a wide screen has the list beside the page instead.
  *
  * The drawings, the knot finished (`drawing`), each step's and the list's, come from the server, drawn there (see
  * `knot-drawing.tsx`), so the browser only shows them.
  */
 export function KnotPage(props: {
-    /** Where the page is (`/knots/<slug>`), to pick it out in the list of knots. */
+    /** Where the page is (`/rescue-knots/<slug>`), to pick it out in the list of knots. */
     href: string;
     type: KnotType;
     /** Its number in The Ashley Book of Knots. */

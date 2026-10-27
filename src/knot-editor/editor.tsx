@@ -46,6 +46,7 @@ import { Menus, propCommand, useShortcuts, type CommandId, type RunOptions } fro
 import { ObjectsList } from "./objects-list";
 import { PROP_KIND_NAMES, PROP_KINDS, type PropKindName } from "./props";
 import { ShortcutsDialog } from "./shortcuts";
+import { StartDialog } from "./start-dialog";
 import { editorReducer, isSaved, loaded, NOTHING, pictureOf } from "./state";
 import { createReadouts, StatusBar, type Warnings } from "./status-bar";
 import { StepsList } from "./steps-list";
@@ -123,6 +124,8 @@ export default function KnotEditor() {
     const [helpOpen, setHelpOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [message, setMessage] = useState<Message | null>(null);
+    // Where to start, as the editor opens (`start`), or the library alone, from the File menu.
+    const [starting, setStarting] = useState<"start" | "library" | null>("start");
     // Whether this browser can open and save files: the File menu explains, until it's known and where it can't.
     const files = useInBrowser() && canUseFiles();
 
@@ -141,7 +144,15 @@ export default function KnotEditor() {
 
     const mayDiscard = () => saved || window.confirm(DISCARD);
 
+    /** A copy of a knot from the library, with no file behind it, so saving it asks where. */
+    function openFromLibrary(file: KnotFile, fileName: string) {
+        if (!mayDiscard()) return;
+        setStarting(null);
+        dispatch({ type: "load", file, fileName, saved: true });
+    }
+
     async function open() {
+        setStarting(null);
         if (!mayDiscard()) return;
         const result = await openKnotFile();
         if (result.kind === "cancelled") return;
@@ -181,6 +192,7 @@ export default function KnotEditor() {
     const enabled: Partial<Record<CommandId, boolean>> = {
         new: true,
         open: files,
+        library: true,
         save: files,
         saveAs: files,
         details: true,
@@ -316,6 +328,7 @@ export default function KnotEditor() {
             if (mayDiscard())
                 dispatch({ type: "load", file: untitledKnot(), fileName: UNTITLED, saved: true });
         } else if (id === "open") void open();
+        else if (id === "library") setStarting("library");
         else if (id === "save") void save(false);
         else if (id === "saveAs") void save(true);
         else if (id === "details") setDetailsOpen(true);
@@ -452,6 +465,15 @@ export default function KnotEditor() {
                 onZoom={(scale) => canvas.current?.setScale(scale)}
             />
             <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
+            <StartDialog
+                open={starting !== null}
+                start={starting === "start"}
+                canOpen={files}
+                onNew={() => setStarting(null)}
+                onOpen={() => void open()}
+                onLibrary={openFromLibrary}
+                onClose={() => setStarting(null)}
+            />
             <DetailsDialog
                 open={detailsOpen}
                 details={state.file}

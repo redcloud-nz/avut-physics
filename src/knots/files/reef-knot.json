@@ -2,9 +2,9 @@
   "format": "avut-knot",
   "version": 3,
   "name": "Reef knot",
-  "description": "Two ends tied together in two half knots, right over left and then left over right.",
-  "about": "More on how the reef knot is used goes here.",
-  "frame": { "x": -50.2, "y": -149.5, "w": 100.3, "h": 298.9 },
+  "description": "A flat knot for tying the two ends of a bandage or tie round something, never for joining ropes.",
+  "about": "In rescue its place is first aid: tying off triangular bandages, slings and other ties. There it lies flat against the patient and unties easily.\n\nNever use it to join two ropes that will take a load. A hard pull on one end can flip it into a loose shape that slides apart, which is also how it's undone on purpose.\n\nCheck that each end comes out beside its own standing end, so both tails are on the same side. If the second half knot is tied the same way round as the first, it becomes a granny knot, which slips.",
+  "frame": { "x": -140, "y": -200, "w": 280, "h": 400 },
   "knot": {
     "strands": [
       {

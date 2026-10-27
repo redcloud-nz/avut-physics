@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Pill } from "@/visual/card";
 
-import { KNOTS_TITLE } from ".";
+import { KNOTS_PATH, KNOTS_TITLE } from ".";
 import { KnotList, type KnotContents } from "./knot-list";
 
 /**
- * "Knots" at the top of a page among the knots, on a phone: tapping it brings the list of knots down over the page. A
+ * The title at the top of a page among the knots, on a phone: tapping it brings the list of knots down over the page. A
  * wide screen has the list beside the page instead, so goes without it.
  */
 export function KnotsMenu(props: {
@@ -45,7 +45,7 @@ export function KnotsMenu(props: {
                     <div className="panel-scroll flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-4 pb-2">
                         <DrawerTitle asChild>
                             <Link
-                                href="/knots"
+                                href={KNOTS_PATH}
                                 onClick={() => setOpen(false)}
                                 className="text-base font-semibold text-ink-strong hover:text-highlight"
                             >

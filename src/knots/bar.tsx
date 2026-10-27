@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 /**
  * A metal bar for a knot to be tied round: a round tube the rope wraps round. Seen end on, the rope lies across the
  * bar's end rather than over or under it, so it's drawn before the rope. Seen side on, running across, it's in front
@@ -17,59 +19,62 @@ const COLORS = {
     outline: "var(--knot-outline)",
 };
 
+/** The bar's shading side on, from its top: a bright highlight near it, its own colour, then shade. */
+const SIDE: [number, string][] = [
+    [0, COLORS.body],
+    [0.12, COLORS.highlight],
+    [0.28, COLORS.highlight],
+    [0.5, COLORS.body],
+    [0.8, COLORS.shade],
+    [1, COLORS.shade],
+];
+
+/** Its end's shading, out from the highlight on its upper left. */
+const END: [number, string][] = [
+    [0, COLORS.highlight],
+    [0.3, COLORS.body],
+    [0.85, COLORS.shade],
+    [1, COLORS.shade],
+];
+
+const stops = (shading: [number, string][]) =>
+    shading.map(([offset, color]) => (
+        <stop key={offset} offset={offset} style={{ stopColor: color }} />
+    ));
+
 /**
- * The bar's end: a disc, shaded round its edge, with a highlight on its upper left. Seen side on, a band, shaded along
- * its bottom, with a highlight along its top, and cut off square at its ends. Its lines are sized for a rope `unit`
- * across (1 by default, for coordinates in rope diameters).
+ * The bar's end: a disc, lit from its upper left, shading off round to its lower right. Seen side on, a band lit along
+ * its top and shaded along its bottom, cut off square at its ends. Its outline is sized for a rope `unit` across (1 by
+ * default, for coordinates in rope diameters).
  */
 export function BarDrawing(props: { bar: Bar; unit?: number }) {
     const { x, y, r, length } = props.bar;
     const { unit = 1 } = props;
+    const id = `bar-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+    const outline = { stroke: COLORS.outline, strokeWidth: 0.25 * unit };
     if (length) {
-        const left = x - length / 2;
         return (
             <g>
-                <rect x={left} y={y - r} width={length} height={2 * r} fill={COLORS.shade} />
-                <rect x={left} y={y - r} width={length} height={1.6 * r} fill={COLORS.body} />
-                <path
-                    d={`M ${left + 0.4 * unit} ${y - 0.55 * r} h ${length - 0.8 * unit}`}
-                    stroke={COLORS.highlight}
-                    strokeOpacity={0.8}
-                    strokeWidth={0.25 * unit}
-                    strokeLinecap="round"
-                />
+                <linearGradient id={id} x1={0} y1={0} x2={0} y2={1}>
+                    {stops(SIDE)}
+                </linearGradient>
                 <rect
-                    x={left}
+                    x={x - length / 2}
                     y={y - r}
                     width={length}
                     height={2 * r}
-                    fill="none"
-                    stroke={COLORS.outline}
-                    strokeWidth={0.25 * unit}
+                    fill={`url(#${id})`}
+                    {...outline}
                 />
             </g>
         );
     }
-    const glint = (a: number) => `${x + 0.65 * r * Math.cos(a)} ${y + 0.65 * r * Math.sin(a)}`;
     return (
         <g>
-            <circle
-                cx={x}
-                cy={y}
-                r={r}
-                fill={COLORS.shade}
-                stroke={COLORS.outline}
-                strokeWidth={0.25 * unit}
-            />
-            <circle cx={x} cy={y} r={r * 0.8} fill={COLORS.body} />
-            <path
-                d={`M ${glint(Math.PI * 0.95)} A ${0.65 * r} ${0.65 * r} 0 0 1 ${glint(Math.PI * 1.45)}`}
-                fill="none"
-                stroke={COLORS.highlight}
-                strokeOpacity={0.8}
-                strokeWidth={0.25 * unit}
-                strokeLinecap="round"
-            />
+            <radialGradient id={id} cx={0.5} cy={0.5} r={0.5} fx={0.3} fy={0.3}>
+                {stops(END)}
+            </radialGradient>
+            <circle cx={x} cy={y} r={r} fill={`url(#${id})`} {...outline} />
         </g>
     );
 }

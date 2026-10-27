@@ -122,6 +122,11 @@ The editor opens and saves files on your computer with the browser's file access
 `showSaveFilePicker`), which only Chrome and Edge have. Save writes back to the file that was opened, with nothing
 written by the server. A dot in the title shows unsaved changes.
 
+As the editor opens it asks where to start (`start-dialog.tsx`): a new knot, a file opened from the computer, or a copy
+of one of the site's knots from the library (every knot in `src/knots/index.ts`, hidden ones too). File > Open from
+Library… brings up the library again. A knot from the library has no file behind it, so Save asks where to save it, and
+the library itself never changes: to change a knot on the site, save it over its file in `src/knots/files/`.
+
 A file holds one knot as JSON, and only what can't be worked out:
 
 ```json
@@ -268,7 +273,7 @@ chrome for addresses that match no page.
 
 - **Menu bar** (shadcn's Menubar, on Radix), each item with its keyboard shortcut if it has one. Inserting has none,
   and of the View toggles only Grid (G) and Snap to Grid (F) do:
-  - File: New, Open…, Save, Save As…, Knot Details… (a dialog for the name, description, about text and frame)
+  - File: New, Open…, Open from Library…, Save, Save As…, Knot Details… (a dialog for the name, description, about text and frame)
   - Edit: Undo, Redo, Delete, Select All, Select None, Select Next Pin, Select Previous Pin, Move (Up, Left, Down,
     Right, Turn Anticlockwise, Turn Clockwise), Link Pins, Unlink
   - Insert: Pin, Rope, Arrow, Prop (each kind), Step

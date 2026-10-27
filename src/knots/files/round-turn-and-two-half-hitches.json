@@ -2,9 +2,9 @@
   "format": "avut-knot",
   "version": 3,
   "name": "Round turn and two half hitches",
-  "description": "The rope taken round something one and a half times, with its tail tied round the standing part in two half hitches.",
-  "about": "More on how the round turn and two half hitches is used goes here.",
-  "frame": { "x": -99, "y": -55, "w": 198, "h": 365.2 },
+  "description": "A hitch for tying a rope to a tree, rail, post or ring, with no hardware needed.",
+  "about": "In rescue it's used for tying a rope off to a tree, rail or post when the load is moderate and steady, such as a tag line, a handline or a rope holding gear in place.\n\nThe round turn takes most of the pull, so the rope can be held with one hand while the hitches are tied. Tie both half hitches the same way round, so that together they form a clove hitch round the standing part.\n\nCheck for a full round turn round the anchor, not a single turn, and leave a tail of at least 100 mm past the second hitch. A rope that's loaded and slackened over and over can work the hitches loose, so check them again during a job.",
+  "frame": { "x": -140, "y": -75, "w": 280, "h": 400 },
   "knot": {
     "strands": [
       {

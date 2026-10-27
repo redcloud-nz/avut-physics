@@ -4,7 +4,7 @@
  * server (see `KnotDrawing`).
  */
 
-import { endsBothWays, KNOT_SECTIONS, KNOTS } from ".";
+import { endsBothWays, KNOT_SECTIONS, KNOTS, KNOTS_PATH } from ".";
 import { KnotDrawing, knotView, workedPicture } from "./knot-drawing";
 import type { KnotContents } from "./knot-list";
 import { TERMINOLOGY_TITLE } from "./terminology";
@@ -38,14 +38,14 @@ const BOX = { w: Math.ceil(Math.max(...SIZES.map((size) => size.w)) * LIST_SCALE
 export function knotContents(): KnotContents {
     const terminology = {
         title: TERMINOLOGY_TITLE,
-        knots: [{ href: "/knots/terminology", name: TERMINOLOGY_TITLE }],
+        knots: [{ href: `${KNOTS_PATH}/terminology`, name: TERMINOLOGY_TITLE }],
     };
     return [
         terminology,
         ...KNOT_SECTIONS.map((section) => ({
             title: section.title,
             knots: section.knots.map((knot) => ({
-                href: `/knots/${knot.slug}`,
+                href: `${KNOTS_PATH}/${knot.slug}`,
                 name: knot.name,
                 variant: knot.variant,
                 drawing: (

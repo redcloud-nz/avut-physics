@@ -5,7 +5,7 @@ import ROUND_TURN from "./files/terms/round-turn.json";
 import TURN from "./files/terms/turn.json";
 
 /*
- * The words used about knots, for the terminology page at /knots/terminology: the parts of a rope, the shapes it's
+ * The words used about knots, for the terminology page at /rescue-knots/terminology: the parts of a rope, the shapes it's
  * made into, then the kinds of knot.
  */
 
