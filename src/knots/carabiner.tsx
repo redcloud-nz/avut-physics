@@ -704,7 +704,7 @@ function NosePeek(props: { carabiner: Carabiner; ids: Ids; from: number }) {
 export function CarabinerDrawing(props: { carabiner: Carabiner; unit: number }) {
     const { carabiner, unit } = props;
     const ids = useIds();
-    const line = 0.25 * unit;
+    const line = 0.125 * unit;
     return (
         <g>
             <Defs carabiner={carabiner} ids={ids} nose={noseShapes(carabiner).block} />
