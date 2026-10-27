@@ -46,7 +46,7 @@ export type Id = number;
 export const FORMAT = "avut-knot";
 
 /** The colours a rope can be. Each is a set of tokens in `globals.css`. */
-export const ROPE_COLOURS = ["orange", "green", "blue", "purple", "yellow"] as const;
+export const ROPE_COLOURS = ["orange", "green", "blue", "purple", "yellow", "red"] as const;
 export type RopeColour = (typeof ROPE_COLOURS)[number];
 
 /** A point a strand passes through, and the way it runs through it (degrees), when it holds one. */

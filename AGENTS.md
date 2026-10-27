@@ -100,7 +100,7 @@ that a diagram draws correctly. The article's first load compiles for around 20 
   classes (`text-slate-400`) in components; add a token instead. The exceptions are the share image
   (`src/visual/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
   own overlays) and the articles' `print:` classes.
-- `src/knots/`: knots drawn from their centrelines (work in progress at `/knots/<slug>`; see
+- `src/knots/`: knots drawn from their centrelines (work in progress at `/rescue-knots/<slug>`; see
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
   - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,

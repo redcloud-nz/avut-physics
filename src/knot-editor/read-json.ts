@@ -72,6 +72,13 @@ export function readString(value: JsonValue | undefined, at: string): string {
     return value;
 }
 
+/** True or false. */
+export function readBoolean(value: JsonValue | undefined, at: string): boolean {
+    if (typeof value !== "boolean")
+        throw new FileError(at, `should be true or false, but is ${describe(value)}`);
+    return value;
+}
+
 /** One of `options`. */
 export function readChoice<T extends string>(
     value: JsonValue | undefined,

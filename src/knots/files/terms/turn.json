@@ -1,0 +1,84 @@
+{
+  "format": "avut-knot",
+  "version": 3,
+  "name": "Turn",
+  "description": "The rope taken once round a bar.",
+  "frame": {
+    "x": -60,
+    "y": -60,
+    "w": 120,
+    "h": 190
+  },
+  "knot": {
+    "strands": [
+      {
+        "id": 1,
+        "kind": "rope",
+        "colour": "blue",
+        "diameter": 11,
+        "pins": [
+          {
+            "id": 2,
+            "x": 0,
+            "y": 120
+          },
+          {
+            "id": 3,
+            "x": 0,
+            "y": 0.05,
+            "angle": -89.93
+          },
+          {
+            "id": 4,
+            "x": -14,
+            "y": -38.48,
+            "angle": 180
+          },
+          {
+            "id": 5,
+            "x": -28,
+            "y": 0.18,
+            "angle": 90
+          },
+          {
+            "id": 6,
+            "x": -28,
+            "y": 120,
+            "angle": 90
+          }
+        ],
+        "segments": [
+          {
+            "id": 7
+          },
+          {
+            "id": 8,
+            "tension": [3.08, 4]
+          },
+          {
+            "id": 9,
+            "tension": [4, 2.31]
+          },
+          {
+            "id": 10
+          }
+        ]
+      }
+    ],
+    "crossings": [],
+    "props": [
+      {
+        "id": 11,
+        "kind": "bar",
+        "x": 0,
+        "y": 0,
+        "r": 33,
+        "length": 165,
+        "passes": [
+          [8, 1, "front"],
+          [9, 1, "behind"]
+        ]
+      }
+    ]
+  }
+}

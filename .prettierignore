@@ -5,3 +5,5 @@ src/visualisations/__snapshots__
 
 # Git worktrees of this same repo: each formats its own staged files.
 .claude/worktrees
+# The share picture's knots, drawn to SVG: a file snapshot, compared byte for byte by its test.
+src/knots/share-knots.json

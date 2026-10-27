@@ -60,6 +60,7 @@ const arrow = (way: string, label: string) => ({ code: `Arrow${way}`, label });
 const BASE_COMMANDS = {
     new: { label: "New", shortcut: { ...letter("N"), mod: true, alt: true } },
     open: { label: "Open…", shortcut: { ...letter("O"), mod: true } },
+    library: { label: "Open from Library…" },
     save: { label: "Save", shortcut: { ...letter("S"), mod: true } },
     saveAs: { label: "Save As…", shortcut: { ...letter("S"), mod: true, shift: true } },
     details: { label: "Knot Details…", shortcut: { ...letter("I"), mod: true } },
@@ -115,7 +116,7 @@ export type MenuItem = CommandId | null | { submenu: string; items: CommandId[] 
 
 /** The menus, their items in order. */
 export const MENUS: { name: string; items: MenuItem[] }[] = [
-    { name: "File", items: ["new", "open", null, "save", "saveAs", null, "details"] },
+    { name: "File", items: ["new", "open", "library", null, "save", "saveAs", null, "details"] },
     {
         name: "Edit",
         items: [

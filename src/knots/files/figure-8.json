@@ -2,15 +2,15 @@
   "format": "avut-knot",
   "version": 3,
   "name": "Figure-8",
-  "description": "Tied by twisting a loop into an 8 and passing the end through it.",
-  "about": "More on how the figure-8 is used goes here.",
-  "frame": { "x": -106.7, "y": -181.5, "w": 213.4, "h": 362.9 },
+  "description": "A knot tied in the end of a rope so the end can't run out through a descender, pulley or hand.",
+  "about": "In rescue it goes in the end of a lowering or abseil rope, so that if the rope turns out to be too short, its end can't run out through the descender or pulley.\n\nCheck that it's a real 8: two clear loops, with the tail leaving through the far one alongside the standing part. Pull it tight and leave a tail of at least a hand's width, about 100 mm.\n\nIt unties easily even after a hard load. The flip side is that it can shake loose in stiff rope that isn't under load, so tighten it firmly and check it again before the rope is used.",
+  "frame": { "x": -140, "y": -200, "w": 280, "h": 400 },
   "knot": {
     "strands": [
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 0, "y": 220 },
@@ -57,7 +57,7 @@
           {
             "id": 25,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 26, "x": 0, "y": 220 },
@@ -89,7 +89,7 @@
           {
             "id": 39,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 41, "x": 0, "y": 220 },
@@ -142,7 +142,7 @@
           {
             "id": 67,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 68, "x": 0, "y": 220 },
@@ -180,7 +180,7 @@
           {
             "id": 87,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 90, "x": 0, "y": 220 },
@@ -248,7 +248,7 @@
           {
             "id": 127,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 128, "x": 0, "y": 220 },
@@ -295,7 +295,7 @@
           {
             "id": 153,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 155, "x": 0, "y": 220 },
@@ -354,7 +354,7 @@
           {
             "id": 185,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 186, "x": 0, "y": 220 },

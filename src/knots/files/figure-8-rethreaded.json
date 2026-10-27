@@ -2,15 +2,15 @@
   "format": "avut-knot",
   "version": 3,
   "name": "Figure-8 rethreaded",
-  "description": "A figure-8 tied in a single strand, with the end followed back through it to leave a loop.",
-  "about": "More on how the figure-8 rethreaded is used goes here.",
-  "frame": { "x": -137.5, "y": -221.8, "w": 275, "h": 443.6 },
+  "description": "A figure-8 loop tied round something a carabiner can't be clipped to, such as a tree, beam or harness.",
+  "about": "Use it when a carabiner isn't wanted or won't fit: round a tree, beam or post, through an anchor plate, or into a harness's tie-in points. Finished, it's the same knot as the figure-8 on a bight, and it's checked the same way.\n\nThe running end must follow the first figure-8 exactly, lying alongside it the whole way without crossing it. The usual faults are a strand that wanders off that path, or a first knot that wasn't a proper 8 to begin with.\n\nSet it by pulling every strand tight, and leave a tail of about 100 mm. Like any figure-8 loop, it can be hard to untie after a heavy load.",
+  "frame": { "x": -140, "y": -215, "w": 280, "h": 400 },
   "knot": {
     "strands": [
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 6.05, "y": 220 },
@@ -98,7 +98,7 @@
           {
             "id": 54,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 55, "x": 6.05, "y": 220 },
@@ -150,7 +150,7 @@
           {
             "id": 83,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 84, "x": 6.05, "y": 220 },
@@ -204,7 +204,7 @@
           {
             "id": 114,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 116, "x": 6.05, "y": 220 },
@@ -269,7 +269,7 @@
           {
             "id": 153,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 154, "x": 6.05, "y": 220 },
@@ -325,7 +325,7 @@
           {
             "id": 184,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 186, "x": 6.05, "y": 220 },
@@ -407,7 +407,7 @@
           {
             "id": 233,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 234, "x": 6.05, "y": 220 },
@@ -468,7 +468,7 @@
           {
             "id": 268,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 270, "x": 6.05, "y": 220 },
@@ -554,7 +554,7 @@
           {
             "id": 323,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 324, "x": 6.05, "y": 220 },
@@ -637,7 +637,7 @@
           {
             "id": 374,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 376, "x": 6.05, "y": 220 },
@@ -731,7 +731,7 @@
           {
             "id": 433,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 434, "x": 6.05, "y": 220 },
@@ -815,7 +815,7 @@
           {
             "id": 482,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 483, "x": 6.05, "y": 220 },

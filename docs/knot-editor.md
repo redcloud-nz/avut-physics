@@ -87,9 +87,21 @@ kind touches nothing else.
 A prop is drawn behind every strand, unless strands pass both in front of it and behind it. Then it's drawn over the strands but under their over stretches. It lists every pass across it with its side, front or behind, as crossings are listed, and you click a pass to swap it. A pass in front is drawn as an over stretch long enough to cover the prop, ending where the strand turns back across it (as a rope wrapped round a bar does at its edge), since the next pass begins there.
 
 The first kind is the bar: end on (a circle, behind the rope) or side on (with a length, passes in front and behind).
-A new one is 17.6 mm in radius and 220 mm long. To come later: a carabiner and a ring, with passes in front and behind
-like the side-on bar; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and flip,
-in front of or behind the strands.
+A new one is 17.6 mm in radius and 220 mm long. The second is the carabiner: a pear-shaped (HMS) carabiner seen face
+on, its wide end at the bottom, with passes in front and behind anywhere round that end (the rest of it takes no
+passes). It has a rod radius, a width and a height, and its `x` and `y` are its bottom end's centre. The width and
+height are its outside size, to the rod's outer edges, as a real carabiner's size is given, and `y` is on the rod's
+outer edge; a new one is the size of a real one: 72 mm wide and 115 mm tall, with a 12 mm rod (6 mm in radius). It's
+drawn from photos of a Beal HMS screw-gate, turned upside down, as filled parts: the body (spine, both ends and the
+keylock nose, with a channel along it and a label plate on the spine), the gate's bar, its locking sleeve (a knurled
+grip between two smooth ends: the top one with a window over the hinge rivet, the bottom one with a rounded slot the
+bar shows through and a longer tab on its inner side) and the rivet. The nose is a flat hook with a slot in its inner
+side, which the gate's end closes over. The rod is shaded as a round bar, with soft graded bands and a highlight, and
+the gate's parts with gradients across them. Its Gate field opens it (written `"open": true`, and left out when closed,
+so older files read as closed): the gate swings inwards about its rivet by 46°, as far as the real one's does, clear of
+the nose. Opening it changes no passes, which are all round the wide end. To come later: a ring, with passes in front
+and behind; and hands, a tree and an anchor, each a drawing placed with a position, rotation, size and flip, in front
+of or behind the strands.
 
 ## The frame
 
@@ -109,6 +121,11 @@ step through them.
 The editor opens and saves files on your computer with the browser's file access (`showOpenFilePicker`,
 `showSaveFilePicker`), which only Chrome and Edge have. Save writes back to the file that was opened, with nothing
 written by the server. A dot in the title shows unsaved changes.
+
+As the editor opens it asks where to start (`start-dialog.tsx`): a new knot, a file opened from the computer, or a copy
+of one of the site's knots from the library (every knot in `src/knots/index.ts`, hidden ones too). File > Open from
+Library… brings up the library again. A knot from the library has no file behind it, so Save asks where to save it, and
+the library itself never changes: to change a knot on the site, save it over its file in `src/knots/files/`.
 
 A file holds one knot as JSON, and only what can't be worked out:
 
@@ -256,7 +273,7 @@ chrome for addresses that match no page.
 
 - **Menu bar** (shadcn's Menubar, on Radix), each item with its keyboard shortcut if it has one. Inserting has none,
   and of the View toggles only Grid (G) and Snap to Grid (F) do:
-  - File: New, Open…, Save, Save As…, Knot Details… (a dialog for the name, description, about text and frame)
+  - File: New, Open…, Open from Library…, Save, Save As…, Knot Details… (a dialog for the name, description, about text and frame)
   - Edit: Undo, Redo, Delete, Select All, Select None, Select Next Pin, Select Previous Pin, Move (Up, Left, Down,
     Right, Turn Anticlockwise, Turn Clockwise), Link Pins, Unlink
   - Insert: Pin, Rope, Arrow, Prop (each kind), Step

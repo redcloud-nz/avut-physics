@@ -491,15 +491,15 @@ describe("props", () => {
         expect(p.props).toEqual([
             { id: 7, kind: "bar", x: 2, y: 3, r: 17.6, length: 220, passes: [] },
         ]);
-        const bar = p.props[0];
+        const bar = p.props[0] as BarProp;
         const moved = changeProp(p, 0, (q) => kindOf(q).moved(q, at(1, -1)));
         expect([moved.props[0].x, moved.props[0].y]).toEqual([3, 2]);
         expect(moved.strands).toBe(p.strands);
         const field = (q: BarProp, label: string) => BAR.fields(q).find((f) => f.label === label)!;
         const radius = field(bar, "Radius");
         if (radius.kind !== "number") throw new Error("Radius should be a number");
-        expect(changeProp(p, 0, (q) => radius.set(q, 2)).props[0].r).toBe(2);
-        expect(changeProp(p, 0, (q) => radius.set(q, 0))).toBe(p);
+        expect(changeProp(p, 0, (q) => radius.set(q as BarProp, 2)).props[0].r).toBe(2);
+        expect(changeProp(p, 0, (q) => radius.set(q as BarProp, 0))).toBe(p);
         expect(changeProp(p, 0, (q) => q)).toBe(p);
         expect(deleteProp(p, 0).props).toEqual([]);
         expect(deleteProp(p, 1)).toBe(p);

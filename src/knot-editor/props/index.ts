@@ -12,13 +12,14 @@ import type { Vector2 } from "@/lib/vector2";
 import type { JsonObject, JsonValue } from "../versions";
 
 import { BAR, type BarProp } from "./bar";
+import { CARABINER, type CarabinerProp } from "./carabiner";
 import type { PassEntry } from "./passes";
 
 export type { PassAt, PassEntry, PassSide } from "./passes";
 export { PASS_SIDES } from "./passes";
 
 /** A prop of any kind. */
-export type Prop = BarProp;
+export type Prop = BarProp | CarabinerProp;
 export type PropKindName = Prop["kind"];
 
 /** A field of a prop in the panel: a number typed in, or a choice. `set` gives back the prop itself if it's refused. */
@@ -76,6 +77,7 @@ export type PropKind<P extends Prop> = {
 /** Every kind, by name. */
 export const PROP_KINDS: { [K in PropKindName]: PropKind<Extract<Prop, { kind: K }>> } = {
     bar: BAR,
+    carabiner: CARABINER,
 };
 
 export const PROP_KIND_NAMES = Object.keys(PROP_KINDS) as PropKindName[];

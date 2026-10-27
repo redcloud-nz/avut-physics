@@ -472,7 +472,8 @@ describe("strand sizes", () => {
             x: prop.x * by,
             y: prop.y * by,
             r: prop.r * by,
-            ...(prop.length !== undefined && { length: prop.length * by }),
+            ...(prop.kind === "bar" && prop.length !== undefined && { length: prop.length * by }),
+            ...(prop.kind === "carabiner" && { width: prop.width * by, height: prop.height * by }),
         })),
     });
 

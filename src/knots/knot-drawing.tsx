@@ -4,6 +4,8 @@
  * browser: working the curves out again there could come out different in the last digits.
  */
 
+import { useId } from "react";
+
 import {
     pictureCrossings,
     strandPaths,
@@ -36,7 +38,10 @@ export function workedPicture(picture: Picture): WorkedPicture {
     return { picture, geometry, crossings, paths: strandPaths(picture, geometry, crossings).paths };
 }
 
-/** How far below a finished knot's lowest crossing its view reaches, showing its ends leaving it (millimetres). */
+/**
+ * How far below a finished knot's lowest crossing (or pass across a prop) its view reaches, showing its ends leaving it
+ * (millimetres).
+ */
 const ENDS = 8 * DIAMETER;
 
 /** How far round the knot its view leaves (millimetres). */
@@ -58,9 +63,12 @@ export function knotView(worked: WorkedPicture, bothWays = false): Frame {
         const box = kindOf(prop).bounds(prop);
         points.push(box.min, box.max);
     }
-    const ys = crossings.crossings
-        .filter((c) => c.pair.every(([i]) => ropes.includes(i)))
-        .map((c) => c.at.y);
+    const ys = [
+        ...crossings.crossings
+            .filter((c) => c.pair.every(([i]) => ropes.includes(i)))
+            .map((c) => c.at.y),
+        ...crossings.passes.filter((p) => ropes.includes(p.strand)).map((p) => p.at.y),
+    ];
     const xs = points.map((p) => p.x);
     const [left, right] = [Math.min(...xs) - MARGIN, Math.max(...xs) + MARGIN];
     const top = bothWays ? Math.min(...ys) - ENDS : Math.min(...points.map((p) => p.y)) - MARGIN;
@@ -68,11 +76,73 @@ export function knotView(worked: WorkedPicture, bothWays = false): Frame {
     return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
+/** How far in from the view's edge a rope running off it fades out over (millimetres). */
+const FADE = 3 * DIAMETER;
+
+type Side = "left" | "right" | "top" | "bottom";
+
+/** The sides of the view a rope runs off, its centreline going on past them. */
+function sidesRunOff(worked: WorkedPicture, view: Frame): Side[] {
+    const points = worked.picture.strands.flatMap((strand, i) =>
+        strand.kind === "rope"
+            ? worked.geometry.strands[i].segments.flatMap((seg) => seg.cubic.points(16))
+            : [],
+    );
+    const past: Record<Side, (p: Vector2) => boolean> = {
+        left: (p) => p.x < view.x,
+        right: (p) => p.x > view.x + view.w,
+        top: (p) => p.y < view.y,
+        bottom: (p) => p.y > view.y + view.h,
+    };
+    return (Object.keys(past) as Side[]).filter((side) => points.some(past[side]));
+}
+
+/**
+ * A mask fading the drawing out towards each of the `sides` given, over the last `FADE` of the view: a hint that the
+ * rope goes on past the edge rather than stopping there. Each side's fade darkens the mask over the rest, so where two
+ * meet in a corner they multiply.
+ */
+function FadeMask(props: { id: string; view: Frame; sides: Side[] }) {
+    const { x, y, w, h } = props.view;
+    // Each side's gradient, from its edge inwards.
+    const from: Record<Side, [number, number, number, number]> = {
+        left: [x, 0, x + FADE, 0],
+        right: [x + w, 0, x + w - FADE, 0],
+        top: [0, y, 0, y + FADE],
+        bottom: [0, y + h, 0, y + h - FADE],
+    };
+    return (
+        <mask id={props.id} maskUnits="userSpaceOnUse" x={x} y={y} width={w} height={h}>
+            <rect x={x} y={y} width={w} height={h} fill="white" />
+            {props.sides.map((side) => {
+                const [x1, y1, x2, y2] = from[side];
+                return (
+                    <g key={side}>
+                        <linearGradient
+                            id={`${props.id}-${side}`}
+                            gradientUnits="userSpaceOnUse"
+                            x1={x1}
+                            y1={y1}
+                            x2={x2}
+                            y2={y2}
+                        >
+                            <stop offset={0} stopColor="black" />
+                            <stop offset={1} stopColor="black" stopOpacity={0} />
+                        </linearGradient>
+                        <rect x={x} y={y} width={w} height={h} fill={`url(#${props.id}-${side})`} />
+                    </g>
+                );
+            })}
+        </mask>
+    );
+}
+
 /**
  * The picture in the view, in an SVG. `turned` lays it on its side, a quarter turn clockwise, so the end that was at
  * the top is on the right. Given a `scale` (pixels per millimetre) it's drawn that size, shrinking only to fit the
- * width it has (and the height, where its box has one); otherwise it fills whatever box its class gives it. It's
- * hidden from screen readers when its label is null (where it's only decoration).
+ * width it has (and the height, where its box has one); otherwise it fills whatever box its class gives it. Where a
+ * rope runs off an edge, the drawing fades out towards it. It's hidden from screen readers when its label is null
+ * (where it's only decoration).
  */
 export function KnotDrawing(props: {
     worked: WorkedPicture;
@@ -83,6 +153,8 @@ export function KnotDrawing(props: {
     className?: string;
 }) {
     const { worked, view, turned, label, scale } = props;
+    const mask = `knot-fade-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+    const sides = sidesRunOff(worked, view);
     // Turning maps (x, y) to (-y, x), so the view's x span becomes its y span, and its y span its x span the other way.
     const box = turned
         ? [-(view.y + view.h), view.x, view.h, view.w]
@@ -98,24 +170,26 @@ export function KnotDrawing(props: {
             })}
             {...(label === null ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
         >
+            {sides.length > 0 && <FadeMask id={mask} view={view} sides={sides} />}
             <g transform={turned ? "rotate(90)" : undefined}>
-                <PictureDrawing
-                    picture={worked.picture}
-                    geometry={worked.geometry}
-                    paths={worked.paths}
-                />
+                <g mask={sides.length > 0 ? `url(#${mask})` : undefined}>
+                    <PictureDrawing
+                        picture={worked.picture}
+                        geometry={worked.geometry}
+                        paths={worked.paths}
+                    />
+                </g>
             </g>
         </svg>
     );
 }
 
 /**
- * Each step's label, from the numbers: "Step 2 of 5", or "Step 2 (cont.)" for a step showing the same number again
- * (a step shown in two pictures).
+ * Each step's label, from the numbers: "Step 2", or "Step 2 (cont.)" for a step showing the same number again (a step
+ * shown in two pictures).
  */
 export function stepLabels(numbers: number[]): string[] {
-    const most = Math.max(0, ...numbers);
     return numbers.map((n, k) =>
-        k > 0 && numbers[k - 1] === n ? `Step ${n} (cont.)` : `Step ${n} of ${most}`,
+        k > 0 && numbers[k - 1] === n ? `Step ${n} (cont.)` : `Step ${n}`,
     );
 }

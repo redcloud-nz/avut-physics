@@ -2,15 +2,15 @@
   "format": "avut-knot",
   "version": 3,
   "name": "Figure-8 on a bight",
-  "description": "A figure-8 tied in the rope doubled, leaving a loop.",
-  "about": "More on how the figure-8 on a bight is used goes here.",
-  "frame": { "x": -131, "y": -199.8, "w": 262, "h": 399.6 },
+  "description": "A fixed loop tied in the doubled end of a rope, for clipping it to an anchor or a load.",
+  "about": "It's the usual way to put a loop in the end of a rope, so the rope can be clipped with a carabiner to an anchor, a stretcher bridle or a rescuer's harness. It's secure and easy to recognise, which is why it's so widely used.\n\nTo check it, follow the two strands through the knot: they should lie side by side the whole way, with neither crossing its partner. Set it by pulling each of the four strands tight, and leave a tail of about 100 mm.\n\nIt's made to be loaded between the loop and the standing part. Tied in the middle of a rope and pulled from both sides, it distorts, so the alpine butterfly is better there. After a heavy load it can jam and be hard to untie.",
+  "frame": { "x": -140, "y": -200, "w": 280, "h": 400 },
   "knot": {
     "strands": [
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 6.88, "y": 220, "angle": -90 },
@@ -95,7 +95,7 @@
           {
             "id": 51,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 52, "x": 6.88, "y": 440, "angle": -90 },
@@ -167,7 +167,7 @@
           {
             "id": 105,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 107, "x": 6.88, "y": 440, "angle": -90 },
@@ -263,7 +263,7 @@
           {
             "id": 173,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 174, "x": 6.87, "y": 440, "angle": -90 },
@@ -340,7 +340,7 @@
           {
             "id": 227,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 230, "x": 6.87, "y": 440, "angle": -90 },
@@ -449,7 +449,7 @@
           {
             "id": 301,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 302, "x": 6.88, "y": 440, "angle": -90 },
@@ -538,7 +538,7 @@
           {
             "id": 363,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 365, "x": 6.88, "y": 440, "angle": -90 },
@@ -644,7 +644,7 @@
           {
             "id": 431,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 432, "x": 6.88, "y": 220, "angle": -90 },

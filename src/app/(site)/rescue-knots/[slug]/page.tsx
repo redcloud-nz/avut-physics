@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { aboutParagraphs, fullName, KNOTS, KNOTS_TITLE } from "@/knots";
-import { KnotDrawing, knotView, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
+import { aboutParagraphs, fullName, KNOTS, KNOTS_IMAGE, KNOTS_PATH, KNOTS_TITLE } from "@/knots";
+import { knotContents } from "@/knots/knot-contents";
+import { KnotDrawing, PAGE_SCALE, stepLabels, workedPicture } from "@/knots/knot-drawing";
 import { KnotPage } from "@/knots/knot-page";
 
 export function generateStaticParams() {
     return KNOTS.map((knot) => ({ slug: knot.slug }));
 }
 
-export async function generateMetadata(props: PageProps<"/knots/[slug]">): Promise<Metadata> {
+export async function generateMetadata(
+    props: PageProps<"/rescue-knots/[slug]">,
+): Promise<Metadata> {
     const { slug } = await props.params;
     const knot = KNOTS.find((k) => k.slug === slug);
     if (!knot) return {};
@@ -19,8 +22,9 @@ export async function generateMetadata(props: PageProps<"/knots/[slug]">): Promi
         openGraph: {
             title: fullName(knot),
             description: knot.file.description,
-            url: `/knots/${slug}`,
+            url: `${KNOTS_PATH}/${slug}`,
             type: "website",
+            images: [KNOTS_IMAGE],
         },
     };
 }
@@ -29,7 +33,7 @@ export async function generateMetadata(props: PageProps<"/knots/[slug]">): Promi
 // keeps the 404 for a slug that isn't a knot, so this tells Next's instant-navigation check the wait is expected.
 export const instant = false;
 
-export default async function Page(props: PageProps<"/knots/[slug]">) {
+export default async function Page(props: PageProps<"/rescue-knots/[slug]">) {
     const { slug } = await props.params;
     const knot = KNOTS.find((k) => k.slug === slug);
     if (!knot) notFound();
@@ -37,21 +41,24 @@ export default async function Page(props: PageProps<"/knots/[slug]">) {
     const { file } = knot;
     const name = fullName(knot);
     const finished = workedPicture(file.knot);
-    const ropes = file.knot.strands.filter((strand) => strand.kind === "rope").length;
     const labels = stepLabels(file.steps.map((step) => step.number));
     return (
         <KnotPage
             key={slug}
+            href={`${KNOTS_PATH}/${slug}`}
+            contents={knotContents()}
+            type={knot.type}
+            abok={knot.abok}
             name={knot.name}
             variant={knot.variant}
-            fullName={name}
             description={file.description}
             about={aboutParagraphs(file)}
-            // Drawn at the same size per millimetre as every other knot, so their ropes all look as thick.
+            // In the file's frame, as its steps are, and at the same size per millimetre as every other knot, so their
+            // ropes all look as thick.
             drawing={
                 <KnotDrawing
                     worked={finished}
-                    view={knotView(finished, ropes > 1)}
+                    view={file.frame}
                     label={`${name}, finished`}
                     scale={PAGE_SCALE}
                     className="mx-auto block"
