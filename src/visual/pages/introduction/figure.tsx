@@ -31,15 +31,12 @@ export function ControlsFigure() {
             <Control icon={<Hand className="size-4" />} action="Slide or drag">
                 Each page’s picture changes as you move its slider, or drag its arrows.
             </Control>
-            <Control
-                icon={<span className="h-1.5 w-5 rounded-full bg-highlight" />}
-                action="Tap the pill"
-            >
-                When the pill between the buttons is lit, there’s more on that page, like the maths.
-                Try it here.
+            <Control icon={<span className="font-semibold">?</span>} action="Tap the ?">
+                More on the page, like the maths (it’s faded where there’s none). It’s between the
+                buttons, or at the top on a wide screen. Try it here.
             </Control>
             <Control icon={<ChevronDown className="size-4" />} action="Tap the name at the top">
-                The contents, to jump to any page.
+                The contents, to jump to any page. On a wide screen they’re down the left.
             </Control>
         </ul>
     );

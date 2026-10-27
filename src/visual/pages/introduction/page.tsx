@@ -7,10 +7,13 @@ function IntroductionMore() {
     return (
         <Section title="More, if you want it">
             <p>
-                Some pages have more in this drawer: the maths behind an idea, say, or the reasoning
-                in full. You don’t need it to follow along, so skip it whenever you like.
+                Some pages have more here: the maths behind an idea, say, or the reasoning in full.
+                You don’t need it to follow along, so skip it whenever you like.
             </p>
-            <p>Drag this back down, or tap the page behind it, to put it away.</p>
+            <p>
+                Drag this back down, or tap the page behind it, to put it away. On a wide screen it
+                opens beside the page instead, and the ? or the × closes it.
+            </p>
         </Section>
     );
 }
