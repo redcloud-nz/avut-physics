@@ -10,7 +10,7 @@
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 6.05, "y": 220 },
@@ -98,7 +98,7 @@
           {
             "id": 54,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 55, "x": 6.05, "y": 220 },
@@ -150,7 +150,7 @@
           {
             "id": 83,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 84, "x": 6.05, "y": 220 },
@@ -204,7 +204,7 @@
           {
             "id": 114,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 116, "x": 6.05, "y": 220 },
@@ -269,7 +269,7 @@
           {
             "id": 153,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 154, "x": 6.05, "y": 220 },
@@ -325,7 +325,7 @@
           {
             "id": 184,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 186, "x": 6.05, "y": 220 },
@@ -407,7 +407,7 @@
           {
             "id": 233,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 234, "x": 6.05, "y": 220 },
@@ -468,7 +468,7 @@
           {
             "id": 268,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 270, "x": 6.05, "y": 220 },
@@ -554,7 +554,7 @@
           {
             "id": 323,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 324, "x": 6.05, "y": 220 },
@@ -637,7 +637,7 @@
           {
             "id": 374,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 376, "x": 6.05, "y": 220 },
@@ -731,7 +731,7 @@
           {
             "id": 433,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 434, "x": 6.05, "y": 220 },
@@ -815,7 +815,7 @@
           {
             "id": 482,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 483, "x": 6.05, "y": 220 },

@@ -10,7 +10,7 @@
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 6.88, "y": 220, "angle": -90 },
@@ -95,7 +95,7 @@
           {
             "id": 51,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 52, "x": 6.88, "y": 440, "angle": -90 },
@@ -167,7 +167,7 @@
           {
             "id": 105,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 107, "x": 6.88, "y": 440, "angle": -90 },
@@ -263,7 +263,7 @@
           {
             "id": 173,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 174, "x": 6.87, "y": 440, "angle": -90 },
@@ -340,7 +340,7 @@
           {
             "id": 227,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 230, "x": 6.87, "y": 440, "angle": -90 },
@@ -449,7 +449,7 @@
           {
             "id": 301,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 302, "x": 6.88, "y": 440, "angle": -90 },
@@ -538,7 +538,7 @@
           {
             "id": 363,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 365, "x": 6.88, "y": 440, "angle": -90 },
@@ -644,7 +644,7 @@
           {
             "id": 431,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 432, "x": 6.88, "y": 220, "angle": -90 },

@@ -10,7 +10,7 @@
       {
         "id": 1,
         "kind": "rope",
-        "colour": "orange",
+        "colour": "blue",
         "diameter": 11,
         "pins": [
           { "id": 2, "x": 0, "y": 220 },
@@ -57,7 +57,7 @@
           {
             "id": 25,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 26, "x": 0, "y": 220 },
@@ -89,7 +89,7 @@
           {
             "id": 39,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 41, "x": 0, "y": 220 },
@@ -142,7 +142,7 @@
           {
             "id": 67,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 68, "x": 0, "y": 220 },
@@ -180,7 +180,7 @@
           {
             "id": 87,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 90, "x": 0, "y": 220 },
@@ -248,7 +248,7 @@
           {
             "id": 127,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 128, "x": 0, "y": 220 },
@@ -295,7 +295,7 @@
           {
             "id": 153,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 155, "x": 0, "y": 220 },
@@ -354,7 +354,7 @@
           {
             "id": 185,
             "kind": "rope",
-            "colour": "orange",
+            "colour": "blue",
             "diameter": 11,
             "pins": [
               { "id": 186, "x": 0, "y": 220 },
