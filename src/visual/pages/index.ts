@@ -55,12 +55,20 @@ export type VisualPage = {
     More?: () => React.ReactNode;
 };
 
-/** The pages in their sections. The introduction and the end stand apart, with no section's title. */
-export const SECTIONS: { title?: string; pages: VisualPage[] }[] = [
+/**
+ * The pages in their sections. The introduction and the end stand apart, with no section's title. A section's slug is
+ * its heading slide's address when the series is presented, so it mustn't be a page's slug too.
+ */
+export const SECTIONS: { title?: string; slug?: string; pages: VisualPage[] }[] = [
     { pages: [introduction] },
-    { title: "Motion and force", pages: [velocity, acceleration, mass, force, weight, units] },
+    {
+        title: "Motion and force",
+        slug: "motion-and-force",
+        pages: [velocity, acceleration, mass, force, weight, units],
+    },
     {
         title: "Forces as arrows",
+        slug: "forces-as-arrows",
         pages: [
             arrows,
             addingArrows,
@@ -74,6 +82,7 @@ export const SECTIONS: { title?: string; pages: VisualPage[] }[] = [
     },
     {
         title: "Pulleys",
+        slug: "pulleys",
         pages: [
             pulleyOnTheAnchor,
             twoToOne,
@@ -85,8 +94,16 @@ export const SECTIONS: { title?: string; pages: VisualPage[] }[] = [
             tMethodCompound,
         ],
     },
-    { title: "Friction, slopes and levers", pages: [friction, inclines, surfaceFriction, levers] },
-    { title: "Falls and strength", pages: [safetyFactors, shockLoading, ropeStretch] },
+    {
+        title: "Friction, slopes and levers",
+        slug: "friction-slopes-and-levers",
+        pages: [friction, inclines, surfaceFriction, levers],
+    },
+    {
+        title: "Falls and strength",
+        slug: "falls-and-strength",
+        pages: [safetyFactors, shockLoading, ropeStretch],
+    },
     { pages: [theEnd] },
 ];
 
@@ -97,3 +114,30 @@ export const CONTENTS: Contents = SECTIONS.map((section) => ({
     title: section.title,
     pages: section.pages.map((p) => ({ name: p.name, href: `/visual/${p.slug}` })),
 }));
+
+/**
+ * One slide of the series presented: a page, or the heading that opens a section. Each has its address at
+ * `/present/visual/<slug>`, so a talk can start from any of them.
+ */
+export type Slide =
+    | { kind: "page"; slug: string; page: VisualPage; section?: string }
+    | { kind: "section"; slug: string; title: string; pages: VisualPage[]; number: number };
+
+/** Every slide in order: each titled section's heading, then its pages. */
+export const SLIDES: Slide[] = SECTIONS.flatMap((section) => {
+    const pages = section.pages.map(
+        (page): Slide => ({ kind: "page", slug: page.slug, page, section: section.title }),
+    );
+    if (!section.title || !section.slug) return pages;
+    const number = SECTIONS.filter((s) => s.title).indexOf(section) + 1;
+    return [
+        { kind: "section", slug: section.slug, title: section.title, pages: section.pages, number },
+        ...pages,
+    ];
+});
+
+/** How many sections have a title, and so a heading slide. */
+export const SECTION_COUNT = SECTIONS.filter((section) => section.title).length;
+
+/** Where a page of the series is presented. */
+export const presentHref = (slug: string) => `/present/visual/${slug}`;
