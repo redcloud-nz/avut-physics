@@ -114,17 +114,51 @@ export function SystemDrawing(props: {
     const height = Math.max(...lanes) + 30;
     const color = (key: string) => props.labels.color?.(key) ?? COLORS.pull;
 
-    // Each pulley's centre, and which side the rope wraps round.
-    const pulleys: { id: string; c: Vector2; right: boolean }[] = [];
-    sys.ropes.forEach((rope) =>
+    // Each sheave's centre, and which side the rope wraps round. A pulley the rope runs round more than once is a
+    // block with a sheave for each time (a double pulley); one at a rope's end has the rope tied to its becket.
+    const pulleys: { key: string; id: string; c: Vector2; right: boolean }[] = [];
+    const beckets: { id: string; at: Vector2 }[] = [];
+    sys.ropes.forEach((rope, r) => {
         rope.path.slice(1, -1).forEach((id, j) => {
             const i = j + 1;
             const y = (rope.lanes[i - 1] + rope.lanes[i]) / 2;
             const right = at[rope.path[i - 1]] < at[id] && at[rope.path[i + 1]] < at[id];
-            pulleys.push({ id, c: vec2(px(at[id]), y), right });
-        }),
-    );
-    const centreOf = (id: string) => pulleys.find((p) => p.id === id)?.c;
+            pulleys.push({ key: `${r}.${i}`, id, c: vec2(px(at[id]), y), right });
+        });
+        const n = rope.path.length;
+        for (const [id, y] of [
+            [rope.path[0], rope.lanes[0]],
+            [rope.path[n - 1], rope.lanes[n - 2]],
+        ] as const) {
+            if (sys.bodies[id].kind === "pulley") beckets.push({ id, at: vec2(px(at[id]), y) });
+        }
+    });
+    // Each block: how many sheaves it has, the span across the ropes they take up, and a tie from each becket to it.
+    const blocks = [...new Set(pulleys.map((p) => p.id))].map((id) => {
+        const ys = pulleys.filter((p) => p.id === id).map((p) => p.c.y);
+        const lo = Math.min(...ys) - R;
+        const hi = Math.max(...ys) + R;
+        const x = px(at[id]);
+        return { id, x, lo, hi, sheaves: ys.length, c: vec2(x, (lo + hi) / 2) };
+    });
+    const blockOf = (id: string) => blocks.find((b) => b.id === id)!;
+    const ties = beckets.map((k) => {
+        const b = blockOf(k.id);
+        return { a: k.at, b: vec2(k.at.x, k.at.y < b.lo ? b.lo : b.hi) };
+    });
+    // A rope tied to a grab on another rope's lane: tie the two together.
+    sys.ropes.forEach((rope) => {
+        const n = rope.path.length;
+        for (const [id, y] of [
+            [rope.path[0], rope.lanes[0]],
+            [rope.path[n - 1], rope.lanes[n - 2]],
+        ] as const) {
+            const b = sys.bodies[id];
+            if (b.kind === "grab" && b.y !== y) {
+                ties.push({ a: vec2(px(at[id]), b.y), b: vec2(px(at[id]), y) });
+            }
+        }
+    });
 
     // The load's box, centred on what's tied or clipped to it.
     const loadId = Object.keys(sys.bodies).find((k) => sys.bodies[k].kind === "load")!;
@@ -136,9 +170,15 @@ export function SystemDrawing(props: {
         ),
         ...Object.entries(sys.bodies).flatMap(([id, b]) =>
             (b.kind === "pulley" || b.kind === "grab") && b.on === loadId
-                ? [b.kind === "grab" ? b.y : centreOf(id)!.y]
+                ? b.kind === "grab"
+                    ? [b.y]
+                    : [blockOf(id).lo + R, blockOf(id).hi - R]
                 : [],
         ),
+        ...beckets.flatMap((k) => {
+            const b = sys.bodies[k.id];
+            return b.kind === "pulley" && b.on === loadId ? [k.at.y] : [];
+        }),
     ];
     const load = vec2(px(at[loadId]), (Math.min(...onLoad) + Math.max(...onLoad)) / 2);
     // Wide enough to reach everything on it.
@@ -147,7 +187,7 @@ export function SystemDrawing(props: {
     // Slings: fixed pulleys to the anchor, others to what they're clipped to.
     const slings: { id: string; a: Vector2; b: Vector2 }[] = [];
     const bolts: Vector2[] = [];
-    for (const p of pulleys) {
+    for (const p of blocks) {
         const body = sys.bodies[p.id];
         if (body.kind !== "pulley") continue;
         if (body.fixed) {
@@ -161,6 +201,7 @@ export function SystemDrawing(props: {
     }
     sys.ropes.forEach((rope) => {
         if (rope.path[0] === "anchor") bolts.push(vec2(ANCHOR_X, rope.lanes[0]));
+        if (rope.path.at(-1) === "anchor") bolts.push(vec2(ANCHOR_X, rope.lanes.at(-1)!));
     });
 
     const grabs = Object.entries(sys.bodies).flatMap(([id, b]) =>
@@ -310,12 +351,59 @@ export function SystemDrawing(props: {
                 />
             ))}
 
+            {ties.map((t, i) => (
+                <line
+                    key={`tie-${i}`}
+                    {...line(t.a, t.b)}
+                    stroke="currentColor"
+                    strokeWidth={3}
+                    opacity={0.5}
+                />
+            ))}
+            {blocks.map((b) => {
+                if (b.sheaves < 2) return null;
+                // A block's side plate, round its sheaves.
+                const pad = 5;
+                const corners = [
+                    P(vec2(b.x - R - pad, b.lo - pad)),
+                    P(vec2(b.x + R + pad, b.hi + pad)),
+                ];
+                const x = Math.min(corners[0].x, corners[1].x);
+                const y = Math.min(corners[0].y, corners[1].y);
+                const w = Math.abs(corners[1].x - corners[0].x);
+                const h = Math.abs(corners[1].y - corners[0].y);
+                return (
+                    <rect
+                        key={`block-${b.id}`}
+                        x={x}
+                        y={y}
+                        width={w}
+                        height={h}
+                        rx={Math.min(w, h) / 2}
+                        fill="currentColor"
+                        opacity={0.18}
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                    />
+                );
+            })}
+            {beckets.map((k, i) => (
+                <circle
+                    key={`becket-${i}`}
+                    cx={P(k.at).x}
+                    cy={P(k.at).y}
+                    r={4}
+                    className="fill-background print:fill-white"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                />
+            ))}
             {pulleys.map((p) => {
                 const c = P(p.c);
                 const top = P(p.c.add(vec2(0, -R)));
                 const bottom = P(p.c.add(vec2(0, R)));
                 return (
-                    <g key={p.id}>
+                    <g key={p.key}>
                         <circle
                             cx={c.x}
                             cy={c.y}
