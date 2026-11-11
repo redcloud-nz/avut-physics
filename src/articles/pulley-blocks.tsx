@@ -11,23 +11,23 @@ import { vec2, type Vector2 } from "@/lib/vector2";
  * sizes, so both show on the one axle. (A real double's are the same size, side by side along the axle, where one would
  * hide the other.)
  */
-const SHEAVES = [22, 17];
+const SHEAVES = [16, 11.5];
 /** How much plate there is round everything: past the larger sheave, and round the eye and the becket's holes. */
-const MATERIAL = 5;
+const MATERIAL = 3.5;
 /**
  * The eye's and the becket's holes' radii. The eye sits `MATERIAL` clear of the larger sheave; the becket a little
  * further, `TAB_REACH`, so its tab stands out from the plate.
  */
-const EYE = 10;
-const BECKET = 5;
-const TAB_REACH = 4;
+const EYE = 6.5;
+const BECKET = 4;
+const TAB_REACH = 3;
 const EYE_Y = -(SHEAVES[0] + MATERIAL + EYE);
 const BECKET_Y = SHEAVES[0] + MATERIAL + BECKET + TAB_REACH;
 /** The radius of the plate's bottom corners. */
-const CORNER = 3;
+const CORNER = 2;
 /** The axle's bolt's radius, and its hole's. */
-const BOLT = 6;
-const BOLT_HOLE = 3.5;
+const BOLT = 4;
+const BOLT_HOLE = 2;
 
 /** A circle as a closed subpath, so with the even-odd rule it cuts a hole in the shape it's part of. */
 const hole = (cy: number, r: number) =>
@@ -346,6 +346,95 @@ export function ropeEye(end: Vector2, next: RopeStop, rope: number) {
         eye,
         splice,
     };
+}
+
+/** A Prusik loop's cord's thickness, and how many times it shows wrapped round the rope (three wraps, twice). */
+const CORD = 2.5;
+const WRAPS = 6;
+
+/** A cord's path drawn with a dark edge, so where it lies against itself each part shows. */
+function Cord(props: { d: string; width?: number; cap?: "round" | "butt" }) {
+    const width = props.width ?? CORD;
+    const cap = props.cap ?? "round";
+    return (
+        <>
+            <path
+                d={props.d}
+                className="stroke-background"
+                strokeWidth={width + 1}
+                strokeLinecap={cap}
+                strokeLinejoin="round"
+            />
+            <path
+                d={props.d}
+                stroke="currentColor"
+                strokeWidth={width}
+                strokeLinecap={cap}
+                strokeLinejoin="round"
+            />
+        </>
+    );
+}
+
+/**
+ * A Prusik loop on a rope: a loop of cord gripping the rope `rope` thick at `on` (the middle of the hitch, on the
+ * rope's middle), and running to a carabiner's end at `to`, round its rod. Side on, the hitch is its wraps lying
+ * straight across the rope side by side, with the bridge running along the rope over their ends on the loop's side;
+ * the loop's two strands leave from the bridge's middle and close round the carabiner like a rope's eye, one of them
+ * with the loop's sewn join on it. Draw it over the rope and under the carabiner.
+ */
+export function Prusik(props: { on: Vector2; to: Vector2; rope: number }) {
+    const { on, to, rope } = props;
+    const side = Math.sign(to.x - on.x) || 1;
+    const w = (rope + CORD) / 2;
+    const pitch = CORD + 0.5;
+    const ys = Array.from({ length: WRAPS }, (_, k) => on.y + (k - (WRAPS - 1) / 2) * pitch);
+    const wraps = ys
+        .map((y) => `M ${svgPoint(vec2(on.x - w, y - 0.4))} L ${svgPoint(vec2(on.x + w, y + 0.4))}`)
+        .join(" ");
+    const bridge = vec2(on.x + side * w, 0);
+    const bridgeD = `M ${svgPoint(vec2(bridge.x, ys[0]))} L ${svgPoint(vec2(bridge.x, ys[WRAPS - 1]))}`;
+    // The loop: from the bridge's middle, its strands touch the circle round the rod and go round its far side.
+    const throat = vec2(bridge.x, on.y);
+    const a = (ROD + CORD) / 2;
+    const u = throat.sub(to).scale(1 / throat.distanceTo(to));
+    const spread = Math.acos(a / throat.distanceTo(to));
+    const turned = (angle: number) =>
+        to.add(
+            vec2(
+                u.x * Math.cos(angle) - u.y * Math.sin(angle),
+                u.x * Math.sin(angle) + u.y * Math.cos(angle),
+            ).scale(a),
+        );
+    const loop = [
+        `M ${svgPoint(throat)} L ${svgPoint(turned(spread))}`,
+        `A ${svgNumber(a)} ${svgNumber(a)} 0 1 1 ${svgPoint(turned(-spread))} Z`,
+    ].join(" ");
+    // The sewn join, on one strand partway along: a stiff barrel, thicker and paler, its stitching across it.
+    const joinFrom = throat.lerp(turned(-spread), 0.3);
+    const joinTo = throat.lerp(turned(-spread), 0.65);
+    const join = `M ${svgPoint(joinFrom)} L ${svgPoint(joinTo)}`;
+    return (
+        <g className="text-grab" fill="none">
+            <Cord d={loop} />
+            <Cord d={wraps} />
+            <Cord d={bridgeD} />
+            <Cord d={join} width={CORD * 1.8} cap="butt" />
+            <path
+                d={join}
+                className="stroke-ink"
+                strokeOpacity={0.45}
+                strokeWidth={CORD * 1.8 - 1}
+            />
+            <path
+                d={join}
+                className="stroke-background"
+                strokeOpacity={0.7}
+                strokeWidth={CORD}
+                strokeDasharray="0.5 0.7"
+            />
+        </g>
+    );
 }
 
 /** A piece of a rope: its path data, the layer it's drawn in, and how far along the rope from its first end it starts. */

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import {
     Carabiner,
+    Prusik,
     Pulley,
     pulleyClippedAt,
     pulleyEnds,
@@ -50,7 +51,7 @@ type ScenePulley = {
 
 /**
  * Everything in a diagram, placed: the anchor's face (from and to across), the hangers on it, the pulleys, the rope's
- * stops from its tied end to where it leaves for the team, the carabiners, the rope's end's eye, and the hole in the load's tab.
+ * stops from its tied end to where it leaves for the team, the carabiners, the rope's end's eye, any Prusik loops, and the hole in the load's tab.
  */
 type Scene = {
     face: [number, number];
@@ -60,6 +61,8 @@ type Scene = {
     clips: [Vector2, Vector2][];
     /** The rope's end's spliced eye. */
     eye: ReturnType<typeof ropeEye>;
+    /** Prusik loops: where each grips the rope, and the carabiner's end it runs to. */
+    prusiks?: { on: Vector2; to: Vector2 }[];
     load: Vector2;
 };
 
@@ -97,6 +100,158 @@ const DIAGRAMS = {
                     [pulleyEnds(at, "down").clip, loadUnder(at, "down")],
                 ],
                 load: loadUnder(at, "down"),
+            };
+        },
+    },
+    "two-to-one-redirect": {
+        label: "2:1, redirected down at the anchor",
+        max: 3.2,
+        // The 2:1, with a second hanger on the anchor for a pulley that turns the team's rope back down. Spliced to a
+        // carabiner on one hanger, down round the pulley on the load, up over the pulley on the other hanger, and down
+        // to the team. The load rises half the rope pulled in.
+        scene: (pulled) => {
+            const at = vec2(160, 300 - (pulled * PER_METRE) / 2);
+            const sheave = pulleySheaves(at).large;
+            const tie = vec2(at.x + sheave.r, HANGER_Y);
+            const end = tie.add(vec2(0, CLIP));
+            // The redirect's right side straight above the load pulley's left, so the rope between them runs plumb.
+            const hanger = vec2(at.x - 2 * sheave.r, HANGER_Y);
+            const redirect = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
+            const rest: RopeStop[] = [
+                { ...sheave, into: 1, out: -1 },
+                { ...pulleySheaves(redirect).large, into: 1, out: -1 },
+                // Leaning away from the load, so the two don't run together.
+                { c: vec2(redirect.x - sheave.r - 40, 445), r: 0 },
+            ];
+            const eye = ropeEye(end, rest[0], ROPE);
+            return {
+                face: [105, 200],
+                hangers: [hanger, tie],
+                pulleys: [
+                    { at, eye: "down", sheaves: 1, stops: { large: 1 } },
+                    { at: redirect, eye: "up", sheaves: 1, stops: { large: 2 } },
+                ],
+                rope: [eye.stop, ...rest],
+                clips: [
+                    [tie, end],
+                    [hanger, pulleyEnds(redirect, "up").clip],
+                    [pulleyEnds(at, "down").clip, loadUnder(at, "down")],
+                ],
+                eye,
+                load: loadUnder(at, "down"),
+            };
+        },
+    },
+    "one-to-one": {
+        label: "1:1, a single at the anchor",
+        max: 2.2,
+        // Spliced to a carabiner on the load, up over the pulley at the anchor, and down to the team. The load rises as
+        // far as the rope's pulled in.
+        scene: (pulled) => {
+            const hanger = vec2(160, HANGER_Y);
+            const at = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
+            const sheave = pulleySheaves(at).large;
+            const load = vec2(at.x + sheave.r, 400 - pulled * PER_METRE);
+            const end = load.sub(vec2(0, CLIP));
+            const rest: RopeStop[] = [
+                { ...sheave, into: 1, out: -1 },
+                // Leaning away from the load, so the two don't run together.
+                { c: vec2(at.x - sheave.r - 40, 445), r: 0 },
+            ];
+            const eye = ropeEye(end, rest[0], ROPE);
+            return {
+                face: [125, 195],
+                hangers: [hanger],
+                pulleys: [{ at, eye: "up", sheaves: 1, stops: { large: 1 } }],
+                rope: [eye.stop, ...rest],
+                clips: [
+                    [hanger, pulleyEnds(at, "up").clip],
+                    [load, end],
+                ],
+                eye,
+                load,
+            };
+        },
+    },
+    "z-rig": {
+        label: "3:1, a Z-rig",
+        max: 2.2,
+        // Spliced to a carabiner on the load, up over the pulley at the anchor, down round a pulley clipped to a Prusik on
+        // the load's rope, and up to the team. The Prusik moves with the load's rope, and the load rises a third of the
+        // rope pulled in.
+        scene: (pulled) => {
+            const rise = (pulled * PER_METRE) / 3;
+            const hanger = vec2(160, HANGER_Y);
+            const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
+            const fixed = pulleySheaves(top).large;
+            const load = vec2(top.x + fixed.r, 400 - rise);
+            const end = load.sub(vec2(0, CLIP));
+            // The Prusik grips the load's rope; its loop runs across to a carabiner hanging from the moving pulley.
+            const grip = vec2(load.x, 320 - rise);
+            const loop = vec2(140, grip.y + 4);
+            const moving = pulleyClippedAt(loop.sub(vec2(0, CLIP)), "down");
+            const rest: RopeStop[] = [
+                { ...fixed, into: 1, out: -1 },
+                { ...pulleySheaves(moving).large, into: 1, out: -1 },
+                { c: vec2(100, 12), r: 0 },
+            ];
+            const eye = ropeEye(end, rest[0], ROPE);
+            return {
+                face: [125, 195],
+                hangers: [hanger],
+                pulleys: [
+                    { at: top, eye: "up", sheaves: 1, stops: { large: 1 } },
+                    { at: moving, eye: "down", sheaves: 1, stops: { large: 2 } },
+                ],
+                rope: [eye.stop, ...rest],
+                clips: [
+                    [hanger, pulleyEnds(top, "up").clip],
+                    [pulleyEnds(moving, "down").clip, loop],
+                    [load, end],
+                ],
+                eye,
+                prusiks: [{ on: grip, to: loop }],
+                load,
+            };
+        },
+    },
+    "four-doubles": {
+        label: "4:1, two double pulleys",
+        max: 4.5,
+        // The 5:1 the other way up: spliced to a carabiner on the top pulley's becket, down and up round each sheave in
+        // turn, and from the top pulley's larger sheave down to the team. Four parts hold the bottom pulley, so the load
+        // rises a quarter of the rope pulled in.
+        scene: (pulled) => {
+            const hanger = vec2(160, HANGER_Y);
+            const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
+            const bottom = vec2(160, top.y + 230 - (pulled * PER_METRE) / 4);
+            const becket = pulleyEnds(top, "up").becket;
+            const end = becket.add(vec2(0, CLIP));
+            const [t, b] = [pulleySheaves(top), pulleySheaves(bottom)];
+            const rest: RopeStop[] = [
+                { ...b.small, into: -1, out: 1 },
+                { ...t.small, into: 1, out: -1 },
+                { ...b.large, into: -1, out: 1 },
+                { ...t.large, into: 1, out: -1 },
+                // Leaning away from the bottom pulley, so the team's rope runs clear of it.
+                { c: vec2(100, 445), r: 0 },
+            ];
+            const eye = ropeEye(end, rest[0], ROPE);
+            return {
+                face: [125, 195],
+                hangers: [hanger],
+                pulleys: [
+                    { at: top, eye: "up", sheaves: 2, stops: { large: 4, small: 2 } },
+                    { at: bottom, eye: "down", sheaves: 2, stops: { large: 3, small: 1 } },
+                ],
+                rope: [eye.stop, ...rest],
+                clips: [
+                    [hanger, pulleyEnds(top, "up").clip],
+                    [becket, end],
+                    [pulleyEnds(bottom, "down").clip, loadUnder(bottom, "down")],
+                ],
+                eye,
+                load: loadUnder(bottom, "down"),
             };
         },
     },
@@ -251,7 +406,13 @@ export default function Sketch() {
                         ))}
                         {/* The load, with its tab. */}
                         <Tab hole={scene.load} base={loadTop} />
-                        <rect x={120} y={loadTop} width={80} height={30} fill="currentColor" />
+                        <rect
+                            x={scene.load.x - 30}
+                            y={loadTop}
+                            width={60}
+                            height={30}
+                            fill="currentColor"
+                        />
                         {/* The rope's end, spliced into an eye round its carabiner, whose front half passes over it. */}
                         <g className="text-ink">
                             <path
@@ -271,6 +432,10 @@ export default function Sketch() {
                             />
                             <path d={scene.eye.splice} fill="currentColor" />
                         </g>
+                        {/* Prusik loops, over the rope they grip and under their carabiners. */}
+                        {scene.prusiks?.map((k, i) => (
+                            <Prusik key={i} on={k.on} to={k.to} rope={ROPE} />
+                        ))}
                         {/* The carabiners, over the plates they clip through. */}
                         {scene.clips.map((ends, i) => (
                             <Carabiner key={i} ends={ends} />
