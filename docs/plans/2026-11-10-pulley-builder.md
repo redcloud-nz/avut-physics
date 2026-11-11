@@ -67,6 +67,20 @@ Every operation keeps the system valid, so there's never "this doesn't move" to 
 operations, which fits in a URL for sharing a system. The T method steps (`TSteps`) can be generated from the same
 structure: start at the haul end, carry each tension across pulleys, sum at each sling.
 
+Tapping is the only way in, for mouse and touch alike; dragging parts onto the drawing can wait. What can be tapped
+(rope parts, pulleys) and the operations each offers are buttons, so the builder works from a keyboard and with a
+screen reader too.
+
+Tests: every preset can be built from the operations, and every operation offered on every preset gives a system the
+solver can solve. The second is what keeps "every operation keeps the system valid" true as operations are added.
+
+Readouts beside the drawing, for what a team checks on a real system:
+
+- the mechanical advantage, ideal and with friction, side by side;
+- the load on each rope grab (a grab is a fixed clamp on its rope: it never slips);
+- the anchor's load;
+- how far the load moves for each metre of rope the team pulls in.
+
 ### 3. Free threading, later, maybe
 
 Placing blocks and clicking sheaves in order to thread a rope is closer to rigging, but it needs validation the
