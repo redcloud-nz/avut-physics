@@ -7,34 +7,38 @@ import { vec2, type Vector2 } from "@/lib/vector2";
  */
 
 /**
- * A double's two sheaves' radii: drawn side on, one larger than the other, so both show on the one axle. (A real
- * double's are the same size, side by side along the axle, where one would hide the other.)
+ * A pulley's sheaves' radii: a single's is the first, and a double has both. Drawn side on, a double's are different
+ * sizes, so both show on the one axle. (A real double's are the same size, side by side along the axle, where one would
+ * hide the other.)
  */
-const SHEAVES = [27, 16];
+const SHEAVES = [22, 17];
 /** How much plate there is round everything: past the larger sheave, and round the eye and the becket's holes. */
-const MATERIAL = 6;
+const MATERIAL = 5;
 /**
  * The eye's and the becket's holes' radii. The eye sits `MATERIAL` clear of the larger sheave; the becket a little
  * further, `TAB_REACH`, so its tab stands out from the plate.
  */
-const EYE = 12;
-const BECKET = 6;
-const TAB_REACH = 5;
+const EYE = 10;
+const BECKET = 5;
+const TAB_REACH = 4;
 const EYE_Y = -(SHEAVES[0] + MATERIAL + EYE);
 const BECKET_Y = SHEAVES[0] + MATERIAL + BECKET + TAB_REACH;
 /** The radius of the plate's bottom corners. */
-const CORNER = 4;
+const CORNER = 3;
+/** The axle's bolt's radius, and its hole's. */
+const BOLT = 6;
+const BOLT_HOLE = 3.5;
 
 /** A circle as a closed subpath, so with the even-odd rule it cuts a hole in the shape it's part of. */
 const hole = (cy: number, r: number) =>
     `M ${-r} ${cy} A ${r} ${r} 0 1 0 ${r} ${cy} A ${r} ${r} 0 1 0 ${-r} ${cy} Z`;
 
 /**
- * The middle plate round the axle, with `MATERIAL` round everything. Above the axle it narrows from round the larger
- * sheave to round the eye, along straight edges touching both. Below, it's square with rounded corners, and a tab sticking out for the
- * becket, its end round the becket's hole.
+ * The middle plate round the axle, with `MATERIAL` round everything, its eye up. Above the axle it narrows from round
+ * the larger sheave to round the eye, along straight edges touching both. Below, it's square with rounded corners, with
+ * a tab sticking out for the becket if it has one, its end round the becket's hole.
  */
-const PLATE = (() => {
+function plate(becket: boolean) {
     const mid = SHEAVES[0] + MATERIAL;
     const eye = EYE + MATERIAL;
     const tab = BECKET + MATERIAL;
@@ -48,15 +52,22 @@ const PLATE = (() => {
         `L ${p(mid * cosine, mid * sine)}`,
         `A ${mid} ${mid} 0 0 1 ${p(mid, 0)}`,
         `L ${p(mid, mid - CORNER)} A ${CORNER} ${CORNER} 0 0 1 ${p(mid - CORNER, mid)}`,
-        `L ${p(tab, mid)} L ${p(tab, BECKET_Y)}`,
-        `A ${tab} ${tab} 0 0 1 ${p(-tab, BECKET_Y)}`,
-        `L ${p(-tab, mid)} L ${p(-mid + CORNER, mid)}`,
+        ...(becket
+            ? [
+                  `L ${p(tab, mid)} L ${p(tab, BECKET_Y)}`,
+                  `A ${tab} ${tab} 0 0 1 ${p(-tab, BECKET_Y)}`,
+                  `L ${p(-tab, mid)}`,
+              ]
+            : []),
+        `L ${p(-mid + CORNER, mid)}`,
         `A ${CORNER} ${CORNER} 0 0 1 ${p(-mid, mid - CORNER)} L ${p(-mid, 0)}`,
         `A ${mid} ${mid} 0 0 1 ${p(-mid * cosine, mid * sine)} Z`,
         hole(EYE_Y, EYE),
-        hole(BECKET_Y, BECKET),
+        ...(becket ? [hole(BECKET_Y, BECKET)] : []),
     ].join(" ");
-})();
+}
+
+const PLATES = { single: plate(false), double: plate(true) };
 
 /**
  * Faint marks on a sheave, so it shows turning: a few short arcs round the part of it that shows, between `inner`
@@ -73,31 +84,36 @@ function sheaveMarks(inner: number, outer: number) {
     }).join(" ");
 }
 
+/** Which way a pulley's eye points, where it's clipped to what holds it: up or down. */
+export type EyeWay = "up" | "down";
+
 /**
- * A double pulley side on: its middle plate, with the eye at the top for its sling and the becket below for tying a
- * rope to, and its two sheaves on one axle in front, the larger behind the smaller. `becket` says which way
- * the becket points: "up" or "down".
+ * A pulley side on: its middle plate, with the eye for its carabiner, and its sheaves on one axle in front. A single
+ * has one sheave; a double two, the larger behind the smaller, and a becket opposite the eye for tying a rope to.
  */
-export function DoublePulley(props: {
+export function Pulley(props: {
     at: Vector2;
-    becket: "up" | "down";
+    eye: EyeWay;
+    sheaves: 1 | 2;
     /**
-     * Just one part of it, for a rope to go between: the plate, the larger sheave or the smaller one (with the axle's
-     * bolt). All of it if not given.
+     * Just one part of it, for a rope to go between: the plate, the larger sheave or the smaller one. The axle's bolt
+     * goes with the front one. All of it if not given.
      */
     part?: "plate" | "large" | "small";
     /** How far each sheave has turned, in degrees clockwise as drawn. */
-    spins?: { large: number; small: number };
+    spins?: { large: number; small?: number };
 }) {
-    const flip = props.becket === "down" ? 1 : -1;
+    const flip = props.eye === "up" ? 1 : -1;
     const shows = (part: string) => !props.part || props.part === part;
+    const d = props.sheaves === 2 ? PLATES.double : PLATES.single;
+    const front = props.sheaves === 2 ? "small" : "large";
     return (
         <g transform={`translate(${props.at.x} ${props.at.y}) scale(1 ${flip})`}>
             {shows("plate") && (
                 <>
-                    <path d={PLATE} fillRule="evenodd" className="fill-surface" />
+                    <path d={d} fillRule="evenodd" className="fill-surface" />
                     <path
-                        d={PLATE}
+                        d={d}
                         fillRule="evenodd"
                         fill="currentColor"
                         fillOpacity={0.18}
@@ -107,9 +123,11 @@ export function DoublePulley(props: {
                     />
                 </>
             )}
-            {SHEAVES.map(
-                (r, i) =>
-                    shows(i === 0 ? "large" : "small") && (
+            {SHEAVES.slice(0, props.sheaves).map((r, i) => {
+                const which = i === 0 ? "large" : "small";
+                const inner = which === front ? BOLT : SHEAVES[1];
+                return (
+                    shows(which) && (
                         <g key={i}>
                             <circle r={r} className="fill-background" />
                             <circle
@@ -120,10 +138,10 @@ export function DoublePulley(props: {
                                 strokeWidth={1.5}
                             />
                             <g
-                                transform={`rotate(${svgNumber(flip * (props.spins?.[i === 0 ? "large" : "small"] ?? 0))})`}
+                                transform={`rotate(${svgNumber(flip * (props.spins?.[which] ?? 0))})`}
                             >
                                 <path
-                                    d={sheaveMarks(i === 0 ? SHEAVES[1] : 7, r)}
+                                    d={sheaveMarks(inner, r)}
                                     fill="none"
                                     stroke="currentColor"
                                     strokeOpacity={0.35}
@@ -132,14 +150,21 @@ export function DoublePulley(props: {
                                 />
                             </g>
                         </g>
-                    ),
-            )}
-            {shows("small") && (
+                    )
+                );
+            })}
+            {shows(front) && (
                 <>
                     {/* The axle's bolt. */}
-                    <circle r={7} className="fill-background" />
-                    <circle r={7} fill="currentColor" fillOpacity={0.7} />
-                    <circle r={4} fill="none" stroke="currentColor" strokeWidth={1} opacity={0.6} />
+                    <circle r={BOLT} className="fill-background" />
+                    <circle r={BOLT} fill="currentColor" fillOpacity={0.7} />
+                    <circle
+                        r={BOLT_HOLE}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1}
+                        opacity={0.6}
+                    />
                 </>
             )}
         </g>
@@ -147,18 +172,31 @@ export function DoublePulley(props: {
 }
 
 /**
- * Where a double pulley's eye and becket are, for ropes to reach: the middles of their holes. `clip` is where a
- * carabiner through the eye has its end: as far into the hole as it reaches into a tab's, where it's centred.
+ * Where a pulley's eye and becket are, for ropes to reach: the middles of their holes. `clip` is where a carabiner
+ * through the eye has its end: as far into the hole as it reaches into a tab's, where it's centred.
  */
-export function doubleEnds(at: Vector2, becket: "up" | "down") {
-    const flip = becket === "down" ? 1 : -1;
-    const eye = at.add(vec2(0, EYE_Y * flip));
+export function pulleyEnds(at: Vector2, eye: EyeWay) {
+    const flip = eye === "up" ? 1 : -1;
+    const middle = at.add(vec2(0, EYE_Y * flip));
     return {
-        eye,
-        clip: eye.add(vec2(0, -(EYE - TAB_HOLE) * flip)),
+        eye: middle,
+        clip: middle.add(vec2(0, -(EYE - TAB_HOLE) * flip)),
         becket: at.add(vec2(0, BECKET_Y * flip)),
     };
 }
+
+/** Where a pulley is whose eye is clipped at `clip`: the other way round from `pulleyEnds`. */
+export const pulleyClippedAt = (clip: Vector2, eye: EyeWay) =>
+    clip.sub(pulleyEnds(vec2(0, 0), eye).clip);
+
+/**
+ * A pulley's sheaves, by size: the larger and the smaller, each a centre, a radius (the rope runs on its rim, half
+ * hidden behind it) and a layer, the smaller's in front. A single has just the larger.
+ */
+export const pulleySheaves = (at: Vector2) => ({
+    large: { c: at, r: SHEAVES[0], layer: 0 },
+    small: { c: at, r: SHEAVES[1], layer: 1 },
+});
 
 /** A tab's hole's radius, and how much there is round it. */
 const TAB_HOLE = 6;
@@ -221,15 +259,6 @@ export function Carabiner(props: { ends: [Vector2, Vector2] }) {
 }
 
 /**
- * A double's sheaves, by size: the larger and the smaller, each a centre, a radius (the rope runs on its rim, half
- * hidden behind it) and a layer, the smaller's in front.
- */
-export const doubleSheaves = (at: Vector2) => ({
-    large: { c: at, r: SHEAVES[0], layer: 0 },
-    small: { c: at, r: SHEAVES[1], layer: 1 },
-});
-
-/**
  * Somewhere a rope goes: round a sheave (a centre and radius), arriving on one side and leaving on the other, −1 its
  * left and 1 its right as the drawing shows it; or to a point, with radius 0, where it's tied or leaves the drawing.
  */
@@ -256,6 +285,67 @@ function tangent(a: RopeStop, b: RopeStop): [Vector2, Vector2] {
         }
     }
     throw new Error("No line touches both stops on the sides asked for");
+}
+
+/** How far the rope's eye reaches past what it's round, and how long its splice is. */
+const EYE_REACH = 8;
+const SPLICE = 18;
+
+/**
+ * A rope's end spliced into an eye round a carabiner's end (`end`, the middle of its rod there), leading off towards
+ * `next`, its first stop, for a rope `rope` thick. The eye is a loop of rope round the rod, closing to a throat; past it the splice, where the
+ * end is buried back into the rope, tapering smoothly from the eye's sides to the rope. `stop` is where the rope's plain part starts,
+ * for its first stop; `eye` and `splice` are path data for the loop (stroked as rope) and the splice (filled, over
+ * the loop).
+ */
+export function ropeEye(end: Vector2, next: RopeStop, rope: number) {
+    const [p, q] = tangent({ c: end, r: 0 }, next);
+    const u = q.sub(p).scale(1 / q.distanceTo(p));
+    const a = (ROD + rope) / 2;
+    const throat = end.add(u.scale(a + EYE_REACH));
+    const start = throat.add(u.scale(SPLICE));
+    // The eye's sides touch the circle round the rod, leaving it at this angle either side of the way to the throat.
+    const spread = Math.acos(a / (a + EYE_REACH));
+    const turned = (angle: number) =>
+        vec2(
+            u.x * Math.cos(angle) - u.y * Math.sin(angle),
+            u.x * Math.sin(angle) + u.y * Math.cos(angle),
+        ).scale(a);
+    const eye = [
+        `M ${svgPoint(throat)} L ${svgPoint(end.add(turned(spread)))}`,
+        `A ${svgNumber(a)} ${svgNumber(a)} 0 1 1 ${svgPoint(end.add(turned(-spread)))} Z`,
+    ].join(" ");
+    // The splice takes over from the eye's two sides just before they meet, as wide as their outer edges there, and
+    // narrows to the rope along curves leaving them the way they run and arriving along the rope, so it has no shoulder.
+    // Its top is across the sides, which overlap there, so drawn over them it covers where they meet.
+    const along = throat.sub(end.add(turned(spread)));
+    const lean = Math.abs(along.cross(u)) / Math.abs(along.dot(u));
+    const back = 4.5;
+    const top = throat.sub(u.scale(back));
+    const half = back * lean + (rope / 2) * Math.sqrt(1 + lean * lean);
+    const side = right(u);
+    const reach = SPLICE / 2;
+    const edge = (sign: number) => {
+        const out = side.scale(sign);
+        return {
+            from: top.add(out.scale(half)),
+            c1: top.add(out.scale(half)).add(u.add(out.scale(-lean)).scale(reach / 2)),
+            c2: start.add(out.scale(rope / 2)).sub(u.scale(reach)),
+            to: start.add(out.scale(rope / 2)),
+        };
+    };
+    const [r, l] = [edge(1), edge(-1)];
+    const splice = [
+        `M ${svgPoint(r.from)}`,
+        `C ${svgPoint(r.c1)} ${svgPoint(r.c2)} ${svgPoint(r.to)}`,
+        `L ${svgPoint(l.to)}`,
+        `C ${svgPoint(l.c2)} ${svgPoint(l.c1)} ${svgPoint(l.from)} Z`,
+    ].join(" ");
+    return {
+        stop: { c: start, r: 0 } satisfies RopeStop,
+        eye,
+        splice,
+    };
 }
 
 /** A piece of a rope: its path data, the layer it's drawn in, and how far along the rope from its first end it starts. */
