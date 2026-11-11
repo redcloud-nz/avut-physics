@@ -53,7 +53,7 @@ export default function PulleyLab() {
     return (
         <VisualisationLayout
             diagram={
-                <div className="flex h-[70dvh] max-h-[720px] min-h-[420px] p-2">
+                <div className="flex p-2 lg:h-[calc(100dvh-12rem)] lg:min-h-105">
                     <SystemDrawing
                         key={key}
                         sys={entry.sys}
@@ -62,7 +62,7 @@ export default function PulleyLab() {
                         upright
                         haulLabel="Pull"
                         stretch={entry.stretch}
-                        className="h-full w-full text-ink-muted"
+                        className="h-auto w-full text-ink-muted lg:h-full"
                         labels={{
                             part: (_, t) => <T t={t} />,
                             sling: (_, pull) => <T t={pull} />,
