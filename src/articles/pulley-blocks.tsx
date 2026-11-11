@@ -1,4 +1,4 @@
-import { svgPoint } from "@/lib/svg-path";
+import { svgNumber, svgPoint } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
 /*
@@ -59,6 +59,21 @@ const PLATE = (() => {
 })();
 
 /**
+ * Faint marks on a sheave, so it shows turning: a few short arcs round the part of it that shows, between `inner`
+ * (what's in front of it, the smaller sheave or the bolt) and its rim, `outer`, clear of the rope that runs there.
+ */
+function sheaveMarks(inner: number, outer: number) {
+    const ring = (inner + outer - 2) / 2;
+    const count = 3;
+    const span = Math.PI / 4;
+    const at = (a: number) => svgPoint(vec2(Math.cos(a), Math.sin(a)).scale(ring));
+    return Array.from({ length: count }, (_, k) => {
+        const a = (2 * Math.PI * k) / count;
+        return `M ${at(a)} A ${ring} ${ring} 0 0 1 ${at(a + span)}`;
+    }).join(" ");
+}
+
+/**
  * A double pulley side on: its middle plate, with the eye at the top for its sling and the becket below for tying a
  * rope to, and its two sheaves on one axle in front, the larger behind the smaller. `becket` says which way
  * the becket points: "up" or "down".
@@ -71,6 +86,8 @@ export function DoublePulley(props: {
      * bolt). All of it if not given.
      */
     part?: "plate" | "large" | "small";
+    /** How far each sheave has turned, in degrees clockwise as drawn. */
+    spins?: { large: number; small: number };
 }) {
     const flip = props.becket === "down" ? 1 : -1;
     const shows = (part: string) => !props.part || props.part === part;
@@ -102,6 +119,18 @@ export function DoublePulley(props: {
                                 stroke="currentColor"
                                 strokeWidth={1.5}
                             />
+                            <g
+                                transform={`rotate(${svgNumber(flip * (props.spins?.[i === 0 ? "large" : "small"] ?? 0))})`}
+                            >
+                                <path
+                                    d={sheaveMarks(i === 0 ? SHEAVES[1] : 7, r)}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeOpacity={0.35}
+                                    strokeWidth={1.5}
+                                    strokeLinecap="round"
+                                />
+                            </g>
                         </g>
                     ),
             )}
@@ -229,36 +258,83 @@ function tangent(a: RopeStop, b: RopeStop): [Vector2, Vector2] {
     throw new Error("No line touches both stops on the sides asked for");
 }
 
+/** A piece of a rope: its path data, the layer it's drawn in, and how far along the rope from its first end it starts. */
+export type RopePiece = {
+    d: string;
+    layer: number;
+    start: number;
+    /** How long it is along the rope's middle. */
+    length: number;
+    /**
+     * Path data for a line along it `offset` to the right of its middle (as it runs), to draw the rope's surface on:
+     * it's as long as the middle is, with `pathLength`, so patterns along it keep step with the middle's.
+     */
+    lane: (offset: number) => string;
+};
+
+/** A direction a quarter turn clockwise as drawn from `dir`, a unit long: to the right of something running along it. */
+const right = (dir: Vector2) => vec2(-dir.y, dir.x).scale(1 / dir.len());
+
 /**
  * A rope through `stops` in order, as pieces of path data to draw each behind the sheave it's on: straight between
- * stops, and round each sheave between them the way it was going as it arrived.
+ * stops, and round each sheave between them the way it was going as it arrived. With them, how far each stop's sheave
+ * has turned (degrees, clockwise as drawn): the rope can't slip on it, so its rim turns with the rope. The rope's first
+ * end is tied, so a point on the rope stays the same distance along it from there; as the rope ahead of a sheave
+ * shortens, the rope runs on round it.
  */
-export function ropePieces(stops: RopeStop[]): { d: string; layer: number }[] {
+export function ropePieces(stops: RopeStop[]): { pieces: RopePiece[]; spins: number[] } {
     const parts = stops.slice(1).map((s, i) => tangent(stops[i], s));
-    // A straight part between sheaves in different layers goes behind each for its own half.
-    const pieces = parts.flatMap(([p, q], i) => {
-        const [a, b] = [stops[i], stops[i + 1]];
-        const [la, lb] = [a.layer ?? b.layer ?? 0, b.layer ?? a.layer ?? 0];
-        const line = (from: Vector2, to: Vector2, layer: number) => ({
+    const pieces: RopePiece[] = [];
+    const spins = stops.map(() => 0);
+    let along = 0;
+    const line = (from: Vector2, to: Vector2, layer: number) => {
+        const side = right(to.sub(from));
+        const length = from.distanceTo(to);
+        pieces.push({
             d: `M ${svgPoint(from)} L ${svgPoint(to)}`,
             layer,
+            start: along,
+            length,
+            lane: (offset) => {
+                const by = side.scale(offset);
+                return `M ${svgPoint(from.add(by))} L ${svgPoint(to.add(by))}`;
+            },
         });
-        return la === lb ? [line(p, q, la)] : [line(p, p.mid(q), la), line(p.mid(q), q, lb)];
-    });
-    for (let i = 1; i < parts.length; i++) {
-        const { c, r, layer = 0 } = stops[i];
-        const [from, to] = [parts[i - 1][1], parts[i][0]];
-        const travel = from.sub(parts[i - 1][0]);
-        const sweep = from.sub(c).cross(travel) > 0 ? 1 : 0;
+        along += length;
+    };
+    parts.forEach(([p, q], i) => {
+        // A straight part between sheaves in different layers goes behind each for its own half.
+        const [a, b] = [stops[i], stops[i + 1]];
+        const [la, lb] = [a.layer ?? b.layer ?? 0, b.layer ?? a.layer ?? 0];
+        if (la === lb) line(p, q, la);
+        else {
+            line(p, p.mid(q), la);
+            line(p.mid(q), q, lb);
+        }
+        if (i + 1 === parts.length) return;
+        const { c, r, layer = 0 } = b;
+        const [from, to] = [q, parts[i + 1][0]];
+        const sweep = from.sub(c).cross(q.sub(p)) > 0 ? 1 : 0;
         // How far round the sheave, the way it turns.
         let turn = to.sub(c).angle() - from.sub(c).angle();
         if (sweep && turn < 0) turn += 2 * Math.PI;
         if (!sweep && turn > 0) turn -= 2 * Math.PI;
         const large = Math.abs(turn) > Math.PI ? 1 : 0;
+        const [into, out] = [right(q.sub(p)), right(parts[i + 1][1].sub(to))];
+        const arc = (from: Vector2, to: Vector2) => {
+            const radius = svgNumber(from.distanceTo(c));
+            return `M ${svgPoint(from)} A ${radius} ${radius} 0 ${large} ${sweep} ${svgPoint(to)}`;
+        };
         pieces.push({
-            d: `M ${svgPoint(from)} A ${r} ${r} 0 ${large} ${sweep} ${svgPoint(to)}`,
+            d: arc(from, to),
             layer,
+            start: along,
+            length: Math.abs(turn) * r,
+            lane: (offset) => arc(from.add(into.scale(offset)), to.add(out.scale(offset))),
         });
-    }
-    return pieces;
+        // The less rope there is before the sheave, the further round it's run, the way the rope goes.
+        spins[i + 1] = (((sweep ? -1 : 1) * along) / r) * (180 / Math.PI);
+        along += Math.abs(turn) * r;
+    });
+    return { pieces, spins };
 }
