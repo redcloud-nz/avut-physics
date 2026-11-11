@@ -315,7 +315,7 @@ const SPLICE = 18;
  * `next`, its first stop, for a rope `rope` thick. The eye is a loop of rope round the rod, closing to a throat; past it the splice, where the
  * end is buried back into the rope, tapering smoothly from the eye's sides to the rope. `stop` is where the rope's plain part starts,
  * for its first stop; `eye` and `splice` are path data for the loop (stroked as rope) and the splice (filled, over
- * the loop).
+ * the loop). `end` is the carabiner's end it's round, as given.
  */
 export function ropeEye(end: Vector2, next: RopeStop, rope: number) {
     const [p, q] = tangent({ c: end, r: 0 }, next);
@@ -362,6 +362,7 @@ export function ropeEye(end: Vector2, next: RopeStop, rope: number) {
     ].join(" ");
     return {
         stop: { c: start, r: 0 } satisfies RopeStop,
+        end,
         eye,
         splice,
     };

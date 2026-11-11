@@ -17,6 +17,7 @@ import {
     type RopePiece,
     type RopeStop,
 } from "@/articles/pulley-blocks";
+import { Segment } from "@/lib/segment";
 import { polylinePath, svgNumber, svgPoint } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
@@ -59,7 +60,11 @@ type ScenePulley = {
 };
 
 /** A rope: its stops from its first end to its last, and the spliced eyes at its ends. */
-type SceneRope = { stops: RopeStop[]; eyes: ReturnType<typeof ropeEye>[] };
+/**
+ * A rope: its stops, its spliced eyes, and its tension at its last end, in team pulls (the team's rope's is the team's
+ * pull, 1; a slack tail's is 0).
+ */
+type SceneRope = { stops: RopeStop[]; eyes: ReturnType<typeof ropeEye>[]; t?: number };
 
 /**
  * Everything in a diagram, placed: the anchor's face (from and to across), the hangers on it, the pulleys, the ropes,
@@ -71,8 +76,11 @@ type Scene = {
     pulleys: ScenePulley[];
     ropes: SceneRope[];
     clips: [Vector2, Vector2][];
-    /** Prusik loops: where each grips the rope, and the carabiner's end it runs to. */
-    prusiks?: { on: Vector2; to: Vector2; along?: Vector2 }[];
+    /**
+     * Prusik loops: where each grips the rope, and the carabiner's end it runs to, which rope it's on (the first,
+     * unless it says), and how hard it pulls that rope towards the rope's last end, in team pulls.
+     */
+    prusiks?: { on: Vector2; to: Vector2; along?: Vector2; rope?: number; pull: number }[];
     load: Vector2;
     /** Other tabs on the load, level with its first. */
     ties?: Vector2[];
@@ -286,7 +294,8 @@ const DIAGRAMS = {
                     [pulleyEnds(moving, "down").clip, loop],
                     [load, end],
                 ],
-                prusiks: [{ on: grip, to: loop }],
+                // The moving pulley's two parts pull its Prusik.
+                prusiks: [{ on: grip, to: loop, pull: 2 }],
                 load,
                 // Straight up from the moving pulley's side, round a pin at the top.
                 pin: { rope: 0, x: moving.x - pulleySheaves(moving).large.r + PIN, edge: "top" },
@@ -419,9 +428,11 @@ const DIAGRAMS = {
                     [pulleyEnds(upperMoving, "down").clip, upperLoop],
                     [load, end],
                 ],
+                // Each moving pulley's two parts pull its Prusik: the second's, the team's pull; the first's, the three the
+                // second Z-rig makes.
                 prusiks: [
-                    { on: grip, to: loop },
-                    { on: upper, to: upperLoop },
+                    { on: grip, to: loop, pull: 6 },
+                    { on: upper, to: upperLoop, pull: 2 },
                 ],
                 load,
                 // Straight up from the second moving pulley's side, round a pin at the top.
@@ -476,7 +487,8 @@ const DIAGRAMS = {
                     { at: single, eye: "up", sheaves: 1, stops: { rope: 1, large: 1 } },
                 ],
                 ropes: [
-                    { stops: [eye.stop, ...rest, tailEye.stop], eyes: [eye, tailEye] },
+                    // Holding the single, which the second rope's two parts pull.
+                    { stops: [eye.stop, ...rest, tailEye.stop], eyes: [eye, tailEye], t: 2 },
                     { stops: [tieEye.stop, ...second], eyes: [tieEye] },
                 ],
                 clips: [
@@ -538,7 +550,8 @@ const DIAGRAMS = {
                     { at: single, eye: "up", sheaves: 1, stops: { rope: 1, large: 1 } },
                 ],
                 ropes: [
-                    { stops: [eye.stop, ...rest, tailEye.stop], eyes: [eye, tailEye] },
+                    // Holding the single, which the second rope's two parts pull.
+                    { stops: [eye.stop, ...rest, tailEye.stop], eyes: [eye, tailEye], t: 2 },
                     { stops: [tieEye.stop, ...second], eyes: [tieEye] },
                 ],
                 clips: [
@@ -753,14 +766,18 @@ const DIAGRAMS = {
                         stops: { rope: 1, large: 2 },
                     },
                 ],
-                ropes: [...scene.ropes, { stops: [eye.stop, ...rest], eyes: [eye] }],
+                // The 7:1's rope is slack past the Prusik, which the 4:1's four parts pull.
+                ropes: [
+                    { ...scene.ropes[0], t: 0 },
+                    { stops: [eye.stop, ...rest], eyes: [eye] },
+                ],
                 clips: [
                     ...scene.clips,
                     [loop, pulleyEnds(top, "up").clip],
                     [hanger, pulleyEnds(bottom, "down").clip],
                     [becket, end],
                 ],
-                prusiks: [{ on: grip, to: loop, along }],
+                prusiks: [{ on: grip, to: loop, along, pull: 4 }],
                 // Just wider than its hanger's tab, so the pin's readout clears it.
                 ground: { y: ground, across: [72, 98], hangers: [hanger] },
                 // The 4:1's: leaning away from the single, so the team's rope runs clear of it.
@@ -986,8 +1003,200 @@ function Dimension({ x, from, to }: { x: number; from: number; to: number }) {
     );
 }
 
+/** Where a tension's label goes, and its place in the order the T-method finds them. */
+type Mark = { at: Vector2; order: number };
+
+/**
+ * A straight run of rope between sheaves or grips, which rope it's on, its tension in team pulls, and where its tension
+ * is labelled: by each of its ends, or on the carabiner an end is spliced round.
+ */
+type Strand = { from: Vector2; to: Vector2; rope: number; t: number; labels: Mark[] };
+
+/**
+ * How far along a strand from where it leaves a sheave its label sits: past the pulley's plate, and further from a
+ * double's smaller sheave than its larger, so labels on strands running side by side don't meet. From a Prusik or the
+ * pin, less.
+ */
+const LABEL_FROM = { large: 28, small: 42, grip: 10, pin: 16 };
+
+/**
+ * Each straight run of rope in `scene` and its tension, for ropes through `stops` (the team's rope's on to its end on
+ * the track, which isn't counted past its pin). Walking back along each rope from its last end, its tension starts at
+ * the rope's own and rises by each Prusik's pull as it passes the Prusik, splitting the run the Prusik grips. That's
+ * the T-method's order, so the labels are numbered in it: the team's rope first, and on each rope, from its last end
+ * back, each strand's far end then its near one.
+ */
+function strandsOf(scene: Scene, stops: RopeStop[][]): Strand[] {
+    const sheaves = pulleySheaves(vec2(0, 0));
+    const ropes = scene.ropes.map((_, r) => r);
+    const first = scene.pin?.rope ?? 0;
+    let n = 0;
+    const mark = (at: Vector2 | undefined): Mark | undefined => at && { at, order: n++ };
+    return [first, ...ropes.filter((r) => r !== first)].flatMap((r) => {
+        const rope = scene.ropes[r];
+        const count = rope.stops.length - 1 + (scene.pin?.rope === r ? 1 : 0);
+        const grips = (scene.prusiks ?? []).filter((k) => (k.rope ?? 0) === r);
+        // Where the label goes for a strand's end at `stop`, leaving it `at` towards `on`: on the carabiner if the
+        // end's spliced round one, or along the strand from the sheave or pin (no further than halfway); none at a
+        // loose end.
+        const labelAt = (stop: RopeStop, at: Vector2, on: Vector2): Vector2 | undefined => {
+            const eye = rope.eyes.find((e) => e.stop === stop);
+            if (eye) {
+                const clip = scene.clips.find(([a, b]) => same(a, eye.end) || same(b, eye.end));
+                return clip ? clip[0].mid(clip[1]) : eye.end;
+            }
+            if (stop.r === 0) return undefined;
+            const by =
+                stop.r === sheaves.large.r
+                    ? LABEL_FROM.large
+                    : stop.r === sheaves.small.r
+                      ? LABEL_FROM.small
+                      : LABEL_FROM.pin;
+            return at.add(
+                on
+                    .sub(at)
+                    .unit()
+                    .scale(Math.min(by, at.distanceTo(on) / 2)),
+            );
+        };
+        // Each strand, with no label for a loose end yet left out.
+        const out: (Omit<Strand, "labels"> & { labels: (Mark | undefined)[] })[] = [];
+        let t = rope.t ?? 1;
+        for (let i = count - 1; i >= 0; i--) {
+            const [p, q] = tangent(stops[r][i], stops[r][i + 1]);
+            const run = new Segment(p, q);
+            // The Prusiks on this run, from its far end back.
+            const on = grips
+                .filter((k) => run.distanceTo(k.on) < 1)
+                .map((k) => ({ ...k, at: run.nearest(k.on).t }))
+                .sort((a, b) => b.at - a.at);
+            let end = q;
+            let endLabel = mark(labelAt(stops[r][i + 1], q, p));
+            for (const k of on) {
+                const ahead = mark(k.on.add(run.direction().scale(LABEL_FROM.grip)));
+                out.push({ from: k.on, to: end, rope: r, t, labels: [ahead, endLabel] });
+                t += k.pull;
+                end = k.on;
+                endLabel = mark(k.on.sub(run.direction().scale(LABEL_FROM.grip)));
+            }
+            const startLabel = mark(labelAt(stops[r][i], p, q));
+            out.push({ from: p, to: end, rope: r, t, labels: [startLabel, endLabel] });
+        }
+        return out.reverse().map((s) => ({ ...s, labels: s.labels.filter((l): l is Mark => !!l) }));
+    });
+}
+
+/** Whether two points are the same, give or take rounding. */
+const same = (a: Vector2, b: Vector2) => a.distanceTo(b) < 0.5;
+
+/**
+ * The force through each of `scene`'s carabiners, in team pulls, from what it holds at either end: a rope's eye, its
+ * rope's tension there; a Prusik's loop, its pull; a pulley, the tension in every strand on its sheaves and whatever's
+ * clipped to its becket. A carabiner with a rope spliced round it is left out, as is one between two things that hold
+ * nothing of their own (a hanger and a load's tab). Each comes in the T-method's order just after the last label it's
+ * found from.
+ */
+function carabinersOf(scene: Scene, strands: Strand[]): (Mark & { t: number })[] {
+    const last = (s: Strand[]) => Math.max(-1, ...s.flatMap((o) => o.labels.map((l) => l.order)));
+    const eyes = scene.ropes.flatMap((rope, r) => {
+        const mine = strands.filter((s) => s.rope === r);
+        return rope.eyes.map((eye) => {
+            const strand = eye.stop === rope.stops[0] ? mine[0] : mine[mine.length - 1];
+            return { end: eye.end, t: strand.t, order: last([strand]) };
+        });
+    });
+    const pulleyAt = (p: Vector2) => {
+        const q = scene.pulleys.find((q) => same(pulleyEnds(q.at, q.eye).clip, p));
+        if (!q) return undefined;
+        const { large, small } = pulleySheaves(q.at);
+        const radii = q.sheaves === 2 ? [large.r, small.r] : [large.r];
+        const onSheaves = strands.filter((s) =>
+            [s.from, s.to].some((e) => radii.some((r) => Math.abs(e.distanceTo(q.at) - r) < 0.5)),
+        );
+        const becket = pulleyEnds(q.at, q.eye).becket;
+        const onBecket = scene.clips.flatMap(([a, b]) => {
+            if (!same(a, becket) && !same(b, becket)) return [];
+            const f = forceAt(same(a, becket) ? b : a);
+            return f ? [f] : [];
+        });
+        return {
+            t: [...onSheaves, ...onBecket].reduce((sum, f) => sum + f.t, 0),
+            order: Math.max(last(onSheaves), ...onBecket.map((f) => f.order)),
+        };
+    };
+    const forceAt = (p: Vector2): { t: number; order: number } | undefined =>
+        pulleyAt(p) ??
+        eyes.find((e) => same(e.end, p)) ??
+        scene.prusiks?.filter((k) => same(k.to, p)).map((k) => ({ t: k.pull, order: -1 }))[0];
+    return scene.clips.flatMap(([a, b]) => {
+        // One with a rope spliced round it carries what the rope's strand does, which is labelled already.
+        if (eyes.some((e) => same(e.end, a) || same(e.end, b))) return [];
+        const f = pulleyAt(a) ?? pulleyAt(b) ?? forceAt(a) ?? forceAt(b);
+        return f ? [{ at: a.mid(b), t: f.t, order: f.order + 0.5 }] : [];
+    });
+}
+
+/** How tall a tension's label is. */
+const TAG = 9;
+
+/**
+ * Each strand's tension, labelled by both its ends in team pulls ("3T"), except slack ones, and the force through each
+ * carabiner holding a pulley or a Prusik, on it.
+ */
+function Tensions(props: { strands: Strand[]; carabiners: (Mark & { t: number })[] }) {
+    const all = [
+        ...props.strands
+            .filter((s) => s.t > 0)
+            .flatMap((s) => s.labels.map((l) => ({ ...l, t: s.t }))),
+        ...props.carabiners,
+    ];
+    // A label that would cover one saying the same, earlier in the order (both ends of a short strand), is left out.
+    const labels = all.filter(
+        (l) =>
+            !all.some((o) => o.order < l.order && o.t === l.t && o.at.distanceTo(l.at) < TAG * 1.5),
+    );
+    return (
+        <g aria-hidden>
+            {labels.map((l, i) => (
+                <Tag key={i} at={l.at} t={l.t} />
+            ))}
+        </g>
+    );
+}
+
+/** A tension's label: `t` team pulls, in a pill centred `at`. */
+function Tag({ at, t }: { at: Vector2; t: number }) {
+    const text = `${t}T`;
+    const width = text.length * 4.5 + 5;
+    return (
+        <g>
+            <rect
+                x={svgNumber(at.x - width / 2)}
+                y={svgNumber(at.y - TAG / 2)}
+                width={width}
+                height={TAG}
+                rx={TAG / 2}
+                className="fill-surface"
+                stroke="var(--pull)"
+                strokeWidth={1}
+            />
+            <text
+                x={svgNumber(at.x)}
+                y={svgNumber(at.y)}
+                dominantBaseline="central"
+                textAnchor="middle"
+                fontSize={7}
+                fill="var(--pull)"
+                className="font-mono"
+            >
+                {text}
+            </text>
+        </g>
+    );
+}
+
 /** A pulley system drawn as it looks, with the team's rope's end to drag round its track to pull the rope in. */
-export function SystemDrawing({ slug }: { slug: Slug }) {
+export function SystemDrawing({ slug, tensions }: { slug: Slug; tensions?: boolean }) {
     const [pulled, setPulled] = useState(0);
     const svg = useRef<SVGSVGElement>(null);
     const [dragging, setDragging] = useState(false);
@@ -1039,11 +1248,11 @@ export function SystemDrawing({ slug }: { slug: Slug }) {
     const scene = diagram.scene(amount, room);
     const [start, finish] = [LEAD, LEAD + max * PER_METRE];
     const reach = start + amount * PER_METRE;
-    const ropes = scene.ropes.map((rope, r) =>
-        ropePieces(
-            track && scene.pin?.rope === r ? [...rope.stops, ...track.stops(reach)] : rope.stops,
-        ),
+    const stops = scene.ropes.map((rope, r) =>
+        track && scene.pin?.rope === r ? [...rope.stops, ...track.stops(reach)] : rope.stops,
     );
+    const ropes = stops.map(ropePieces);
+    const strands = strandsOf(scene, stops);
     // Drag the rope's end along its track: the nearest point on it to the pointer, within the rope there is to pull.
     const drag = (e: React.PointerEvent) => {
         const ctm = svg.current?.getScreenCTM();
@@ -1226,6 +1435,9 @@ export function SystemDrawing({ slug }: { slug: Slug }) {
                 {scene.clips.map((ends, i) => (
                     <Carabiner key={i} ends={ends} />
                 ))}
+                {tensions && (
+                    <Tensions strands={strands} carabiners={carabinersOf(scene, strands)} />
+                )}
                 {/* The pin the team's rope turns round, and its end, which is dragged along the track to pull it in. */}
                 {track && (
                     <>

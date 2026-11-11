@@ -14,6 +14,7 @@ import { CONTENTS, SERIES, SYSTEMS, type Slug } from "./systems";
  */
 export function SystemPage({ slug }: { slug: Slug }) {
     const [contents, setContents] = useState(false);
+    const [tensions, setTensions] = useState(false);
     const index = SYSTEMS.findIndex((s) => s.slug === slug);
     const system = SYSTEMS[index];
     return (
@@ -29,9 +30,27 @@ export function SystemPage({ slug }: { slug: Slug }) {
                     <ChevronDown className="size-3.5 shrink-0" aria-hidden />
                 </button>
             </header>
-            <h1 className="text-xl leading-tight font-semibold text-ink-bright">{system.name}</h1>
+            <div className="flex items-center justify-between gap-3">
+                <h1 className="text-xl leading-tight font-semibold text-ink-bright">
+                    {system.name}
+                </h1>
+                <button
+                    type="button"
+                    aria-pressed={tensions}
+                    aria-label="Tension in each strand, in team pulls"
+                    title="Tension in each strand, in team pulls"
+                    onClick={() => setTensions(!tensions)}
+                    className={`flex h-7 shrink-0 items-center rounded-full border px-3 font-mono text-sm ${
+                        tensions
+                            ? "border-action text-highlight"
+                            : "border-line-faint text-ink-muted hover:border-action hover:text-highlight"
+                    }`}
+                >
+                    T
+                </button>
+            </div>
             <p className="text-ink-soft">{system.text}</p>
-            <SystemDrawing slug={slug} />
+            <SystemDrawing slug={slug} tensions={tensions} />
             <ContentsDrawer
                 open={contents}
                 onOpenChange={setContents}
