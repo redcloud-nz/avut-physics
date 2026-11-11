@@ -298,3 +298,63 @@ export const SIX_TO_ONE: PulleySystem = {
         { path: ["anchor", "m2", "haul"], lanes: [124, 152] },
     ],
 };
+
+/*
+ * Systems for the pulley lab, a prototype towards systems people build themselves. A pulley named in the middle of a
+ * rope's path more than once is a block with a sheave for each time: a double pulley. A pulley at either end of a path
+ * is the rope tied to its becket.
+ */
+
+/** The 5:1 on a pair of double pulleys, as it's rigged: tied to the load block's becket, then round each sheave. */
+export const FIVE_TO_ONE_DOUBLES: PulleySystem = {
+    bodies: {
+        anchor: { kind: "anchor" },
+        p1: { kind: "pulley", x: 0.9, fixed: true },
+        load: { kind: "load", x: 4 },
+        m1: { kind: "pulley", x: 3.75, on: "load" },
+        haul: { kind: "haul", x: 1 },
+    },
+    ropes: [{ path: ["m1", "p1", "m1", "p1", "m1", "haul"], lanes: [40, 68, 96, 124, 152] }],
+};
+
+/** A 3:1 on a rope grab on the Z-rig's haul line: 9:1. */
+export const NINE_TO_ONE: PulleySystem = {
+    bodies: {
+        anchor: { kind: "anchor" },
+        p1: { kind: "pulley", x: 0.9, fixed: true },
+        load: { kind: "load", x: 5 },
+        g1: { kind: "grab", x: 4.4, y: 40, on: "load" },
+        p2: { kind: "pulley", x: 4.2, on: "g1" },
+        g2: { kind: "grab", x: 3.7, y: 96 },
+        p3: { kind: "pulley", x: 0.9, fixed: true },
+        g3: { kind: "grab", x: 3.1, y: 124, on: "g2" },
+        p4: { kind: "pulley", x: 2.9, on: "g3" },
+        haul: { kind: "haul", x: 1.2 },
+    },
+    ropes: [
+        { path: ["load", "p1", "p2", "g2"], lanes: [40, 68, 96] },
+        { path: ["g2", "p3", "p4", "haul"], lanes: [124, 152, 180] },
+    ],
+};
+
+/**
+ * A complex 5:1: neither simple (one rope, the moving pulleys all on the load) nor compound (one system pulling on
+ * another's rope). The main line runs round a pulley on the anchor to a free pulley, and back to the team. A second
+ * rope, tied to the anchor, runs round a pulley on a grab on the main line and is tied to the free pulley, holding it.
+ * The tensions add rather than multiply: 1T + 2T + 2T.
+ */
+export const COMPLEX_FIVE_TO_ONE: PulleySystem = {
+    bodies: {
+        anchor: { kind: "anchor" },
+        p1: { kind: "pulley", x: 0.9, fixed: true },
+        load: { kind: "load", x: 4.4 },
+        g1: { kind: "grab", x: 3.9, y: 96, on: "load" },
+        m1: { kind: "pulley", x: 3.6, on: "g1" },
+        t1: { kind: "pulley", x: 2.4 },
+        haul: { kind: "haul", x: 1.2 },
+    },
+    ropes: [
+        { path: ["load", "p1", "t1", "haul"], lanes: [96, 124, 152] },
+        { path: ["anchor", "m1", "t1"], lanes: [40, 68] },
+    ],
+};

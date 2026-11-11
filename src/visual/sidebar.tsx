@@ -6,14 +6,21 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { ContentsList, type Contents } from "./contents";
-import { SERIES } from "./series";
 
 /**
- * The series' contents down the left of a wide screen, held in place as the page beside it scrolls, and scrolled
+ * A series' contents down the left of a wide screen, held in place as the page beside it scrolls, and scrolled
  * itself to keep the page being read in sight. Phones go without it: they bring the contents down from the page's
- * title instead. Under the series' name, a link presents the series as slides from the page being read.
+ * title instead. Under the series' name, a link presents the series as slides from the page being read, for a series
+ * that can be presented.
  */
-export function Sidebar(props: { contents: Contents }) {
+export function Sidebar(props: {
+    contents: Contents;
+    /** The series' name, and where its first page (the one before its contents) is. */
+    series: string;
+    href: string;
+    /** Where the series is presented from, if it can be. */
+    present?: string;
+}) {
     const path = usePathname();
     const current = props.contents
         .flatMap((section) => section.pages)
@@ -33,19 +40,21 @@ export function Sidebar(props: { contents: Contents }) {
                 ← Physics Visualisations
             </Link>
             <Link
-                href="/visual"
-                aria-current={path === "/visual" ? "page" : undefined}
+                href={props.href}
+                aria-current={path === props.href ? "page" : undefined}
                 className="px-2 font-semibold text-ink-strong hover:text-highlight"
             >
-                {SERIES}
+                {props.series}
             </Link>
-            <Link
-                href={path.replace(/^\/visual/, "/present/visual")}
-                className="-mt-1 flex items-center gap-2 px-2 text-sm text-link hover:text-highlight"
-            >
-                <Presentation className="size-4" aria-hidden />
-                {path === "/visual" ? "Present the series" : "Present from this page"}
-            </Link>
+            {props.present && (
+                <Link
+                    href={path.replace(props.href, props.present)}
+                    className="-mt-1 flex items-center gap-2 px-2 text-sm text-link hover:text-highlight"
+                >
+                    <Presentation className="size-4" aria-hidden />
+                    {path === props.href ? "Present the series" : "Present from this page"}
+                </Link>
+            )}
             <nav aria-label="Contents">
                 <ContentsList
                     contents={props.contents}

@@ -1,5 +1,5 @@
 import { DetailsPanelProvider } from "@/visual/details-panel";
-import { CONTENTS } from "@/visual/pages";
+import { CONTENTS, SERIES } from "@/visual/pages";
 import { Sidebar } from "@/visual/sidebar";
 
 /**
@@ -9,7 +9,7 @@ import { Sidebar } from "@/visual/sidebar";
 export default function VisualLayout({ children }: LayoutProps<"/visual">) {
     return (
         <div className="fills-screen flex min-h-full shrink-0">
-            <Sidebar contents={CONTENTS} />
+            <Sidebar contents={CONTENTS} series={SERIES} href="/visual" present="/present/visual" />
             <div className="flex min-w-0 flex-1 flex-col">
                 <DetailsPanelProvider>{children}</DetailsPanelProvider>
             </div>

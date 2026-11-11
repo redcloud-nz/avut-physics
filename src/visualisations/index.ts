@@ -6,7 +6,8 @@ export type Visualisation = {
         | "/four-point-lower"
         | "/body-belay"
         | "/ute-load"
-        | "/multi-point-anchor";
+        | "/multi-point-anchor"
+        | "/pulley-lab";
     title: string;
     description: string;
 };
@@ -16,6 +17,13 @@ export const incline: Visualisation = {
     title: "Block on an Incline",
     description:
         "Free-body diagram of a block on a slope. Static friction holds the block until the angle exceeds arctan(μs); after that it slides with kinetic friction μk·N.",
+};
+
+export const pulleyLab: Visualisation = {
+    href: "/pulley-lab",
+    title: "Pulley Lab",
+    description:
+        "A prototype for building pulley systems: pick a system, haul it, and see the tension in every part of the rope, with friction in the pulleys if you like.",
 };
 
 export const ladderHinge: Visualisation = {
@@ -60,7 +68,7 @@ export const multiPointAnchor: Visualisation = {
         "Two or three anchors joined to a master point, rigged either pre-equalised or sliding. Swing the load to one side and see how each rig shares it between the anchors, how the angle between the legs adds to their load, and how far the master point moves.",
 };
 
-/** Listed on the home page (the incline isn't, but keeps its page). Each one also needs its own page under `src/app`. */
+/** Listed on the home page (the incline and the pulley lab aren't, but keep their pages). Each one also needs its own page under `src/app`. */
 export const visualisations: Visualisation[] = [
     ladderHinge,
     twoPointLower,

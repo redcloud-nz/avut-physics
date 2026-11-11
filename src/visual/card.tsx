@@ -7,7 +7,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 
-import { ContentsList, pageCount, type Contents } from "./contents";
+import { pageCount, type Contents } from "./contents";
+import { ContentsDrawer } from "./contents-drawer";
 import { useDetailsPanel } from "./details-panel";
 import { SERIES } from "./series";
 
@@ -249,45 +250,13 @@ export function Card(props: {
                 </DrawerContent>
             </Drawer>
 
-            <Drawer open={contents} onOpenChange={setContents} direction="top">
-                <DrawerContent
-                    aria-describedby={undefined}
-                    className="mx-auto max-h-[85dvh] max-w-md border-line-faint bg-surface pt-[env(safe-area-inset-top)] text-base text-ink-soft"
-                >
-                    <div className="panel-scroll flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-4 pb-2">
-                        <DrawerTitle className="text-base font-semibold text-ink-strong">
-                            {SERIES}
-                        </DrawerTitle>
-                        {/* Next keeps the page being left, hidden, for coming back to: leave it with its contents put
-                            away. */}
-                        <ContentsList
-                            contents={props.contents}
-                            current={props.index}
-                            onFollow={() => setContents(false)}
-                        />
-                        <Link
-                            href="/"
-                            onClick={() => setContents(false)}
-                            className="px-2 text-sm text-link hover:text-highlight"
-                        >
-                            ← Physics Visualisations
-                        </Link>
-                    </div>
-                    <button
-                        type="button"
-                        aria-label="Hide the contents"
-                        onClick={() => setContents(false)}
-                        className="group flex h-7 w-full shrink-0 items-center justify-center"
-                    >
-                        <Pill className="bg-ghost group-hover:bg-indicator" />
-                    </button>
-                </DrawerContent>
-            </Drawer>
+            <ContentsDrawer
+                open={contents}
+                onOpenChange={setContents}
+                series={SERIES}
+                contents={props.contents}
+                current={props.index}
+            />
         </div>
     );
-}
-
-/** The grab handle drawn on the button that puts the contents away. */
-export function Pill(props: { className: string }) {
-    return <span className={`h-1.5 w-10 rounded-full transition-colors ${props.className}`} />;
 }

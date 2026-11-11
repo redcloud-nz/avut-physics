@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    COMPLEX_FIVE_TO_ONE,
     FIVE_TO_ONE,
+    FIVE_TO_ONE_DOUBLES,
     hauled,
     loadPerMetre,
+    NINE_TO_ONE,
     partsOnTheLoad,
     pullsOf,
     REDIRECT,
@@ -21,6 +24,9 @@ const SYSTEMS: [string, PulleySystem, number][] = [
     ["the Z-rig", Z_RIG, 3],
     ["a 5:1", FIVE_TO_ONE, 5],
     ["a 2:1 on the Z-rig", SIX_TO_ONE, 6],
+    ["a 5:1 on double pulleys", FIVE_TO_ONE_DOUBLES, 5],
+    ["a 3:1 on the Z-rig", NINE_TO_ONE, 9],
+    ["a complex 5:1", COMPLEX_FIVE_TO_ONE, 5],
 ];
 
 /** The length of each rope, from where its bodies are. */
@@ -106,5 +112,31 @@ describe("pulley systems", () => {
         expect(p.pull.p1).toBeCloseTo(2, 12);
         expect(p.pull.p2).toBeCloseTo(-2, 12);
         expect(p.pull.anchor).toBeCloseTo(2, 12);
+    });
+
+    it("a double pulley works as two single pulleys on the same body, friction included", () => {
+        for (const e of [1, 0.9, 0.5]) {
+            expect(pullsOf(FIVE_TO_ONE_DOUBLES, e).advantage).toBeCloseTo(
+                pullsOf(FIVE_TO_ONE, e).advantage,
+                12,
+            );
+        }
+    });
+
+    it("a 3:1 on a 3:1 multiplies to 9:1, friction included", () => {
+        for (const e of [1, 0.9, 0.5]) {
+            expect(pullsOf(NINE_TO_ONE, e).advantage).toBeCloseTo(
+                pullsOf(Z_RIG, e).advantage ** 2,
+                12,
+            );
+        }
+    });
+
+    it("the complex 5:1's tensions add: 1T on the main line, 2T on the rope holding the free pulley", () => {
+        const p = pullsOf(COMPLEX_FIVE_TO_ONE);
+        expect(p.tensions[0]).toEqual([1, 1, 1].map((t) => expect.closeTo(t, 12)));
+        expect(p.tensions[1]).toEqual([2, 2].map((t) => expect.closeTo(t, 12)));
+        // Not a product of simple systems' advantages, as a compound's is.
+        expect(partsOnTheLoad(COMPLEX_FIVE_TO_ONE)).toHaveLength(3);
     });
 });

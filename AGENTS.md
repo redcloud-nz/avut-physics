@@ -97,8 +97,8 @@ that a diagram draws correctly. The article's first load compiles for around 20 
 - Colours come from the tokens in `src/app/globals.css`, named for what they show (`ink-muted`, `pull`, `mass`,
   `warning`): token classes (`text-ink-muted`, `fill-surface`) in `className`, and `var(--pull)` in SVG attributes and
   styles (the base name: a `--color-*` variable exists only once a class uses it). No hex values or Tailwind palette
-  classes (`text-slate-400`) in components; add a token instead. The exceptions are the share image
-  (`src/visual/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
+  classes (`text-slate-400`) in components; add a token instead. The exceptions are the share images
+  (`src/visual/share-image.tsx` and `src/pulley-systems/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
   own overlays) and the articles' `print:` classes.
 - `src/knots/`: knots drawn from their centrelines (work in progress at `/rescue-knots/<slug>`; see
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
