@@ -12,7 +12,7 @@ export type PinEdge = "top" | "bottom";
 
 /**
  * The team's rope's way on past a pin at `x` on the drawing's top or bottom `edge`: clockwise round the drawing (from
- * `left` to `right` across, and `height` tall), `inset` in from its edge, from beside the pin all the way round. From one at
+ * `left` to `right` across, and `top` to `bottom` down), `inset` in from its edge, from beside the pin all the way round. From one at
  * the foot it runs along the bottom, up the left side, along the top and down the right; from one at the top, along the
  * top first. It gives the pin, where a distance along the track is and which distance along it is nearest a point, and
  * the rope's stops from the pin to a distance along it: the pin, each corner the rope has gone round, and its end.
@@ -21,11 +21,12 @@ export function trackOf(
     x: number,
     edge: PinEdge,
     left: number,
+    top: number,
     right: number,
-    height: number,
+    bottom: number,
     inset: number,
 ) {
-    const [l, t, r, b] = [left + inset, inset, right - inset, height - inset];
+    const [l, t, r, b] = [left + inset, top + inset, right - inset, bottom - inset];
     // Each side in turn clockwise from the bottom: where it starts and ends, between the corners at either end of it,
     // and the corner after it, with the angle its quarter turn starts from (radians, y down).
     const sides = [

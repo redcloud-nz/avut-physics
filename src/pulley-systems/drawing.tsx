@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
     Carabiner,
@@ -17,10 +17,10 @@ import {
     type RopePiece,
     type RopeStop,
 } from "@/articles/pulley-blocks";
-import { Readout, Select, Slider, VisualisationLayout } from "@/components/diagram/controls";
 import { polylinePath, svgNumber, svgPoint } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 
+import { SYSTEMS, type Slug } from "./systems";
 import { PIN, trackOf, type PinEdge } from "./track";
 
 /** The rope's thickness. */
@@ -91,28 +91,31 @@ type Scene = {
 const LEAD = 14;
 
 /**
- * A diagram: its name, how much rope can be pulled in (metres), its scene with that much pulled in, and how tall it
- * is if it needs more than the usual room.
+ * A diagram: how much rope can be pulled in (metres), and its scene with that much pulled in. Given `room` to spare below it (drawing units), it starts its load (or what limits its
+ * travel) that much lower, and `gain` is how much more rope that lets the team pull in, per unit of room, in drawing
+ * units.
  */
-type Diagram = { label: string; max: number; height?: number; scene: (pulled: number) => Scene };
-
-/** How tall a diagram is, unless it says. */
-const HEIGHT = 445;
+type Diagram = {
+    max: number;
+    gain: number;
+    scene: (pulled: number, room: number) => Scene;
+};
 
 /** Where the load's tab is, hanging from a pulley's eye. */
 const loadUnder = (at: Vector2, eye: EyeWay) => pulleyEnds(at, eye).clip.add(vec2(0, CLIP));
 
 /**
- * The 7:1, with the load risen `rise` (drawing units) and its team's rope running down to `team`. Two pairs side by
- * side. Spliced to a carabiner on the load's double's becket, round the right pair's sheaves like the 5:1, up to the
+ * The 7:1, with the load risen `rise` (drawing units) from `room` below where it usually starts, and its team's rope
+ * running down to `team`, if given (or, without it, ending at its last sheave, for a pin to take it on). Two pairs side
+ * by side. Spliced to a carabiner on the load's double's becket, round the right pair's sheaves like the 5:1, up to the
  * left anchor double's smaller sheave, down round the single, up over the left double's larger sheave, and down to the
  * team. Seven parts hold the load, so it rises a seventh of the rope pulled in; the last sheave only turns the team's
  * rope back down.
  */
-function sevenToOne(rise: number, team: Vector2): Scene {
+function sevenToOne(rise: number, room: number, team?: Vector2): Scene {
     const hangers = [vec2(135, HANGER_Y), vec2(185, HANGER_Y)];
     const [left, right] = hangers.map((h) => pulleyClippedAt(h.add(vec2(0, CLIP)), "up"));
-    const double = vec2(right.x, right.y + 230 - rise);
+    const double = vec2(right.x, right.y + 230 + room - rise);
     // The single sits under the left double, with its left side straight below the smaller sheave's.
     const [l, d, r] = [pulleySheaves(left), pulleySheaves(double), pulleySheaves(right)];
     const single = vec2(left.x + l.large.r - l.small.r, double.y);
@@ -126,7 +129,7 @@ function sevenToOne(rise: number, team: Vector2): Scene {
         { ...l.small, into: 1, out: -1 },
         { ...pulleySheaves(single).large, into: -1, out: 1 },
         { ...l.large, into: 1, out: -1 },
-        { c: team, r: 0 },
+        ...(team ? [{ c: team, r: 0 }] : []),
     ];
     const eye = ropeEye(end, rest[0], ROPE);
     const load = loadUnder(double, "down");
@@ -155,12 +158,12 @@ function sevenToOne(rise: number, team: Vector2): Scene {
 
 const DIAGRAMS = {
     "two-to-one": {
-        label: "2:1, a single on the load",
         max: 4,
+        gain: 2,
         // Spliced to a carabiner on the anchor beside where the pulley hangs, down round the pulley on the load, and up to
         // the team. The load rises half the rope pulled in.
-        scene: (pulled) => {
-            const at = vec2(160, 300 - (pulled * PER_METRE) / 2);
+        scene: (pulled, room) => {
+            const at = vec2(160, 300 + room - (pulled * PER_METRE) / 2);
             const sheave = pulleySheaves(at).large;
             // The rope's end is spliced round a carabiner hanging from the hanger, straight above the sheave's side.
             const hanger = vec2(at.x + sheave.r, HANGER_Y);
@@ -183,13 +186,13 @@ const DIAGRAMS = {
         },
     },
     "two-to-one-redirect": {
-        label: "2:1, redirected down at the anchor",
         max: 3.2,
+        gain: 2,
         // The 2:1, with a second hanger on the anchor for a pulley that turns the team's rope back down. Spliced to a
         // carabiner on one hanger, down round the pulley on the load, up over the pulley on the other hanger, and down
         // to the team. The load rises half the rope pulled in.
-        scene: (pulled) => {
-            const at = vec2(160, 300 - (pulled * PER_METRE) / 2);
+        scene: (pulled, room) => {
+            const at = vec2(160, 300 + room - (pulled * PER_METRE) / 2);
             const sheave = pulleySheaves(at).large;
             const tie = vec2(at.x + sheave.r, HANGER_Y);
             const end = tie.add(vec2(0, CLIP));
@@ -221,15 +224,15 @@ const DIAGRAMS = {
         },
     },
     "one-to-one": {
-        label: "1:1, a single at the anchor",
         max: 2.2,
+        gain: 1,
         // Spliced to a carabiner on the load, up over the pulley at the anchor, and down to the team. The load rises as
         // far as the rope's pulled in.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const hanger = vec2(160, HANGER_Y);
             const at = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
             const sheave = pulleySheaves(at).large;
-            const load = vec2(at.x + sheave.r, 400 - pulled * PER_METRE);
+            const load = vec2(at.x + sheave.r, 400 + room - pulled * PER_METRE);
             const end = load.sub(vec2(0, CLIP));
             const rest: RopeStop[] = [{ ...sheave, into: 1, out: -1 }];
             const eye = ropeEye(end, rest[0], ROPE);
@@ -249,22 +252,20 @@ const DIAGRAMS = {
         },
     },
     "z-rig": {
-        label: "3:1, a Z-rig",
         max: 5,
-        // Taller than the others, so the moving pulley starts further from the anchor's and there's more to pull in.
-        height: 500,
+        gain: 3,
         // Spliced to a carabiner on the load, up over the pulley at the anchor, down round a pulley clipped to a Prusik on
         // the load's rope, and up to the team. The Prusik moves with the load's rope, and the load rises a third of the
         // rope pulled in.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const rise = (pulled * PER_METRE) / 3;
             const hanger = vec2(160, HANGER_Y);
             const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
             const fixed = pulleySheaves(top).large;
-            const load = vec2(top.x + fixed.r, 455 - rise);
+            const load = vec2(top.x + fixed.r, 455 + room - rise);
             const end = load.sub(vec2(0, CLIP));
             // The Prusik grips the load's rope; its loop runs across to a carabiner hanging from the moving pulley.
-            const grip = vec2(load.x, 375 - rise);
+            const grip = vec2(load.x, 375 + room - rise);
             const loop = vec2(125, grip.y + 4);
             const moving = pulleyClippedAt(loop.sub(vec2(0, CLIP)), "down");
             const rest: RopeStop[] = [
@@ -292,16 +293,16 @@ const DIAGRAMS = {
             };
         },
     },
-    "four-doubles": {
-        label: "4:1, two double pulleys",
+    "four-to-one": {
         max: 4.5,
+        gain: 4,
         // The 5:1 the other way up: spliced to a carabiner on the top pulley's becket, down and up round each sheave in
         // turn, and from the top pulley's larger sheave down to the team. Four parts hold the bottom pulley, so the load
         // rises a quarter of the rope pulled in.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const hanger = vec2(160, HANGER_Y);
             const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
-            const bottom = vec2(160, top.y + 230 - (pulled * PER_METRE) / 4);
+            const bottom = vec2(160, top.y + 230 + room - (pulled * PER_METRE) / 4);
             const becket = pulleyEnds(top, "up").becket;
             const end = becket.add(vec2(0, CLIP));
             const [t, b] = [pulleySheaves(top), pulleySheaves(bottom)];
@@ -310,8 +311,6 @@ const DIAGRAMS = {
                 { ...t.small, into: 1, out: -1 },
                 { ...b.large, into: -1, out: 1 },
                 { ...t.large, into: 1, out: -1 },
-                // Leaning away from the bottom pulley, so the team's rope runs clear of it.
-                { c: vec2(100, 445), r: 0 },
             ];
             const eye = ropeEye(end, rest[0], ROPE);
             return {
@@ -328,22 +327,83 @@ const DIAGRAMS = {
                     [pulleyEnds(bottom, "down").clip, loadUnder(bottom, "down")],
                 ],
                 load: loadUnder(bottom, "down"),
+                // Leaning away from the bottom pulley, so the team's rope runs clear of it.
+                pin: { rope: 0, x: 100 - PIN },
             };
         },
     },
     "nine-to-one": {
-        label: "9:1, a 2:1 on the 4:1, tied to the load",
+        max: 3.4,
+        // The second Z-rig's pulley comes up to its anchor's at a third of the rope pulled in.
+        gain: 3,
+        // Two Z-rigs in one rope, the second to the left of the first. Spliced to a carabiner on the load, up over the
+        // first pulley at the anchor, down round a pulley clipped to a Prusik on the load's rope, up over the second
+        // pulley at the anchor, down round a pulley clipped to a Prusik on the rope coming up to it, and up to the team.
+        // The second Z-rig pulls its Prusik up a third of the rope pulled in, pulling the first Z-rig's rope in with it,
+        // and the first pulls the load up a third of that: a ninth of the rope pulled in.
+        scene: (pulled, room) => {
+            const rise = (pulled * PER_METRE) / 9;
+            const hangers = [vec2(133, HANGER_Y), vec2(200, HANGER_Y)];
+            const [second, first] = hangers.map((h) => pulleyClippedAt(h.add(vec2(0, CLIP)), "up"));
+            const r = pulleySheaves(first).large.r;
+            const load = vec2(first.x + r, 490 + room - rise);
+            const end = load.sub(vec2(0, CLIP));
+            // Each Prusik's loop runs across to a carabiner hanging from its moving pulley. The first's grips the load's
+            // rope; the second's, the rope from the first moving pulley up to the second anchor pulley, which runs
+            // plumb between them.
+            const grip = vec2(load.x, load.y - 75);
+            const loop = vec2(165, grip.y + 4);
+            const moving = pulleyClippedAt(loop.sub(vec2(0, CLIP)), "down");
+            const upper = vec2(moving.x - r, 320 + room - 3 * rise);
+            const upperLoop = vec2(101, upper.y + 4);
+            const upperMoving = pulleyClippedAt(upperLoop.sub(vec2(0, CLIP)), "down");
+            const rest: RopeStop[] = [first, moving, second, upperMoving].map((at) => ({
+                ...pulleySheaves(at).large,
+                into: 1,
+                out: -1,
+            }));
+            const eye = ropeEye(end, rest[0], ROPE);
+            return {
+                face: [105, 228],
+                hangers,
+                pulleys: [
+                    { at: first, eye: "up", sheaves: 1, stops: { large: 1 } },
+                    { at: moving, eye: "down", sheaves: 1, stops: { large: 2 } },
+                    { at: second, eye: "up", sheaves: 1, stops: { large: 3 } },
+                    { at: upperMoving, eye: "down", sheaves: 1, stops: { large: 4 } },
+                ],
+                ropes: [{ stops: [eye.stop, ...rest], eyes: [eye] }],
+                clips: [
+                    [hangers[0], pulleyEnds(second, "up").clip],
+                    [hangers[1], pulleyEnds(first, "up").clip],
+                    [pulleyEnds(moving, "down").clip, loop],
+                    [pulleyEnds(upperMoving, "down").clip, upperLoop],
+                    [load, end],
+                ],
+                prusiks: [
+                    { on: grip, to: loop },
+                    { on: upper, to: upperLoop },
+                ],
+                load,
+                // Straight up from the second moving pulley's side, round a pin at the top.
+                pin: { rope: 0, x: upperMoving.x - r + PIN, edge: "top" },
+            };
+        },
+    },
+    "nine-to-one-complex": {
         max: 2.7,
-        height: 520,
+        // The single comes down to meet the load: room lets it start that much further away, which they close at five
+        // times the load's rise.
+        gain: 9 / 5,
         // The 4:1 with its team's end spliced to a carabiner on a single pulley, and a second rope tied to the load, up
         // round the single, and down to the team. As the load rises, the 4:1's rope lets the single down four times as
         // far, so the second rope's two parts to it shorten by five times the rise each, and the load rises a ninth of
         // the rope pulled in: eight from the 2:1 on the 4:1, and one from the second rope pulling on the load itself.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const rise = (pulled * PER_METRE) / 9;
             const hanger = vec2(160, HANGER_Y);
             const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
-            const bottom = vec2(160, top.y + 300 - rise);
+            const bottom = vec2(160, top.y + 300 + room - rise);
             const load = loadUnder(bottom, "down");
             const becket = pulleyEnds(top, "up").becket;
             const end = becket.add(vec2(0, CLIP));
@@ -364,10 +424,7 @@ const DIAGRAMS = {
             // The second rope's end is spliced round a carabiner on a tab on the load, straight below the single's side.
             const tie = vec2(single.x + s.r, load.y);
             const tieEnd = tie.sub(vec2(0, CLIP));
-            const second: RopeStop[] = [
-                { ...s, into: 1, out: -1 },
-                { c: vec2(70, 520), r: 0 },
-            ];
+            const second: RopeStop[] = [{ ...s, into: 1, out: -1 }];
             const tieEye = ropeEye(tieEnd, second[0], ROPE);
             return {
                 face: [125, 195],
@@ -390,18 +447,20 @@ const DIAGRAMS = {
                 ],
                 load,
                 ties: [tie],
+                // The second rope's: leaning away from the single.
+                pin: { rope: 1, x: 70 - PIN },
             };
         },
     },
-    "five-doubles": {
-        label: "5:1, two double pulleys",
+    "five-to-one": {
         max: 4,
+        gain: 5,
         // Spliced to a carabiner on the bottom pulley's becket, round each sheave in turn, and up past the top pulley to
         // the team. The load rises a fifth of the rope pulled in.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const hanger = vec2(160, HANGER_Y);
             const top = pulleyClippedAt(hanger.add(vec2(0, CLIP)), "up");
-            const bottom = vec2(160, top.y + 230 - (pulled * PER_METRE) / 5);
+            const bottom = vec2(160, top.y + 230 + room - (pulled * PER_METRE) / 5);
             // The rope's end is spliced round a carabiner clipped to the bottom pulley's becket.
             const becket = pulleyEnds(bottom, "down").becket;
             const end = becket.sub(vec2(0, CLIP));
@@ -411,7 +470,6 @@ const DIAGRAMS = {
                 { ...b.small, into: 1, out: -1 },
                 { ...t.large, into: -1, out: 1 },
                 { ...b.large, into: 1, out: -1 },
-                { c: vec2(112, 12), r: 0 },
             ];
             const eye = ropeEye(end, rest[0], ROPE);
             return {
@@ -428,30 +486,35 @@ const DIAGRAMS = {
                     [pulleyEnds(bottom, "down").clip, loadUnder(bottom, "down")],
                 ],
                 load: loadUnder(bottom, "down"),
+                // Up past the top pulley, leaning clear of it, round a pin at the top.
+                pin: { rope: 0, x: 112 + PIN, edge: "top" },
             };
         },
     },
     "seven-to-one": {
-        label: "7:1, two doubles at the anchor, a double and a single on the load",
         max: 5.5,
-        // Leaning away from the single, so the team's rope runs clear of it.
-        scene: (pulled) => sevenToOne((pulled * PER_METRE) / 7, vec2(80, 445)),
+        gain: 7,
+        scene: (pulled, room) => ({
+            ...sevenToOne((pulled * PER_METRE) / 7, room),
+            // Leaning away from the single, so the team's rope runs clear of it.
+            pin: { rope: 0, x: 80 - PIN },
+        }),
     },
     "twenty-eight-to-one": {
-        label: "28:1, a 4:1 on the 7:1's rope from a ground anchor",
         max: 7.5,
-        height: 595,
+        // Room lowers the ground anchor, giving the Prusik further to come down, at a quarter of the rope pulled in.
+        gain: 4,
         // The 7:1, with a 4:1 between an anchor on the ground and a Prusik on the 7:1's team's rope, which is slack past
         // it. Spliced to a carabiner on the ground single's becket, up round the double on the Prusik, down round the
         // single, up round the double again, and down to the team. Four parts pull the Prusik down, so it moves a
         // quarter of the 4:1's rope pulled in, pulling the 7:1's rope with it, and the load rises a seventh of that: a
         // 28th of the rope pulled in.
-        scene: (pulled) => {
+        scene: (pulled, room) => {
             const rise = (pulled * PER_METRE) / 28;
-            const ground = 580;
+            const ground = 580 + room;
             // The line the 7:1's team's rope runs down, from its last sheave towards the ground.
             const towards = vec2(100, ground);
-            const stops = sevenToOne(rise, towards).ropes[0].stops;
+            const stops = sevenToOne(rise, 0, towards).ropes[0].stops;
             const [from, to] = tangent(stops[stops.length - 2], { c: towards, r: 0 });
             const along = to.sub(from).scale(1 / to.distanceTo(from));
             // The Prusik starts just under the 7:1's top left pulley, and moves down as far as its rope's pulled in.
@@ -459,7 +522,7 @@ const DIAGRAMS = {
             const grip = from.add(along.scale((y - from.y) / along.y));
             // Past it the 7:1's rope is slack: a short tail, fading out.
             const tail = grip.add(along.scale(70));
-            const scene = sevenToOne(rise, tail);
+            const scene = sevenToOne(rise, 0, tail);
             // The 4:1 hangs on the far side of the 7:1's rope from the load, its loop running across to it.
             const loop = vec2(85, grip.y + 4);
             const top = pulleyClippedAt(loop.add(vec2(0, CLIP)), "up");
@@ -472,8 +535,6 @@ const DIAGRAMS = {
                 { ...t.small, into: 1, out: -1 },
                 { ...g, into: -1, out: 1 },
                 { ...t.large, into: 1, out: -1 },
-                // Leaning away from the single, so the team's rope runs clear of it.
-                { c: vec2(30, ground), r: 0 },
             ];
             const eye = ropeEye(end, rest[0], ROPE);
             return {
@@ -497,14 +558,22 @@ const DIAGRAMS = {
                     [becket, end],
                 ],
                 prusiks: [{ on: grip, to: loop, along }],
-                ground: { y: ground, across: [60, 110], hangers: [hanger] },
+                // Just wider than its hanger's tab, so the pin's readout clears it.
+                ground: { y: ground, across: [72, 98], hangers: [hanger] },
+                // The 4:1's: leaning away from the single, so the team's rope runs clear of it.
+                pin: { rope: 1, x: 26 },
                 fade: { rope: 0, from: grip.add(along.scale(8)), to: tail },
             };
         },
     },
-} satisfies Record<string, Diagram>;
+} satisfies Record<Slug, Diagram>;
 
-type Key = keyof typeof DIAGRAMS;
+/**
+ * How big a drawing unit is drawn (pixels), so every diagram is drawn the same size, and the frame's height beyond a
+ * diagram is room for its load to travel further. A screen too small for the tallest diagram at this size, such as a
+ * phone's, draws every diagram smaller, at the size that fits it.
+ */
+const SCALE = 1.5;
 
 /** A piece of rope: white, with a faint braid and black tracers spiralling round it, fixed to it so it shows running. */
 function RopePath({ piece, mask }: { piece: RopePiece; mask?: string }) {
@@ -576,13 +645,21 @@ function Anchor(props: { y: number; across: [number, number]; hangers: Vector2[]
 
 /** How wide the track's band is. */
 const BAND = ROPE + 3;
+/** The gap either side of the track: between it and the frame, and between it and the edge of the drawing. */
+const GAP = 3;
 /**
- * How far in from the drawing's edge the track's middle runs: halfway between the edge and the top of the anchor's
- * hatching, so there's as much room between the track and the frame as between the track and the anchor.
+ * The room round the frame for the track, which isn't part of the system: the team's rope leaves the frame round its
+ * pin, and runs round the track outside it.
  */
-const INSET = (FACE - HATCH) / 2;
-/** The rope's end's handle: small enough, with its outline, to stay inside the frame on the track. */
+const MARGIN = BAND + 2 * GAP;
+/** How far in from the drawing's edge the track's middle runs. */
+const INSET = MARGIN / 2;
+/** The rope's end's handle: small enough, with its outline, to stay inside the drawing on the track. */
 const THUMB = 5;
+/** How far from the rope's end's handle it can still be grabbed: about a finger's width across, on a phone. */
+const GRAB = 20;
+/** How round the frame's corners are. */
+const CORNER = 8;
 
 /**
  * The track the team's rope's end runs along, from where it starts (`from`, none pulled in) to as far as there's rope to
@@ -632,6 +709,18 @@ function Track(props: { track: ReturnType<typeof trackOf>; from: number; to: num
 
 /** How tall the load's box is. */
 const LOAD_HEIGHT = 30;
+/** The gap inside the frame above the anchor's hatching, and below the load or the ground anchor's hatching. */
+const PADDING = FACE - HATCH;
+
+/** How tall a diagram is with no room to spare: down to the bottom of its load where it starts, or its ground anchor. */
+function heightOf(diagram: Diagram) {
+    const scene = diagram.scene(0, 0);
+    const load = scene.load.y + 10 + LOAD_HEIGHT;
+    return Math.max(load, scene.ground ? scene.ground.y + HATCH : 0) + PADDING;
+}
+
+/** How tall the tallest diagram is. */
+const TALLEST = Math.max(...Object.values(DIAGRAMS).map(heightOf));
 /** How far the load must have moved (drawing units) before it's marked, from where its bottom was. */
 const MOVED = 0.5;
 /** A dimension's arrowheads: how long, and how wide either side of the line. */
@@ -694,47 +783,58 @@ function Dimension({ x, from, to }: { x: number; from: number; to: number }) {
     );
 }
 
-/** Pulley systems drawn as they look, picked from a list, with a slider for the rope pulled in. */
-export default function Sketch() {
-    const [key, setKey] = useState<Key>("two-to-one");
+/** A pulley system drawn as it looks, with the team's rope's end to drag round its track to pull the rope in. */
+export function SystemDrawing({ slug }: { slug: Slug }) {
     const [pulled, setPulled] = useState(0);
     const svg = useRef<SVGSVGElement>(null);
     const [dragging, setDragging] = useState(false);
-    const diagram: Diagram = DIAGRAMS[key];
-    const amount = Math.min(pulled, diagram.max);
-    const scene = diagram.scene(amount);
-    const height = diagram.height ?? HEIGHT;
-    // On wide screens the drawing fills a box of its own shape: the room either side of it, in drawing units, so the
-    // track can run round the box's edge. On narrow ones the box takes the drawing's shape, so there's none.
-    const [spare, setSpare] = useState(0);
+    const diagram: Diagram = DIAGRAMS[slug];
+    const system = SYSTEMS.find((s) => s.slug === slug)!;
+    // The drawing fills the box the page gives it, every diagram at the same scale: the room either side of it, in
+    // drawing units, and how tall the box is, so the track can run round the box's edge, with room to spare below the
+    // diagram. Until the box is measured, it takes the diagram's own shape.
+    const [box, setBox] = useState<{ width: number; height: number } | null>(null);
     useEffect(() => {
         const el = svg.current;
         if (!el) return;
-        const wide = window.matchMedia("(min-width: 64rem)");
-        const fit = () => {
-            const box = el.getBoundingClientRect();
-            setSpare(wide.matches ? Math.max(0, (box.width / box.height) * height - 320) : 0);
-        };
-        const watch = new ResizeObserver(fit);
+        const watch = new ResizeObserver(() => {
+            const { width, height } = el.getBoundingClientRect();
+            setBox({ width, height });
+        });
         watch.observe(el);
-        wide.addEventListener("change", fit);
-        return () => {
-            watch.disconnect();
-            wide.removeEventListener("change", fit);
-        };
-    }, [height]);
-    // The team's rope's track, and where along it the rope's end is: as far past its start as the rope's pulled in.
+        return () => watch.disconnect();
+    }, []);
+    const scale =
+        box && Math.min(SCALE, box.width / (320 + 2 * MARGIN), box.height / (TALLEST + 2 * MARGIN));
+    const spare = scale ? Math.max(0, box.width / scale - 2 * MARGIN - 320) : 0;
+    const base = heightOf(diagram);
+    const height = Math.max(base, scale ? box.height / scale - 2 * MARGIN : 0);
+    // The whole drawing, the frame and the margin round it.
+    const [x0, y0, across, down] = [
+        -spare / 2 - MARGIN,
+        -MARGIN,
+        320 + spare + 2 * MARGIN,
+        height + 2 * MARGIN,
+    ];
+    // The room below the diagram lets its load start lower, so there's more rope to pull in.
+    const room = height - base;
+    const rest = diagram.scene(0, room);
+    // The team's rope's track (its pin stays put as the rope's pulled in), and where along it the rope's end is: as far
+    // past its start as the rope's pulled in, but never so far it runs off the track's end.
     const track =
-        scene.pin &&
-        trackOf(
-            scene.pin.x,
-            scene.pin.edge ?? "bottom",
-            -spare / 2,
-            320 + spare / 2,
-            height,
-            INSET,
-        );
-    const [start, finish] = [LEAD, LEAD + diagram.max * PER_METRE];
+        rest.pin &&
+        trackOf(rest.pin.x, rest.pin.edge ?? "bottom", x0, y0, x0 + across, y0 + down, INSET);
+    // Down to the centimetre, as the rope's end steps.
+    const max =
+        Math.floor(
+            Math.min(
+                diagram.max * PER_METRE + room * diagram.gain,
+                track ? track.length - LEAD - THUMB : Infinity,
+            ),
+        ) / PER_METRE;
+    const amount = Math.min(pulled, max);
+    const scene = diagram.scene(amount, room);
+    const [start, finish] = [LEAD, LEAD + max * PER_METRE];
     const reach = start + amount * PER_METRE;
     const ropes = scene.ropes.map((rope, r) =>
         ropePieces(
@@ -748,8 +848,26 @@ export default function Sketch() {
         const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
         setPulled(Math.round(track.nearest(vec2(p.x, p.y), start, finish) - start) / PER_METRE);
     };
+    // Grabbing the rope's end, by its handle or the room round it.
+    const grab = {
+        onPointerDown: (e: React.PointerEvent<SVGCircleElement>) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragging(true);
+        },
+        onPointerUp: () => setDragging(false),
+        onPointerCancel: () => setDragging(false),
+    };
+    // A touch starting on the rope's end mustn't scroll the page, or the browser takes the touch over and the drag stops
+    // there. Shapes inside an SVG ignore `touch-action`, so it's stopped as it starts instead, which needs a listener
+    // that isn't passive.
+    const holdTouch = useCallback((el: SVGGElement | null) => {
+        if (!el) return;
+        const hold = (e: TouchEvent) => e.preventDefault();
+        el.addEventListener("touchstart", hold, { passive: false });
+        return () => el.removeEventListener("touchstart", hold);
+    }, []);
     const step = (by: number) =>
-        setPulled(Math.min(Math.max(Math.round((amount + by) * 100) / 100, 0), diagram.max));
+        setPulled(Math.min(Math.max(Math.round((amount + by) * 100) / 100, 0), max));
     // Each piece of rope, and whether it's the slack one that fades out.
     const pieces = ropes.flatMap((rope, r) =>
         rope.pieces.map((piece, k) => ({
@@ -758,7 +876,7 @@ export default function Sketch() {
         })),
     );
     const loadTop = scene.load.y + 10;
-    const startTop = diagram.scene(0).load.y + 10;
+    const startTop = rest.load.y + 10;
     // The load's box reaches past its tabs: 30 either side of a lone one, less past several, so it stays narrow.
     const tabs = [scene.load, ...(scene.ties ?? [])].map((t) => t.x);
     const past = tabs.length > 1 ? 20 : 30;
@@ -767,249 +885,231 @@ export default function Sketch() {
         Math.max(...tabs) - Math.min(...tabs) + 2 * past,
     ];
     return (
-        <VisualisationLayout
-            diagram={
-                <div className="flex lg:h-[calc(100dvh-12rem)] lg:min-h-105">
-                    <svg
-                        ref={svg}
-                        viewBox={`${svgNumber(-spare / 2)} 0 ${svgNumber(320 + spare)} ${height}`}
-                        className="h-auto w-full overflow-visible text-ink-muted lg:h-full"
-                        role="group"
-                        aria-label={diagram.label}
-                        onPointerMove={drag}
-                    >
-                        {/* Slack rope fades out: it shows as much as the mask is light, which fades to dark along it. */}
-                        {scene.fade && (
-                            <defs>
-                                <linearGradient
-                                    id="slack-fade"
-                                    gradientUnits="userSpaceOnUse"
-                                    x1={svgNumber(scene.fade.from.x)}
-                                    y1={svgNumber(scene.fade.from.y)}
-                                    x2={svgNumber(scene.fade.to.x)}
-                                    y2={svgNumber(scene.fade.to.y)}
-                                >
-                                    <stop offset={0} stopColor="white" />
-                                    <stop offset={1} stopColor="black" />
-                                </linearGradient>
-                                <mask id="slack" maskUnits="userSpaceOnUse">
-                                    <rect
-                                        x={svgNumber(-spare / 2)}
-                                        width={svgNumber(320 + spare)}
-                                        height={height}
-                                        fill="url(#slack-fade)"
-                                    />
-                                </mask>
-                            </defs>
-                        )}
-                        {/* The anchors, with their hangers. */}
-                        <Anchor y={FACE} across={scene.face} hangers={scene.hangers} />
-                        {scene.ground && <Anchor {...scene.ground} />}
-                        {track && <Track track={track} from={start} to={finish} />}
-                        {/* Each part of every pulley in turn from the back, with the rope on each sheave behind it. */}
-                        {(["plate", "large", "small"] as const).map((part, i) => (
-                            <g key={part}>
-                                {i > 0 &&
-                                    pieces
-                                        .filter(({ piece }) => piece.layer === i - 1)
-                                        .map(({ piece, fades }, j) => (
-                                            <RopePath
-                                                key={j}
-                                                piece={piece}
-                                                mask={fades ? "url(#slack)" : undefined}
-                                            />
-                                        ))}
-                                {scene.pulleys.map((p, j) => {
-                                    const { spins } = ropes[p.stops.rope ?? 0];
-                                    return (
-                                        <Pulley
-                                            key={j}
-                                            at={p.at}
-                                            eye={p.eye}
-                                            sheaves={p.sheaves}
-                                            becket={p.becket}
-                                            part={part}
-                                            spins={{
-                                                large: spins[p.stops.large],
-                                                small:
-                                                    p.stops.small === undefined
-                                                        ? 0
-                                                        : spins[p.stops.small],
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </g>
-                        ))}
-                        {/* Where the load started, dashed, behind it. */}
-                        {startTop - loadTop > MOVED && (
+        <div className="flex min-h-105 flex-1">
+            <svg
+                ref={svg}
+                viewBox={[x0, y0, across, down].map(svgNumber).join(" ")}
+                className="h-full w-full overflow-visible text-ink-muted"
+                role="group"
+                aria-label={`${system.name}: ${system.text}`}
+                onPointerMove={drag}
+            >
+                {/* Slack rope fades out: it shows as much as the mask is light, which fades to dark along it. */}
+                {scene.fade && (
+                    <defs>
+                        <linearGradient
+                            id="slack-fade"
+                            gradientUnits="userSpaceOnUse"
+                            x1={svgNumber(scene.fade.from.x)}
+                            y1={svgNumber(scene.fade.from.y)}
+                            x2={svgNumber(scene.fade.to.x)}
+                            y2={svgNumber(scene.fade.to.y)}
+                        >
+                            <stop offset={0} stopColor="white" />
+                            <stop offset={1} stopColor="black" />
+                        </linearGradient>
+                        <mask id="slack" maskUnits="userSpaceOnUse">
                             <rect
-                                x={left}
-                                y={svgNumber(startTop)}
-                                width={wide}
-                                height={LOAD_HEIGHT}
+                                x={svgNumber(x0)}
+                                y={svgNumber(y0)}
+                                width={svgNumber(across)}
+                                height={svgNumber(down)}
+                                fill="url(#slack-fade)"
+                            />
+                        </mask>
+                    </defs>
+                )}
+                {/* The frame round the system. */}
+                <rect
+                    x={svgNumber(-spare / 2)}
+                    width={svgNumber(320 + spare)}
+                    height={svgNumber(height)}
+                    rx={CORNER}
+                    className="fill-surface stroke-border"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                />
+                {/* The anchors, with their hangers. */}
+                <Anchor y={FACE} across={scene.face} hangers={scene.hangers} />
+                {scene.ground && <Anchor {...scene.ground} />}
+                {track && <Track track={track} from={start} to={finish} />}
+                {/* Each part of every pulley in turn from the back, with the rope on each sheave behind it. */}
+                {(["plate", "large", "small"] as const).map((part, i) => (
+                    <g key={part}>
+                        {i > 0 &&
+                            pieces
+                                .filter(({ piece }) => piece.layer === i - 1)
+                                .map(({ piece, fades }, j) => (
+                                    <RopePath
+                                        key={j}
+                                        piece={piece}
+                                        mask={fades ? "url(#slack)" : undefined}
+                                    />
+                                ))}
+                        {scene.pulleys.map((p, j) => {
+                            const { spins } = ropes[p.stops.rope ?? 0];
+                            return (
+                                <Pulley
+                                    key={j}
+                                    at={p.at}
+                                    eye={p.eye}
+                                    sheaves={p.sheaves}
+                                    becket={p.becket}
+                                    part={part}
+                                    spins={{
+                                        large: spins[p.stops.large],
+                                        small:
+                                            p.stops.small === undefined ? 0 : spins[p.stops.small],
+                                    }}
+                                />
+                            );
+                        })}
+                    </g>
+                ))}
+                {/* Where the load started, dashed, behind it. */}
+                {startTop - loadTop > MOVED && (
+                    <rect
+                        x={left}
+                        y={svgNumber(startTop)}
+                        width={wide}
+                        height={LOAD_HEIGHT}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeOpacity={0.6}
+                        strokeWidth={1}
+                        strokeDasharray="3 2"
+                    />
+                )}
+                {/* The load, with its tabs, and how far it's risen. */}
+                {[scene.load, ...(scene.ties ?? [])].map((t, i) => (
+                    <Tab key={i} hole={t} base={loadTop} />
+                ))}
+                <rect x={left} y={loadTop} width={wide} height={LOAD_HEIGHT} fill="currentColor" />
+                {startTop - loadTop > MOVED && (
+                    <Dimension
+                        x={left + wide}
+                        from={startTop + LOAD_HEIGHT}
+                        to={loadTop + LOAD_HEIGHT}
+                    />
+                )}
+                {/* The ropes' ends, spliced into eyes round their carabiners, whose front halves pass over them. */}
+                {scene.ropes
+                    .flatMap((rope) => rope.eyes)
+                    .map((eye, i) => (
+                        <g key={i} className="text-ink">
+                            <path
+                                d={eye.eye}
                                 fill="none"
                                 stroke="currentColor"
-                                strokeOpacity={0.6}
-                                strokeWidth={1}
-                                strokeDasharray="3 2"
+                                strokeWidth={ROPE}
+                                strokeLinejoin="round"
                             />
-                        )}
-                        {/* The load, with its tabs, and how far it's risen. */}
-                        {[scene.load, ...(scene.ties ?? [])].map((t, i) => (
-                            <Tab key={i} hole={t} base={loadTop} />
-                        ))}
-                        <rect
-                            x={left}
-                            y={loadTop}
-                            width={wide}
-                            height={LOAD_HEIGHT}
+                            <path
+                                d={eye.eye}
+                                fill="none"
+                                className="stroke-background"
+                                strokeOpacity={0.85}
+                                strokeWidth={ROPE / 2}
+                                strokeDasharray={TRACER}
+                            />
+                            <path d={eye.splice} fill="currentColor" />
+                        </g>
+                    ))}
+                {/* Prusik loops, over the rope they grip and under their carabiners. */}
+                {scene.prusiks?.map((k, i) => (
+                    <Prusik key={i} on={k.on} to={k.to} along={k.along} rope={ROPE} />
+                ))}
+                {/* The carabiners, over the plates they clip through. */}
+                {scene.clips.map((ends, i) => (
+                    <Carabiner key={i} ends={ends} />
+                ))}
+                {/* The pin the team's rope turns round, and its end, which is dragged along the track to pull it in. */}
+                {track && (
+                    <>
+                        {/* Solid, over the frame's edge it sits on. */}
+                        <circle
+                            cx={svgNumber(track.pin.x)}
+                            cy={svgNumber(track.pin.y)}
+                            r={PIN - ROPE / 2}
+                            className="fill-surface"
+                        />
+                        <circle
+                            cx={svgNumber(track.pin.x)}
+                            cy={svgNumber(track.pin.y)}
+                            r={PIN - ROPE / 2}
                             fill="currentColor"
+                            fillOpacity={0.3}
+                            stroke="currentColor"
+                            strokeWidth={1.5}
                         />
-                        {startTop - loadTop > MOVED && (
-                            <Dimension
-                                x={left + wide}
-                                from={startTop + LOAD_HEIGHT}
-                                to={loadTop + LOAD_HEIGHT}
+                        {/*
+                         * How much rope has come off the pin: across the rope from it (left of the rope rising to
+                         * a pin at the top, right of the rope coming down to one at the foot), in the middle of the
+                         * frame's padding on the pin's edge.
+                         */}
+                        <text
+                            x={svgNumber(
+                                scene.pin?.edge === "top"
+                                    ? track.pin.x - PIN - 6
+                                    : track.pin.x + PIN + 6,
+                            )}
+                            y={svgNumber(
+                                scene.pin?.edge === "top" ? PADDING / 2 : height - PADDING / 2,
+                            )}
+                            dominantBaseline="central"
+                            textAnchor={scene.pin?.edge === "top" ? "end" : "start"}
+                            fontSize={8}
+                            className="fill-ink-muted font-mono"
+                            opacity={0.7}
+                        >
+                            {amount.toFixed(2)} m
+                        </text>
+                        {/* A finger on the rope's end drags it, not the page. */}
+                        <g ref={holdTouch}>
+                            {/* Room round it to grab it by, wide enough for a finger. */}
+                            <circle
+                                cx={svgNumber(track.at(reach).x)}
+                                cy={svgNumber(track.at(reach).y)}
+                                r={GRAB}
+                                fill="none"
+                                pointerEvents="all"
+                                className={dragging ? "cursor-grabbing" : "cursor-grab"}
+                                {...grab}
                             />
-                        )}
-                        {/* The ropes' ends, spliced into eyes round their carabiners, whose front halves pass over them. */}
-                        {scene.ropes
-                            .flatMap((rope) => rope.eyes)
-                            .map((eye, i) => (
-                                <g key={i} className="text-ink">
-                                    <path
-                                        d={eye.eye}
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth={ROPE}
-                                        strokeLinejoin="round"
-                                    />
-                                    <path
-                                        d={eye.eye}
-                                        fill="none"
-                                        className="stroke-background"
-                                        strokeOpacity={0.85}
-                                        strokeWidth={ROPE / 2}
-                                        strokeDasharray={TRACER}
-                                    />
-                                    <path d={eye.splice} fill="currentColor" />
-                                </g>
-                            ))}
-                        {/* Prusik loops, over the rope they grip and under their carabiners. */}
-                        {scene.prusiks?.map((k, i) => (
-                            <Prusik key={i} on={k.on} to={k.to} along={k.along} rope={ROPE} />
-                        ))}
-                        {/* The carabiners, over the plates they clip through. */}
-                        {scene.clips.map((ends, i) => (
-                            <Carabiner key={i} ends={ends} />
-                        ))}
-                        {/* The pin the team's rope turns round, and its end, which is dragged along the track to pull it in. */}
-                        {track && (
-                            <>
-                                <circle
-                                    cx={svgNumber(track.pin.x)}
-                                    cy={svgNumber(track.pin.y)}
-                                    r={PIN - ROPE / 2}
-                                    fill="currentColor"
-                                    fillOpacity={0.3}
-                                    stroke="currentColor"
-                                    strokeWidth={1.5}
-                                />
-                                {/*
-                                 * How much rope has come off the pin: level with it, across the rope from it (left of
-                                 * the rope rising to a pin at the top, right of the rope coming down to one at the foot).
-                                 */}
-                                <text
-                                    x={svgNumber(
-                                        scene.pin?.edge === "top"
-                                            ? track.pin.x - PIN - 6
-                                            : track.pin.x + PIN + 6,
-                                    )}
-                                    y={svgNumber(track.pin.y)}
-                                    dominantBaseline="central"
-                                    textAnchor={scene.pin?.edge === "top" ? "end" : "start"}
-                                    fontSize={8}
-                                    className="fill-ink-muted font-mono"
-                                    opacity={0.7}
-                                >
-                                    {amount.toFixed(2)} m
-                                </text>
-                                <circle
-                                    cx={svgNumber(track.at(reach).x)}
-                                    cy={svgNumber(track.at(reach).y)}
-                                    r={THUMB}
-                                    className={`fill-action stroke-background outline-none focus-visible:stroke-ink ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
-                                    strokeWidth={1.5}
-                                    style={{ touchAction: "none" }}
-                                    tabIndex={0}
-                                    role="slider"
-                                    aria-label="Rope pulled in"
-                                    aria-valuemin={0}
-                                    aria-valuemax={diagram.max}
-                                    aria-valuenow={amount}
-                                    aria-valuetext={`${amount.toFixed(2)} m`}
-                                    onPointerDown={(e) => {
-                                        e.currentTarget.setPointerCapture(e.pointerId);
-                                        setDragging(true);
-                                    }}
-                                    onPointerUp={() => setDragging(false)}
-                                    onPointerCancel={() => setDragging(false)}
-                                    onKeyDown={(e) => {
-                                        const by = {
-                                            ArrowUp: 0.05,
-                                            ArrowRight: 0.05,
-                                            ArrowDown: -0.05,
-                                            ArrowLeft: -0.05,
-                                            PageUp: 0.5,
-                                            PageDown: -0.5,
-                                            Home: -diagram.max,
-                                            End: diagram.max,
-                                        }[e.key];
-                                        if (by === undefined) return;
-                                        e.preventDefault();
-                                        step(by);
-                                    }}
-                                />
-                            </>
-                        )}
-                    </svg>
-                </div>
-            }
-            controls={
-                <>
-                    <Select
-                        label="System"
-                        value={key}
-                        groups={[
-                            {
-                                options: (Object.keys(DIAGRAMS) as Key[]).map((k) => ({
-                                    value: k,
-                                    label: DIAGRAMS[k].label,
-                                })),
-                            },
-                        ]}
-                        onChange={(k) => {
-                            setKey(k);
-                            setPulled(0);
-                        }}
-                    />
-                    {track ? (
-                        <Readout label="Rope pulled in" value={`${amount.toFixed(2)} m`} />
-                    ) : (
-                        <Slider
-                            label="Rope pulled in"
-                            value={amount}
-                            min={0}
-                            max={diagram.max}
-                            step={0.01}
-                            unit="m"
-                            digits={2}
-                            onChange={setPulled}
-                        />
-                    )}
-                </>
-            }
-        />
+                            <circle
+                                cx={svgNumber(track.at(reach).x)}
+                                cy={svgNumber(track.at(reach).y)}
+                                r={THUMB}
+                                className={`fill-action stroke-background outline-none focus-visible:stroke-ink ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+                                strokeWidth={1.5}
+                                tabIndex={0}
+                                role="slider"
+                                aria-label="Rope pulled in"
+                                aria-valuemin={0}
+                                aria-valuemax={max}
+                                aria-valuenow={amount}
+                                aria-valuetext={`${amount.toFixed(2)} m`}
+                                {...grab}
+                                onKeyDown={(e) => {
+                                    const by = {
+                                        ArrowUp: 0.05,
+                                        ArrowRight: 0.05,
+                                        ArrowDown: -0.05,
+                                        ArrowLeft: -0.05,
+                                        PageUp: 0.5,
+                                        PageDown: -0.5,
+                                        Home: -max,
+                                        End: max,
+                                    }[e.key];
+                                    if (by === undefined) return;
+                                    e.preventDefault();
+                                    step(by);
+                                }}
+                            />
+                        </g>
+                    </>
+                )}
+            </svg>
+        </div>
     );
 }

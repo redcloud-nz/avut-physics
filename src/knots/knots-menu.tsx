@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
-import { Pill } from "@/visual/card";
+import { Pill } from "@/visual/contents-drawer";
 
 import { KNOTS_PATH, KNOTS_TITLE } from ".";
 import { KnotList, type KnotContents } from "./knot-list";

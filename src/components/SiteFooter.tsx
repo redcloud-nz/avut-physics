@@ -3,13 +3,14 @@
 import { usePathname } from "next/navigation";
 
 /**
- * The link to the source at the foot of every page, except the visual introduction and the rescue knots. The visual
- * introduction's pages fill the screen, and its first page, like the knots', puts the link in its own column, beside
- * the contents on a wide screen; a knot's own page goes without it.
+ * The link to the source at the foot of every page, except the visual introduction, the pulley systems and the rescue
+ * knots. The visual introduction's pages and the pulley systems' fill the screen, and the first page of each, like the
+ * knots', puts the link in its own column, beside the contents on a wide screen; a knot's own page goes without it.
  */
 export function SiteFooter() {
     const path = usePathname();
     if (path === "/visual" || path.startsWith("/visual/")) return null;
+    if (path === "/pulley-systems" || path.startsWith("/pulley-systems/")) return null;
     if (path === "/rescue-knots" || path.startsWith("/rescue-knots/")) return null;
     return <Footer />;
 }
