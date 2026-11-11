@@ -265,7 +265,19 @@ export function Carabiner(props: { ends: [Vector2, Vector2] }) {
  * Somewhere a rope goes: round a sheave (a centre and radius), arriving on one side and leaving on the other, −1 its
  * left and 1 its right as the drawing shows it; or to a point, with radius 0, where it's tied or leaves the drawing.
  */
-export type RopeStop = { c: Vector2; r: number; into?: -1 | 1; out?: -1 | 1; layer?: number };
+/**
+ * Where a rope runs round something: its centre and the radius the rope's middle runs at, and which side of it the rope
+ * arrives on and leaves from (left or right of its centre), or which way it turns round it (1 clockwise as drawn, with
+ * the centre on the rope's right; -1 the other way) where that's clearer, as for a turn off a level run.
+ */
+export type RopeStop = {
+    c: Vector2;
+    r: number;
+    into?: -1 | 1;
+    out?: -1 | 1;
+    turn?: -1 | 1;
+    layer?: number;
+};
 
 /**
  * The straight part of a rope from one stop to the next: the line touching both, on the sides they ask for. Each
@@ -276,15 +288,19 @@ export function tangent(a: RopeStop, b: RopeStop): [Vector2, Vector2] {
     const d = b.c.sub(a.c);
     const u = d.scale(1 / d.len());
     const n = vec2(-u.y, u.x);
-    const ok = (s: RopeStop, side: -1 | 1 | undefined, p: Vector2) =>
-        !side || s.r === 0 || Math.sign(p.x - s.c.x) === side;
+    const ok = (s: RopeStop, side: -1 | 1 | undefined, p: Vector2, dir: Vector2) =>
+        s.r === 0 ||
+        (s.turn
+            ? Math.sign(s.c.sub(p).dot(right(dir))) === s.turn
+            : !side || Math.sign(p.x - s.c.x) === side);
     for (const ra of a.r ? [a.r, -a.r] : [0]) {
         for (const rb of b.r ? [b.r, -b.r] : [0]) {
             const along = (rb - ra) / d.len();
             const m = u.scale(along).add(n.scale(Math.sqrt(1 - along * along)));
             const p = a.c.sub(m.scale(ra));
             const q = b.c.sub(m.scale(rb));
-            if (ok(a, a.out, p) && ok(b, b.into, q)) return [p, q];
+            const dir = q.sub(p);
+            if (ok(a, a.out, p, dir) && ok(b, b.into, q, dir)) return [p, q];
         }
     }
     throw new Error("No line touches both stops on the sides asked for");
