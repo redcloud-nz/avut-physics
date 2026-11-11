@@ -67,7 +67,7 @@ function plate(becket: boolean) {
     ].join(" ");
 }
 
-const PLATES = { single: plate(false), double: plate(true) };
+const PLATES = { plain: plate(false), becket: plate(true) };
 
 /**
  * Faint marks on a sheave, so it shows turning: a few short arcs round the part of it that shows, between `inner`
@@ -89,12 +89,15 @@ export type EyeWay = "up" | "down";
 
 /**
  * A pulley side on: its middle plate, with the eye for its carabiner, and its sheaves on one axle in front. A single
- * has one sheave; a double two, the larger behind the smaller, and a becket opposite the eye for tying a rope to.
+ * has one sheave; a double two, the larger behind the smaller. A double has a becket opposite the eye for tying a rope
+ * to, and a single can have one too.
  */
 export function Pulley(props: {
     at: Vector2;
     eye: EyeWay;
     sheaves: 1 | 2;
+    /** Whether it has a becket: a double always does. */
+    becket?: boolean;
     /**
      * Just one part of it, for a rope to go between: the plate, the larger sheave or the smaller one. The axle's bolt
      * goes with the front one. All of it if not given.
@@ -105,7 +108,7 @@ export function Pulley(props: {
 }) {
     const flip = props.eye === "up" ? 1 : -1;
     const shows = (part: string) => !props.part || props.part === part;
-    const d = props.sheaves === 2 ? PLATES.double : PLATES.single;
+    const d = props.sheaves === 2 || props.becket ? PLATES.becket : PLATES.plain;
     const front = props.sheaves === 2 ? "small" : "large";
     return (
         <g transform={`translate(${props.at.x} ${props.at.y}) scale(1 ${flip})`}>
@@ -269,7 +272,7 @@ export type RopeStop = { c: Vector2; r: number; into?: -1 | 1; out?: -1 | 1; lay
  * centre sits a signed distance from the line, ±its radius; of the four lines that touch both, take the one whose
  * touching points are on the right sides.
  */
-function tangent(a: RopeStop, b: RopeStop): [Vector2, Vector2] {
+export function tangent(a: RopeStop, b: RopeStop): [Vector2, Vector2] {
     const d = b.c.sub(a.c);
     const u = d.scale(1 / d.len());
     const n = vec2(-u.y, u.x);
@@ -381,21 +384,25 @@ function Cord(props: { d: string; width?: number; cap?: "round" | "butt" }) {
  * rope's middle), and running to a carabiner's end at `to`, round its rod. Side on, the hitch is its wraps lying
  * straight across the rope side by side, with the bridge running along the rope over their ends on the loop's side;
  * the loop's two strands leave from the bridge's middle and close round the carabiner like a rope's eye, one of them
- * with the loop's sewn join on it. Draw it over the rope and under the carabiner.
+ * with the loop's sewn join on it. Draw it over the rope and under the carabiner. The rope runs straight down unless
+ * `along` (a unit direction down it) says otherwise.
  */
-export function Prusik(props: { on: Vector2; to: Vector2; rope: number }) {
+export function Prusik(props: { on: Vector2; to: Vector2; rope: number; along?: Vector2 }) {
     const { on, to, rope } = props;
-    const side = Math.sign(to.x - on.x) || 1;
+    const along = props.along ?? vec2(0, 1);
+    // Across the rope, to the right as drawn when it runs straight down; `x` across it and `y` along from `on`.
+    const across = vec2(along.y, -along.x);
+    const at = (x: number, y: number) => on.add(across.scale(x)).add(along.scale(y));
+    const side = Math.sign(to.sub(on).dot(across)) || 1;
     const w = (rope + CORD) / 2;
     const pitch = CORD + 0.5;
-    const ys = Array.from({ length: WRAPS }, (_, k) => on.y + (k - (WRAPS - 1) / 2) * pitch);
+    const ys = Array.from({ length: WRAPS }, (_, k) => (k - (WRAPS - 1) / 2) * pitch);
     const wraps = ys
-        .map((y) => `M ${svgPoint(vec2(on.x - w, y - 0.4))} L ${svgPoint(vec2(on.x + w, y + 0.4))}`)
+        .map((y) => `M ${svgPoint(at(-w, y - 0.4))} L ${svgPoint(at(w, y + 0.4))}`)
         .join(" ");
-    const bridge = vec2(on.x + side * w, 0);
-    const bridgeD = `M ${svgPoint(vec2(bridge.x, ys[0]))} L ${svgPoint(vec2(bridge.x, ys[WRAPS - 1]))}`;
+    const bridgeD = `M ${svgPoint(at(side * w, ys[0]))} L ${svgPoint(at(side * w, ys[WRAPS - 1]))}`;
     // The loop: from the bridge's middle, its strands touch the circle round the rod and go round its far side.
-    const throat = vec2(bridge.x, on.y);
+    const throat = at(side * w, 0);
     const a = (ROD + CORD) / 2;
     const u = throat.sub(to).scale(1 / throat.distanceTo(to));
     const spread = Math.acos(a / throat.distanceTo(to));
