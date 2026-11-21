@@ -45,6 +45,8 @@ export type Face = {
     material: Material;
     planks?: number;
     normal?: Vector3;
+    /** Its colour, where it isn't its material's. */
+    color?: string;
 };
 
 /**

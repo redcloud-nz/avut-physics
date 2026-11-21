@@ -332,6 +332,9 @@ html {
   --tower-ground: #1d3527;
   /* Black rigging gear (a rope bucket), dark but lighter than the page so it shows. */
   --rig-black: #2b2b31;
+  --rig-on-rope: #0f172a;
+  --rig-white: #e5e7eb;
+  --rig-dark-green: #14532d;
 
   /* The knot editor's ropes, by the colour names its files use: each rope's body, the weave of its sheath and the
      highlight along its top. Blue and red are the knot pages' two ropes. Then the outline every rope and arrow
