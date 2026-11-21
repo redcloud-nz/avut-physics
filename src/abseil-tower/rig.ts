@@ -345,7 +345,8 @@ export const RIGS: Rig[] = [
             {
                 kind: "wrap-sling",
                 id: "wrap-sling-1",
-                around: { flight: 4, stringer: "north", up: 0.6 },
+                // Low on the stringer, so the belay and its bucket sit east of its belayer and abseiler.
+                around: { flight: 4, stringer: "north", up: 0.25 },
                 length: 3,
                 color: "green",
             },
@@ -436,7 +437,14 @@ export const RIGS: Rig[] = [
                 kind: "person",
                 id: "person-11",
                 role: "Belayer",
-                place: { east: 0.7, north: 0.6, level: 3 },
+                place: { east: 0.92, north: 0.6, level: 3 },
+            },
+            // Its abseiler, against the west railing, under the rope to the redirect.
+            {
+                kind: "person",
+                id: "person-12",
+                role: "Abseiler",
+                place: { east: 0.35, north: 0.6, level: 3 },
             },
         ],
     },
