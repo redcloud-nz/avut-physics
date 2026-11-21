@@ -56,13 +56,14 @@ describe("the first east face rig", () => {
         for (const p of knot.points) expect(p.sub(centre).cross(towards).len()).toBeLessThan(0.01);
     });
 
-    it("hangs the rope down the outside of the east face to the ground", () => {
-        // The rope's real end past the east rail: the stretch outside that ends rounded.
-        const last = ropes.find((p) => p.kind === "strand" && p.shell?.out.x === 1 && p.capB)!;
-        if (last.kind !== "strand") throw new Error();
-        const foot = last.points[last.points.length - 1];
-        expect(foot.x).toBeGreaterThan(SIDE + 0.15);
-        expect(foot.y).toBeLessThan(0.1);
+    it("hangs the rope down the outside of the east face to the ground, a stopper on its end", () => {
+        // The knots on rope ends outside the east face: those at the ground are the abseil ropes' stoppers.
+        const feet = pieces.flatMap((p) =>
+            p.kind === "rod" && p.material === "rope" && p.shell?.out.x === 1 ? [p.b] : [],
+        );
+        const onGround = feet.filter((q) => q.y < 0.1);
+        expect(onGround.length).toBeGreaterThan(0);
+        for (const q of onGround) expect(q.x).toBeGreaterThan(SIDE + 0.15);
     });
 
     it("stands the bucket on the top deck under the beam, just north of the stairs' steel railing", () => {

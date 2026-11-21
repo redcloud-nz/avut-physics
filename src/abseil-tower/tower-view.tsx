@@ -3,6 +3,7 @@
 import { ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Toggle } from "@/components/diagram/controls";
 import { Label } from "@/components/diagram/svg";
 import { useInBrowser } from "@/components/use-in-browser";
 import { clamp, deg, rad } from "@/lib/math";
@@ -215,10 +216,13 @@ export default function TowerView() {
     const { azimuth, elevation } = camera ?? turned;
     const rig = RIGS[0];
     const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
+    // Where people stand, shown only when asked for, as they crowd the rigging.
+    const [showPeople, setShowPeople] = useState(false);
     const pieces = useMemo(() => {
         const tower = towerPieces();
-        return [...tower, ...laid.pieces.map((p) => onDeck(p, tower))];
-    }, [laid]);
+        const rigging = laid.pieces.filter((p) => showPeople || p.material !== "person");
+        return [...tower, ...rigging.map((p) => onDeck(p, tower))];
+    }, [laid, showPeople]);
     const [frame, setFrame] = useState<Frame>(WHOLE);
     // Whether the legend's open: until it's toggled, open on wide screens and closed on phones, where it'd cover the
     // tower.
@@ -465,6 +469,7 @@ export default function TowerView() {
                             legendOpen === null ? "hidden sm:flex" : legendOpen ? "flex" : "hidden"
                         }`}
                     >
+                        <h3 className="text-xs font-medium text-ink-strong">Rigging</h3>
                         <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
                             {key.cylinders.map((c) => (
                                 <li key={c.text} className="flex items-center gap-2">
@@ -490,6 +495,16 @@ export default function TowerView() {
                             ))}
                         </ul>
                         {key.people.length > 0 && (
+                            <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
+                                <h3 className="text-xs font-medium text-ink-strong">People</h3>
+                                <Toggle
+                                    label="Show"
+                                    checked={showPeople}
+                                    onChange={setShowPeople}
+                                />
+                            </div>
+                        )}
+                        {showPeople && key.people.length > 0 && (
                             <ul className="flex flex-col gap-1 text-xs text-ink-soft">
                                 {key.people.map((p) => (
                                     <li key={p.letter} className="flex items-center gap-2">

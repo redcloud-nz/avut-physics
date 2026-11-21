@@ -76,7 +76,7 @@ export type Rope = {
      */
     end?: "below-outrigger" | { drop: number; carabiner: boolean };
     /** How it's tied to its carabiner: a munter and two half hitches (the default) or a figure 8 on a bight. */
-    knot?: "M+2HH" | "F8";
+    knot?: "M+2HH" | "F8oB";
 };
 
 /**
@@ -385,7 +385,7 @@ export const RIGS: Rig[] = [
                 color: "maroon",
                 length: 12,
                 route: "east-face",
-                knot: "F8",
+                knot: "F8oB",
                 end: { drop: 1, carabiner: true },
             },
             {
@@ -403,7 +403,7 @@ export const RIGS: Rig[] = [
                 color: "maroon",
                 length: 12,
                 route: "east-face",
-                knot: "F8",
+                knot: "F8oB",
                 end: { drop: 2, carabiner: false },
             },
             // Where people stand.
@@ -632,19 +632,22 @@ const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
  * A figure 8 on a bight clipped to a carabiner, drawn the same way but shorter and slimmer: where a rope's tied to the
  * beam's sling, and on every rope's end that finishes in a carabiner.
  */
-const F8 = { text: "F8", r: 0.045, length: 0.16 };
+const F8_BIGHT = { text: "F8oB", r: 0.045, length: 0.16 };
+/** A figure 8 stopper, on the end of every rope that finishes with nothing clipped to it, drawn as the figure 8 is. */
+const F8_STOPPER = { ...F8_BIGHT, text: "F8" };
 
-/** Where a rope hanging down to `end` goes into the figure 8 on it: the knot's top. */
-const intoKnot = (end: Vector3) => end.add(vec3(0, F8.length, 0));
+/** Where a rope hanging down to `end` goes into the knot on it: the knot's top. */
+const intoKnot = (end: Vector3) => end.add(vec3(0, F8_BIGHT.length, 0));
 
 /**
- * The figure 8 on a rope's end, hanging straight down to `end`, where its carabiner clips in. It's outside the tower
- * with the rope, in `shell`.
+ * The knot on a rope's end, hanging straight down to `end`: a figure 8 where a carabiner clips in, or a stopper. It's
+ * outside the tower with the rope, in `shell`.
  */
 function endKnot(
     end: Vector3,
     color: RigColor,
     shell: Piece["shell"],
+    knot = F8_BIGHT,
 ): { piece: Piece; label: RigLabel } {
     const up = vec3(0, 1, 0);
     const top = intoKnot(end);
@@ -653,7 +656,7 @@ function endKnot(
             kind: "rod",
             a: top,
             b: end,
-            r: F8.r,
+            r: knot.r,
             material: "rope",
             color: rigColor(color),
             capA: true,
@@ -662,8 +665,8 @@ function endKnot(
         },
         label: {
             at: top.lerp(end, 0.5),
-            text: F8.text,
-            on: { along: up, length: F8.length, r: F8.r },
+            text: knot.text,
+            on: { along: up, length: knot.length, r: knot.r },
             light: DARK_COLORS.includes(color),
             shell,
         },
@@ -730,9 +733,10 @@ function ropeOverSide(
         (end === "below-outrigger" || (typeof end === "object" && end.carabiner)) &&
         carabiner(last.sub(vec3(0, 0.01, 0)), vec3(0, -1, 0), vec3(0, 0, 1));
     const out = route === "east-face" ? EAST : EAST.neg();
-    const tail = endKrab ? endKnot(last, rope.color, { out, layer: 3 }) : undefined;
+    // Every end has a knot: a figure 8 for its carabiner, or a stopper.
+    const tail = endKnot(last, rope.color, { out, layer: 3 }, endKrab ? F8_BIGHT : F8_STOPPER);
     const color = rigColor(rope.color);
-    const knot = rope.knot === "F8" ? F8 : HITCH;
+    const knot = rope.knot === "F8oB" ? F8_BIGHT : HITCH;
     const hitch = clip.add(along.scale(knot.length));
     // The hitch starts a little back over the carabiner's end, round which it's tied.
     const tied = clip.sub(along.scale(0.02));
@@ -749,12 +753,13 @@ function ropeOverSide(
     return {
         pieces: [
             hitchPiece,
-            ...toGround(route, [hitch], color, end, !!tail),
-            // A fixed line's carabiner, hanging from its end flat against the side.
-            ...(endKrab ? [{ ...endKrab.piece, shell: { out, layer: 3 } }, tail!.piece] : []),
+            ...toGround(route, [hitch], color, end, true),
+            tail.piece,
+            // A carabiner on the end, hanging from it flat against the side.
+            ...(endKrab ? [{ ...endKrab.piece, shell: { out, layer: 3 } }] : []),
         ],
         labels: [
-            ...(tail ? [tail.label] : []),
+            tail.label,
             {
                 at: tied.lerp(hitch, 0.5),
                 text: knot.text,
@@ -1353,12 +1358,12 @@ export function legend(rig: Rig): {
     const ropes = rig.items.filter((i): i is Rope => i.kind === "rope");
     const belays = rig.items.filter((i): i is Belay => i.kind === "belay");
     const cylinders: LegendCylinder[] = [];
-    const munter = ropes.filter((r) => r.knot !== "F8");
+    const munter = ropes.filter((r) => r.knot !== "F8oB");
     // Figure 8s: ropes tied to their slings with one, and every rope or belay ending in a carabiner.
     const f8 = [
         ...ropes.filter(
             (r) =>
-                r.knot === "F8" ||
+                r.knot === "F8oB" ||
                 r.end === "below-outrigger" ||
                 (typeof r.end === "object" && r.end.carabiner),
         ),
@@ -1373,10 +1378,21 @@ export function legend(rig: Rig): {
         });
     if (f8.length)
         cylinders.push({
-            text: F8.text,
+            text: F8_BIGHT.text,
             name: "Figure 8 on a bight",
             colors: [rigColor(f8[0].color)],
             light: DARK_COLORS.includes(f8[0].color),
+        });
+    // Stoppers: every rope whose end has nothing clipped to it.
+    const stopped = ropes.filter(
+        (r) => r.end === undefined || (typeof r.end === "object" && !r.end.carabiner),
+    );
+    if (stopped.length)
+        cylinders.push({
+            text: F8_STOPPER.text,
+            name: "Figure 8 stopper",
+            colors: [rigColor(stopped[0].color)],
+            light: DARK_COLORS.includes(stopped[0].color),
         });
     if (belays.length)
         cylinders.push(
