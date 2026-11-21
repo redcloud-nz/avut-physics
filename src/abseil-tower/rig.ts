@@ -131,6 +131,11 @@ export type Belay = {
      */
     redirect?: { via: string; drop: number };
     spare?: string;
+    /**
+     * Where its spare lies coiled on the deck on the way to its bucket, the middle of the coil (by the tower's sides).
+     * Without one, it drapes straight into the bucket.
+     */
+    coil?: OnDeck;
 };
 
 /**
@@ -278,6 +283,7 @@ export const RIGS: Rig[] = [
                 route: "east-face",
                 beside: "rope-1",
                 spare: "bucket-3",
+                coil: { east: 3.4, north: 1.8 },
             },
             {
                 kind: "sling",
@@ -306,6 +312,7 @@ export const RIGS: Rig[] = [
                 route: "east-face",
                 beside: "rope-2",
                 spare: "bucket-4",
+                coil: { east: 2.95, north: 3.5 },
             },
             // The other end of the same red rope, over the west side, sharing its bucket.
             {
@@ -327,6 +334,7 @@ export const RIGS: Rig[] = [
                 route: "west-outrigger",
                 beside: "rope-4",
                 spare: "bucket-4",
+                coil: { east: 1.6, north: 3.4 },
             },
             // A fixed line from space 1 over the outrigger, ending in a carabiner just below it.
             {
@@ -365,6 +373,7 @@ export const RIGS: Rig[] = [
                 tbp: ["dark-red", "dark-green"],
                 redirect: { via: "rope-5", drop: 1 },
                 spare: "bucket-5",
+                coil: { east: 1.45, north: 1.25 },
             },
             { kind: "bucket", id: "bucket-5", color: "yellow", place: { underBelay: "belay-4" } },
             // The photographer's two lines, so they can work over the east edge, each on its own green sling and tied
@@ -1153,6 +1162,64 @@ function bucketPieces(
     return [floor, ...sides, ...coil];
 }
 
+/** How big a coil of spare rope lying on a deck is: its outer and inner radius and how many times it goes round. */
+const COIL = { outer: 0.2, inner: 0.12, turns: 2.25 };
+
+/**
+ * Spare rope from `from` (behind the prusiks) down to the deck at `centre`, round in a loose coil lying on it, and up
+ * over the rim of the bucket at `base`. The coil's cut into short runs, so each sorts with the deck it lies on.
+ */
+function coiledDrape(
+    from: Vector3,
+    centre: Vector3,
+    base: Vector3,
+    color: string,
+    height = BUCKET_H,
+): Piece[] {
+    const onDeck = centre.y + ROPE_R + 0.005;
+    const flat = (v: Vector3) => vec3(v.x, 0, v.z);
+    // It starts on the side facing the prusiks and ends on the side facing the bucket, winding inwards.
+    const startAngle = Math.atan2(from.z - centre.z, from.x - centre.x);
+    const endAngle = Math.atan2(base.z - centre.z, base.x - centre.x);
+    const sweep =
+        COIL.turns * 2 * Math.PI +
+        ((((endAngle - startAngle) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) -
+        2 * Math.PI;
+    const steps = 48;
+    const coil = Array.from({ length: steps + 1 }, (_, i) => {
+        const t = i / steps;
+        const a = startAngle + sweep * t;
+        // In to the inner radius and back out, so it leaves from the outside towards the bucket.
+        const r = COIL.inner + (COIL.outer - COIL.inner) * Math.abs(1 - 2 * t);
+        return vec3(centre.x + r * Math.cos(a), onDeck, centre.z + r * Math.sin(a));
+    });
+    // Down from the prusiks, falling steeply at first and easing onto the deck.
+    const landing = coil[0];
+    const down = Array.from({ length: 8 }, (_, i) => {
+        const t = i / 8;
+        const across = flat(from).lerp(flat(landing), t);
+        return vec3(across.x, landing.y + (from.y - landing.y) * (1 - t) ** 2, across.z);
+    });
+    // Up over the bucket's rim and down onto the coil in it.
+    const leave = coil[coil.length - 1];
+    const rim = base
+        .add(flat(leave.sub(base)).unit().scale(BUCKET_R))
+        .add(vec3(0, height + 0.03, 0));
+    const up = Array.from({ length: 6 }, (_, i) => {
+        const t = (i + 1) / 6;
+        const across = flat(leave).lerp(flat(rim), t);
+        return vec3(across.x, leave.y + (rim.y - leave.y) * Math.sin((t * Math.PI) / 2), across.z);
+    });
+    const points = [...down, ...coil, ...up, base.add(vec3(0.12, height - 0.12, 0))];
+    // Cut so the stretches coming down onto the deck and leaving it are short pieces of their own, low enough to sort
+    // with the deck too.
+    const first = down.length;
+    const cuts = [3, first - 2, first];
+    for (let i = first + 4; i < first + steps; i += 4) cuts.push(i);
+    cuts.push(first + steps, first + steps + 1, points.length - 3);
+    return run(points, cuts, ROPE_R, "rope", color);
+}
+
 /** Spare rope draping from `from` (the hitch) into the bucket at `base`, sagging a little, and down onto its coil. */
 function drape(from: Vector3, base: Vector3, color: string, height = BUCKET_H): Piece[] {
     const into = base.add(vec3(0, height, 0));
@@ -1313,7 +1380,15 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
             const bucket = item.spare && buckets.get(item.spare);
             if (bucket)
                 pieces.push(
-                    ...drape(belay.back, bucket, rigColor(item.color), heightOf(item.spare)),
+                    ...(item.coil
+                        ? coiledDrape(
+                              belay.back,
+                              vec3(item.coil.east, bucket.y, item.coil.north),
+                              bucket,
+                              rigColor(item.color),
+                              heightOf(item.spare),
+                          )
+                        : drape(belay.back, bucket, rigColor(item.color), heightOf(item.spare))),
                 );
         } else {
             const from = clips.get(item.from);

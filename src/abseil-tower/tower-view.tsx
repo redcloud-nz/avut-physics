@@ -150,18 +150,24 @@ function startOf(start: Start, size: Vector2): Frame {
 const WIDE = "(min-width: 640px)";
 
 /**
- * A person's disc, put in the group of the deck rectangle it lies on and over it, so it's drawn just after that
- * rectangle from every side. Anything else comes back as it is.
+ * A person's disc or rope coiled on a deck, put in the group of the deck rectangle it lies on and over it, so it's
+ * drawn just after that rectangle from every side. Anything else comes back as it is.
  */
 function onDeck(piece: Piece, tower: Piece[]): Piece {
-    if (piece.material !== "person" || piece.kind !== "face") return piece;
-    const c = centreOf(piece);
+    // A person's disc, or a short run of rope lying on the deck or just coming off it (a coil and its ends).
+    const ys = piece.kind === "rod" ? [] : piece.points.map((q) => q.y);
+    const low =
+        (piece.kind === "face" && piece.material === "person") ||
+        (piece.kind === "strand" && Math.max(...ys) - Math.min(...ys) < 0.15);
+    if (!low) return piece;
+    // It's on the deck at its lowest point, wherever its middle is.
+    const c = vec3(centreOf(piece).x, Math.min(...ys), centreOf(piece).z);
     const under = tower.find((t) => {
         if (t.kind !== "face" || t.material !== "deck" || !t.group) return false;
         const xs = t.points.map((q) => q.x);
         const zs = t.points.map((q) => q.z);
         return (
-            Math.abs(t.points[0].y - c.y) < 0.05 &&
+            Math.abs(t.points[0].y - c.y) < 0.03 &&
             c.x >= Math.min(...xs) &&
             c.x <= Math.max(...xs) &&
             c.z >= Math.min(...zs) &&
@@ -760,7 +766,9 @@ function RigLabelDrawing({
     const { on } = label;
     const ends = on && [-0.5, 0.5].map((t) => toSvg(label.at.add(on.along.scale(t * on.length))));
     const span = ends && ends[1].sub(ends[0]);
-    // Seen end on, the cylinder has no direction on the page to write along.
+    // Seen end on, the cylinder has no direction on the page to write along, so it's written beside it, but only once
+    // it's drawn big enough to pick out.
+    if (on && span && span.len() < 12 && 2 * on.r * ppm < 8) return null;
     if (!on || !span || span.len() < 12)
         return (
             <text
@@ -803,26 +811,8 @@ function RigLabelDrawing({
                 {label.text}
             </text>
         );
-    // Beside it, on whichever side is up the page.
-    const size = 12;
-    const side = vec2(-Math.sin(upright), Math.cos(upright));
-    const away = side.y < 0 ? side : side.neg();
-    const beside = at.add(away.scale(thick / 2 + size * 0.75));
-    return (
-        <text
-            x={beside.x}
-            y={beside.y}
-            transform={`rotate(${svgNumber(deg(upright))} ${svgNumber(beside.x)} ${svgNumber(beside.y)})`}
-            fill="var(--ink-strong)"
-            fontSize={size}
-            fontFamily={MONO}
-            textAnchor="middle"
-            dominantBaseline="central"
-            {...halo}
-        >
-            {label.text}
-        </text>
-    );
+    // Too small to write on: zoomed out, where there'd be a label beside every knot, it goes unlabelled.
+    return null;
 }
 
 /** Where a point on the screen is in the drawing's SVG units. */
