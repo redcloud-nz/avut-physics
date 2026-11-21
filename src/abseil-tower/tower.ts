@@ -92,7 +92,7 @@ const FALL = 1.0;
 /** The ground's height at `z` across the plan. */
 const planGround = (z: number) => (-FALL * z) / SIDE;
 
-const LOG_R = 0.125;
+export const LOG_R = 0.125;
 const PIPE_R = 0.022;
 const RAIL_HEIGHT = 1.0;
 /** The boarding sits on the outside of the posts, and the east face's is this thick. */
@@ -646,17 +646,41 @@ export function topOpening(): { x0: number; x1: number; z0: number; z1: number }
 
 /**
  * The west side's edges a rope going over it rests on, by the compass: the top rail's top outer corner, then the
- * outrigger log a metre out (its middle and radius).
+ * outrigger log a metre out (its middle and radius). A rope dropping straight down the side instead hangs at `clear`,
+ * just outside the level beams and the boarding from the ground to level 1.
  */
 export const WEST_EDGE = {
     rail: { x: -TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
     outrigger: { x: -OUTRIGGER, y: TOP - LOG_R - 0.08, r: LOG_R },
+    clear: { x: -(SKIN + BOARD_T), y: TOP },
 };
 
 export const EAST_EDGE = {
     rail: { x: SIDE + TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
     boarding: { x: SIDE + SKIN + BOARD_T, y: TOP },
 };
+
+/**
+ * One of a flight's two stringers, by the compass: the middles of its ends (`a` at the foot), and its width across and
+ * depth. Flight 4 is the stairs up to level 4.
+ */
+export function stringer(
+    flight: 1 | 2 | 3 | 4,
+    side: "north" | "south",
+): { a: Vector3; b: Vector3; w: number; h: number } {
+    const s = STAIRS[flight - 1];
+    const across = vec3(s.dir.z, 0, -s.dir.x);
+    const head = s.foot
+        .add(s.dir.scale(s.run))
+        .add(vec3(0, LEVELS[flight] - LEVELS[flight - 1], 0));
+    const drop = vec3(0, -0.06, 0);
+    const [p, q] = [-1, 1].map((k) => {
+        const out = across.scale(k * (STAIR_WIDTH / 2 + STRINGER_W / 2)).add(drop);
+        return { a: pointToCompass(s.foot.add(out)), b: pointToCompass(head.add(out)) };
+    });
+    const north = p.a.z > q.a.z ? p : q;
+    return { ...(side === "north" ? north : north === p ? q : p), w: STRINGER_W, h: STRINGER_D };
+}
 
 /** The ground round the tower, by the compass: a slope falling to the west, as one face. */
 export const groundCorners = () => {

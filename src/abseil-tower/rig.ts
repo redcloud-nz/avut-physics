@@ -1,3 +1,4 @@
+import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -5,9 +6,12 @@ import { basket, stackedLogs } from "./basket";
 import {
     EAST_EDGE,
     groundAt,
+    LEVELS,
+    LOG_R,
     OVERHEAD,
     overheadSpace,
     SIDE,
+    stringer,
     TOP,
     topOpening,
     WEST_EDGE,
@@ -32,7 +36,8 @@ export type RigColor =
     | "dark-red"
     | "purple"
     | "black"
-    | "white";
+    | "white"
+    | "maroon";
 
 /**
  * A sling round the overhead beam, both its ends clipped to one carabiner (a basket). `length` is its length laid flat
@@ -50,7 +55,7 @@ export type Sling = {
 
 /**
  * A rope tied to an item's carabiner with a munter and two half hitches, running from there over the east side's
- * railing and down the east face, or over the west side's railing and its outrigger and down the west side. Its
+ * railing and down the east face, or over the west side's railing and either its outrigger or straight down the west side. Its
  * `spare` rope, if it has a bucket, drapes from the hitch into it. Two lines sharing a bucket are the two ends of one
  * rope.
  */
@@ -59,14 +64,17 @@ export type Rope = {
     id: string;
     from: string;
     color: RigColor;
-    route: "east-face" | "west-outrigger";
+    route: "east-face" | "west-outrigger" | "west-face";
     spare?: string;
+    /** Where a fixed line stops short of the ground, a carabiner on its end: just below the outrigger. */
+    end?: "below-outrigger";
 };
 
 /**
  * A rope bucket on the top deck: directly under the overhead beam beside the steel railing round the stairs, the
  * mirror image of another bucket across the tower's middle (from south to north), or east of the stairs' steel
- * railing in line with one of the beam's spaces, or directly under one of its spaces.
+ * railing in line with one of the beam's spaces, directly under one of its spaces, or on the deck under a belay's
+ * prusiks (as near under them as it can stand inside the railings).
  */
 export type Bucket = {
     kind: "bucket";
@@ -76,7 +84,8 @@ export type Bucket = {
         | "by-stair-railing"
         | { mirrorOf: string }
         | { eastOfStairsAt: 1 | 2 | 3 | 4 | 5 }
-        | { underBeamAt: 1 | 2 | 3 | 4 | 5 };
+        | { underBeamAt: 1 | 2 | 3 | 4 | 5 }
+        | { underBelay: string };
 };
 
 /**
@@ -92,11 +101,31 @@ export type Belay = {
     color: RigColor;
     lrh: RigColor;
     tbp: [RigColor, RigColor];
-    route: Rope["route"];
+    route?: Rope["route"];
+    /**
+     * A belay run through a redirect instead of over a side: up to the carabiner on the end of the fixed line `via`,
+     * through it and hanging `drop` metres down the far side.
+     */
+    redirect?: { via: string; drop: number };
     spare?: string;
 };
 
-export type RigItem = Sling | Rope | Bucket | Belay;
+/**
+ * A sling wrapped round some other part of the tower, both ends on one carabiner: one of a flight's stringers (flight 4
+ * is the stairs up to level 4), `up` metres along it from its foot, or one of the corner posts, `height` metres above
+ * a level's deck. Like a basket round the beam, it lines up with whatever pulls on its carabiner.
+ */
+export type WrapSling = {
+    kind: "wrap-sling";
+    id: string;
+    around:
+        | { flight: 1 | 2 | 3 | 4; stringer: "north" | "south"; up: number }
+        | { corner: "NE" | "SE" | "SW" | "NW"; level: 1 | 2 | 3 | 4; height: number };
+    length: number;
+    color: RigColor;
+};
+
+export type RigItem = Sling | WrapSling | Rope | Bucket | Belay;
 export type Rig = { name: string; items: RigItem[] };
 
 export const RIGS: Rig[] = [
@@ -138,7 +167,8 @@ export const RIGS: Rig[] = [
                 route: "east-face",
                 spare: "bucket-2",
             },
-            // The west lines: the other ends of the same two ropes, over the outrigger, sharing their buckets.
+            // The west lines: the other ends of the same two ropes, sharing their buckets. The first goes over the
+            // outrigger, the second just drops past the railing.
             {
                 kind: "sling",
                 id: "sling-3",
@@ -168,7 +198,7 @@ export const RIGS: Rig[] = [
                 id: "rope-4",
                 from: "sling-4",
                 color: "blue",
-                route: "west-outrigger",
+                route: "west-face",
                 spare: "bucket-2",
             },
             // The belays, one at a time.
@@ -229,6 +259,42 @@ export const RIGS: Rig[] = [
                 route: "west-outrigger",
                 spare: "bucket-4",
             },
+            // A fixed line from space 1 over the outrigger, ending in a carabiner just below it.
+            {
+                kind: "sling",
+                id: "sling-8",
+                space: 1,
+                length: 2,
+                color: "purple",
+                configuration: "basket",
+            },
+            {
+                kind: "rope",
+                id: "rope-5",
+                from: "sling-8",
+                color: "maroon",
+                route: "west-outrigger",
+                end: "below-outrigger",
+            },
+            // The belay for it, on level 3: a sling round the stairs' stringer, and its rope up through the redirect.
+            {
+                kind: "wrap-sling",
+                id: "wrap-sling-1",
+                around: { flight: 4, stringer: "north", up: 0.6 },
+                length: 2,
+                color: "yellow",
+            },
+            {
+                kind: "belay",
+                id: "belay-4",
+                from: "wrap-sling-1",
+                color: "white",
+                lrh: "green",
+                tbp: ["dark-red", "dark-green"],
+                redirect: { via: "rope-5", drop: 1 },
+                spare: "bucket-5",
+            },
+            { kind: "bucket", id: "bucket-5", color: "yellow", place: { underBelay: "belay-4" } },
         ],
     },
 ];
@@ -236,7 +302,9 @@ export const RIGS: Rig[] = [
 /** Each rig colour as drawn: the knot pages' colour of that name, or the rig's own for those they don't have. */
 export const rigColor = (c: RigColor) =>
     OWN_COLORS.includes(c) ? `var(--rig-${c})` : `var(--knot-${c})`;
-const OWN_COLORS: RigColor[] = ["black", "white", "dark-green", "dark-red"];
+const OWN_COLORS: RigColor[] = ["black", "white", "dark-green", "dark-red", "maroon"];
+/** Colours dark enough that a label on them is written light. */
+const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon"];
 
 /** Tape and rope, as round as they're drawn. */
 const SLING_R = 0.0125;
@@ -329,6 +397,7 @@ function carabiner(near: Vector3, along: Vector3, across: Vector3): { piece: Pie
 const PULL: Record<Rope["route"], Vector2> = {
     "east-face": vec2(EAST_EDGE.rail.x, EAST_EDGE.rail.y + ROPE_R),
     "west-outrigger": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
+    "west-face": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
 };
 
 /**
@@ -349,11 +418,16 @@ const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
 /**
  * Where a rope goes after the top rail, in the beam's cross-section at `z`. Over the east side: out over the edge of the
  * east face's boarding and straight down the face to the ground. Over the west side: down onto the outrigger log (where
- * it first touches it from the rail), round its top to its outer side and straight down to the lower ground there.
+ * it first touches it from the rail), round its top to its outer side and straight down to the lower ground there;
+ * or, dropping straight past the railing, down the west side clear of its beams and boarding to the ground.
  */
-function beyondRail(route: Rope["route"], z: number): Vector3[] {
+function beyondRail(route: Rope["route"], z: number, end?: Rope["end"]): Vector3[] {
     if (route === "east-face") {
         const edge = vec3(EAST_EDGE.boarding.x + ROPE_R, EAST_EDGE.boarding.y, z);
+        return [edge, vec3(edge.x, groundAt(edge.x) + 0.02, z)];
+    }
+    if (route === "west-face") {
+        const edge = vec3(WEST_EDGE.clear.x - ROPE_R, WEST_EDGE.clear.y, z);
         return [edge, vec3(edge.x, groundAt(edge.x) + 0.02, z)];
     }
     const { x, y } = WEST_EDGE.outrigger;
@@ -367,7 +441,13 @@ function beyondRail(route: Rope["route"], z: number): Vector3[] {
         const a = first + ((Math.PI - first) * i) / n;
         return vec3(x + r * Math.cos(a), y + r * Math.sin(a), z);
     });
-    return [...round, vec3(x - r, groundAt(x - r) + 0.02, z)];
+    return [...round, end ? belowOutrigger(z) : vec3(x - r, groundAt(x - r) + 0.02, z)];
+}
+
+/** Where a fixed line over the outrigger ends: hanging down its outer side to just below it. */
+function belowOutrigger(z: number): Vector3 {
+    const { x, y, r } = WEST_EDGE.outrigger;
+    return vec3(x - r - ROPE_R, y - r - 0.12, z);
 }
 
 /**
@@ -376,11 +456,15 @@ function beyondRail(route: Rope["route"], z: number): Vector3[] {
  * of the shell.
  */
 function ropeOverSide(
-    route: Rope["route"],
+    rope: Rope,
     clip: Vector3,
     along: Vector3,
-    color: string,
-): { pieces: Piece[]; labels: RigLabel[] } {
+): { pieces: Piece[]; labels: RigLabel[]; through?: Vector3 } {
+    const { route, end } = rope;
+    const endKrab =
+        end &&
+        carabiner(belowOutrigger(clip.z).sub(vec3(0, 0.01, 0)), vec3(0, -1, 0), vec3(0, 0, 1));
+    const color = rigColor(rope.color);
     const hitch = clip.add(along.scale(HITCH.length));
     // The hitch starts a little back over the carabiner's end, round which it's tied.
     const tied = clip.sub(along.scale(0.02));
@@ -395,14 +479,22 @@ function ropeOverSide(
         capB: true,
     };
     return {
-        pieces: [hitchPiece, ...toGround(route, [hitch], color)],
+        pieces: [
+            hitchPiece,
+            ...toGround(route, [hitch], color, end),
+            // A fixed line's carabiner, hanging from its end flat against the side.
+            ...(endKrab ? [{ ...endKrab.piece, shell: { out: EAST.neg(), layer: 3 } }] : []),
+        ],
         labels: [
             {
                 at: tied.lerp(hitch, 0.5),
                 text: HITCH.text,
                 on: { along, length: hitch.distanceTo(tied), r: HITCH.r },
+                light: DARK_COLORS.includes(rope.color),
             },
         ],
+        // A rope round the end carabiner bears on the inside of its lower end.
+        through: endKrab ? endKrab.far.add(vec3(0, ROPE_R + 0.006, 0)) : undefined,
     };
 }
 
@@ -411,7 +503,12 @@ function ropeOverSide(
  * corner and on down that side (`beyondRail`). What's past the rail is outside the tower, so it sorts as outside that
  * side of the shell.
  */
-function toGround(route: Rope["route"], from: Vector3[], color: string): Piece[] {
+function toGround(
+    route: Rope["route"],
+    from: Vector3[],
+    color: string,
+    end?: Rope["end"],
+): Piece[] {
     const last = from[from.length - 1];
     const z = last.z;
     const rail = vec3(PULL[route].x, PULL[route].y, z);
@@ -422,7 +519,7 @@ function toGround(route: Rope["route"], from: Vector3[], color: string): Piece[]
         strand([...from, nearRail], ROPE_R, "rope", color, true, false),
         {
             ...strand(
-                [nearRail, rail, ...beyondRail(route, z)],
+                [nearRail, rail, ...beyondRail(route, z, end)],
                 ROPE_R,
                 "rope",
                 color,
@@ -456,17 +553,17 @@ function banded(a: Vector3, b: Vector3, r: number, colors: string[], bands: numb
 }
 
 /**
- * A belay from `clip`: the load-release hitch along the pull, a carabiner on its end, and the tandem prusiks from that
- * on the rope, which runs through them to the rail and just over it, ready for its abseiler. Gives its pieces, its
- * labels, and where the rope comes from behind the prusiks, for its spare.
+ * A belay's hitches from `clip`: the load-release hitch along the pull, a carabiner on its end, and the tandem prusiks
+ * from that on the rope. Gives their pieces and labels, the prusiks' two ends (the rope goes on from the second), and
+ * where the rope comes from behind them, for its spare.
  */
-function belayOverSide(
+function belayHitches(
     belay: Belay,
     clip: Vector3,
     along: Vector3,
-): { pieces: Piece[]; labels: RigLabel[]; back: Vector3 } {
+): { pieces: Piece[]; labels: RigLabel[]; tbpA: Vector3; tbpB: Vector3; back: Vector3 } {
     const color = rigColor(belay.color);
-    const across = vec3(-along.y, along.x, 0);
+    const across = vec3(-along.y, along.x, 0).unit();
     const tied = clip.sub(along.scale(0.02));
     const lrhEnd = clip.add(along.scale(LRH.length));
     const lrh: Piece = {
@@ -496,14 +593,6 @@ function belayOverSide(
         ),
     );
     const back = onRope.sub(along.scale(0.04));
-    const { route } = belay;
-    const rail = vec3(PULL[route].x, PULL[route].y, back.z);
-    const out = route === "east-face" ? EAST : EAST.neg();
-    // Over the rail's outer corner and a little way down, outside the tower.
-    const hang = rail.add(out.scale(ROPE_R)).add(vec3(0, -BELAY_DROP, 0));
-    const nearRail = rail.sub(rail.sub(tbpB).unit().scale(0.3));
-    // A carabiner on the rope's end, hanging from it flat against the side, for the abseiler to clip in.
-    const endKrab = carabiner(hang.sub(vec3(0, 0.01, 0)), vec3(0, -1, 0), vec3(0, 0, 1));
     return {
         pieces: [
             lrh,
@@ -512,12 +601,6 @@ function belayOverSide(
             ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
             // The rope goes into the prusiks at one end and out at the other, hidden inside them.
             strand([back, tbpA], ROPE_R, "rope", color),
-            strand([tbpB, nearRail], ROPE_R, "rope", color, true, false),
-            {
-                ...strand([nearRail, rail, hang], ROPE_R, "rope", color, false, true),
-                shell: { out, layer: 3 },
-            },
-            { ...endKrab.piece, shell: { out, layer: 3 } },
         ],
         labels: [
             {
@@ -532,7 +615,153 @@ function belayOverSide(
                 light: true,
             },
         ],
+        tbpA,
+        tbpB,
         back,
+    };
+}
+
+/**
+ * A belay from `clip` over a side: its hitches (`belayHitches`), and the rope on from them to the rail and just over
+ * it, ready for its abseiler.
+ */
+function belayOverSide(
+    belay: Belay,
+    route: Rope["route"],
+    clip: Vector3,
+    along: Vector3,
+): { pieces: Piece[]; labels: RigLabel[]; back: Vector3 } {
+    const color = rigColor(belay.color);
+    const hitches = belayHitches(belay, clip, along);
+    const { tbpB, back } = hitches;
+    const rail = vec3(PULL[route].x, PULL[route].y, back.z);
+    const out = route === "east-face" ? EAST : EAST.neg();
+    // Over the rail's outer corner and a little way down, outside the tower.
+    const hang = rail.add(out.scale(ROPE_R)).add(vec3(0, -BELAY_DROP, 0));
+    const nearRail = rail.sub(rail.sub(tbpB).unit().scale(0.3));
+    // A carabiner on the rope's end, hanging from it flat against the side, for the abseiler to clip in.
+    const endKrab = carabiner(hang.sub(vec3(0, 0.01, 0)), vec3(0, -1, 0), vec3(0, 0, 1));
+    return {
+        pieces: [
+            ...hitches.pieces,
+            strand([tbpB, nearRail], ROPE_R, "rope", color, true, false),
+            {
+                ...strand([nearRail, rail, hang], ROPE_R, "rope", color, false, true),
+                shell: { out, layer: 3 },
+            },
+            { ...endKrab.piece, shell: { out, layer: 3 } },
+        ],
+        labels: hitches.labels,
+        back,
+    };
+}
+
+/**
+ * A belay from `clip` through a redirect: its hitches (`belayHitches`), then the rope on from them in a straight line
+ * to the redirect's carabiner (`through`, the inside of its lower end), round it and hanging `drop` down the far side.
+ * The redirect is out past the west side, so the rope sorts as outside it from where it leaves the tower.
+ */
+function belayRedirected(
+    belay: Belay,
+    clip: Vector3,
+    along: Vector3,
+    through: Vector3,
+    drop: number,
+): { pieces: Piece[]; labels: RigLabel[]; back: Vector3; under: Vector3 } {
+    const color = rigColor(belay.color);
+    const hitches = belayHitches(belay, clip, along);
+    const { tbpB } = hitches;
+    // Where it leaves the tower, a little past the west railing.
+    const leave = tbpB.lerp(through, (tbpB.x - (WEST_EDGE.rail.x - 0.1)) / (tbpB.x - through.x));
+    const round = through.add(vec3(-0.02, -0.02, 0));
+    const end = round.add(vec3(0, -drop, 0));
+    // A carabiner on the rope's end, for the abseiler to clip in.
+    const endKrab = carabiner(end.sub(vec3(0, 0.01, 0)), vec3(0, -1, 0), vec3(0, 0, 1));
+    const outside = { out: EAST.neg(), layer: 3 };
+    return {
+        pieces: [
+            ...hitches.pieces,
+            strand([tbpB, leave], ROPE_R, "rope", color, true, false),
+            {
+                ...strand([leave, through, round, end], ROPE_R, "rope", color, false, true),
+                shell: outside,
+            },
+            { ...endKrab.piece, shell: outside },
+        ],
+        labels: hitches.labels,
+        back: hitches.back,
+        under: hitches.tbpA.lerp(tbpB, 0.5),
+    };
+}
+
+/**
+ * A sling wrapped round a stringer or a corner post, pulled towards `target` (or hanging straight down without one):
+ * worked like a basket round the beam, in the plane across what it wraps that holds the pull, so its carabiner points
+ * at the target. Gives its pieces, its carabiner's far end, and the direction from there to the target.
+ */
+function wrapSling(
+    item: WrapSling,
+    target: Vector3 | null,
+): { pieces: Piece[]; clip: Vector3; along: Vector3 } {
+    const up = vec3(0, 1, 0);
+    const { around } = item;
+    // What it wraps: its middle where the sling goes round, the way it runs, and its section.
+    let centre: Vector3;
+    let axis: Vector3;
+    let section: { w: number; h: number } | { r: number };
+    if ("corner" in around) {
+        const x = around.corner.includes("E") ? SIDE : 0;
+        const z = around.corner.includes("N") ? SIDE : 0;
+        centre = vec3(x, LEVELS[around.level] + around.height, z);
+        axis = up;
+        section = { r: LOG_R };
+    } else {
+        const st = stringer(around.flight, around.stringer);
+        axis = st.b.sub(st.a).unit();
+        centre = st.a.add(axis.scale(around.up));
+        section = { w: st.w, h: st.h };
+    }
+    const to = target ? target.sub(centre) : up.neg();
+    // Across it in the sling's plane: a sawn timber's width, or for a round post square to the pull.
+    const depth = up.sub(axis.scale(up.dot(axis))).unit();
+    const s = ("r" in section ? axis.cross(to) : axis.cross(depth)).unit();
+    // The sling lies in the plane across it that holds the pull, wrapping it at a slant: its section there is as wide as
+    // it is, but longer along the pull, the more steeply the plane cuts across it.
+    const w = to.sub(s.scale(to.dot(s))).unit();
+    const slant = Math.max(Math.sqrt(1 - w.dot(axis) ** 2), 0.3);
+    const outline =
+        "r" in section
+            ? Array.from({ length: 24 }, (_, i) => {
+                  const a = (i / 24) * Math.PI * 2;
+                  const r = section.r + SLING_R;
+                  return vec2(r * Math.cos(a), (r / slant) * Math.sin(a));
+              })
+            : (() => {
+                  const [half, long] = [section.w / 2 + SLING_R, (section.h / 2 + SLING_R) / slant];
+                  return [
+                      vec2(-half, -long),
+                      vec2(half, -long),
+                      vec2(half, long),
+                      vec2(-half, long),
+                  ];
+              })();
+    const pull = vec2(to.dot(s), to.dot(w)).unit();
+    const { clip, path } = basket(outline, vec2(0, 0), pull, item.length);
+    const at = (p: Vector2) => centre.add(s.scale(p.x)).add(w.scale(p.y));
+    const loop = path.map(at);
+    // Cut into short runs, so each sorts by where it is: in front of what it wraps or behind.
+    const cuts = Array.from({ length: loop.length - 2 }, (_, i) => i + 1).filter(
+        (i) => i === 1 || i === loop.length - 2 || i % 3 === 0,
+    );
+    const krab = carabiner(
+        at(clip),
+        s.scale(pull.x).add(w.scale(pull.y)),
+        s.scale(-pull.y).add(w.scale(pull.x)),
+    );
+    return {
+        pieces: [...run(loop, cuts, SLING_R, "sling", rigColor(item.color)), krab.piece],
+        clip: krab.far,
+        along: target ? target.sub(krab.far).unit() : up.neg(),
     };
 }
 
@@ -544,6 +773,8 @@ function bucketBase(bucket: Bucket, rig: Rig): Vector3 {
     const place = bucket.place;
     if (place === "by-stair-railing")
         return vec3(OVERHEAD.x, TOP, topOpening().z1 + BUCKET_R + BUCKET_GAP);
+    if ("underBelay" in place)
+        throw new Error("A bucket under a belay stands where its belay is laid out");
     if ("underBeamAt" in place) {
         const { z0, z1 } = overheadSpace(place.underBeamAt);
         return vec3(OVERHEAD.x, TOP, (z0 + z1) / 2);
@@ -610,13 +841,30 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
     const pieces: Piece[] = [];
     const labels: RigLabel[] = [];
     const clips = new Map<string, { clip: Vector3; along: Vector3 }>();
+    // Where each fixed line's end carabiner takes a rope round it, for belays redirected through it.
+    const redirects = new Map<string, Vector3>();
+    // Buckets standing under a belay's prusiks are placed when it's laid out.
+    const underBelay = (b: Bucket) => typeof b.place === "object" && "underBelay" in b.place;
     const buckets = new Map(
         rig.items
-            .filter((i): i is Bucket => i.kind === "bucket")
+            .filter((i): i is Bucket => i.kind === "bucket" && !underBelay(i))
             .map((b) => [b.id, bucketBase(b, rig)]),
     );
-    // Slings sharing a space spread evenly across it, a little apart, in the order they were put up.
-    const slings = rig.items.filter((i): i is Sling => i.kind === "sling");
+    // Slings sharing a space spread evenly across it, a little apart: those for lines over the west side to the south,
+    // those over the east side to the north, and otherwise in the order they were put up.
+    const route = (s: Sling) =>
+        rig.items.find(
+            (i): i is Rope | Belay => (i.kind === "rope" || i.kind === "belay") && i.from === s.id,
+        )?.route;
+    const southFirst = (s: Sling) =>
+        route(s) === "west-outrigger" || route(s) === "west-face"
+            ? 0
+            : route(s) === "east-face"
+              ? 2
+              : 1;
+    const slings = rig.items
+        .filter((i): i is Sling => i.kind === "sling")
+        .sort((a, b) => southFirst(a) - southFirst(b));
     for (const item of rig.items) {
         if (item.kind === "sling") {
             const mates = slings.filter((s) => s.space === item.space);
@@ -629,12 +877,13 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
             const s = basketSling(
                 (z0 + z1) / 2 + k * SLING_GAP,
                 item.length,
-                rope ? PULL[rope.route] : null,
+                rope?.route ? PULL[rope.route] : null,
                 rigColor(item.color),
             );
             pieces.push(...s.pieces);
             clips.set(item.id, s);
         } else if (item.kind === "bucket") {
+            if (underBelay(item)) continue;
             const fed = rig.items.find(
                 (i): i is Rope | Belay =>
                     (i.kind === "rope" || i.kind === "belay") && i.spare === item.id,
@@ -646,18 +895,57 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
                     fed ? rigColor(fed.color) : null,
                 ),
             );
+        } else if (item.kind === "wrap-sling") {
+            const belay = rig.items.find(
+                (i): i is Belay => i.kind === "belay" && i.from === item.id,
+            );
+            const via = belay?.redirect && redirects.get(belay.redirect.via);
+            const s = wrapSling(item, via ?? null);
+            pieces.push(...s.pieces);
+            clips.set(item.id, s);
         } else if (item.kind === "belay") {
             const from = clips.get(item.from);
             if (!from) continue;
-            const belay = belayOverSide(item, from.clip, from.along);
+            const through = item.redirect && redirects.get(item.redirect.via);
+            const belay: {
+                pieces: Piece[];
+                labels: RigLabel[];
+                back: Vector3;
+                under?: Vector3;
+            } | null =
+                item.redirect && through
+                    ? belayRedirected(item, from.clip, from.along, through, item.redirect.drop)
+                    : item.route
+                      ? belayOverSide(item, item.route, from.clip, from.along)
+                      : null;
+            if (!belay) continue;
             pieces.push(...belay.pieces);
             labels.push(...belay.labels);
+            // A bucket for its spare standing on the deck under its prusiks.
+            const below = rig.items.find(
+                (i): i is Bucket =>
+                    i.kind === "bucket" &&
+                    i.id === item.spare &&
+                    typeof i.place === "object" &&
+                    "underBelay" in i.place,
+            );
+            if (below && belay.under) {
+                const { under } = belay;
+                const deck = Math.max(...LEVELS.filter((y) => y < under.y));
+                // As near under them as it can stand, inside the corner posts and the railings between them.
+                const inside = LOG_R + BUCKET_R + 0.05;
+                const keep = (v: number) => clamp(v, inside, SIDE - inside);
+                const base = vec3(keep(under.x), deck, keep(under.z));
+                buckets.set(below.id, base);
+                pieces.push(...bucketPieces(base, rigColor(below.color), rigColor(item.color)));
+            }
             const bucket = item.spare && buckets.get(item.spare);
             if (bucket) pieces.push(...drape(belay.back, bucket, rigColor(item.color)));
         } else {
             const from = clips.get(item.from);
             if (!from) continue;
-            const rope = ropeOverSide(item.route, from.clip, from.along, rigColor(item.color));
+            const rope = ropeOverSide(item, from.clip, from.along);
+            if (rope.through) redirects.set(item.id, rope.through);
             pieces.push(...rope.pieces);
             labels.push(...rope.labels);
             const bucket = item.spare && buckets.get(item.spare);
@@ -696,16 +984,27 @@ export function legend(rig: Rig): { cylinders: LegendCylinder[]; lines: LegendLi
                 colors: belays[0].tbp.map(rigColor),
             },
         );
-    const colours = (kind: RigItem["kind"]) => [
-        ...new Set(rig.items.filter((i) => i.kind === kind).map((i) => rigColor(i.color))),
-    ];
-    const lengths = [
-        ...new Set(rig.items.filter((i): i is Sling => i.kind === "sling").map((i) => i.length)),
-    ];
+    const unique = (cs: RigColor[]) => [...new Set(cs.map(rigColor))];
+    const allSlings = rig.items.filter(
+        (i): i is Sling | WrapSling => i.kind === "sling" || i.kind === "wrap-sling",
+    );
+    const lengths = [...new Set(allSlings.map((i) => i.length))];
     const lines: LegendLine[] = [
-        { name: `${lengths.join(" and ")} m slings`, look: "tape", colors: colours("sling") },
-        { name: "Abseil ropes", look: "rope", colors: colours("rope") },
-        { name: "Belay ropes", look: "rope", colors: colours("belay") },
+        {
+            name: `${lengths.join(" and ")} m slings`,
+            look: "tape",
+            colors: unique(allSlings.map((i) => i.color)),
+        },
+        {
+            name: "Abseil ropes",
+            look: "rope",
+            colors: unique(ropes.filter((r) => !r.end).map((r) => r.color)),
+        },
+        {
+            name: "Belay ropes",
+            look: "rope",
+            colors: unique([...belays, ...ropes.filter((r) => r.end)].map((i) => i.color)),
+        },
     ];
     return { cylinders, lines: lines.filter((l) => l.colors.length) };
 }

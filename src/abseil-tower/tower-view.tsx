@@ -15,8 +15,6 @@ import {
     groundAt,
     groundCorners,
     LEVELS,
-    OVERHEAD,
-    overheadSpace,
     SIDE,
     towerPieces,
     type Face,
@@ -267,17 +265,6 @@ export default function TowerView() {
             {laid.labels.map((l, i) => (
                 <RigLabelDrawing key={i} label={l} toSvg={toSvg} ppm={ppm} />
             ))}
-            {/* The spaces' numbers, unless the beam's seen end on and they'd fall on one another. */}
-            {Math.abs(cam.right.z) > 0.4 &&
-                [1, 2, 3, 4, 5].map((n) => {
-                    const { z0, z1 } = overheadSpace(n);
-                    const at = vec3(OVERHEAD.x, OVERHEAD.upperY + OVERHEAD.r + 0.2, (z0 + z1) / 2);
-                    return (
-                        <Label key={n} at={toSvg(at)} color="var(--ink-muted)">
-                            {n}
-                        </Label>
-                    );
-                })}
             {LEVELS.slice(1).map((y, i) => {
                 const at = toSvg(vec3(leftmost.x, y, leftmost.z));
                 return (
@@ -404,11 +391,18 @@ const MONO = "var(--font-geist-mono), monospace";
 
 /** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */
 function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
-    const [w, h] = [64, 8];
+    const [w, h] = [64, 9];
     const thick = look === "tape" ? 6 : 3.5;
     const line = { x1: thick / 2 + 1, x2: w - thick / 2 - 1, y1: h / 2, y2: h / 2 };
     return (
         <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="block">
+            {/* A faint light edge, so a dark rope still shows on the dark card. */}
+            <line
+                {...line}
+                stroke="var(--line)"
+                strokeWidth={thick + 3}
+                strokeLinecap={look === "tape" ? "butt" : "round"}
+            />
             <line
                 {...line}
                 stroke={`color-mix(in oklab, ${color} 40%, black)`}

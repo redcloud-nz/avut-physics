@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { vec3 } from "@/lib/vector3";
 
 import { layoutRig, RIGS } from "./rig";
-import { EAST_EDGE, OVERHEAD, overheadSpace, SIDE, TOP, topOpening } from "./tower";
+import { EAST_EDGE, OVERHEAD, overheadSpace, SIDE, TOP, topOpening, WEST_EDGE } from "./tower";
 
 describe("the first east face rig", () => {
     const { pieces } = layoutRig(RIGS[0]);
     const ropes = pieces.filter((p) => p.kind === "strand" && p.material === "rope");
-    const sling = pieces.filter((p) => p.kind === "strand" && p.material === "sling");
+    // The slings round the overhead beam, not the one round the stairs' stringer.
+    const sling = pieces.filter(
+        (p) => p.kind === "strand" && p.material === "sling" && p.points[0].y > TOP + 1,
+    );
     // The abseil lines alone, without the belay and its bucket.
     const abseil = layoutRig({
         ...RIGS[0],
@@ -91,8 +94,13 @@ describe("the first east face rig", () => {
     });
 
     it("stands the first belay's bucket east of the stairs' steel railing, clear of the opening", () => {
+        // The yellow bucket on the top deck (the other is on level 3, under the redirected belay).
         const yellow = pieces.filter(
-            (p) => p.material === "bucket" && p.color === "var(--knot-yellow)",
+            (p) =>
+                p.material === "bucket" &&
+                p.color === "var(--knot-yellow)" &&
+                p.kind === "face" &&
+                p.points.every((q) => q.y > TOP - 0.01),
         );
         expect(yellow.length).toBeGreaterThan(0);
         for (const p of yellow)
@@ -113,5 +121,17 @@ describe("the first east face rig", () => {
         const { z0, z1 } = overheadSpace(5);
         expect(mid(pts.map((p) => p.x))).toBeCloseTo(OVERHEAD.x);
         expect(mid(pts.map((p) => p.z))).toBeCloseTo((z0 + z1) / 2);
+    });
+
+    it("stops the maroon fixed line just below the outrigger, not at the ground", () => {
+        const maroon = ropes.filter(
+            (p) => p.kind === "strand" && p.color === "var(--rig-maroon)" && p.shell?.out.x === -1,
+        );
+        expect(maroon).toHaveLength(1);
+        const end = maroon[0].kind === "strand" ? maroon[0].points.at(-1)! : vec3(0, 0, 0);
+        const { x, y, r } = WEST_EDGE.outrigger;
+        expect(end.x).toBeLessThan(x - r);
+        expect(end.y).toBeLessThan(y - r);
+        expect(end.y).toBeGreaterThan(y - r - 0.3);
     });
 });
