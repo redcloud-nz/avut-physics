@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { vec3 } from "@/lib/vector3";
 
 import { layoutRig, RIGS } from "./rig";
-import { EAST_EDGE, OVERHEAD, overheadSpace, SIDE, TOP, topOpening, WEST_EDGE } from "./tower";
+import { EAST_EDGE, OVERHEAD, SIDE, TOP, topOpening, WEST_EDGE } from "./tower";
 
 describe("the first east face rig", () => {
     const { pieces } = layoutRig(RIGS[0]);
@@ -20,17 +20,17 @@ describe("the first east face rig", () => {
         ),
     }).pieces;
 
-    it("keeps each sling within its space on the beam: 1, 2, 4 and 5", () => {
+    it("hangs each sling at its distance along the beam", () => {
+        // The beam slings' carabiners: those clipped to them start where each sling's legs meet.
+        const at = RIGS[0].items.flatMap((i) => (i.kind === "sling" ? [i.at] : []));
         const middle = (p: (typeof sling)[number]) =>
             p.kind === "strand" ? p.points.reduce((t, q) => t + q.z, 0) / p.points.length : NaN;
-        for (const p of sling) {
-            const z = middle(p);
-            const inSpace = (n: number) => {
-                const { z0, z1 } = overheadSpace(n);
-                return z > z0 && z < z1;
-            };
-            expect([1, 2, 4, 5].some(inSpace)).toBe(true);
-        }
+        // Each piece of tape sits within 15 cm of one of the slings' places (the angled belays' legs lean
+        // a little along the beam).
+        for (const p of sling)
+            expect(Math.min(...at.map((z) => Math.abs(middle(p) - z)))).toBeLessThan(0.15);
+        // And every sling has tape there.
+        for (const z of at) expect(sling.some((p) => Math.abs(middle(p) - z) < 0.1)).toBe(true);
     });
 
     it("mirrors the second line's bucket across the tower's middle", () => {
@@ -112,21 +112,23 @@ describe("the first east face rig", () => {
                 }
     });
 
-    it("stands the second belay's bucket directly under the beam's space 5", () => {
-        // The blue bucket at the north end (the other blue one is the space 4 line's).
+    it("stands the red belays' bucket directly under the beam, between their slings", () => {
+        // The blue bucket at the north end (the other blue one is the space 4 line's, further south).
         const blue = pieces.filter(
             (p) =>
                 p.material === "bucket" &&
                 p.color === "var(--knot-blue)" &&
                 p.kind === "face" &&
-                p.points.every((q) => q.z > overheadSpace(5).z0 - 0.2),
+                p.points.every((q) => q.z > 3.25),
         );
         expect(blue.length).toBeGreaterThan(0);
         const pts = blue.flatMap((p) => (p.kind === "face" ? p.points : []));
         const mid = (vs: number[]) => (Math.min(...vs) + Math.max(...vs)) / 2;
-        const { z0, z1 } = overheadSpace(5);
+        const at = (id: string) =>
+            RIGS[0].items.flatMap((i) => (i.kind === "sling" && i.id === id ? [i.at] : []))[0];
         expect(mid(pts.map((p) => p.x))).toBeCloseTo(OVERHEAD.x);
-        expect(mid(pts.map((p) => p.z))).toBeCloseTo((z0 + z1) / 2);
+        expect(mid(pts.map((p) => p.z))).toBeGreaterThan(at("sling-7"));
+        expect(mid(pts.map((p) => p.z))).toBeLessThan(at("sling-6"));
     });
 
     it("stops the maroon fixed line just below the outrigger, not at the ground", () => {

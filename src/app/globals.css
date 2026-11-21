@@ -321,14 +321,12 @@ html {
   --strand-3: #3d83f0;
   --strand-4: #d9a816;
 
-  /* The abseil tower's drawing: its logs, timber rails and stairs, boarding, decks, steel pipe, door, the ground round
-     it. */
+  /* The abseil tower's drawing: its logs, timber rails and stairs, boarding, decks, steel pipe, the ground round it. */
   --tower-log: #8a6b4a;
   --tower-rail: #a08462;
   --tower-board: #7a6650;
   --tower-deck: #675646;
   --tower-steel: #a8b4c4;
-  --tower-door: #3d3226;
   --tower-ground: #1d3527;
   /* Black rigging gear (a rope bucket), dark but lighter than the page so it shows. */
   --rig-black: #2b2b31;

@@ -1,30 +1,22 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Choice, Slider } from "@/components/diagram/controls";
 import { Label } from "@/components/diagram/svg";
-import { Button } from "@/components/ui/button";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet";
+import { useInBrowser } from "@/components/use-in-browser";
 import { clamp, deg, rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
-import { layoutRig, legend, RIGS, type RigLabel } from "./rig";
+import { layoutRig, legend, RIGS, rigSide, type RigLabel } from "./rig";
 import {
     groundAt,
     groundCorners,
     LEVELS,
+    OVERHEAD,
     SIDE,
     towerPieces,
     type Face,
@@ -78,7 +70,6 @@ const COLOR: Record<Material, string> = {
     board: "var(--tower-board)",
     deck: "var(--tower-deck)",
     steel: "var(--tower-steel)",
-    door: "var(--tower-door)",
     sling: "var(--knot-yellow)",
     rope: "var(--knot-blue)",
     bucket: "var(--rig-black)",
@@ -91,17 +82,76 @@ const shade = (color: string, percent: number) =>
 /** Where the light comes from: high in the north, as the sun is here. */
 const LIGHT = vec3(0.3, 0.8, 0.5).unit();
 
-/** The preset views: the compass bearing from the tower to the eye, and how far above level it looks down. */
-type ViewName = "sw" | "se" | "ne" | "nw" | "above";
+/** The 3D view's compass presets: the bearing from the tower to the eye, and how far above level it looks down. */
+type ViewName = "sw" | "se" | "ne" | "nw";
 const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: number }> = {
     sw: { label: "SW", azimuth: 225, elevation: 25 },
     se: { label: "SE", azimuth: 135, elevation: 25 },
     ne: { label: "NE", azimuth: 45, elevation: 25 },
     nw: { label: "NW", azimuth: 315, elevation: 25 },
-    above: { label: "Above", azimuth: 180, elevation: 89 },
 };
 
-const LEVEL_NAMES = ["G", "Level 1", "Level 2", "Level 3", "Level 4"];
+/**
+ * How the tower's shown: from straight above (north up); from level with it on one side, with only that side's lines;
+ * or in 3D, turned and tilted by dragging. Each starts at its own frame, which the reset button goes back to: a fixed
+ * one, or the closest that fits a box round a point.
+ */
+type Mode = "plan" | "west" | "east" | "3d";
+type Start = Frame | { fit: { centre: Vector3; width: number; height: number } };
+/** The elevations' box: levels 3 and 4 and the beam over them, the outrigger and the ropes just past the sides. */
+const UPPER = (() => {
+    const [bottom, top] = [LEVELS[3] - 0.8, OVERHEAD.upperY + OVERHEAD.r + 0.4];
+    return {
+        centre: vec3(SIDE / 2, (bottom + top) / 2, SIDE / 2),
+        width: SIDE + 2.4,
+        height: top - bottom,
+    };
+})();
+const MODES: Record<
+    Mode,
+    {
+        label: string;
+        camera?: { azimuth: number; elevation: number };
+        start: Start;
+        side?: "east" | "west";
+    }
+> = {
+    plan: {
+        label: "Overhead",
+        camera: { azimuth: 180, elevation: 90 },
+        start: { zoom: 1.6, target: vec3(SIDE / 2 - 0.4, LEVELS[4], SIDE / 2) },
+    },
+    west: {
+        label: "West elevation",
+        camera: { azimuth: 270, elevation: 0 },
+        start: { fit: UPPER },
+        side: "west",
+    },
+    east: {
+        label: "East elevation",
+        camera: { azimuth: 90, elevation: 0 },
+        start: { fit: UPPER },
+        side: "east",
+    },
+    "3d": { label: "3D", start: WHOLE },
+};
+
+/** Where a view starts, in a drawing `size` (SVG units). */
+function startOf(start: Start, size: Vector2): Frame {
+    if (!("fit" in start)) return start;
+    const { centre, width, height } = start.fit;
+    const zoom = clamp(Math.min(size.x / width, size.y / height) / PPM, 1, MAX_ZOOM);
+    return { zoom, target: centre };
+}
+
+/** Screens wide enough to open the legend over the drawing to start with (Tailwind's `sm`). */
+const WIDE = "(min-width: 640px)";
+
+/** The highest point of a piece, for darkening what's below a level looked down on. */
+function highest(p: Piece): number {
+    if (p.kind === "rod") return Math.max(p.a.y, p.b.y) + p.r;
+    return Math.max(...p.points.map((q) => q.y));
+}
 
 /** How a face's colour is shaded: lit faces brighter, those edge on to the light darker. */
 function faceShade(f: Face): number {
@@ -130,12 +180,25 @@ function plankLines(f: Face, spacing: number): [Vector3, Vector3][] {
 }
 
 export default function TowerView() {
-    const [azimuth, setAzimuth] = useState(VIEWS.se.azimuth);
-    const [elevation, setElevation] = useState(VIEWS.se.elevation);
+    const [mode, setMode] = useState<Mode>("3d");
+    const { camera, side } = MODES[mode];
+    // Looking straight down, what's well below the level looked at is drawn darker, so openings in its deck show.
+    const below = camera?.elevation === 90 ? LEVELS[4] - 0.3 : undefined;
+    // The 3D view's turn and tilt, kept while the other views are shown.
+    const [turned, setTurned] = useState({
+        azimuth: VIEWS.se.azimuth,
+        elevation: VIEWS.se.elevation,
+    });
+    const { azimuth, elevation } = camera ?? turned;
     const rig = RIGS[0];
-    const laid = useMemo(() => layoutRig(rig), [rig]);
+    const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
     const pieces = useMemo(() => [...towerPieces(), ...laid.pieces], [laid]);
     const [frame, setFrame] = useState<Frame>(WHOLE);
+    // Whether the legend's open: until it's toggled, open on wide screens and closed on phones, where it'd cover the
+    // tower.
+    const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
+    // The drawing's last digits can differ between the server and the browser, so it's drawn only in the browser.
+    const inBrowser = useInBrowser();
     const svgRef = useRef<SVGSVGElement>(null);
     /** The box the drawing fills, which it matches in shape. */
     const boxRef = useRef<HTMLDivElement>(null);
@@ -219,9 +282,14 @@ export default function TowerView() {
         .map((d) => d.piece);
 
     const view = (Object.keys(VIEWS) as ViewName[]).find(
-        (k) => VIEWS[k].azimuth === azimuth && VIEWS[k].elevation === elevation,
+        (k) => VIEWS[k].azimuth === turned.azimuth && VIEWS[k].elevation === turned.elevation,
     );
 
+    // In 3D a drag turns the tower; in the flat views, it moves the view, as on a map.
+    const drag = (at: Vector2, x: number, y: number): NonNullable<typeof gesture.current> =>
+        camera
+            ? { kind: "pan", at, frame }
+            : { kind: "turn", x, y, azimuth: turned.azimuth, elevation: turned.elevation };
     const startPinch = () => {
         const [a, b] = [...pointers.current.values()];
         gesture.current = { kind: "pinch", mid: a.mid(b), spread: a.distanceTo(b), frame };
@@ -232,10 +300,10 @@ export default function TowerView() {
         pointers.current.set(e.pointerId, at);
         if (pointers.current.size === 2) startPinch();
         else if (pointers.current.size > 2) return;
-        // Shift, or the right or middle button, pans; otherwise a drag turns the tower.
+        // Shift, or the right or middle button, always pans.
         else if (e.shiftKey || e.button === 1 || e.button === 2)
             gesture.current = { kind: "pan", at, frame };
-        else gesture.current = { kind: "turn", x: e.clientX, y: e.clientY, azimuth, elevation };
+        else gesture.current = drag(at, e.clientX, e.clientY);
     };
     const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
         if (!pointers.current.has(e.pointerId)) return;
@@ -256,27 +324,25 @@ export default function TowerView() {
         }
         // A drag across the whole drawing turns the tower about once.
         const perPixel = 360 / e.currentTarget.getBoundingClientRect().width;
-        setAzimuth(
-            ((Math.round(d.azimuth + (e.clientX - d.x) * perPixel * 0.6) % 360) + 360) % 360,
-        );
-        setElevation(Math.round(clamp(d.elevation + (e.clientY - d.y) * perPixel * 0.4, 0, 89)));
+        setTurned({
+            azimuth:
+                ((Math.round(d.azimuth + (e.clientX - d.x) * perPixel * 0.6) % 360) + 360) % 360,
+            elevation: Math.round(clamp(d.elevation + (e.clientY - d.y) * perPixel * 0.4, 0, 89)),
+        });
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         pointers.current.delete(e.pointerId);
-        // Lifting one finger of a pinch carries on as a turn with the other, from where it is.
+        // Lifting one finger of a pinch carries on as a drag with the other, from where it is.
         const [rest] = [...pointers.current.entries()];
         gesture.current = null;
         if (pointers.current.size === 2) startPinch();
         else if (rest && e.pointerType === "touch") {
             const r = svgRef.current?.getScreenCTM();
             const client = r ? new DOMPoint(rest[1].x, rest[1].y).matrixTransform(r) : rest[1];
-            gesture.current = { kind: "turn", x: client.x, y: client.y, azimuth, elevation };
+            gesture.current = drag(rest[1], client.x, client.y);
         }
     };
 
-    // The levels' names beside whichever corner is leftmost in the view.
-    const corners = [vec3(0, 0, 0), vec3(SIDE, 0, 0), vec3(SIDE, 0, SIDE), vec3(0, 0, SIDE)];
-    const leftmost = corners.reduce((a, b) => (toSvg(b).x < toSvg(a).x ? b : a));
     const compass: [string, Vector3][] = [
         ["N", vec3(SIDE / 2, groundAt(SIDE / 2), SIDE + 1.8)],
         ["S", vec3(SIDE / 2, groundAt(SIDE / 2), -1.8)],
@@ -290,7 +356,11 @@ export default function TowerView() {
             viewBox={`0 0 ${svgNumber(size.x)} ${svgNumber(size.y)}`}
             className="absolute inset-0 block h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
-            aria-label="The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and shift-drag or drag with two fingers to move it."
+            aria-label={
+                camera
+                    ? `The Cracroft abseil tower: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`
+                    : "The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and shift-drag or drag with two fingers to move it."
+            }
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -298,174 +368,184 @@ export default function TowerView() {
             onContextMenu={(e) => e.preventDefault()}
         >
             <polygon points={svgPoints(groundCorners().map(toSvg))} fill="var(--tower-ground)" />
-            {compass.map(([name, p]) => (
-                <Label key={name} at={toSvg(p)} color="var(--ink-muted)">
-                    {name}
-                </Label>
-            ))}
-            {sorted.map((piece, i) => (
-                <PieceDrawing key={i} piece={piece} toSvg={toSvg} ppm={ppm} />
-            ))}
-            {laid.labels.map((l, i) => (
-                <RigLabelDrawing key={i} label={l} toSvg={toSvg} ppm={ppm} />
-            ))}
-            {LEVELS.slice(1).map((y, i) => {
-                const at = toSvg(vec3(leftmost.x, y, leftmost.z));
-                return (
-                    <text
+            {compass
+                // Level with the tower, the two straight towards and away from the eye would sit on one spot.
+                .filter(([, p]) => {
+                    const away = vec3(p.x - SIDE / 2, 0, p.z - SIDE / 2).unit();
+                    return Math.abs(away.dot(cam.toward)) < 0.95;
+                })
+                .map(([name, p]) => (
+                    <Label key={name} at={toSvg(p)} color="var(--ink-muted)">
+                        {name}
+                    </Label>
+                ))}
+            {inBrowser &&
+                sorted.map((piece, i) => (
+                    <PieceDrawing
                         key={i}
-                        x={at.x - 26}
-                        y={at.y}
-                        fill="var(--ink-soft)"
-                        fontSize={14}
-                        fontFamily="var(--font-geist-mono), monospace"
-                        textAnchor="end"
-                        dominantBaseline="middle"
-                        paintOrder="stroke"
-                        stroke="var(--halo)"
-                        strokeWidth={4}
-                    >
-                        {LEVEL_NAMES[i + 1]}
-                    </text>
-                );
-            })}
+                        piece={piece}
+                        toSvg={toSvg}
+                        ppm={ppm}
+                        dim={below !== undefined && highest(piece) < below ? 0.55 : 1}
+                    />
+                ))}
+            {inBrowser &&
+                laid.labels.map((l, i) => (
+                    <RigLabelDrawing key={i} label={l} toSvg={toSvg} ppm={ppm} />
+                ))}
         </svg>
     );
 
-    const controls = (
-        <>
-            <Choice
-                label="View from"
-                value={view ?? ("" as ViewName)}
-                options={(Object.keys(VIEWS) as ViewName[]).map((k) => ({
-                    value: k,
-                    label: VIEWS[k].label,
-                }))}
-                onChange={(k) => {
-                    setAzimuth(VIEWS[k].azimuth);
-                    setElevation(VIEWS[k].elevation);
-                }}
-            />
-            <Slider
-                label="Turn (bearing to the eye)"
-                value={azimuth}
-                min={0}
-                max={359}
-                step={1}
-                unit="°"
-                digits={0}
-                onChange={setAzimuth}
-            />
-            <Slider
-                label="Look down"
-                value={elevation}
-                min={0}
-                max={89}
-                step={1}
-                unit="°"
-                digits={0}
-                onChange={setElevation}
-            />
-            <Slider
-                label="Zoom"
-                value={frame.zoom}
-                min={1}
-                max={MAX_ZOOM}
-                step={0.1}
-                unit="×"
-                digits={1}
-                onChange={(z) => setFrame((f) => reframe(cam, origin, f, origin, origin, z))}
-            />
-            <button
-                type="button"
-                onClick={() => setFrame(WHOLE)}
-                disabled={frame === WHOLE}
-                className="self-start rounded-md bg-surface-raised px-3 py-1 text-sm text-ink-soft transition-colors hover:bg-line-faint disabled:opacity-50"
-            >
-                Show the whole tower
-            </button>
-            <p className="text-xs text-ink-muted">
-                Scroll or pinch to zoom about a point. Shift-drag, right-drag or drag with two
-                fingers to move the view.
-            </p>
-        </>
-    );
-
+    const zoomBy = (factor: number) =>
+        setFrame((f) => reframe(cam, origin, f, origin, origin, f.zoom * factor));
+    const start = startOf(MODES[mode].start, size);
     const key = legend(rig);
-    const readouts = (
-        <>
-            <h2 className="text-sm font-medium text-ink-strong">{rig.name}</h2>
-            <ul className="flex flex-col gap-2 text-sm text-ink-soft">
-                {key.cylinders.map((c) => (
-                    <li key={c.text} className="flex items-center gap-3">
-                        <CylinderSwatch text={c.text} colors={c.colors} />
-                        <span>{c.name}</span>
-                    </li>
-                ))}
-            </ul>
-            <ul className="flex flex-col gap-1.5 text-sm text-ink-soft">
-                {key.lines.map((l) => (
-                    <li key={l.name} className="flex items-center gap-3">
-                        <span className="flex w-16 shrink-0 flex-col gap-1">
-                            {l.colors.map((c) => (
-                                <StrandSwatch key={c} color={c} look={l.look} />
-                            ))}
-                        </span>
-                        {l.name}
-                    </li>
-                ))}
-            </ul>
-            <p className="text-xs text-ink-muted">
-                The overhead beam&rsquo;s spaces are numbered 1 to 5 from the south, between its
-                steel rods.
-            </p>
-        </>
-    );
 
-    // The drawing fills what the panel leaves. On narrow screens the panel's in a sheet instead, opened from a button.
+    // Laid out like a map: the drawing fills the box, with the legend over its top right, the views bottom left and
+    // zoom bottom right.
     return (
-        <div className="flex min-h-0 flex-1 gap-4">
-            <div
-                ref={boxRef}
-                className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface"
-            >
-                {diagram}
-                <Sheet modal={false}>
-                    <SheetTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="absolute top-2 right-2 lg:hidden"
-                            aria-label="Settings and key"
-                        >
-                            <SlidersHorizontal />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent
-                        side="bottom"
-                        className="max-h-[45dvh] gap-0 overflow-y-auto overscroll-contain"
+        <div
+            ref={boxRef}
+            className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface"
+        >
+            {diagram}
+            <section className="absolute top-2 right-2 max-h-[calc(100%-1rem)] w-64 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur">
+                <button
+                    type="button"
+                    onClick={() => setLegendOpen((o) => !(o ?? window.matchMedia(WIDE).matches))}
+                    aria-expanded={legendOpen ?? undefined}
+                    className="flex w-full items-center justify-between text-sm font-medium text-ink-strong"
+                >
+                    Legend
+                    <ChevronDown
+                        className={`size-4 transition-transform ${
+                            legendOpen === null ? "sm:rotate-180" : legendOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                </button>
+                {
+                    <div
+                        className={`mt-2 flex-col gap-2 ${
+                            legendOpen === null ? "hidden sm:flex" : legendOpen ? "flex" : "hidden"
+                        }`}
                     >
-                        <SheetHeader className="pb-2">
-                            <SheetTitle>Settings and key</SheetTitle>
-                            <SheetDescription className="sr-only">
-                                Change the view, and what the rig&rsquo;s colours and labels mean.
-                            </SheetDescription>
-                        </SheetHeader>
-                        <div className="flex flex-col gap-4 px-4 pb-4">
-                            {controls}
-                            {readouts}
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                        <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
+                            {key.cylinders.map((c) => (
+                                <li key={c.text} className="flex items-center gap-2">
+                                    <CylinderSwatch text={c.text} colors={c.colors} />
+                                    <span>{c.name}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <ul className="flex flex-col gap-1 text-xs text-ink-soft">
+                            {key.lines.map((l) => (
+                                <li key={l.name} className="flex items-center gap-2">
+                                    <span className="flex w-16 shrink-0 flex-col gap-1">
+                                        {l.colors.map((c) => (
+                                            <StrandSwatch key={c} color={c} look={l.look} />
+                                        ))}
+                                    </span>
+                                    {l.name}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                }
+            </section>
+            <div className="absolute bottom-2 left-2 flex flex-col items-start gap-2">
+                {!camera && (
+                    <div
+                        role="group"
+                        aria-label="View the 3D tower from"
+                        className="flex overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
+                    >
+                        {(Object.keys(VIEWS) as ViewName[]).map((k) => (
+                            <button
+                                key={k}
+                                type="button"
+                                aria-pressed={view === k}
+                                onClick={() =>
+                                    setTurned({
+                                        azimuth: VIEWS[k].azimuth,
+                                        elevation: VIEWS[k].elevation,
+                                    })
+                                }
+                                className={`px-2.5 py-1 text-xs transition-colors ${
+                                    view === k
+                                        ? "bg-action text-primary-foreground"
+                                        : "text-ink-soft hover:bg-line-faint"
+                                }`}
+                            >
+                                {VIEWS[k].label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                <div
+                    role="group"
+                    aria-label="View"
+                    className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
+                >
+                    {(Object.keys(MODES) as Mode[]).map((m) => (
+                        <button
+                            key={m}
+                            type="button"
+                            aria-pressed={mode === m}
+                            onClick={() => {
+                                setMode(m);
+                                setFrame(startOf(MODES[m].start, size));
+                            }}
+                            className={`px-3 py-1.5 text-left text-xs transition-colors ${
+                                mode === m
+                                    ? "bg-action text-primary-foreground"
+                                    : "text-ink-soft hover:bg-line-faint"
+                            }`}
+                        >
+                            {MODES[m].label}
+                        </button>
+                    ))}
+                </div>
             </div>
-            {/* The panel scrolls on its own only if the window's too short for it. */}
-            <div className="hidden w-[300px] shrink-0 flex-col gap-4 overflow-y-auto overscroll-contain lg:flex">
-                <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4">
-                    {controls}
-                </section>
-                <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
-                    {readouts}
-                </section>
+            <div className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur">
+                {[
+                    {
+                        label: "Zoom in",
+                        icon: <Plus />,
+                        onClick: () => zoomBy(1.4),
+                        off: frame.zoom >= MAX_ZOOM,
+                    },
+                    {
+                        label: "Zoom out",
+                        icon: <Minus />,
+                        onClick: () => zoomBy(1 / 1.4),
+                        off: frame.zoom <= 1,
+                    },
+                    {
+                        label: "Show the whole view again",
+                        icon: <RotateCcw />,
+                        onClick: () => {
+                            setFrame(start);
+                            if (!camera)
+                                setTurned({
+                                    azimuth: VIEWS.se.azimuth,
+                                    elevation: VIEWS.se.elevation,
+                                });
+                        },
+                        off: false,
+                    },
+                ].map((b) => (
+                    <button
+                        key={b.label}
+                        type="button"
+                        aria-label={b.label}
+                        title={b.label}
+                        onClick={b.onClick}
+                        disabled={b.off}
+                        className="flex size-9 items-center justify-center text-ink-soft transition-colors hover:bg-line-faint disabled:opacity-40 [&_svg]:size-4"
+                    >
+                        {b.icon}
+                    </button>
+                ))}
             </div>
         </div>
     );
@@ -661,12 +741,16 @@ function PieceDrawing({
     piece,
     toSvg,
     ppm,
+    dim = 1,
 }: {
     piece: Piece;
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
+    /** How bright it's drawn, darker for what's below the level looked down on. */
+    dim?: number;
 }) {
-    const color = piece.color || COLOR[piece.material];
+    const own = piece.color || COLOR[piece.material];
+    const color = dim < 1 ? shade(own, dim * 100) : own;
     if (piece.kind === "face") {
         const fill = shade(color, faceShade(piece));
         return (

@@ -10,16 +10,7 @@ import { vec3, type Vector3 } from "@/lib/vector3";
  */
 
 /** What a piece is made of, which sets its colour. */
-export type Material =
-    | "log"
-    | "rail"
-    | "board"
-    | "deck"
-    | "steel"
-    | "door"
-    | "sling"
-    | "rope"
-    | "bucket";
+export type Material = "log" | "rail" | "board" | "deck" | "steel" | "sling" | "rope" | "bucket";
 
 /** A round piece (a log, a rail or a pipe): a cylinder from `a` to `b`, drawn with a rounded end where `capA`/`capB`. */
 export type Rod = {
@@ -51,7 +42,7 @@ export type Face = {
 
 /**
  * Where a piece is in the tower's shell, for the back-to-front sort: `layer` 1 is on one of its sides (railings, beams,
- * corner posts), 2 the boarding outside that, and 3 what sticks out past it (log ends, the door, the outrigger), with
+ * corner posts), 2 the boarding outside that, and 3 what sticks out past it (log ends, the outrigger), with
  * `out` the way that side faces. Pieces on a side facing the eye are drawn after everything inside, and those on a side
  * facing away before it. Pieces with no shell are inside.
  */
@@ -612,16 +603,23 @@ function planPieces(): Piece[] {
         ),
     );
     // The ground floor's south and north sides, boarded (an assumption: the door suggests the ground floor is closed in).
+    // The south side's doorway, beside the south-east corner, is left open: the boarding stops above it.
+    const DOOR = { z0: 0.3, z1: 1.1, height: 1.9 };
     for (const x of [-SKIN, SIDE + SKIN]) {
         const strips = 6;
-        for (let i = 0; i < strips; i++) {
-            const z0 = (SIDE * i) / strips;
-            const z1 = (SIDE * (i + 1)) / strips;
+        const edges = Array.from({ length: strips + 1 }, (_, i) => (SIDE * i) / strips);
+        if (x < 0) edges.push(DOOR.z0, DOOR.z1);
+        edges.sort((a, b) => a - b);
+        for (let i = 0; i + 1 < edges.length; i++) {
+            const [z0, z1] = [edges[i], edges[i + 1]];
+            if (z1 - z0 < 1e-9) continue;
+            const doorway = x < 0 && z0 >= DOOR.z0 && z1 <= DOOR.z1;
+            const foot = (z: number) => planGround(z) + (doorway ? DOOR.height : 0);
             pieces.push({
                 kind: "face",
                 points: [
-                    vec3(x, planGround(z0), z0),
-                    vec3(x, planGround(z1), z1),
+                    vec3(x, foot(z0), z0),
+                    vec3(x, foot(z1), z1),
                     vec3(x, LEVELS[1], z1),
                     vec3(x, LEVELS[1], z0),
                 ],
@@ -631,18 +629,6 @@ function planPieces(): Piece[] {
             });
         }
     }
-    // The door, on the south side beside the south-east corner.
-    pieces.push({
-        kind: "face",
-        points: [
-            vec3(-SKIN - 0.01, 0, 0.3),
-            vec3(-SKIN - 0.01, 0, 1.1),
-            vec3(-SKIN - 0.01, 1.9, 1.1),
-            vec3(-SKIN - 0.01, 1.9, 0.3),
-        ].map((p) => vec3(p.x, p.y + planGround(p.z), p.z)),
-        material: "door",
-        shell: { out: S_OUT, layer: 3 },
-    });
 
     // Railings round every level's open sides: north, south and west on every level, and east on the top deck.
     for (const y of LEVELS.slice(1)) {
@@ -725,14 +711,15 @@ function planPieces(): Piece[] {
 /**
  * The overhead beam, by the compass: it runs north–south at `x`, its lower log's middle at `lowerY` and its upper's at
  * `upperY`, both of radius `r`. The lower log runs the tower's width (z from 0 to `SIDE`), and the steel rods through
- * both stand at the `rods` z's, dividing it into five spaces numbered from the south.
+ * both stand at the `rods` z's, dividing it into five spaces numbered from the south. They're set out symmetrically:
+ * the end spaces the same as the next ones in, and the middle space twice as wide.
  */
 export const OVERHEAD = {
     x: SIDE / 2,
     lowerY: TOP + 2.3,
     upperY: TOP + 2.3 + 2 * LOG_R,
     r: LOG_R,
-    rods: [-1.5, -0.5, 0.5, 1.5].map((k) => SIDE / 2 + k),
+    rods: [-2, -1, 1, 2].map((k) => SIDE / 2 + (k * SIDE) / 6),
 };
 
 /** Where a space on the overhead beam runs, from the south: z from `z0` to `z1`. Spaces are numbered 1 to 5. */
