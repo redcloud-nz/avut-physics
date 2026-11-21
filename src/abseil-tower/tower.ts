@@ -588,7 +588,7 @@ function planPieces(): Piece[] {
 
     // The west outrigger: a log the width of the west side, a metre out, level with the top deck's beams. The top
     // deck's south and north beams run on out and butt into it; there's no other bracing.
-    const outY = TOP - LOG_R - 0.08;
+    const outY = WEST_EDGE.outrigger.y;
     const out = SIDE + OUTRIGGER;
     const outrigger: Rod[] = [];
     for (const x of [0, SIDE])
@@ -641,6 +641,15 @@ export function topOpening(): { x0: number; x1: number; z0: number; z1: number }
         z1: Math.max(a.z, b.z),
     };
 }
+
+/**
+ * The west side's edges a rope going over it rests on, by the compass: the top rail's top outer corner, then the
+ * outrigger log a metre out (its middle and radius).
+ */
+export const WEST_EDGE = {
+    rail: { x: -TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
+    outrigger: { x: -OUTRIGGER, y: TOP - LOG_R - 0.08, r: LOG_R },
+};
 
 export const EAST_EDGE = {
     rail: { x: SIDE + TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
