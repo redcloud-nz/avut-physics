@@ -1,9 +1,19 @@
 "use client";
 
+import { SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Choice, Slider, VisualisationLayout } from "@/components/diagram/controls";
+import { Choice, Slider } from "@/components/diagram/controls";
 import { Label } from "@/components/diagram/svg";
+import { Button } from "@/components/ui/button";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
 import { clamp, deg, rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
@@ -22,13 +32,20 @@ import {
     type Piece,
 } from "./tower";
 
+/** The least room (SVG units) the whole tower needs unzoomed. The drawing widens or deepens past it to fill its box. */
 const W = 800;
 const H = 1000;
 /** SVG units per metre unzoomed: the same in every view, so the tower doesn't grow and shrink as it turns. */
 const PPM = 60;
-/** The point the camera turns about to start with, and where that point sits in the drawing. */
+/** The point the camera turns about to start with. It sits in the middle of the drawing. */
 const CENTRE = vec3(SIDE / 2, 5.4, SIDE / 2);
-const ORIGIN = vec2(W / 2, H / 2 + 10);
+
+/** The drawing's size (SVG units) for a box `width` by `height` (pixels): at least `W` by `H`, in the box's shape. */
+function drawingSize(width: number, height: number): Vector2 {
+    if (width <= 0 || height <= 0) return vec2(W, H);
+    return width / height > W / H ? vec2((H * width) / height, H) : vec2(W, (W * height) / width);
+}
+const originOf = (size: Vector2) => vec2(size.x / 2, size.y / 2 + 10);
 const MAX_ZOOM = 8;
 
 /** How close the view is, and the point it's centred on (which it turns about). */
@@ -39,10 +56,17 @@ const WHOLE: Frame = { zoom: 1, target: CENTRE };
  * The frame that keeps the scene point that was under `from` (in `start`) under `to`, at `zoom`: zooming about a point,
  * panning, or both at once as in a pinch.
  */
-function reframe(cam: OrbitCamera, start: Frame, from: Vector2, to: Vector2, zoom: number): Frame {
+function reframe(
+    cam: OrbitCamera,
+    origin: Vector2,
+    start: Frame,
+    from: Vector2,
+    to: Vector2,
+    zoom: number,
+): Frame {
     const z = clamp(zoom, 1, MAX_ZOOM);
     const inView = (s: Vector2, ppm: number) =>
-        vec2((s.x - ORIGIN.x) / ppm, (ORIGIN.y - s.y) / ppm);
+        vec2((s.x - origin.x) / ppm, (origin.y - s.y) / ppm);
     const [u, v] = [inView(from, PPM * start.zoom), inView(to, PPM * z)];
     const shift = cam.right.scale(u.x - v.x).add(cam.up.scale(u.y - v.y));
     return { zoom: z, target: start.target.add(shift) };
@@ -113,6 +137,10 @@ export default function TowerView() {
     const pieces = useMemo(() => [...towerPieces(), ...laid.pieces], [laid]);
     const [frame, setFrame] = useState<Frame>(WHOLE);
     const svgRef = useRef<SVGSVGElement>(null);
+    /** The box the drawing fills, which it matches in shape. */
+    const boxRef = useRef<HTMLDivElement>(null);
+    const [size, setSize] = useState(vec2(W, H));
+    const origin = originOf(size);
     /** The pointers down on the drawing, where each is now (SVG units). */
     const pointers = useRef(new Map<number, Vector2>());
     /** What a drag or pinch started from: turning, panning, or a pinch (two touches). */
@@ -127,30 +155,46 @@ export default function TowerView() {
     const ppm = PPM * frame.zoom;
     const toSvg = (p: Vector3): Vector2 => {
         const v = cam.project(p.sub(frame.target));
-        return vec2(ORIGIN.x + v.x * ppm, ORIGIN.y - v.y * ppm);
+        return vec2(origin.x + v.x * ppm, origin.y - v.y * ppm);
     };
 
-    // A trackpad pinch, or the wheel with Ctrl or ⌘ held, zooms about the pointer. A plain wheel still scrolls the page.
+    // The drawing takes the shape of its box, so the tower stays the same size as the window changes shape.
+    useEffect(() => {
+        const box = boxRef.current;
+        if (!box) return;
+        const observer = new ResizeObserver(([entry]) => {
+            const { width, height } = entry.contentRect;
+            setSize(drawingSize(width, height));
+        });
+        observer.observe(box);
+        return () => observer.disconnect();
+    }, []);
+
+    // Scrolling over the drawing zooms about the pointer, as does a trackpad pinch (which comes as a scroll with Ctrl).
+    // The page itself never scrolls.
     useEffect(() => {
         const svg = svgRef.current;
         if (!svg) return;
         const onWheel = (e: WheelEvent) => {
-            if (!e.ctrlKey && !e.metaKey) return;
             e.preventDefault();
             const at = toDrawing(svg, e.clientX, e.clientY);
+            // A mouse wheel's notch is around 100 pixels (or 3 lines); a pinch's steps are much smaller.
+            const delta = e.deltaY * (e.deltaMode === 1 ? 33 : 1);
+            const rate = e.ctrlKey ? 0.01 : 0.0025;
             setFrame((f) =>
                 reframe(
                     new OrbitCamera(rad(azimuth), rad(elevation)),
+                    originOf(size),
                     f,
                     at,
                     at,
-                    f.zoom * Math.exp(-e.deltaY * 0.004),
+                    f.zoom * Math.exp(-delta * rate),
                 ),
             );
         };
         svg.addEventListener("wheel", onWheel, { passive: false });
         return () => svg.removeEventListener("wheel", onWheel);
-    }, [azimuth, elevation]);
+    }, [azimuth, elevation, size]);
 
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). A timber's sides
@@ -203,11 +247,11 @@ export default function TowerView() {
             if (pointers.current.size !== 2) return;
             const [a, b] = [...pointers.current.values()];
             const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
-            setFrame(reframe(cam, d.frame, d.mid, a.mid(b), zoom));
+            setFrame(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom));
             return;
         }
         if (d.kind === "pan") {
-            setFrame(reframe(cam, d.frame, d.at, at, d.frame.zoom));
+            setFrame(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
             return;
         }
         // A drag across the whole drawing turns the tower about once.
@@ -215,11 +259,7 @@ export default function TowerView() {
         setAzimuth(
             ((Math.round(d.azimuth + (e.clientX - d.x) * perPixel * 0.6) % 360) + 360) % 360,
         );
-        // On a touch screen an up-and-down drag scrolls the page instead, so only a mouse or pen tilts.
-        if (e.pointerType !== "touch")
-            setElevation(
-                Math.round(clamp(d.elevation + (e.clientY - d.y) * perPixel * 0.4, 0, 89)),
-            );
+        setElevation(Math.round(clamp(d.elevation + (e.clientY - d.y) * perPixel * 0.4, 0, 89)));
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         pointers.current.delete(e.pointerId);
@@ -247,13 +287,10 @@ export default function TowerView() {
     const diagram = (
         <svg
             ref={svgRef}
-            viewBox={`0 0 ${W} ${H}`}
-            className={`block h-auto max-h-[85vh] w-full cursor-grab select-none active:cursor-grabbing ${
-                // Zoomed in, every touch gesture is the drawing's; zoomed out, an up-and-down drag scrolls the page.
-                frame.zoom > 1 ? "touch-none" : "touch-pan-y"
-            }`}
+            viewBox={`0 0 ${svgNumber(size.x)} ${svgNumber(size.y)}`}
+            className="absolute inset-0 block h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
-            aria-label="The Cracroft abseil tower in 3D. Drag to turn it, pinch to zoom, and shift-drag or drag with two fingers to move it."
+            aria-label="The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and shift-drag or drag with two fingers to move it."
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -337,7 +374,7 @@ export default function TowerView() {
                 step={0.1}
                 unit="×"
                 digits={1}
-                onChange={(z) => setFrame((f) => reframe(cam, f, ORIGIN, ORIGIN, z))}
+                onChange={(z) => setFrame((f) => reframe(cam, origin, f, origin, origin, z))}
             />
             <button
                 type="button"
@@ -348,8 +385,8 @@ export default function TowerView() {
                 Show the whole tower
             </button>
             <p className="text-xs text-ink-muted">
-                Pinch, or Ctrl/⌘ and scroll, to zoom about a point. Shift-drag, right-drag or drag
-                with two fingers to move the view.
+                Scroll or pinch to zoom about a point. Shift-drag, right-drag or drag with two
+                fingers to move the view.
             </p>
         </>
     );
@@ -385,7 +422,53 @@ export default function TowerView() {
         </>
     );
 
-    return <VisualisationLayout diagram={diagram} controls={controls} readouts={readouts} />;
+    // The drawing fills what the panel leaves. On narrow screens the panel's in a sheet instead, opened from a button.
+    return (
+        <div className="flex min-h-0 flex-1 gap-4">
+            <div
+                ref={boxRef}
+                className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface"
+            >
+                {diagram}
+                <Sheet modal={false}>
+                    <SheetTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="absolute top-2 right-2 lg:hidden"
+                            aria-label="Settings and key"
+                        >
+                            <SlidersHorizontal />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                        side="bottom"
+                        className="max-h-[45dvh] gap-0 overflow-y-auto overscroll-contain"
+                    >
+                        <SheetHeader className="pb-2">
+                            <SheetTitle>Settings and key</SheetTitle>
+                            <SheetDescription className="sr-only">
+                                Change the view, and what the rig&rsquo;s colours and labels mean.
+                            </SheetDescription>
+                        </SheetHeader>
+                        <div className="flex flex-col gap-4 px-4 pb-4">
+                            {controls}
+                            {readouts}
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
+            {/* The panel scrolls on its own only if the window's too short for it. */}
+            <div className="hidden w-[300px] shrink-0 flex-col gap-4 overflow-y-auto overscroll-contain lg:flex">
+                <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/50 p-4">
+                    {controls}
+                </section>
+                <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4">
+                    {readouts}
+                </section>
+            </div>
+        </div>
+    );
 }
 
 function centreOf(piece: Piece): Vector3 {

@@ -285,28 +285,17 @@ function flight(
             );
         }
     const n = Math.round(rise / (ladder ? 0.28 : 0.22));
-    const step = vec3(0, rise / n, 0);
-    for (let i = 1; i <= n; i++) {
+    for (let i = 1; i < n; i++) {
         const c = foot.lerp(head, i / n);
-        if (ladder) {
-            if (i < n) pieces.push(...rod(c.sub(side), c.add(side), 0.016, "steel", 2));
-            continue;
+        if (ladder) pieces.push(...rod(c.sub(side), c.add(side), 0.016, "steel", 2));
+        else {
+            const depth = dir.scale(0.2);
+            pieces.push({
+                kind: "face",
+                points: [c.sub(side), c.add(side), c.add(side).add(depth), c.sub(side).add(depth)],
+                material: "deck",
+            });
         }
-        // Each step's riser, under the front edge of its tread (the last up to the deck), facing down the stairs.
-        const below = c.sub(step);
-        pieces.push({
-            kind: "face",
-            points: [below.sub(side), below.add(side), c.add(side), c.sub(side)],
-            material: "deck",
-            normal: dir.neg(),
-        });
-        if (i === n) continue;
-        const depth = dir.scale(0.2);
-        pieces.push({
-            kind: "face",
-            points: [c.sub(side), c.add(side), c.add(side).add(depth), c.sub(side).add(depth)],
-            material: "deck",
-        });
     }
     return pieces;
 }
