@@ -321,6 +321,16 @@ html {
   --strand-3: #3d83f0;
   --strand-4: #d9a816;
 
+  /* The abseil tower's drawing: its logs, timber rails and stairs, boarding, decks, steel pipe, door, the ground round
+     it. */
+  --tower-log: #8a6b4a;
+  --tower-rail: #a08462;
+  --tower-board: #7a6650;
+  --tower-deck: #675646;
+  --tower-steel: #a8b4c4;
+  --tower-door: #3d3226;
+  --tower-ground: #1d3527;
+
   /* The knot editor's ropes, by the colour names its files use: each rope's body, the weave of its sheath and the
      highlight along its top. Blue and red are the knot pages' two ropes. Then the outline every rope and arrow
      has, the tape round a rope's end (green, to stand out from both ropes), the arrows, and the bar a knot's tied round (its body, its shading and the
