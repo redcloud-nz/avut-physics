@@ -73,6 +73,7 @@ const COLOR: Record<Material, string> = {
     sling: "var(--knot-yellow)",
     rope: "var(--knot-blue)",
     bucket: "var(--rig-black)",
+    person: "var(--rig-person)",
 };
 /** The narrowest some things are drawn (SVG units), however thin they are, so a rope never vanishes. */
 const MIN_WIDTH: Partial<Record<Material, number>> = { sling: 4.5, rope: 3.5, steel: 1.6 };
@@ -147,6 +148,28 @@ function startOf(start: Start, size: Vector2): Frame {
 /** Screens wide enough to open the legend over the drawing to start with (Tailwind's `sm`). */
 const WIDE = "(min-width: 640px)";
 
+/**
+ * A person's disc, put in the group of the deck rectangle it lies on and over it, so it's drawn just after that
+ * rectangle from every side. Anything else comes back as it is.
+ */
+function onDeck(piece: Piece, tower: Piece[]): Piece {
+    if (piece.material !== "person" || piece.kind !== "face") return piece;
+    const c = centreOf(piece);
+    const under = tower.find((t) => {
+        if (t.kind !== "face" || t.material !== "deck" || !t.group) return false;
+        const xs = t.points.map((q) => q.x);
+        const zs = t.points.map((q) => q.z);
+        return (
+            Math.abs(t.points[0].y - c.y) < 0.05 &&
+            c.x >= Math.min(...xs) &&
+            c.x <= Math.max(...xs) &&
+            c.z >= Math.min(...zs) &&
+            c.z <= Math.max(...zs)
+        );
+    });
+    return under?.group ? { ...piece, group: { ...under.group, over: true } } : piece;
+}
+
 /** The highest point of a piece, for darkening what's below a level looked down on. */
 function highest(p: Piece): number {
     if (p.kind === "rod") return Math.max(p.a.y, p.b.y) + p.r;
@@ -192,7 +215,10 @@ export default function TowerView() {
     const { azimuth, elevation } = camera ?? turned;
     const rig = RIGS[0];
     const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
-    const pieces = useMemo(() => [...towerPieces(), ...laid.pieces], [laid]);
+    const pieces = useMemo(() => {
+        const tower = towerPieces();
+        return [...tower, ...laid.pieces.map((p) => onDeck(p, tower))];
+    }, [laid]);
     const [frame, setFrame] = useState<Frame>(WHOLE);
     // Whether the legend's open: until it's toggled, open on wide screens and closed on phones, where it'd cover the
     // tower.
@@ -275,11 +301,20 @@ export default function TowerView() {
         if (!p.shell) return depth;
         return depth + (p.shell.out.dot(cam.toward) > 0 ? 1 : -1) * p.shell.layer * 100;
     };
-    const sorted = pieces
-        .filter(shown)
-        .map((piece) => ({ piece, key: sortKey(piece) }))
-        .sort((a, b) => a.key - b.key)
-        .map((d) => d.piece);
+    // A label sorts just after the nearer end of the cylinder it's written on (or its point, without one), so it's
+    // drawn over its own cylinder but under whatever's in front of it.
+    const labelKey = (l: RigLabel) => {
+        if (!l.on) return cam.depth(l.at) + 0.01;
+        const half = l.on.along.scale(l.on.length / 2);
+        return Math.max(cam.depth(l.at.add(half)), cam.depth(l.at.sub(half))) + 0.01;
+    };
+    const sorted: ({ piece: Piece } | { label: RigLabel })[] = [
+        ...pieces.filter(shown).map((piece) => ({ piece, key: sortKey(piece) })),
+        ...laid.labels
+            // Looking straight down, what's under the top deck is hidden, so its labels are too.
+            .filter((l) => below === undefined || l.at.y >= below)
+            .map((label) => ({ label, key: labelKey(label) })),
+    ].sort((a, b) => a.key - b.key);
 
     const view = (Object.keys(VIEWS) as ViewName[]).find(
         (k) => VIEWS[k].azimuth === turned.azimuth && VIEWS[k].elevation === turned.elevation,
@@ -380,19 +415,19 @@ export default function TowerView() {
                     </Label>
                 ))}
             {inBrowser &&
-                sorted.map((piece, i) => (
-                    <PieceDrawing
-                        key={i}
-                        piece={piece}
-                        toSvg={toSvg}
-                        ppm={ppm}
-                        dim={below !== undefined && highest(piece) < below ? 0.55 : 1}
-                    />
-                ))}
-            {inBrowser &&
-                laid.labels.map((l, i) => (
-                    <RigLabelDrawing key={i} label={l} toSvg={toSvg} ppm={ppm} />
-                ))}
+                sorted.map((d, i) =>
+                    "piece" in d ? (
+                        <PieceDrawing
+                            key={i}
+                            piece={d.piece}
+                            toSvg={toSvg}
+                            ppm={ppm}
+                            dim={below !== undefined && highest(d.piece) < below ? 0.55 : 1}
+                        />
+                    ) : (
+                        <RigLabelDrawing key={i} label={d.label} toSvg={toSvg} ppm={ppm} />
+                    ),
+                )}
         </svg>
     );
 
@@ -449,6 +484,18 @@ export default function TowerView() {
                                 </li>
                             ))}
                         </ul>
+                        {key.people.length > 0 && (
+                            <ul className="flex flex-col gap-1 text-xs text-ink-soft">
+                                {key.people.map((p) => (
+                                    <li key={p.letter} className="flex items-center gap-2">
+                                        <span className="flex w-16 shrink-0 justify-center">
+                                            <PersonSwatch letter={p.letter} />
+                                        </span>
+                                        {p.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 }
             </section>
@@ -590,6 +637,28 @@ function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" })
 }
 
 /** A legend's cylinder: a short pill in its colours (split along its length if two), its label on it. */
+/** A legend's person: their pale disc with its letter. */
+function PersonSwatch({ letter }: { letter: string }) {
+    const d = 20;
+    return (
+        <svg width={d} height={d} viewBox={`0 0 ${d} ${d}`} aria-hidden className="shrink-0">
+            <circle cx={d / 2} cy={d / 2} r={d / 2 - 1} fill="var(--rig-person)" />
+            <text
+                x={d / 2}
+                y={d / 2}
+                fill="var(--rig-on-rope)"
+                fontSize={11}
+                fontWeight={600}
+                fontFamily={MONO}
+                textAnchor="middle"
+                dominantBaseline="central"
+            >
+                {letter}
+            </text>
+        </svg>
+    );
+}
+
 function CylinderSwatch({ text, colors }: { text: string; colors: string[] }) {
     const [w, h] = [64, 20];
     const light = colors.length > 1;
@@ -777,6 +846,25 @@ function PieceDrawing({
                             />
                         );
                     })}
+                {piece.text &&
+                    (() => {
+                        // Dark on the pale face, sized to a person's disc.
+                        const at = toSvg(centreOf(piece));
+                        return (
+                            <text
+                                x={at.x}
+                                y={at.y}
+                                fill="var(--rig-on-rope)"
+                                fontSize={clamp(0.5 * ppm * 0.55, 9, 40)}
+                                fontWeight={600}
+                                fontFamily={MONO}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                            >
+                                {piece.text}
+                            </text>
+                        );
+                    })()}
             </g>
         );
     }

@@ -94,22 +94,25 @@ describe("the first east face rig", () => {
         }
     });
 
-    it("stands the first belay's bucket east of the stairs' steel railing, clear of the opening", () => {
+    it("stands the first belay's bucket on the top deck in line with the black bucket, clear of the opening", () => {
         // The yellow bucket on the top deck (the other is on level 3, under the redirected belay).
-        const yellow = pieces.filter(
-            (p) =>
-                p.material === "bucket" &&
-                p.color === "var(--knot-yellow)" &&
-                p.kind === "face" &&
-                p.points.every((q) => q.y > TOP - 0.01),
-        );
+        const onTop = (color: string) =>
+            pieces
+                .filter(
+                    (p) =>
+                        p.material === "bucket" &&
+                        p.color === color &&
+                        p.kind === "face" &&
+                        p.points.every((q) => q.y > TOP - 0.01),
+                )
+                .flatMap((p) => (p.kind === "face" ? p.points : []));
+        const yellow = onTop("var(--knot-yellow)");
+        const black = onTop("var(--rig-black)").filter((q) => q.z > topOpening().z1);
         expect(yellow.length).toBeGreaterThan(0);
-        for (const p of yellow)
-            if (p.kind === "face")
-                for (const q of p.points) {
-                    expect(q.x).toBeGreaterThan(topOpening().x1);
-                    expect(q.x).toBeLessThan(SIDE);
-                }
+        const mid = (vs: number[]) => (Math.min(...vs) + Math.max(...vs)) / 2;
+        expect(mid(yellow.map((q) => q.z))).toBeCloseTo(mid(black.map((q) => q.z)));
+        const { x0, x1, z0, z1 } = topOpening();
+        for (const q of yellow) expect(q.x < x0 || q.x > x1 || q.z < z0 || q.z > z1).toBe(true);
     });
 
     it("stands the red belays' bucket directly under the beam, between their slings", () => {

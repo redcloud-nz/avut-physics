@@ -88,10 +88,13 @@ export type Bucket = {
     place:
         | "by-stair-railing"
         | { mirrorOf: string }
+        /** Due east of another bucket, in line with it across the tower, `east` metres east of the west side. */
+        | { dueEastOf: string; east: number }
         | { eastOfStairsAt: 1 | 2 | 3 | 4 | 5 }
         | { underBeamAt: number }
         | { underBelay: string }
-        | { inCorner: "NE" | "SE" | "SW" | "NW" };
+        | { inCorner: "NE" | "SE" | "SW" | "NW" }
+        | OnDeck;
     /** How tall it is (m), if not the usual. */
     height?: number;
 };
@@ -140,7 +143,21 @@ export type WrapSling = {
     color: RigColor;
 };
 
-export type RigItem = Sling | WrapSling | Rope | Bucket | Belay;
+/** A place on a deck measured from the tower's sides (m): how far east of the west side and north of the south side. */
+export type OnDeck = { east: number; north: number };
+
+/**
+ * Where someone stands while the rig's in use: a disc on a level's deck, labelled with their role. It's in a corner
+ * (just inside its posts) or at a measured place.
+ */
+export type Person = {
+    kind: "person";
+    id: string;
+    role: "Abseiler" | "Belayer" | "Edge" | "Supervisor" | "Photographer";
+    place: ({ inCorner: "NE" | "SE" | "SW" | "NW" } | OnDeck) & { level: 1 | 2 | 3 | 4 };
+};
+
+export type RigItem = Sling | WrapSling | Rope | Bucket | Belay | Person;
 export type Rig = { name: string; items: RigItem[] };
 
 export const RIGS: Rig[] = [
@@ -150,7 +167,7 @@ export const RIGS: Rig[] = [
             {
                 kind: "sling",
                 id: "sling-1",
-                at: 1.25,
+                at: 1.45,
                 length: 2,
                 color: "red",
                 configuration: "basket",
@@ -232,12 +249,19 @@ export const RIGS: Rig[] = [
             {
                 kind: "sling",
                 id: "sling-5",
-                at: 1.0,
+                at: 1.2,
                 length: 2,
                 color: "red",
                 configuration: "basket",
             },
-            { kind: "bucket", id: "bucket-3", color: "yellow", place: { eastOfStairsAt: 1 } },
+            // Due east of the next line's black bucket, and west of the white belay's prusiks, so its spare runs back
+            // west into it.
+            {
+                kind: "bucket",
+                id: "bucket-3",
+                color: "yellow",
+                place: { dueEastOf: "bucket-1", east: 2.95 },
+            },
             {
                 kind: "belay",
                 id: "belay-1",
@@ -337,6 +361,83 @@ export const RIGS: Rig[] = [
                 spare: "bucket-5",
             },
             { kind: "bucket", id: "bucket-5", color: "yellow", place: { underBelay: "belay-4" } },
+            // Where people stand.
+            // The white belay's belayer, by its prusiks and bucket.
+            {
+                kind: "person",
+                id: "person-1",
+                role: "Belayer",
+                // Beside the white belay's prusiks, just east of the stairs' steel railing.
+                place: { east: 3.6, north: 1.05, level: 4 },
+            },
+            // The red belays' belayers, just north of their prusiks.
+            {
+                kind: "person",
+                id: "person-2",
+                role: "Belayer",
+                place: { east: 3.4, north: 4.0, level: 4 },
+            },
+            {
+                kind: "person",
+                id: "person-3",
+                role: "Belayer",
+                place: { east: 1.05, north: 3.85, level: 4 },
+            },
+            // East side, against the railing in the middle.
+            {
+                kind: "person",
+                id: "person-4",
+                role: "Edge",
+                place: { east: 4.15, north: 2.25, level: 4 },
+            },
+            // West side, against the railing in the middle.
+            {
+                kind: "person",
+                id: "person-5",
+                role: "Edge",
+                place: { east: 0.35, north: 2.25, level: 4 },
+            },
+            // Just east of the middle, clear of the beam.
+            {
+                kind: "person",
+                id: "person-6",
+                role: "Supervisor",
+                place: { east: 2.8, north: 2.25, level: 4 },
+            },
+            // SE: at the east railing, under its pair of ropes (the dark blue abseil and white belay).
+            {
+                kind: "person",
+                id: "person-7",
+                role: "Abseiler",
+                place: { east: 4.15, north: 1.39, level: 4 },
+            },
+            // NW: at the west railing, under its pair of ropes (the light blue abseil and red belay).
+            {
+                kind: "person",
+                id: "person-8",
+                role: "Abseiler",
+                place: { east: 0.35, north: 3.26, level: 4 },
+            },
+            // NE: at the east railing, under its pair of ropes (the light blue abseil and red belay).
+            {
+                kind: "person",
+                id: "person-9",
+                role: "Abseiler",
+                place: { east: 4.15, north: 3.41, level: 4 },
+            },
+            {
+                kind: "person",
+                id: "person-10",
+                role: "Photographer",
+                place: { inCorner: "SE", level: 4 },
+            },
+            // The redirected belay's belayer on level 3, under the stairs up to level 4 by its prusiks and bucket.
+            {
+                kind: "person",
+                id: "person-11",
+                role: "Belayer",
+                place: { east: 0.7, north: 0.6, level: 3 },
+            },
         ],
     },
 ];
@@ -357,6 +458,17 @@ const BESIDE_GAP = 0.12;
 const KRAB_L = 0.11;
 const KRAB_W = 0.06;
 const EAST = vec3(1, 0, 0);
+/** The letter each role's disc is labelled with, which the legend spells out. */
+const ROLE_LETTER: Record<Person["role"], string> = {
+    Abseiler: "A",
+    Belayer: "B",
+    Edge: "E",
+    Supervisor: "S",
+    Photographer: "P",
+};
+
+/** The radius of the disc where a person stands. */
+const PERSON_R = 0.25;
 /** A rope bucket's radius and height, and how far it stands off the steel railing. */
 const BUCKET_R = 0.18;
 const BUCKET_H = 0.42;
@@ -848,16 +960,22 @@ function bucketBase(bucket: Bucket, rig: Rig): Vector3 {
         const z = place.inCorner.includes("N") ? SIDE - inside : inside;
         return vec3(x, TOP, z);
     }
+    if ("north" in place) return vec3(place.east, TOP, place.north);
     if ("underBeamAt" in place) return vec3(OVERHEAD.x, TOP, place.underBeamAt);
     if ("eastOfStairsAt" in place) {
         const { z0, z1 } = overheadSpace(place.eastOfStairsAt);
         return vec3(topOpening().x1 + BUCKET_R + BUCKET_GAP, TOP, (z0 + z1) / 2);
     }
-    const other = rig.items.find(
-        (i): i is Bucket => i.kind === "bucket" && i.id === place.mirrorOf,
-    );
-    if (!other || other === bucket) throw new Error(`No bucket ${place.mirrorOf} to mirror`);
-    const base = bucketBase(other, rig);
+    const byOther = (id: string) => {
+        const other = rig.items.find((i): i is Bucket => i.kind === "bucket" && i.id === id);
+        if (!other || other === bucket) throw new Error(`No bucket ${id} to place by`);
+        return bucketBase(other, rig);
+    };
+    if ("dueEastOf" in place) {
+        const base = byOther(place.dueEastOf);
+        return vec3(place.east, base.y, base.z);
+    }
+    const base = byOther(place.mirrorOf);
     return vec3(base.x, base.y, SIDE - base.z);
 }
 
@@ -991,6 +1109,27 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
             const s = wrapSling(item, via ?? null);
             pieces.push(...s.pieces);
             clips.set(item.id, s);
+        } else if (item.kind === "person") {
+            const { place } = item;
+            const inside = LOG_R + PERSON_R + 0.05;
+            const [x, z] =
+                "inCorner" in place
+                    ? [
+                          place.inCorner.includes("E") ? SIDE - inside : inside,
+                          place.inCorner.includes("N") ? SIDE - inside : inside,
+                      ]
+                    : [place.east, place.north];
+            const centre = vec3(x, LEVELS[place.level] + 0.01, z);
+            pieces.push({
+                kind: "face",
+                points: Array.from({ length: 24 }, (_, i) => {
+                    const a = (i / 24) * Math.PI * 2;
+                    return centre.add(vec3(Math.cos(a), 0, Math.sin(a)).scale(PERSON_R));
+                }),
+                material: "person",
+                normal: vec3(0, 1, 0),
+                text: ROLE_LETTER[item.role],
+            });
         } else if (item.kind === "belay") {
             const from = clips.get(item.from);
             if (!from) return;
@@ -1058,10 +1197,16 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
 /** A cylinder standing for a knot or hitch, as the legend shows it: its label, full name and colours. */
 export type LegendCylinder = { text: string; name: string; colors: string[] };
 /** A kind of item in the rig, whether it's tape or rope, and the colours it comes in. */
+/** A role people have in the rig, and the letter on their discs. */
+export type LegendPerson = { letter: string; name: string };
 export type LegendLine = { name: string; look: "tape" | "rope"; colors: string[] };
 
 /** What the drawing's cylinders and colours stand for, for the rig's legend. */
-export function legend(rig: Rig): { cylinders: LegendCylinder[]; lines: LegendLine[] } {
+export function legend(rig: Rig): {
+    cylinders: LegendCylinder[];
+    lines: LegendLine[];
+    people: LegendPerson[];
+} {
     const ropes = rig.items.filter((i): i is Rope => i.kind === "rope");
     const belays = rig.items.filter((i): i is Belay => i.kind === "belay");
     const cylinders: LegendCylinder[] = [];
@@ -1107,7 +1252,12 @@ export function legend(rig: Rig): { cylinders: LegendCylinder[]; lines: LegendLi
         ...byLength(slings, "sling", "tape"),
         ...byLength([...ropes, ...belays], "rope", "rope"),
     ];
-    return { cylinders, lines };
+    // Each role someone has, in the order the roles are listed.
+    const roles = new Set(rig.items.flatMap((i) => (i.kind === "person" ? [i.role] : [])));
+    const people = (Object.keys(ROLE_LETTER) as Person["role"][])
+        .filter((r) => roles.has(r))
+        .map((name) => ({ letter: ROLE_LETTER[name], name }));
+    return { cylinders, lines, people };
 }
 
 /**
@@ -1125,5 +1275,10 @@ export function rigSide(rig: Rig, side: "east" | "west"): Set<string> {
                 ? sideOf(ropes.find((r) => r.id === i.redirect?.via)?.route)
                 : sideOf(i.route)) === side,
     );
-    return new Set(lines.flatMap((l) => [l.id, l.from, ...(l.spare ? [l.spare] : [])]));
+    // People are on every side's view.
+    const people = rig.items.filter((i) => i.kind === "person").map((i) => i.id);
+    return new Set([
+        ...people,
+        ...lines.flatMap((l) => [l.id, l.from, ...(l.spare ? [l.spare] : [])]),
+    ]);
 }

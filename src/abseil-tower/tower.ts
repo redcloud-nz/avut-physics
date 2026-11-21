@@ -10,7 +10,16 @@ import { vec3, type Vector3 } from "@/lib/vector3";
  */
 
 /** What a piece is made of, which sets its colour. */
-export type Material = "log" | "rail" | "board" | "deck" | "steel" | "sling" | "rope" | "bucket";
+export type Material =
+    | "log"
+    | "rail"
+    | "board"
+    | "deck"
+    | "steel"
+    | "sling"
+    | "rope"
+    | "bucket"
+    | "person";
 
 /** A round piece (a log, a rail or a pipe): a cylinder from `a` to `b`, drawn with a rounded end where `capA`/`capB`. */
 export type Rod = {
@@ -38,6 +47,8 @@ export type Face = {
     normal?: Vector3;
     /** Its colour, where it isn't its material's. */
     color?: string;
+    /** A short label written in its middle, drawn with it so what's in front of it covers both. */
+    text?: string;
 };
 
 /**
@@ -208,8 +219,15 @@ function panel(
 /** How far a deck runs out past the tower's sides, over its side beams. */
 const DECK_OUT = 0.1;
 /** A level rectangle at height `y`, x from x0 to x1 and z from z0 to z1. */
-const deckRect = (x0: number, x1: number, z0: number, z1: number, y: number) =>
-    panel(vec3(x0, y, z0), vec3(x1 - x0, 0, 0), vec3(0, 0, z1 - z0), "deck");
+/**
+ * A rectangle of deck. It's a group of its own, by its middle, so what lies flat on it (a person's place) can sort
+ * with it and come just after it from every side.
+ */
+const deckRect = (x0: number, x1: number, z0: number, z1: number, y: number): Face[] =>
+    panel(vec3(x0, y, z0), vec3(x1 - x0, 0, 0), vec3(0, 0, z1 - z0), "deck").map((f) => ({
+        ...f,
+        group: { at: vec3((x0 + x1) / 2, y, (z0 + z1) / 2) },
+    }));
 
 /** A stair opening in a deck: x from x0 to x1, z from z0 to z1. */
 type Opening = { x0: number; x1: number; z0: number; z1: number };
