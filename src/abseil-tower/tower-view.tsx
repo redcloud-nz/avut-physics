@@ -157,7 +157,14 @@ export default function TowerView() {
     // facing away are left out, being behind its others.
     const shown = (p: Piece) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0;
     const sortKey = (p: Piece) => {
-        const depth = cam.depth(centreOf(p));
+        // A group's pieces sort together by its middle, then those facing the eye with `ahead` first, then by their own.
+        const own = cam.depth(centreOf(p));
+        const depth = p.group
+            ? cam.depth(p.group.at) +
+              (p.group.ahead ? Math.sign(p.group.ahead.dot(cam.toward)) * 0.01 : 0) +
+              (p.group.over ? 0.02 : 0) +
+              own * 1e-4
+            : own;
         if (!p.shell) return depth;
         return depth + (p.shell.out.dot(cam.toward) > 0 ? 1 : -1) * p.shell.layer * 100;
     };

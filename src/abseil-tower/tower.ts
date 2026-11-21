@@ -72,7 +72,15 @@ export type Strand = {
     capB: boolean;
 };
 
-export type Piece = (Rod | Face | Strand) & { shell?: Shell };
+/**
+ * Where a piece of a group sorts, for the back-to-front sort: the group's middle `at`, so the group sorts as one, then
+ * `ahead` (a direction: the piece comes in front of the rest of its group when it faces the eye), then the piece's own
+ * middle; `over` puts a piece over the rest of its group from every side. A railing's pieces are a group, so its posts
+ * keep one order against its boards whatever their position, and a stair railing's newels cover its rails' ends.
+ */
+export type Group = { at: Vector3; ahead?: Vector3; over?: boolean };
+
+export type Piece = (Rod | Face | Strand) & { shell?: Shell; group?: Group };
 
 const S_OUT = vec3(-1, 0, 0);
 const N_OUT = vec3(1, 0, 0);
@@ -126,7 +134,7 @@ export function rod(
 
 /**
  * A sawn timber from `a` to `b` (the middles of its ends), `w` wide and `h` deep, its depth as near `up` as it can be:
- * its six sides.
+ * its four long sides, and its two ends unless they're hidden (`ends` false).
  */
 function timber(
     a: Vector3,
@@ -135,6 +143,7 @@ function timber(
     w: number,
     h: number,
     material: Material,
+    withEnds = true,
 ): Face[] {
     const along = b.sub(a).unit();
     const v = up
@@ -174,7 +183,7 @@ function timber(
         },
         { kind: "face", points: ring.map(([i, j]) => corner(b, i, j)), material, normal: along },
     ];
-    return [...sides, ...ends];
+    return withEnds ? [...sides, ...ends] : sides;
 }
 
 const UP = vec3(0, 1, 0);
@@ -205,6 +214,8 @@ function panel(
     return faces;
 }
 
+/** How far a deck runs out past the tower's sides, over its side beams. */
+const DECK_OUT = 0.1;
 /** A level rectangle at height `y`, x from x0 to x1 and z from z0 to z1. */
 const deckRect = (x0: number, x1: number, z0: number, z1: number, y: number) =>
     panel(vec3(x0, y, z0), vec3(x1 - x0, 0, 0), vec3(0, 0, z1 - z0), "deck");
@@ -212,15 +223,20 @@ const deckRect = (x0: number, x1: number, z0: number, z1: number, y: number) =>
 /** A stair opening in a deck: x from x0 to x1, z from z0 to z1. */
 type Opening = { x0: number; x1: number; z0: number; z1: number };
 
-/** A deck over the whole tower, with a hole for the stairs coming up through it. */
+/**
+ * A deck over the whole tower, with a hole for the stairs coming up through it. It sits on the side beams, level with
+ * their tops, and runs out over them most of the way to their outer edges; a hole reaching a side runs out too.
+ */
 function deck(y: number, hole: Opening | null): Face[] {
-    if (!hole) return deckRect(0, SIDE, 0, SIDE, y);
-    const { x0, x1, z0, z1 } = hole;
+    const [lo, hi] = [-DECK_OUT, SIDE + DECK_OUT];
+    if (!hole) return deckRect(lo, hi, lo, hi, y);
+    const out = (v: number) => (v <= 0 ? lo : v >= SIDE ? hi : v);
+    const [x0, x1, z0, z1] = [hole.x0, hole.x1, hole.z0, hole.z1].map(out);
     return [
-        ...(z0 > 0 ? deckRect(0, SIDE, 0, z0, y) : []),
-        ...(z1 < SIDE ? deckRect(0, SIDE, z1, SIDE, y) : []),
-        ...(x0 > 0 ? deckRect(0, x0, z0, z1, y) : []),
-        ...(x1 < SIDE ? deckRect(x1, SIDE, z0, z1, y) : []),
+        ...(z0 > lo ? deckRect(lo, hi, lo, z0, y) : []),
+        ...(z1 < hi ? deckRect(lo, hi, z1, hi, y) : []),
+        ...(x0 > lo ? deckRect(lo, x0, z0, z1, y) : []),
+        ...(x1 < hi ? deckRect(x1, hi, z0, z1, y) : []),
     ];
 }
 
@@ -269,17 +285,28 @@ function flight(
             );
         }
     const n = Math.round(rise / (ladder ? 0.28 : 0.22));
-    for (let i = 1; i < n; i++) {
+    const step = vec3(0, rise / n, 0);
+    for (let i = 1; i <= n; i++) {
         const c = foot.lerp(head, i / n);
-        if (ladder) pieces.push(...rod(c.sub(side), c.add(side), 0.016, "steel", 2));
-        else {
-            const depth = dir.scale(0.2);
-            pieces.push({
-                kind: "face",
-                points: [c.sub(side), c.add(side), c.add(side).add(depth), c.sub(side).add(depth)],
-                material: "deck",
-            });
+        if (ladder) {
+            if (i < n) pieces.push(...rod(c.sub(side), c.add(side), 0.016, "steel", 2));
+            continue;
         }
+        // Each step's riser, under the front edge of its tread (the last up to the deck), facing down the stairs.
+        const below = c.sub(step);
+        pieces.push({
+            kind: "face",
+            points: [below.sub(side), below.add(side), c.add(side), c.sub(side)],
+            material: "deck",
+            normal: dir.neg(),
+        });
+        if (i === n) continue;
+        const depth = dir.scale(0.2);
+        pieces.push({
+            kind: "face",
+            points: [c.sub(side), c.add(side), c.add(side).add(depth), c.sub(side).add(depth)],
+            material: "deck",
+        });
     }
     return pieces;
 }
@@ -367,6 +394,12 @@ function cutoutRailings(): Piece[] {
     ];
 }
 
+/**
+ * A stair railing's newel at each end: how wide it is (square), how far it stands above the top rail, and how far its
+ * middle sits out towards the boards, so it covers both the rail's and the boards' ends.
+ */
+const NEWEL = { w: 0.16, above: 0.06, out: 0.03 };
+
 /** The railings' sawn timbers: square posts, a deep top rail on them, and thin boards below it on the outside. */
 const POST = 0.09;
 const TOP_RAIL = { w: 0.09, h: 0.15 };
@@ -394,6 +427,8 @@ function railing(
         [a, b] = [a.add(inset), b.sub(inset)];
     }
     const lift = (h: number) => vec3(0, h, 0);
+    // The railing sorts as one, from its middle; its boards in front of its posts from their side, its top rail on top.
+    const middle = a.lerp(b, 0.5).add(lift(RAIL_HEIGHT / 2));
     const n = Math.max(1, Math.round(a.distanceTo(b) / 1.2));
     const at =
         posts === "ends"
@@ -403,10 +438,37 @@ function railing(
               );
     for (const i of at) {
         const p = a.lerp(b, i / n);
-        pieces.push(...timber(p, p.add(lift(RAIL_HEIGHT - TOP_RAIL.h)), out, POST, POST, "rail"));
+        if (posts === "ends") {
+            // A stair railing's end posts are newels: stouter, standing a little above the top rail with their tops
+            // showing, and drawn over the rest of the railing so they hide its rails' ends.
+            const centre = p.add(out.scale(NEWEL.out));
+            pieces.push(
+                ...timber(
+                    centre,
+                    centre.add(lift(RAIL_HEIGHT + NEWEL.above)),
+                    out,
+                    NEWEL.w,
+                    NEWEL.w,
+                    "rail",
+                ).map((f) => ({ ...f, group: { at: middle, over: true } })),
+            );
+            continue;
+        }
+        // Its top is under the top rail and its foot on the deck, so only its sides show.
+        pieces.push(
+            ...timber(p, p.add(lift(RAIL_HEIGHT - TOP_RAIL.h)), out, POST, POST, "rail", false).map(
+                (f) => ({ ...f, group: { at: middle } }),
+            ),
+        );
     }
     const top = lift(RAIL_HEIGHT - TOP_RAIL.h / 2);
-    pieces.push(...timber(a.add(top), b.add(top), UP, TOP_RAIL.w, TOP_RAIL.h, "rail"));
+    // The rails' ends meet a log or a post, or are too small to matter, so they're left off.
+    pieces.push(
+        ...timber(a.add(top), b.add(top), UP, TOP_RAIL.w, TOP_RAIL.h, "rail", false).map((f) => ({
+            ...f,
+            group: { at: middle, ahead: UP },
+        })),
+    );
     const face = out.scale(POST / 2 + BOARD.w / 2);
     for (const h of BOARD_HEIGHTS)
         pieces.push(
@@ -417,7 +479,8 @@ function railing(
                 BOARD.w,
                 BOARD.h,
                 "rail",
-            ),
+                false,
+            ).map((f) => ({ ...f, group: { at: middle, ahead: out } })),
         );
     return pieces;
 }
@@ -434,13 +497,20 @@ const dirToCompass = (v: Vector3) => vec3(-v.z, v.y, v.x);
 
 function toCompass(p: Piece): Piece {
     const shell = p.shell && { ...p.shell, out: dirToCompass(p.shell.out) };
-    if (p.kind === "rod") return { ...p, a: pointToCompass(p.a), b: pointToCompass(p.b), shell };
-    if (p.kind === "strand") return { ...p, points: p.points.map(pointToCompass), shell };
+    const group = p.group && {
+        at: pointToCompass(p.group.at),
+        ahead: p.group.ahead && dirToCompass(p.group.ahead),
+        over: p.group.over,
+    };
+    if (p.kind === "rod")
+        return { ...p, a: pointToCompass(p.a), b: pointToCompass(p.b), shell, group };
+    if (p.kind === "strand") return { ...p, points: p.points.map(pointToCompass), shell, group };
     return {
         ...p,
         points: p.points.map(pointToCompass),
         normal: p.normal && dirToCompass(p.normal),
         shell,
+        group,
     };
 }
 
@@ -478,7 +548,8 @@ function planPieces(): Piece[] {
 
     // Log beams round each level under its deck, from corner post to corner post, on their sides of the shell.
     for (const y of LEVELS.slice(1)) {
-        const by = y - LOG_R - 0.03;
+        // Their tops level with the deck, which sits on them.
+        const by = y - LOG_R;
         const beam = (from: Vector3, to: Vector3, out: Vector3) =>
             onShell(
                 rod(from, to, LOG_R, "log").map((r) => ({ ...r, capA: false, capB: false })),
@@ -487,8 +558,8 @@ function planPieces(): Piece[] {
             );
         pieces.push(...beam(vec3(0, by, 0), vec3(SIDE, by, 0), E_OUT));
         pieces.push(...beam(vec3(0, by, SIDE), vec3(SIDE, by, SIDE), W_OUT));
-        pieces.push(...beam(vec3(0, by - 0.05, 0), vec3(0, by - 0.05, SIDE), S_OUT));
-        pieces.push(...beam(vec3(SIDE, by - 0.05, 0), vec3(SIDE, by - 0.05, SIDE), N_OUT));
+        pieces.push(...beam(vec3(0, by, 0), vec3(0, by, SIDE), S_OUT));
+        pieces.push(...beam(vec3(SIDE, by, 0), vec3(SIDE, by, SIDE), N_OUT));
     }
 
     // Decks, with the stairs' openings and cutouts, and the railings round the cutouts.
@@ -706,7 +777,7 @@ export function topOpening(): { x0: number; x1: number; z0: number; z1: number }
  */
 export const WEST_EDGE = {
     rail: { x: -TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
-    outrigger: { x: -OUTRIGGER, y: TOP - LOG_R - 0.08, r: LOG_R },
+    outrigger: { x: -OUTRIGGER, y: TOP - LOG_R, r: LOG_R },
     clear: { x: -(SKIN + BOARD_T), y: TOP },
 };
 
