@@ -264,7 +264,7 @@ function flight(
                     foot.add(out).add(onTop),
                     head.add(out).add(onTop),
                     across.scale(s),
-                    true,
+                    "ends",
                 ),
             );
         }
@@ -303,7 +303,7 @@ const STRINGER_D = 0.28;
 const STAIR_IN = LOG_R + STAIR_WIDTH / 2 + STRINGER_W / 2 + 0.045 + 0.03 + 0.05;
 const LADDER_IN = LOG_R + 0.45 / 2 + 0.05;
 const STAIRS = [
-    { foot: vec3(1.4, LEVELS[0], LADDER_IN), dir: NORTH, run: 0.6, ladder: true },
+    { foot: vec3(2.4, LEVELS[0], LADDER_IN), dir: NORTH, run: 0.6, ladder: true },
     { foot: vec3(STAIR_IN, LEVELS[1], 3.3), dir: EAST, run: 2.0, ladder: false },
     { foot: vec3(SIDE - STAIR_IN, LEVELS[2], 1.2), dir: WEST, run: 2.0, ladder: false },
     { foot: vec3(STAIR_IN, LEVELS[3], 1.2), dir: WEST, run: 2.0, ladder: false },
@@ -324,6 +324,49 @@ const OPENINGS: Opening[] = STAIRS.map((s) => {
     };
 });
 
+/**
+ * What's cut out of each deck from level 1 up, by the plan (x north, z west). Level 1's whole SE corner is open, from
+ * the ladder's top south to the side and west to the foot of the stairs up to level 2. Level 2's stairwell runs on to
+ * the west side, its SW corner open; level 3's runs on to the east side, its NE corner open. The top deck has just
+ * the stairs' opening.
+ */
+const LADDER_TOP = STAIRS[0].foot.x + STAIRS[0].run;
+const HOLES: Opening[] = [
+    { x0: 0, x1: LADDER_TOP, z0: 0, z1: STAIRS[1].foot.z },
+    { ...OPENINGS[1], x0: 0, z1: SIDE },
+    { ...OPENINGS[2], z0: 0, x1: SIDE },
+    OPENINGS[3],
+];
+
+/**
+ * The railings round the cutouts, by the plan: each runs from the top of the stairs (or ladder) coming up to it, along
+ * the cutout's edge, with its boards on the cutout's side. Level 1's runs west from the ladder's top, then south to
+ * the stairs up to level 2.
+ */
+function cutoutRailings(): Piece[] {
+    const free = LOG_R + 0.06;
+    const ladderWest = STAIRS[0].foot.z + 0.45 / 2 + 0.08;
+    const [l1, l2, l3] = HOLES;
+    const stairNorth = STAIRS[1].foot.x + STAIR_WIDTH / 2 + STRINGER_W + 0.08;
+    const y1 = LEVELS[1];
+    return [
+        ...railing(vec3(l1.x1, y1, ladderWest), vec3(l1.x1, y1, l1.z1), vec3(-1, 0, 0), "all"),
+        ...railing(vec3(l1.x1, y1, l1.z1), vec3(stairNorth, y1, l1.z1), vec3(0, 0, -1), "all"),
+        ...railing(
+            vec3(l2.x1, LEVELS[2], STAIRS[1].foot.z - 2.0),
+            vec3(l2.x1, LEVELS[2], SIDE - free),
+            vec3(-1, 0, 0),
+            "all",
+        ),
+        ...railing(
+            vec3(l3.x0, LEVELS[3], STAIRS[2].foot.z + 2.0),
+            vec3(l3.x0, LEVELS[3], free),
+            vec3(1, 0, 0),
+            "all",
+        ),
+    ];
+}
+
 /** The railings' sawn timbers: square posts, a deep top rail on them, and thin boards below it on the outside. */
 const POST = 0.09;
 const TOP_RAIL = { w: 0.09, h: 0.15 };
@@ -332,13 +375,18 @@ const BOARD_HEIGHTS = [0.2, 0.42, 0.64];
 
 /**
  * A timber railing from `a` to `b` (where it stands, level for a deck or sloping up a stair), with `out` the side its
- * boards are on. A deck's railing runs between the corner logs, so it has posts only between them; a stair's has its
- * own `endPosts`.
+ * boards are on. A side's railing runs between the corner logs, so it has posts only `between` them; a stair's has a
+ * post at each of its `ends` only; one standing free round a cutout in a deck has `all` of them.
  */
-function railing(a: Vector3, b: Vector3, out: Vector3, endPosts = false): Piece[] {
+function railing(
+    a: Vector3,
+    b: Vector3,
+    out: Vector3,
+    posts: "between" | "ends" | "all" = "between",
+): Piece[] {
     const pieces: Piece[] = [];
     // Between corner logs, the rails stop at the logs' sides rather than running into them.
-    if (!endPosts) {
+    if (posts === "between") {
         const inset = b
             .sub(a)
             .unit()
@@ -347,7 +395,13 @@ function railing(a: Vector3, b: Vector3, out: Vector3, endPosts = false): Piece[
     }
     const lift = (h: number) => vec3(0, h, 0);
     const n = Math.max(1, Math.round(a.distanceTo(b) / 1.2));
-    for (let i = endPosts ? 0 : 1; i <= (endPosts ? n : n - 1); i++) {
+    const at =
+        posts === "ends"
+            ? [0, n]
+            : Array.from({ length: posts === "all" ? n + 1 : n - 1 }, (_, i) =>
+                  posts === "all" ? i : i + 1,
+              );
+    for (const i of at) {
         const p = a.lerp(b, i / n);
         pieces.push(...timber(p, p.add(lift(RAIL_HEIGHT - TOP_RAIL.h)), out, POST, POST, "rail"));
     }
@@ -437,8 +491,9 @@ function planPieces(): Piece[] {
         pieces.push(...beam(vec3(SIDE, by - 0.05, 0), vec3(SIDE, by - 0.05, SIDE), N_OUT));
     }
 
-    // Decks, with the stairs' openings.
-    for (let i = 1; i < LEVELS.length; i++) pieces.push(...deck(LEVELS[i], OPENINGS[i - 1]));
+    // Decks, with the stairs' openings and cutouts, and the railings round the cutouts.
+    for (let i = 1; i < LEVELS.length; i++) pieces.push(...deck(LEVELS[i], HOLES[i - 1]));
+    pieces.push(...cutoutRailings());
 
     // Stairs.
     for (let i = 0; i < STAIRS.length; i++) {

@@ -37,7 +37,8 @@ export type RigColor =
     | "purple"
     | "black"
     | "white"
-    | "maroon";
+    | "maroon"
+    | "dark-blue";
 
 /**
  * A sling round the overhead beam, both its ends clipped to one carabiner (a basket). `length` is its length laid flat
@@ -73,7 +74,8 @@ export type Rope = {
 /**
  * A rope bucket on the top deck: directly under the overhead beam beside the steel railing round the stairs, the
  * mirror image of another bucket across the tower's middle (from south to north), or east of the stairs' steel
- * railing in line with one of the beam's spaces, directly under one of its spaces, or on the deck under a belay's
+ * railing in line with one of the beam's spaces, directly under one of its spaces, in one of the top deck's corners, or
+ * on the deck under a belay's
  * prusiks (as near under them as it can stand inside the railings).
  */
 export type Bucket = {
@@ -85,7 +87,10 @@ export type Bucket = {
         | { mirrorOf: string }
         | { eastOfStairsAt: 1 | 2 | 3 | 4 | 5 }
         | { underBeamAt: 1 | 2 | 3 | 4 | 5 }
-        | { underBelay: string };
+        | { underBelay: string }
+        | { inCorner: "NE" | "SE" | "SW" | "NW" };
+    /** How tall it is (m), if not the usual. */
+    height?: number;
 };
 
 /**
@@ -145,7 +150,7 @@ export const RIGS: Rig[] = [
                 kind: "rope",
                 id: "rope-1",
                 from: "sling-1",
-                color: "blue",
+                color: "dark-blue",
                 route: "east-face",
                 spare: "bucket-1",
             },
@@ -158,7 +163,13 @@ export const RIGS: Rig[] = [
                 color: "purple",
                 configuration: "basket",
             },
-            { kind: "bucket", id: "bucket-2", color: "black", place: { mirrorOf: "bucket-1" } },
+            {
+                kind: "bucket",
+                id: "bucket-2",
+                color: "blue",
+                place: { mirrorOf: "bucket-1" },
+                height: 0.55,
+            },
             {
                 kind: "rope",
                 id: "rope-2",
@@ -167,24 +178,26 @@ export const RIGS: Rig[] = [
                 route: "east-face",
                 spare: "bucket-2",
             },
-            // The west lines: the other ends of the same two ropes, sharing their buckets. The first goes over the
-            // outrigger, the second just drops past the railing.
+            // The west lines. The first, in space 1 on a longer sling, goes over the outrigger, its spare in its own
+            // bucket in the top deck's SW corner; the second, the other end of the space 4 rope sharing its bucket,
+            // just drops past the railing.
             {
                 kind: "sling",
                 id: "sling-3",
-                space: 2,
-                length: 2,
-                color: "purple",
+                space: 1,
+                length: 3,
+                color: "green",
                 configuration: "basket",
             },
             {
                 kind: "rope",
                 id: "rope-3",
                 from: "sling-3",
-                color: "blue",
+                color: "dark-blue",
                 route: "west-outrigger",
-                spare: "bucket-1",
+                spare: "bucket-6",
             },
+            { kind: "bucket", id: "bucket-6", color: "black", place: { inCorner: "SW" } },
             {
                 kind: "sling",
                 id: "sling-4",
@@ -229,7 +242,13 @@ export const RIGS: Rig[] = [
                 color: "purple",
                 configuration: "basket",
             },
-            { kind: "bucket", id: "bucket-4", color: "blue", place: { underBeamAt: 5 } },
+            {
+                kind: "bucket",
+                id: "bucket-4",
+                color: "blue",
+                place: { underBeamAt: 5 },
+                height: 0.55,
+            },
             {
                 kind: "belay",
                 id: "belay-2",
@@ -264,8 +283,8 @@ export const RIGS: Rig[] = [
                 kind: "sling",
                 id: "sling-8",
                 space: 1,
-                length: 2,
-                color: "purple",
+                length: 3,
+                color: "green",
                 configuration: "basket",
             },
             {
@@ -302,9 +321,9 @@ export const RIGS: Rig[] = [
 /** Each rig colour as drawn: the knot pages' colour of that name, or the rig's own for those they don't have. */
 export const rigColor = (c: RigColor) =>
     OWN_COLORS.includes(c) ? `var(--rig-${c})` : `var(--knot-${c})`;
-const OWN_COLORS: RigColor[] = ["black", "white", "dark-green", "dark-red", "maroon"];
+const OWN_COLORS: RigColor[] = ["black", "white", "dark-green", "dark-red", "maroon", "dark-blue"];
 /** Colours dark enough that a label on them is written light. */
-const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon"];
+const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "dark-blue"];
 
 /** Tape and rope, as round as they're drawn. */
 const SLING_R = 0.0125;
@@ -515,19 +534,39 @@ function toGround(
     // The last stretch to the rail sorts with what's outside, so the rail doesn't cover the rope lying on it.
     const nearRail = rail.sub(rail.sub(last).unit().scale(0.3));
     const outside = { out: route === "east-face" ? EAST : EAST.neg(), layer: 3 };
+    // Past the rail it's cut where it lands on what it goes over (the boarding's edge, the outrigger) and where it leaves
+    // for the long drop, so the stretch lying on each sorts against it, not by a long stretch's middle far off.
+    // The stretch landing on what's below the rail joins the stretch lying on it, so it sorts there too.
+    const beyond = beyondRail(route, z, end);
+    const landing = beyond[0].add(
+        rail
+            .sub(beyond[0])
+            .unit()
+            .scale(Math.min(0.25, rail.distanceTo(beyond[0]) / 2)),
+    );
+    // And the start of the drop off it joins the stretch lying on it too.
+    const [off, foot] = [beyond[beyond.length - 2] ?? landing, beyond[beyond.length - 1]];
+    const leaving = off.add(
+        foot
+            .sub(off)
+            .unit()
+            .scale(Math.min(0.3, off.distanceTo(foot) / 2)),
+    );
+    const past = [nearRail, rail, landing, ...beyond.slice(0, -1), leaving, foot];
+    const cuts = [0, 2, past.length - 2, past.length - 1].filter((c, i, cs) => cs.indexOf(c) === i);
     return [
         strand([...from, nearRail], ROPE_R, "rope", color, true, false),
-        {
+        ...cuts.slice(1).map((c, i) => ({
             ...strand(
-                [nearRail, rail, ...beyondRail(route, z, end)],
+                past.slice(cuts[i], c + 1),
                 ROPE_R,
                 "rope",
                 color,
                 false,
-                true,
+                i === cuts.length - 2,
             ),
             shell: outside,
-        },
+        })),
     ];
 }
 
@@ -775,6 +814,12 @@ function bucketBase(bucket: Bucket, rig: Rig): Vector3 {
         return vec3(OVERHEAD.x, TOP, topOpening().z1 + BUCKET_R + BUCKET_GAP);
     if ("underBelay" in place)
         throw new Error("A bucket under a belay stands where its belay is laid out");
+    if ("inCorner" in place) {
+        const inside = LOG_R + BUCKET_R + 0.08;
+        const x = place.inCorner.includes("E") ? SIDE - inside : inside;
+        const z = place.inCorner.includes("N") ? SIDE - inside : inside;
+        return vec3(x, TOP, z);
+    }
     if ("underBeamAt" in place) {
         const { z0, z1 } = overheadSpace(place.underBeamAt);
         return vec3(OVERHEAD.x, TOP, (z0 + z1) / 2);
@@ -795,7 +840,12 @@ function bucketBase(bucket: Bucket, rig: Rig): Vector3 {
  * A rope bucket standing at `base`: its sides and floor (open at the top, so its far side shows inside from above),
  * and the top coil of the rope in it.
  */
-function bucketPieces(base: Vector3, color: string, ropeColor: string | null): Piece[] {
+function bucketPieces(
+    base: Vector3,
+    color: string,
+    ropeColor: string | null,
+    height = BUCKET_H,
+): Piece[] {
     const n = 16;
     const ring = (y: number, r: number) =>
         Array.from({ length: n }, (_, i) => {
@@ -803,7 +853,7 @@ function bucketPieces(base: Vector3, color: string, ropeColor: string | null): P
             return base.add(vec3(r * Math.cos(a), y, r * Math.sin(a)));
         });
     const bottom = ring(0, BUCKET_R);
-    const rim = ring(BUCKET_H, BUCKET_R);
+    const rim = ring(height, BUCKET_R);
     const sides: Face[] = bottom.map((p, i) => ({
         kind: "face",
         points: [p, bottom[(i + 1) % n], rim[(i + 1) % n], rim[i]],
@@ -814,7 +864,7 @@ function bucketPieces(base: Vector3, color: string, ropeColor: string | null): P
     const coil = ropeColor
         ? [
               strand(
-                  [...ring(BUCKET_H - 0.12, 0.12), ring(BUCKET_H - 0.12, 0.12)[0]],
+                  [...ring(height - 0.12, 0.12), ring(height - 0.12, 0.12)[0]],
                   ROPE_R,
                   "rope",
                   ropeColor,
@@ -825,14 +875,14 @@ function bucketPieces(base: Vector3, color: string, ropeColor: string | null): P
 }
 
 /** Spare rope draping from `from` (the hitch) into the bucket at `base`, sagging a little, and down onto its coil. */
-function drape(from: Vector3, base: Vector3, color: string): Piece[] {
-    const into = base.add(vec3(0, BUCKET_H, 0));
+function drape(from: Vector3, base: Vector3, color: string, height = BUCKET_H): Piece[] {
+    const into = base.add(vec3(0, height, 0));
     const sag = 0.25;
     const points = Array.from({ length: 13 }, (_, i) => {
         const t = i / 12;
         return from.lerp(into, t).add(vec3(0, -sag * 4 * t * (1 - t), 0));
     });
-    points.push(base.add(vec3(0.12, BUCKET_H - 0.12, 0)));
+    points.push(base.add(vec3(0.12, height - 0.12, 0)));
     return run(points, [4, 8, 12], ROPE_R, "rope", color);
 }
 
@@ -843,6 +893,8 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
     const clips = new Map<string, { clip: Vector3; along: Vector3 }>();
     // Where each fixed line's end carabiner takes a rope round it, for belays redirected through it.
     const redirects = new Map<string, Vector3>();
+    const heightOf = (id?: string) =>
+        rig.items.find((i): i is Bucket => i.kind === "bucket" && i.id === id)?.height;
     // Buckets standing under a belay's prusiks are placed when it's laid out.
     const underBelay = (b: Bucket) => typeof b.place === "object" && "underBelay" in b.place;
     const buckets = new Map(
@@ -893,6 +945,7 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
                     bucketBase(item, rig),
                     rigColor(item.color),
                     fed ? rigColor(fed.color) : null,
+                    item.height,
                 ),
             );
         } else if (item.kind === "wrap-sling") {
@@ -937,10 +990,20 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
                 const keep = (v: number) => clamp(v, inside, SIDE - inside);
                 const base = vec3(keep(under.x), deck, keep(under.z));
                 buckets.set(below.id, base);
-                pieces.push(...bucketPieces(base, rigColor(below.color), rigColor(item.color)));
+                pieces.push(
+                    ...bucketPieces(
+                        base,
+                        rigColor(below.color),
+                        rigColor(item.color),
+                        below.height,
+                    ),
+                );
             }
             const bucket = item.spare && buckets.get(item.spare);
-            if (bucket) pieces.push(...drape(belay.back, bucket, rigColor(item.color)));
+            if (bucket)
+                pieces.push(
+                    ...drape(belay.back, bucket, rigColor(item.color), heightOf(item.spare)),
+                );
         } else {
             const from = clips.get(item.from);
             if (!from) continue;
@@ -949,7 +1012,10 @@ export function layoutRig(rig: Rig): { pieces: Piece[]; labels: RigLabel[] } {
             pieces.push(...rope.pieces);
             labels.push(...rope.labels);
             const bucket = item.spare && buckets.get(item.spare);
-            if (bucket) pieces.push(...drape(from.clip, bucket, rigColor(item.color)));
+            if (bucket)
+                pieces.push(
+                    ...drape(from.clip, bucket, rigColor(item.color), heightOf(item.spare)),
+                );
         }
     }
     return { pieces, labels };

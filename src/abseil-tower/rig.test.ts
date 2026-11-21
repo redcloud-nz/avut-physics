@@ -16,7 +16,7 @@ describe("the first east face rig", () => {
     const abseil = layoutRig({
         ...RIGS[0],
         items: RIGS[0].items.filter(
-            (i) => i.kind !== "belay" && i.id !== "bucket-3" && i.id !== "bucket-4",
+            (i) => i.kind !== "belay" && !["bucket-3", "bucket-4", "bucket-6"].includes(i.id),
         ),
     }).pieces;
 
@@ -57,7 +57,8 @@ describe("the first east face rig", () => {
     });
 
     it("hangs the rope down the outside of the east face to the ground", () => {
-        const last = ropes.find((p) => p.shell?.out.x === 1)!;
+        // The rope's real end past the east rail: the stretch outside that ends rounded.
+        const last = ropes.find((p) => p.kind === "strand" && p.shell?.out.x === 1 && p.capB)!;
         if (last.kind !== "strand") throw new Error();
         const foot = last.points[last.points.length - 1];
         expect(foot.x).toBeGreaterThan(SIDE + 0.15);
@@ -112,8 +113,13 @@ describe("the first east face rig", () => {
     });
 
     it("stands the second belay's bucket directly under the beam's space 5", () => {
+        // The blue bucket at the north end (the other blue one is the space 4 line's).
         const blue = pieces.filter(
-            (p) => p.material === "bucket" && p.color === "var(--knot-blue)",
+            (p) =>
+                p.material === "bucket" &&
+                p.color === "var(--knot-blue)" &&
+                p.kind === "face" &&
+                p.points.every((q) => q.z > overheadSpace(5).z0 - 0.2),
         );
         expect(blue.length).toBeGreaterThan(0);
         const pts = blue.flatMap((p) => (p.kind === "face" ? p.points : []));
@@ -127,8 +133,9 @@ describe("the first east face rig", () => {
         const maroon = ropes.filter(
             (p) => p.kind === "strand" && p.color === "var(--rig-maroon)" && p.shell?.out.x === -1,
         );
-        expect(maroon).toHaveLength(1);
-        const end = maroon[0].kind === "strand" ? maroon[0].points.at(-1)! : vec3(0, 0, 0);
+        const ends = maroon.filter((p) => p.kind === "strand" && p.capB);
+        expect(ends).toHaveLength(1);
+        const end = ends[0].kind === "strand" ? ends[0].points.at(-1)! : vec3(0, 0, 0);
         const { x, y, r } = WEST_EDGE.outrigger;
         expect(end.x).toBeLessThan(x - r);
         expect(end.y).toBeLessThan(y - r);
