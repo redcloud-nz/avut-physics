@@ -10,10 +10,13 @@ import { svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import { describe, layoutRig, rigColor, RIGS } from "./rig";
 import {
     groundAt,
     groundCorners,
     LEVELS,
+    OVERHEAD,
+    overheadSpace,
     SIDE,
     towerPieces,
     type Face,
@@ -36,7 +39,12 @@ const COLOR: Record<Material, string> = {
     deck: "var(--tower-deck)",
     steel: "var(--tower-steel)",
     door: "var(--tower-door)",
+    sling: "var(--knot-yellow)",
+    rope: "var(--knot-blue)",
+    bucket: "var(--rig-black)",
 };
+/** The narrowest some things are drawn (SVG units), however thin they are, so a rope never vanishes. */
+const MIN_WIDTH: Partial<Record<Material, number>> = { sling: 4.5, rope: 3.5, steel: 1.6 };
 const shade = (color: string, percent: number) =>
     `color-mix(in oklab, ${color} ${Math.round(percent)}%, black)`;
 
@@ -84,7 +92,9 @@ function plankLines(f: Face, spacing: number): [Vector3, Vector3][] {
 export default function TowerView() {
     const [azimuth, setAzimuth] = useState(VIEWS.se.azimuth);
     const [elevation, setElevation] = useState(VIEWS.se.elevation);
-    const pieces = useMemo(() => towerPieces(), []);
+    const rig = RIGS[0];
+    const laid = useMemo(() => layoutRig(rig), [rig]);
+    const pieces = useMemo(() => [...towerPieces(), ...laid.pieces], [laid]);
     const drag = useRef<{ x: number; y: number; azimuth: number; elevation: number } | null>(null);
 
     const cam = new OrbitCamera(rad(azimuth), rad(elevation));
@@ -96,7 +106,7 @@ export default function TowerView() {
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). A timber's sides
     // facing away are left out, being behind its others.
-    const shown = (p: Piece) => p.kind === "rod" || !p.normal || p.normal.dot(cam.toward) > 0;
+    const shown = (p: Piece) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0;
     const sortKey = (p: Piece) => {
         const depth = cam.depth(centreOf(p));
         if (!p.shell) return depth;
@@ -162,6 +172,36 @@ export default function TowerView() {
             {sorted.map((piece, i) => (
                 <PieceDrawing key={i} piece={piece} toSvg={toSvg} />
             ))}
+            {laid.labels.map((l, i) => {
+                const at = toSvg(l.at);
+                return (
+                    <text
+                        key={i}
+                        x={at.x + 10}
+                        y={at.y + 12}
+                        fill="var(--ink-strong)"
+                        fontSize={13}
+                        fontFamily="var(--font-geist-mono), monospace"
+                        dominantBaseline="hanging"
+                        paintOrder="stroke"
+                        stroke="var(--halo)"
+                        strokeWidth={4}
+                    >
+                        {l.text}
+                    </text>
+                );
+            })}
+            {/* The spaces' numbers, unless the beam's seen end on and they'd fall on one another. */}
+            {Math.abs(cam.right.z) > 0.4 &&
+                [1, 2, 3, 4, 5].map((n) => {
+                    const { z0, z1 } = overheadSpace(n);
+                    const at = vec3(OVERHEAD.x, OVERHEAD.upperY + OVERHEAD.r + 0.2, (z0 + z1) / 2);
+                    return (
+                        <Label key={n} at={toSvg(at)} color="var(--ink-muted)">
+                            {n}
+                        </Label>
+                    );
+                })}
             {LEVELS.slice(1).map((y, i) => {
                 const at = toSvg(vec3(leftmost.x, y, leftmost.z));
                 return (
@@ -222,16 +262,39 @@ export default function TowerView() {
         </>
     );
 
-    return <VisualisationLayout diagram={diagram} controls={controls} />;
+    const readouts = (
+        <>
+            <h2 className="text-sm font-medium text-ink-strong">{rig.name}</h2>
+            <ol className="flex flex-col gap-1.5 text-sm text-ink-soft">
+                {rig.items.map((item) => (
+                    <li key={item.id} className="flex items-baseline gap-2">
+                        <span
+                            aria-hidden
+                            className="inline-block size-2.5 shrink-0 rounded-full ring-1 ring-line"
+                            style={{ background: rigColor(item.color) }}
+                        />
+                        {describe(item, rig)}
+                    </li>
+                ))}
+            </ol>
+            <p className="text-xs text-ink-muted">
+                The overhead beam&rsquo;s spaces are numbered 1 to 5 from the south, between its
+                steel rods.
+            </p>
+        </>
+    );
+
+    return <VisualisationLayout diagram={diagram} controls={controls} readouts={readouts} />;
 }
 
 function centreOf(piece: Piece): Vector3 {
     if (piece.kind === "rod") return piece.a.lerp(piece.b, 0.5);
+    // A strand by its middle along its length would do better, but its points' average is near enough.
     return piece.points.reduce((s, p) => s.add(p), vec3(0, 0, 0)).scale(1 / piece.points.length);
 }
 
 function PieceDrawing({ piece, toSvg }: { piece: Piece; toSvg: (p: Vector3) => Vector2 }) {
-    const color = COLOR[piece.material];
+    const color = (piece.kind !== "face" && piece.color) || COLOR[piece.material];
     if (piece.kind === "face") {
         const fill = shade(color, faceShade(piece));
         return (
@@ -261,9 +324,43 @@ function PieceDrawing({ piece, toSvg }: { piece: Piece; toSvg: (p: Vector3) => V
             </g>
         );
     }
+    if (piece.kind === "strand") {
+        const w = Math.max(2 * piece.r * PPM, MIN_WIDTH[piece.material] ?? 0);
+        const pts = piece.points.map(toSvg);
+        const n = pts.length - 1;
+        // Where it joins another strand the ends are cut square, with the fill running a little past so no line shows
+        // across the join; real ends are rounded.
+        const past = (end: Vector2, next: Vector2) =>
+            end.add(end.sub(next).safeUnit(vec2(0, 0)).scale(0.8));
+        const fillPts = [
+            piece.capA ? pts[0] : past(pts[0], pts[1]),
+            ...pts.slice(1, n),
+            piece.capB ? pts[n] : past(pts[n], pts[n - 1]),
+        ];
+        const line = { fill: "none", strokeLinecap: "round", strokeLinejoin: "round" } as const;
+        const cut = { ...line, strokeLinecap: "butt" } as const;
+        const caps = [piece.capA && pts[0], piece.capB && pts[n]].filter((p): p is Vector2 => !!p);
+        return (
+            <g>
+                <polyline
+                    {...cut}
+                    points={svgPoints(pts)}
+                    stroke={shade(color, 40)}
+                    strokeWidth={w + 2}
+                />
+                {caps.map((p, i) => (
+                    <circle key={i} cx={p.x} cy={p.y} r={w / 2 + 1} fill={shade(color, 40)} />
+                ))}
+                <polyline {...cut} points={svgPoints(fillPts)} stroke={color} strokeWidth={w} />
+                {caps.map((p, i) => (
+                    <circle key={i} cx={p.x} cy={p.y} r={w / 2} fill={color} />
+                ))}
+            </g>
+        );
+    }
     const a = toSvg(piece.a);
     const b = toSvg(piece.b);
-    const w = 2 * piece.r * PPM;
+    const w = Math.max(2 * piece.r * PPM, MIN_WIDTH[piece.material] ?? 0);
     const outline = w > 3;
     // A round end only where the rod really ends: between its lengths the joins must not show.
     const ends = (cap: boolean, p: Vector2) =>

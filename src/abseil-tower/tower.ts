@@ -10,7 +10,16 @@ import { vec3, type Vector3 } from "@/lib/vector3";
  */
 
 /** What a piece is made of, which sets its colour. */
-export type Material = "log" | "rail" | "board" | "deck" | "steel" | "door";
+export type Material =
+    | "log"
+    | "rail"
+    | "board"
+    | "deck"
+    | "steel"
+    | "door"
+    | "sling"
+    | "rope"
+    | "bucket";
 
 /** A round piece (a log, a rail or a pipe): a cylinder from `a` to `b`, drawn with a rounded end where `capA`/`capB`. */
 export type Rod = {
@@ -21,6 +30,8 @@ export type Rod = {
     material: Material;
     capA: boolean;
     capB: boolean;
+    /** A colour in place of its material's (a rig's slings and ropes each have their own). */
+    color?: string;
 };
 
 /**
@@ -44,7 +55,22 @@ export type Face = {
  */
 export type Shell = { out: Vector3; layer: number };
 
-export type Piece = (Rod | Face) & { shell?: Shell };
+/**
+ * A run of rope, tape or wire through `points`, drawn as one line so it bends without showing joins. It sorts as one
+ * piece, so long or wrapping runs are split into a few strands.
+ */
+export type Strand = {
+    kind: "strand";
+    points: Vector3[];
+    r: number;
+    material: Material;
+    color?: string;
+    /** Whether each end is a real end, drawn rounded, or a join to the next strand, drawn so it doesn't show. */
+    capA: boolean;
+    capB: boolean;
+};
+
+export type Piece = (Rod | Face | Strand) & { shell?: Shell };
 
 const S_OUT = vec3(-1, 0, 0);
 const N_OUT = vec3(1, 0, 0);
@@ -76,8 +102,14 @@ const BOARD_T = 0.05;
 const PIECE = 0.6;
 const TILE = 1.2;
 
-/** A rod cut into short lengths, rounded only at its two real ends. */
-function rod(a: Vector3, b: Vector3, r: number, material: Material, maxPiece = PIECE): Rod[] {
+/** A rod cut into short lengths, rounded only at its two real ends. The rigs use it too. */
+export function rod(
+    a: Vector3,
+    b: Vector3,
+    r: number,
+    material: Material,
+    maxPiece = PIECE,
+): Rod[] {
     const n = Math.max(1, Math.ceil(a.distanceTo(b) / maxPiece));
     return Array.from({ length: n }, (_, i) => ({
         kind: "rod",
@@ -275,7 +307,7 @@ const STAIRS = [
     { foot: vec3(STAIR_IN, LEVELS[3], 1.2), dir: WEST, run: 2.0, ladder: false },
 ];
 
-export const OPENINGS: Opening[] = STAIRS.map((s) => {
+const OPENINGS: Opening[] = STAIRS.map((s) => {
     const head = s.foot.add(s.dir.scale(s.run));
     const back = s.ladder ? 1.0 : s.run;
     const tail = head.sub(s.dir.scale(back));
@@ -347,6 +379,7 @@ const dirToCompass = (v: Vector3) => vec3(-v.z, v.y, v.x);
 function toCompass(p: Piece): Piece {
     const shell = p.shell && { ...p.shell, out: dirToCompass(p.shell.out) };
     if (p.kind === "rod") return { ...p, a: pointToCompass(p.a), b: pointToCompass(p.b), shell };
+    if (p.kind === "strand") return { ...p, points: p.points.map(pointToCompass), shell };
     return {
         ...p,
         points: p.points.map(pointToCompass),
@@ -520,14 +553,24 @@ function planPieces(): Piece[] {
 
     // The overhead beam: two logs, one on the other, north–south across the middle of the top deck on an A-frame at
     // each end, the top one running a metre past each side. Four steel rods 1 m apart run down through both, standing 0.25 m above.
-    const beamY = TOP + 2.3;
-    const upperY = beamY + 2 * LOG_R;
+    const beamY = OVERHEAD.lowerY;
+    const upperY = OVERHEAD.upperY;
     const mid = SIDE / 2;
     // Only the top log runs past the sides; the lower one stops at the A-frames.
-    pieces.push(...rod(vec3(0, beamY, mid), vec3(SIDE, beamY, mid), LOG_R, "log"));
-    pieces.push(...rod(vec3(-1, upperY, mid), vec3(SIDE + 1, upperY, mid), LOG_R, "log"));
-    for (const k of [-1.5, -0.5, 0.5, 1.5]) {
-        const x = SIDE / 2 + k * 1.0;
+    // Each log is cut at the rods, so each space is one length, its middle where its slings are: then a sling sorts
+    // against the log it wraps rather than against a length off to one side.
+    const through = (y: number, xs: number[]) =>
+        xs.slice(1).flatMap((x, i) =>
+            rod(vec3(xs[i], y, mid), vec3(x, y, mid), LOG_R, "log", 2).map((r) => ({
+                ...r,
+                capA: i === 0,
+                capB: i === xs.length - 2,
+            })),
+        );
+    pieces.push(...through(beamY, [0, ...OVERHEAD.rods, SIDE]));
+    pieces.push(...through(upperY, [-1, 0, ...OVERHEAD.rods, SIDE, SIDE + 1]));
+    // The plan's x is north, as the compass's z is.
+    for (const x of OVERHEAD.rods) {
         pieces.push(
             ...rod(
                 vec3(x, beamY - LOG_R - 0.03, mid),
@@ -561,6 +604,48 @@ function planPieces(): Piece[] {
 
     return pieces;
 }
+
+/**
+ * The overhead beam, by the compass: it runs north–south at `x`, its lower log's middle at `lowerY` and its upper's at
+ * `upperY`, both of radius `r`. The lower log runs the tower's width (z from 0 to `SIDE`), and the steel rods through
+ * both stand at the `rods` z's, dividing it into five spaces numbered from the south.
+ */
+export const OVERHEAD = {
+    x: SIDE / 2,
+    lowerY: TOP + 2.3,
+    upperY: TOP + 2.3 + 2 * LOG_R,
+    r: LOG_R,
+    rods: [-1.5, -0.5, 0.5, 1.5].map((k) => SIDE / 2 + k),
+};
+
+/** Where a space on the overhead beam runs, from the south: z from `z0` to `z1`. Spaces are numbered 1 to 5. */
+export function overheadSpace(n: number): { z0: number; z1: number } {
+    const bounds = [0, ...OVERHEAD.rods, SIDE];
+    return { z0: bounds[n - 1], z1: bounds[n] };
+}
+
+/** The east side's edges a rope going over it rests on, by the compass: the top rail's top outer corner, then the top
+ * outer corner of the east face's boarding below it. */
+/**
+ * The top deck's stair opening by the compass (x from `x0` to `x1`, z from `z0` to `z1`). The steel railing runs along
+ * its north and east sides; the tower's south railing is on its south, and it's open to the west where the stairs come
+ * out.
+ */
+export function topOpening(): { x0: number; x1: number; z0: number; z1: number } {
+    const o = OPENINGS[3];
+    const [a, b] = [pointToCompass(vec3(o.x0, 0, o.z0)), pointToCompass(vec3(o.x1, 0, o.z1))];
+    return {
+        x0: Math.min(a.x, b.x),
+        x1: Math.max(a.x, b.x),
+        z0: Math.min(a.z, b.z),
+        z1: Math.max(a.z, b.z),
+    };
+}
+
+export const EAST_EDGE = {
+    rail: { x: SIDE + TOP_RAIL.w / 2, y: TOP + RAIL_HEIGHT },
+    boarding: { x: SIDE + SKIN + BOARD_T, y: TOP },
+};
 
 /** The ground round the tower, by the compass: a slope falling to the west, as one face. */
 export const groundCorners = () => {
