@@ -82,8 +82,8 @@ function plankLines(f: Face, spacing: number): [Vector3, Vector3][] {
 }
 
 export default function TowerView() {
-    const [azimuth, setAzimuth] = useState(VIEWS.sw.azimuth);
-    const [elevation, setElevation] = useState(VIEWS.sw.elevation);
+    const [azimuth, setAzimuth] = useState(VIEWS.se.azimuth);
+    const [elevation, setElevation] = useState(VIEWS.se.elevation);
     const pieces = useMemo(() => towerPieces(), []);
     const drag = useRef<{ x: number; y: number; azimuth: number; elevation: number } | null>(null);
 
@@ -93,22 +93,20 @@ export default function TowerView() {
         return vec2(ORIGIN.x + v.x * PPM, ORIGIN.y - v.y * PPM);
     };
 
-    // Back to front, by each piece's middle. That goes wrong between a big flat wall and what's just behind it, so the
-    // outside walls (the boarding and the door) go first when they face away and last when they face the eye.
-    const byDepth = (list: Piece[]) =>
-        list
-            .map((piece) => ({ piece, depth: cam.depth(centreOf(piece)) }))
-            .sort((a, b) => a.depth - b.depth)
-            .map((d) => d.piece);
-    const facing = (f: Face) => outward(f).dot(cam.toward) > 0;
-    const walls = pieces.filter((p): p is Face => p.kind === "face" && isWall(p));
-    // A timber's sides facing away are behind its others.
+    // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
+    // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). A timber's sides
+    // facing away are left out, being behind its others.
     const shown = (p: Piece) => p.kind === "rod" || !p.normal || p.normal.dot(cam.toward) > 0;
-    const sorted = [
-        ...byDepth(walls.filter((w) => !facing(w))),
-        ...byDepth(pieces.filter((p) => shown(p) && !(p.kind === "face" && isWall(p)))),
-        ...byDepth(walls.filter(facing)),
-    ];
+    const sortKey = (p: Piece) => {
+        const depth = cam.depth(centreOf(p));
+        if (!p.shell) return depth;
+        return depth + (p.shell.out.dot(cam.toward) > 0 ? 1 : -1) * p.shell.layer * 100;
+    };
+    const sorted = pieces
+        .filter(shown)
+        .map((piece) => ({ piece, key: sortKey(piece) }))
+        .sort((a, b) => a.key - b.key)
+        .map((d) => d.piece);
 
     const view = (Object.keys(VIEWS) as ViewName[]).find(
         (k) => VIEWS[k].azimuth === azimuth && VIEWS[k].elevation === elevation,
@@ -138,10 +136,10 @@ export default function TowerView() {
     const corners = [vec3(0, 0, 0), vec3(SIDE, 0, 0), vec3(SIDE, 0, SIDE), vec3(0, 0, SIDE)];
     const leftmost = corners.reduce((a, b) => (toSvg(b).x < toSvg(a).x ? b : a));
     const compass: [string, Vector3][] = [
-        ["N", vec3(SIDE / 2, groundAt(SIDE + 2), SIDE + 2)],
-        ["S", vec3(SIDE / 2, groundAt(-1.8), -1.8)],
-        ["E", vec3(SIDE + 1.8, groundAt(SIDE / 2), SIDE / 2)],
-        ["W", vec3(-1.8, groundAt(SIDE / 2), SIDE / 2)],
+        ["N", vec3(SIDE / 2, groundAt(SIDE / 2), SIDE + 1.8)],
+        ["S", vec3(SIDE / 2, groundAt(SIDE / 2), -1.8)],
+        ["E", vec3(SIDE + 1.8, groundAt(SIDE + 1.8), SIDE / 2)],
+        ["W", vec3(-2.2, groundAt(-2.2), SIDE / 2)],
     ];
 
     const diagram = (
@@ -149,7 +147,7 @@ export default function TowerView() {
             viewBox={`0 0 ${W} ${H}`}
             className="block h-auto max-h-[85vh] w-full cursor-grab touch-pan-y select-none active:cursor-grabbing"
             role="img"
-            aria-label="The abseil tower in 3D. Drag to turn it."
+            aria-label="The Cracroft abseil tower in 3D. Drag to turn it."
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -225,17 +223,6 @@ export default function TowerView() {
     );
 
     return <VisualisationLayout diagram={diagram} controls={controls} />;
-}
-
-/** The outside walls: the boarding and the door, which are all on the tower's outside. */
-const isWall = (f: Face) => f.material === "board" || f.material === "door";
-
-/** A flat piece's normal, turned to point away from the tower's middle. */
-function outward(f: Face): Vector3 {
-    const [p0, p1, , p3] = f.points;
-    const n = p1.sub(p0).cross(p3.sub(p0)).unit();
-    const away = centreOf(f).sub(vec3(SIDE / 2, 0, SIDE / 2));
-    return n.dot(vec3(away.x, 0, away.z)) < 0 ? n.neg() : n;
 }
 
 function centreOf(piece: Piece): Vector3 {

@@ -1,8 +1,12 @@
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
- * The abseil tower, as described from memory and a few photos: every size here is an estimate. Scene coordinates are
- * metres with x east, y up and z north, the origin at the tower's south-west corner post on the ground.
+ * The Cracroft abseil tower, as described from memory and a few photos: every size here is an estimate. Scene
+ * coordinates are metres with x east, y up and z north, the origin at the tower's south-west corner post on the ground.
+ *
+ * The pieces are laid out in a plan a quarter turn from that, with the boarded east face along its z = 0 side: the
+ * plan's x runs north, its z west, and its origin is the south-east corner post. `towerPieces` turns them to the compass
+ * at the end.
  */
 
 /** What a piece is made of, which sets its colour. */
@@ -32,23 +36,42 @@ export type Face = {
     normal?: Vector3;
 };
 
-export type Piece = Rod | Face;
+/**
+ * Where a piece is in the tower's shell, for the back-to-front sort: `layer` 1 is on one of its sides (railings, beams,
+ * corner posts), 2 the boarding outside that, and 3 what sticks out past it (log ends, the door, the outrigger), with
+ * `out` the way that side faces. Pieces on a side facing the eye are drawn after everything inside, and those on a side
+ * facing away before it. Pieces with no shell are inside.
+ */
+export type Shell = { out: Vector3; layer: number };
+
+export type Piece = (Rod | Face) & { shell?: Shell };
+
+const S_OUT = vec3(-1, 0, 0);
+const N_OUT = vec3(1, 0, 0);
+const E_OUT = vec3(0, 0, -1);
+const W_OUT = vec3(0, 0, 1);
+
+/** `pieces` placed in the shell, on the side facing `out`, in `layer`. */
+const onShell = <T extends Piece>(pieces: T[], out: Vector3, layer: number): T[] =>
+    pieces.map((p) => ({ ...p, shell: { out, layer } }));
 
 export const SIDE = 4.5;
-/** The height of each level's deck above the ground at the south face. Level 0 is the ground. */
+/** The height of each level's deck above the ground at the east face. Level 0 is the ground. */
 export const LEVELS = [0, 2.0, 4.5, 7.0, 9.5];
 export const TOP = LEVELS[4];
-/** The ground falls about a metre from the south face to the north face, towards the river. */
+/** The ground falls about a metre from the east face to the west face, towards the river. */
 const FALL = 1.0;
-export const groundAt = (z: number) => (-FALL * z) / SIDE;
+/** The ground's height at `z` across the plan. */
+const planGround = (z: number) => (-FALL * z) / SIDE;
 
 const LOG_R = 0.125;
 const PIPE_R = 0.022;
 const RAIL_HEIGHT = 1.0;
-/** How far log beams run past the corners. */
-const OVERHANG = 0.35;
-/** The boarding sits on the outside of the posts. */
+/** The boarding sits on the outside of the posts, and the east face's is this thick. */
 const SKIN = LOG_R + 0.02;
+/** How far the outrigger stands out from the west side. */
+const OUTRIGGER = 1.0;
+const BOARD_T = 0.05;
 /** Long pieces are cut into lengths no longer than this, so the back-to-front sort can put each in its place. */
 const PIECE = 0.6;
 const TILE = 1.2;
@@ -227,23 +250,29 @@ function flight(
     return pieces;
 }
 
-const NORTH = vec3(0, 0, 1);
-const SOUTH = vec3(0, 0, -1);
-const EAST = vec3(1, 0, 0);
+const WEST = vec3(0, 0, 1);
+const EAST = vec3(0, 0, -1);
+const NORTH = vec3(1, 0, 0);
 
 /**
- * The stairs, named by the direction a person faces going up: G to 1 is a ladder facing east beside the south side, 1
- * to 2 faces south beside the west side, 2 to 3 faces north beside the east side, and 3 to 4 faces north beside the west
+ * The stairs, named by the direction a person faces going up: G to 1 is a ladder facing north beside the east side, 1
+ * to 2 faces east beside the south side, 2 to 3 faces west beside the north side, and 3 to 4 faces west beside the south
  * side. Each opening runs back over its flight from where it comes out.
  */
 const STAIR_WIDTH = 0.7;
 const STRINGER_W = 0.06;
 const STRINGER_D = 0.28;
+/**
+ * How far a flight's middle sits in from the side it runs beside: clear of the corner logs and the tower's railing by
+ * a few centimetres, counting its stringer and the boards on the outside of its own railing.
+ */
+const STAIR_IN = LOG_R + STAIR_WIDTH / 2 + STRINGER_W / 2 + 0.045 + 0.03 + 0.05;
+const LADDER_IN = LOG_R + 0.45 / 2 + 0.05;
 const STAIRS = [
-    { foot: vec3(1.4, LEVELS[0], 0.55), dir: EAST, run: 0.6, ladder: true },
-    { foot: vec3(0.55, LEVELS[1], 3.3), dir: SOUTH, run: 2.0, ladder: false },
-    { foot: vec3(3.95, LEVELS[2], 1.2), dir: NORTH, run: 2.0, ladder: false },
-    { foot: vec3(0.55, LEVELS[3], 1.2), dir: NORTH, run: 2.0, ladder: false },
+    { foot: vec3(1.4, LEVELS[0], LADDER_IN), dir: NORTH, run: 0.6, ladder: true },
+    { foot: vec3(STAIR_IN, LEVELS[1], 3.3), dir: EAST, run: 2.0, ladder: false },
+    { foot: vec3(SIDE - STAIR_IN, LEVELS[2], 1.2), dir: WEST, run: 2.0, ladder: false },
+    { foot: vec3(STAIR_IN, LEVELS[3], 1.2), dir: WEST, run: 2.0, ladder: false },
 ];
 
 export const OPENINGS: Opening[] = STAIRS.map((s) => {
@@ -307,42 +336,70 @@ function railing(a: Vector3, b: Vector3, out: Vector3, endPosts = false): Piece[
 
 /** The tower, as pieces to draw. */
 export function towerPieces(): Piece[] {
+    return planPieces().map(toCompass);
+}
+
+/** A point in the plan, at its place by the compass. */
+const pointToCompass = (p: Vector3) => vec3(SIDE - p.z, p.y, p.x);
+/** A direction in the plan, turned to the compass. */
+const dirToCompass = (v: Vector3) => vec3(-v.z, v.y, v.x);
+
+function toCompass(p: Piece): Piece {
+    const shell = p.shell && { ...p.shell, out: dirToCompass(p.shell.out) };
+    if (p.kind === "rod") return { ...p, a: pointToCompass(p.a), b: pointToCompass(p.b), shell };
+    return {
+        ...p,
+        points: p.points.map(pointToCompass),
+        normal: p.normal && dirToCompass(p.normal),
+        shell,
+    };
+}
+
+/** The ground's height at a point by the compass: it falls about a metre from the east face to the west face. */
+export const groundAt = (x: number) => planGround(SIDE - x);
+
+/** The tower's pieces, laid out in the plan. */
+function planPieces(): Piece[] {
     const pieces: Piece[] = [];
     const corners = [vec3(0, 0, 0), vec3(SIDE, 0, 0), vec3(SIDE, 0, SIDE), vec3(0, 0, SIDE)];
     const top = TOP + RAIL_HEIGHT;
 
     // Corner posts, ground to the top railing, cut at each level.
     for (const c of corners) {
-        const heights = [groundAt(c.z), ...LEVELS.slice(1), top];
+        const heights = [planGround(c.z), ...LEVELS.slice(1), top];
+        const diagonal = vec3(c.x - SIDE / 2, 0, c.z - SIDE / 2).unit();
         for (let i = 0; i + 1 < heights.length; i++)
             pieces.push(
-                ...rod(
-                    vec3(c.x, heights[i], c.z),
-                    vec3(c.x, heights[i + 1], c.z),
-                    LOG_R,
-                    "log",
-                ).map((p) => ({
-                    ...p,
-                    capA: i === 0 && p.capA,
-                    capB: i === heights.length - 2 && p.capB,
-                })),
+                ...onShell(
+                    rod(
+                        vec3(c.x, heights[i], c.z),
+                        vec3(c.x, heights[i + 1], c.z),
+                        LOG_R,
+                        "log",
+                    ).map((p) => ({
+                        ...p,
+                        capA: i === 0 && p.capA,
+                        capB: i === heights.length - 2 && p.capB,
+                    })),
+                    diagonal,
+                    1,
+                ),
             );
     }
 
-    // Log beams round each level under its deck, their ends past the corners.
+    // Log beams round each level under its deck, from corner post to corner post, on their sides of the shell.
     for (const y of LEVELS.slice(1)) {
         const by = y - LOG_R - 0.03;
-        for (const z of [0, SIDE])
-            pieces.push(...rod(vec3(-OVERHANG, by, z), vec3(SIDE + OVERHANG, by, z), LOG_R, "log"));
-        for (const x of [0, SIDE])
-            pieces.push(
-                ...rod(
-                    vec3(x, by - 0.05, -OVERHANG),
-                    vec3(x, by - 0.05, SIDE + OVERHANG),
-                    LOG_R,
-                    "log",
-                ),
+        const beam = (from: Vector3, to: Vector3, out: Vector3) =>
+            onShell(
+                rod(from, to, LOG_R, "log").map((r) => ({ ...r, capA: false, capB: false })),
+                out,
+                1,
             );
+        pieces.push(...beam(vec3(0, by, 0), vec3(SIDE, by, 0), E_OUT));
+        pieces.push(...beam(vec3(0, by, SIDE), vec3(SIDE, by, SIDE), W_OUT));
+        pieces.push(...beam(vec3(0, by - 0.05, 0), vec3(0, by - 0.05, SIDE), S_OUT));
+        pieces.push(...beam(vec3(SIDE, by - 0.05, 0), vec3(SIDE, by - 0.05, SIDE), N_OUT));
     }
 
     // Decks, with the stairs' openings.
@@ -363,29 +420,48 @@ export function towerPieces(): Piece[] {
         );
     }
 
-    // The south face, boarded from the ground to the top deck.
+    // The east face, boarded from the ground to the top deck: a layer of boards its thickness deep, outside and
+    // inside, with their ends showing at each corner and their edge along the top.
     const planksAcross = 0.2;
+    const across = vec3(SIDE + 2 * SKIN, 0, 0);
+    const outside = vec3(-SKIN, 0, -SKIN - BOARD_T);
+    const inside = vec3(-SKIN, 0, -SKIN);
+    const east: Face[] = [];
+    for (const at of [outside, inside])
+        east.push(...panel(at, across, vec3(0, TOP, 0), "board", planksAcross));
+    for (const x of [0, across.x])
+        east.push(
+            ...panel(
+                outside.add(vec3(x, 0, 0)),
+                vec3(0, 0, BOARD_T),
+                vec3(0, TOP, 0),
+                "board",
+                planksAcross,
+            ),
+        );
+    east.push(
+        ...panel(outside.add(vec3(0, TOP, 0)), across, vec3(0, 0, BOARD_T), "board").map((f) => ({
+            ...f,
+            normal: vec3(0, 1, 0),
+        })),
+    );
+    pieces.push(...onShell(east, E_OUT, 2));
+    // The west face, boarded from its lower ground up to level 1.
+    const westGround = planGround(SIDE);
     pieces.push(
-        ...panel(
-            vec3(-SKIN, 0, -SKIN),
-            vec3(SIDE + 2 * SKIN, 0, 0),
-            vec3(0, TOP, 0),
-            "board",
-            planksAcross,
+        ...onShell(
+            panel(
+                vec3(-SKIN, westGround, SIDE + SKIN),
+                vec3(SIDE + 2 * SKIN, 0, 0),
+                vec3(0, LEVELS[1] - westGround, 0),
+                "board",
+                planksAcross,
+            ),
+            W_OUT,
+            2,
         ),
     );
-    // The north face, boarded from its lower ground up to level 1.
-    const northGround = groundAt(SIDE);
-    pieces.push(
-        ...panel(
-            vec3(-SKIN, northGround, SIDE + SKIN),
-            vec3(SIDE + 2 * SKIN, 0, 0),
-            vec3(0, LEVELS[1] - northGround, 0),
-            "board",
-            planksAcross,
-        ),
-    );
-    // The ground floor's west and east sides, boarded (an assumption: the door suggests the ground floor is closed in).
+    // The ground floor's south and north sides, boarded (an assumption: the door suggests the ground floor is closed in).
     for (const x of [-SKIN, SIDE + SKIN]) {
         const strips = 6;
         for (let i = 0; i < strips; i++) {
@@ -394,17 +470,18 @@ export function towerPieces(): Piece[] {
             pieces.push({
                 kind: "face",
                 points: [
-                    vec3(x, groundAt(z0), z0),
-                    vec3(x, groundAt(z1), z1),
+                    vec3(x, planGround(z0), z0),
+                    vec3(x, planGround(z1), z1),
                     vec3(x, LEVELS[1], z1),
                     vec3(x, LEVELS[1], z0),
                 ],
                 material: "board",
                 planks: planksAcross,
+                shell: { out: x < 0 ? S_OUT : N_OUT, layer: 2 },
             });
         }
     }
-    // The door, on the west side beside the south-west corner.
+    // The door, on the south side beside the south-east corner.
     pieces.push({
         kind: "face",
         points: [
@@ -412,20 +489,22 @@ export function towerPieces(): Piece[] {
             vec3(-SKIN - 0.01, 0, 1.1),
             vec3(-SKIN - 0.01, 1.9, 1.1),
             vec3(-SKIN - 0.01, 1.9, 0.3),
-        ].map((p) => vec3(p.x, p.y + groundAt(p.z), p.z)),
+        ].map((p) => vec3(p.x, p.y + planGround(p.z), p.z)),
         material: "door",
+        shell: { out: S_OUT, layer: 3 },
     });
 
-    // Railings round every level's open sides: east, west and north on every level, and south on the top deck.
+    // Railings round every level's open sides: north, south and west on every level, and east on the top deck.
     for (const y of LEVELS.slice(1)) {
-        pieces.push(...railing(vec3(0, y, 0), vec3(0, y, SIDE), vec3(-1, 0, 0)));
-        pieces.push(...railing(vec3(SIDE, y, 0), vec3(SIDE, y, SIDE), vec3(1, 0, 0)));
-        pieces.push(...railing(vec3(0, y, SIDE), vec3(SIDE, y, SIDE), vec3(0, 0, 1)));
-        // The south face's boarding stops at the top deck, so only there does it need a railing.
-        if (y === TOP) pieces.push(...railing(vec3(0, y, 0), vec3(SIDE, y, 0), vec3(0, 0, -1)));
+        pieces.push(...onShell(railing(vec3(0, y, 0), vec3(0, y, SIDE), S_OUT), S_OUT, 1));
+        pieces.push(...onShell(railing(vec3(SIDE, y, 0), vec3(SIDE, y, SIDE), N_OUT), N_OUT, 1));
+        pieces.push(...onShell(railing(vec3(0, y, SIDE), vec3(SIDE, y, SIDE), W_OUT), W_OUT, 1));
+        // The east face's boarding stops at the top deck, so only there does it need a railing.
+        if (y === TOP)
+            pieces.push(...onShell(railing(vec3(0, y, 0), vec3(SIDE, y, 0), E_OUT), E_OUT, 1));
     }
 
-    // The steel railing round the stairs' opening on the top deck, open at its north end where the stairs come out.
+    // The steel railing round the stairs' opening on the top deck, open at its west end where the stairs come out.
     const o = OPENINGS[3];
     for (const h of [0.5, RAIL_HEIGHT]) {
         const up = (x: number, z: number) => vec3(x, TOP + h, z);
@@ -439,13 +518,14 @@ export function towerPieces(): Piece[] {
     ])
         pieces.push(...rod(vec3(x, TOP, z), vec3(x, TOP + RAIL_HEIGHT, z), PIPE_R, "steel"));
 
-    // The overhead beam: two logs, one on the other, east–west across the middle of the top deck and a metre past each
-    // side, on an A-frame at each end. Four steel rods 1 m apart run down through both, standing 0.25 m above.
+    // The overhead beam: two logs, one on the other, north–south across the middle of the top deck on an A-frame at
+    // each end, the top one running a metre past each side. Four steel rods 1 m apart run down through both, standing 0.25 m above.
     const beamY = TOP + 2.3;
     const upperY = beamY + 2 * LOG_R;
     const mid = SIDE / 2;
-    for (const y of [beamY, upperY])
-        pieces.push(...rod(vec3(-1, y, mid), vec3(SIDE + 1, y, mid), LOG_R, "log"));
+    // Only the top log runs past the sides; the lower one stops at the A-frames.
+    pieces.push(...rod(vec3(0, beamY, mid), vec3(SIDE, beamY, mid), LOG_R, "log"));
+    pieces.push(...rod(vec3(-1, upperY, mid), vec3(SIDE + 1, upperY, mid), LOG_R, "log"));
     for (const k of [-1.5, -0.5, 0.5, 1.5]) {
         const x = SIDE / 2 + k * 1.0;
         pieces.push(
@@ -463,35 +543,32 @@ export function towerPieces(): Piece[] {
                 ...rod(vec3(x, TOP + 0.2, z), vec3(x, beamY - LOG_R, mid), LOG_R * 0.9, "log"),
             );
 
-    // The north outrigger: a log the width of the north side, a metre out at the top deck's height, on two arms.
-    const armY = TOP - 0.1;
-    const out = SIDE + 1.0;
-    for (const x of [0, SIDE]) {
-        pieces.push(...rod(vec3(x, armY, SIDE), vec3(x, armY, out + 0.15), LOG_R, "log"));
-        pieces.push(
-            ...rod(vec3(x, TOP - 1.6, SIDE), vec3(x, armY - LOG_R, out - 0.1), LOG_R * 0.8, "log"),
+    // The west outrigger: a log the width of the west side, a metre out, level with the top deck's beams. The top
+    // deck's south and north beams run on out and butt into it; there's no other bracing.
+    const outY = TOP - LOG_R - 0.08;
+    const out = SIDE + OUTRIGGER;
+    const outrigger: Rod[] = [];
+    for (const x of [0, SIDE])
+        outrigger.push(
+            ...rod(vec3(x, outY, SIDE), vec3(x, outY, out - LOG_R), LOG_R, "log").map((r) => ({
+                ...r,
+                capA: false,
+                capB: false,
+            })),
         );
-    }
-    pieces.push(
-        ...rod(
-            vec3(-0.3, armY + 2 * LOG_R, out),
-            vec3(SIDE + 0.3, armY + 2 * LOG_R, out),
-            LOG_R,
-            "log",
-        ),
-    );
+    outrigger.push(...rod(vec3(-0.15, outY, out), vec3(SIDE + 0.15, outY, out), LOG_R, "log"));
+    pieces.push(...onShell(outrigger, W_OUT, 3));
 
     return pieces;
 }
 
-/** The ground round the tower: a slope falling to the north, as one face. */
-export const GROUND_EXTENT = { x0: -2.5, x1: SIDE + 2.5, z0: -2.5, z1: SIDE + 3 };
+/** The ground round the tower, by the compass: a slope falling to the west, as one face. */
 export const groundCorners = () => {
-    const { x0, x1, z0, z1 } = GROUND_EXTENT;
+    const [x0, x1, z0, z1] = [-3, SIDE + 2.5, -2.5, SIDE + 2.5];
     return [
-        vec3(x0, groundAt(z0), z0),
-        vec3(x1, groundAt(z0), z0),
-        vec3(x1, groundAt(z1), z1),
-        vec3(x0, groundAt(z1), z1),
+        vec3(x0, groundAt(x0), z0),
+        vec3(x1, groundAt(x1), z0),
+        vec3(x1, groundAt(x1), z1),
+        vec3(x0, groundAt(x0), z1),
     ];
 };
