@@ -58,7 +58,7 @@ const LEVEL_NAMES = ["G", "Level 1", "Level 2", "Level 3", "Level 4"];
 /** How a face's colour is shaded: lit faces brighter, those edge on to the light darker. */
 function faceShade(f: Face): number {
     const [p0, p1, , p3] = f.points;
-    const n = p1.sub(p0).cross(p3.sub(p0)).unit();
+    const n = f.normal ?? p1.sub(p0).cross(p3.sub(p0)).unit();
     return 55 + 45 * Math.abs(n.dot(LIGHT));
 }
 
@@ -102,9 +102,11 @@ export default function TowerView() {
             .map((d) => d.piece);
     const facing = (f: Face) => outward(f).dot(cam.toward) > 0;
     const walls = pieces.filter((p): p is Face => p.kind === "face" && isWall(p));
+    // A timber's sides facing away are behind its others.
+    const shown = (p: Piece) => p.kind === "rod" || !p.normal || p.normal.dot(cam.toward) > 0;
     const sorted = [
         ...byDepth(walls.filter((w) => !facing(w))),
-        ...byDepth(pieces.filter((p) => !(p.kind === "face" && isWall(p)))),
+        ...byDepth(pieces.filter((p) => shown(p) && !(p.kind === "face" && isWall(p)))),
         ...byDepth(walls.filter(facing)),
     ];
 
@@ -250,8 +252,8 @@ function PieceDrawing({ piece, toSvg }: { piece: Piece; toSvg: (p: Vector3) => V
                 <polygon
                     points={svgPoints(piece.points.map(toSvg))}
                     fill={fill}
-                    stroke={fill}
-                    strokeWidth={0.8}
+                    stroke={piece.normal ? shade(color, 40) : fill}
+                    strokeWidth={piece.normal ? 0.7 : 0.8}
                     strokeLinejoin="round"
                 />
                 {piece.planks &&
@@ -288,30 +290,35 @@ function PieceDrawing({ piece, toSvg }: { piece: Piece; toSvg: (p: Vector3) => V
         );
     const endFills = (cap: boolean, p: Vector2) =>
         cap && outline && <circle cx={p.x} cy={p.y} r={w / 2 - 0.5} fill={color} />;
+    // The outline is two lines along the rod's sides, so a length's outline never crosses the one before it. The fill
+    // runs a little past each join so no hairline shows there.
+    const along = b.sub(a).safeUnit(vec2(1, 0));
+    const side = along.perp().scale(w / 2 + 0.25);
+    const past = along.scale(0.6);
+    const fa = piece.capA ? a : a.sub(past);
+    const fb = piece.capB ? b : b.add(past);
+    const edge = (s: number) => {
+        const [p, q] = [a.add(side.scale(s)), b.add(side.scale(s))];
+        return (
+            <line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={shade(color, 45)} strokeWidth={1.5} />
+        );
+    };
     return (
         <g>
             {ends(piece.capA, a)}
             {ends(piece.capB, b)}
-            {outline && (
-                <line
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={shade(color, 45)}
-                    strokeWidth={w + 2}
-                />
-            )}
             {endFills(piece.capA, a)}
             {endFills(piece.capB, b)}
             <line
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
+                x1={fa.x}
+                y1={fa.y}
+                x2={fb.x}
+                y2={fb.y}
                 stroke={color}
-                strokeWidth={outline ? w - 1 : w}
+                strokeWidth={outline ? w - 0.5 : w}
             />
+            {outline && edge(1)}
+            {outline && edge(-1)}
         </g>
     );
 }

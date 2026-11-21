@@ -19,12 +19,17 @@ export type Rod = {
     capB: boolean;
 };
 
-/** A flat piece (a deck, boarding, a tread): a convex polygon, with level board joints `planks` apart if it has them. */
+/**
+ * A flat piece (a deck, boarding, a tread, or one side of a sawn timber): a convex polygon, with level board joints
+ * `planks` apart if it has them. A side of a timber has its outward `normal`, so it's left out when it faces away, and
+ * its edges drawn.
+ */
 export type Face = {
     kind: "face";
     points: Vector3[];
     material: Material;
     planks?: number;
+    normal?: Vector3;
 };
 
 export type Piece = Rod | Face;
@@ -38,7 +43,6 @@ const FALL = 1.0;
 export const groundAt = (z: number) => (-FALL * z) / SIDE;
 
 const LOG_R = 0.125;
-const RAIL_R = 0.035;
 const PIPE_R = 0.022;
 const RAIL_HEIGHT = 1.0;
 /** How far log beams run past the corners. */
@@ -62,6 +66,61 @@ function rod(a: Vector3, b: Vector3, r: number, material: Material, maxPiece = P
         capB: i === n - 1,
     }));
 }
+
+/**
+ * A sawn timber from `a` to `b` (the middles of its ends), `w` wide and `h` deep, its depth as near `up` as it can be:
+ * its six sides.
+ */
+function timber(
+    a: Vector3,
+    b: Vector3,
+    up: Vector3,
+    w: number,
+    h: number,
+    material: Material,
+): Face[] {
+    const along = b.sub(a).unit();
+    const v = up
+        .sub(along.scale(up.dot(along)))
+        .unit()
+        .scale(h / 2);
+    const s = along
+        .cross(v)
+        .unit()
+        .scale(w / 2);
+    const corner = (p: Vector3, i: number, j: number) => p.add(s.scale(i)).add(v.scale(j));
+    const ring = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+    ];
+    const sides: Face[] = ring.map(([i, j], k) => {
+        const [i2, j2] = ring[(k + 1) % 4];
+        const normal = s
+            .scale(i + i2)
+            .add(v.scale(j + j2))
+            .unit();
+        return {
+            kind: "face",
+            points: [corner(a, i, j), corner(b, i, j), corner(b, i2, j2), corner(a, i2, j2)],
+            material,
+            normal,
+        };
+    });
+    const ends: Face[] = [
+        {
+            kind: "face",
+            points: ring.map(([i, j]) => corner(a, i, j)),
+            material,
+            normal: along.neg(),
+        },
+        { kind: "face", points: ring.map(([i, j]) => corner(b, i, j)), material, normal: along },
+    ];
+    return [...sides, ...ends];
+}
+
+const UP = vec3(0, 1, 0);
 
 /** A parallelogram from `origin` along `u` and `v`, cut into tiles no bigger than `TILE` each way. */
 function panel(
@@ -120,11 +179,38 @@ function flight(
     width: number,
     ladder = false,
 ): Piece[] {
-    const side = vec3(dir.z, 0, -dir.x).scale(width / 2);
+    const across = vec3(dir.z, 0, -dir.x);
+    const side = across.scale(width / 2);
     const head = foot.add(dir.scale(run)).add(vec3(0, rise, 0));
-    const pieces: Piece[] = [-1, 1].flatMap((s) =>
-        rod(foot.add(side.scale(s)), head.add(side.scale(s)), ladder ? 0.03 : 0.04, "rail"),
-    );
+    const pieces: Piece[] = [];
+    if (ladder)
+        for (const s of [-1, 1])
+            pieces.push(...rod(foot.add(side.scale(s)), head.add(side.scale(s)), 0.03, "rail"));
+    else
+        // A heavy stringer each side, the treads between them, and a railing above each stringer.
+        for (const s of [-1, 1]) {
+            const out = across.scale(s * (width / 2 + STRINGER_W / 2));
+            const drop = vec3(0, -0.06, 0);
+            pieces.push(
+                ...timber(
+                    foot.add(out).add(drop),
+                    head.add(out).add(drop),
+                    UP,
+                    STRINGER_W,
+                    STRINGER_D,
+                    "rail",
+                ),
+            );
+            const onTop = vec3(0, STRINGER_D / 2 - 0.06, 0);
+            pieces.push(
+                ...railing(
+                    foot.add(out).add(onTop),
+                    head.add(out).add(onTop),
+                    across.scale(s),
+                    true,
+                ),
+            );
+        }
     const n = Math.round(rise / (ladder ? 0.28 : 0.22));
     for (let i = 1; i < n; i++) {
         const c = foot.lerp(head, i / n);
@@ -151,6 +237,8 @@ const EAST = vec3(1, 0, 0);
  * side. Each opening runs back over its flight from where it comes out.
  */
 const STAIR_WIDTH = 0.7;
+const STRINGER_W = 0.06;
+const STRINGER_D = 0.28;
 const STAIRS = [
     { foot: vec3(1.4, LEVELS[0], 0.55), dir: EAST, run: 0.6, ladder: true },
     { foot: vec3(0.55, LEVELS[1], 3.3), dir: SOUTH, run: 2.0, ladder: false },
@@ -162,7 +250,7 @@ export const OPENINGS: Opening[] = STAIRS.map((s) => {
     const head = s.foot.add(s.dir.scale(s.run));
     const back = s.ladder ? 1.0 : s.run;
     const tail = head.sub(s.dir.scale(back));
-    const half = STAIR_WIDTH / 2 + 0.05;
+    const half = STAIR_WIDTH / 2 + 0.15;
     const xs = [head.x, tail.x];
     const zs = [head.z, tail.z];
     return {
@@ -173,18 +261,47 @@ export const OPENINGS: Opening[] = STAIRS.map((s) => {
     };
 });
 
-/** A timber railing from `a` to `b` (both at deck height): three rails, with posts between. */
-function railing(a: Vector3, b: Vector3): Piece[] {
+/** The railings' sawn timbers: square posts, a deep top rail on them, and thin boards below it on the outside. */
+const POST = 0.09;
+const TOP_RAIL = { w: 0.09, h: 0.15 };
+const BOARD = { w: 0.03, h: 0.1 };
+const BOARD_HEIGHTS = [0.2, 0.42, 0.64];
+
+/**
+ * A timber railing from `a` to `b` (where it stands, level for a deck or sloping up a stair), with `out` the side its
+ * boards are on. A deck's railing runs between the corner logs, so it has posts only between them; a stair's has its
+ * own `endPosts`.
+ */
+function railing(a: Vector3, b: Vector3, out: Vector3, endPosts = false): Piece[] {
     const pieces: Piece[] = [];
-    for (const h of [0.35, 0.65, RAIL_HEIGHT]) {
-        const up = vec3(0, h, 0);
-        pieces.push(...rod(a.add(up), b.add(up), RAIL_R, "rail"));
+    // Between corner logs, the rails stop at the logs' sides rather than running into them.
+    if (!endPosts) {
+        const inset = b
+            .sub(a)
+            .unit()
+            .scale(LOG_R * 0.8);
+        [a, b] = [a.add(inset), b.sub(inset)];
     }
-    const posts = Math.max(1, Math.round(a.distanceTo(b) / 1.2));
-    for (let i = 1; i < posts; i++) {
-        const p = a.lerp(b, i / posts);
-        pieces.push(...rod(p, p.add(vec3(0, RAIL_HEIGHT, 0)), 0.045, "rail"));
+    const lift = (h: number) => vec3(0, h, 0);
+    const n = Math.max(1, Math.round(a.distanceTo(b) / 1.2));
+    for (let i = endPosts ? 0 : 1; i <= (endPosts ? n : n - 1); i++) {
+        const p = a.lerp(b, i / n);
+        pieces.push(...timber(p, p.add(lift(RAIL_HEIGHT - TOP_RAIL.h)), out, POST, POST, "rail"));
     }
+    const top = lift(RAIL_HEIGHT - TOP_RAIL.h / 2);
+    pieces.push(...timber(a.add(top), b.add(top), UP, TOP_RAIL.w, TOP_RAIL.h, "rail"));
+    const face = out.scale(POST / 2 + BOARD.w / 2);
+    for (const h of BOARD_HEIGHTS)
+        pieces.push(
+            ...timber(
+                a.add(face).add(lift(h)),
+                b.add(face).add(lift(h)),
+                UP,
+                BOARD.w,
+                BOARD.h,
+                "rail",
+            ),
+        );
     return pieces;
 }
 
@@ -301,11 +418,11 @@ export function towerPieces(): Piece[] {
 
     // Railings round every level's open sides: east, west and north on every level, and south on the top deck.
     for (const y of LEVELS.slice(1)) {
-        pieces.push(...railing(vec3(0, y, 0), vec3(0, y, SIDE)));
-        pieces.push(...railing(vec3(SIDE, y, 0), vec3(SIDE, y, SIDE)));
-        pieces.push(...railing(vec3(0, y, SIDE), vec3(SIDE, y, SIDE)));
+        pieces.push(...railing(vec3(0, y, 0), vec3(0, y, SIDE), vec3(-1, 0, 0)));
+        pieces.push(...railing(vec3(SIDE, y, 0), vec3(SIDE, y, SIDE), vec3(1, 0, 0)));
+        pieces.push(...railing(vec3(0, y, SIDE), vec3(SIDE, y, SIDE), vec3(0, 0, 1)));
         // The south face's boarding stops at the top deck, so only there does it need a railing.
-        if (y === TOP) pieces.push(...railing(vec3(0, y, 0), vec3(SIDE, y, 0)));
+        if (y === TOP) pieces.push(...railing(vec3(0, y, 0), vec3(SIDE, y, 0), vec3(0, 0, -1)));
     }
 
     // The steel railing round the stairs' opening on the top deck, open at its north end where the stairs come out.
@@ -322,10 +439,24 @@ export function towerPieces(): Piece[] {
     ])
         pieces.push(...rod(vec3(x, TOP, z), vec3(x, TOP + RAIL_HEIGHT, z), PIPE_R, "steel"));
 
-    // The overhead log: east–west across the middle of the top deck, a metre past each side, on an A-frame at each end.
+    // The overhead beam: two logs, one on the other, east–west across the middle of the top deck and a metre past each
+    // side, on an A-frame at each end. Four steel rods 1 m apart run down through both, standing 0.25 m above.
     const beamY = TOP + 2.3;
+    const upperY = beamY + 2 * LOG_R;
     const mid = SIDE / 2;
-    pieces.push(...rod(vec3(-1, beamY, mid), vec3(SIDE + 1, beamY, mid), LOG_R, "log"));
+    for (const y of [beamY, upperY])
+        pieces.push(...rod(vec3(-1, y, mid), vec3(SIDE + 1, y, mid), LOG_R, "log"));
+    for (const k of [-1.5, -0.5, 0.5, 1.5]) {
+        const x = SIDE / 2 + k * 1.0;
+        pieces.push(
+            ...rod(
+                vec3(x, beamY - LOG_R - 0.03, mid),
+                vec3(x, upperY + LOG_R + 0.25, mid),
+                0.012,
+                "steel",
+            ),
+        );
+    }
     for (const x of [0, SIDE])
         for (const z of [0, SIDE])
             pieces.push(
