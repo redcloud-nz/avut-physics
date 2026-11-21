@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { vec3 } from "@/lib/vector3";
 
 import { layoutRig, RIGS } from "./rig";
-import { EAST_EDGE, OVERHEAD, overheadSpace, SIDE, TOP, topOpening, type Piece } from "./tower";
+import { EAST_EDGE, OVERHEAD, overheadSpace, SIDE, TOP, topOpening } from "./tower";
 
 describe("the first east face rig", () => {
     const { pieces } = layoutRig(RIGS[0]);
@@ -12,10 +12,12 @@ describe("the first east face rig", () => {
     // The abseil lines alone, without the belay and its bucket.
     const abseil = layoutRig({
         ...RIGS[0],
-        items: RIGS[0].items.filter((i) => i.kind !== "belay" && i.id !== "bucket-3"),
+        items: RIGS[0].items.filter(
+            (i) => i.kind !== "belay" && i.id !== "bucket-3" && i.id !== "bucket-4",
+        ),
     }).pieces;
 
-    it("keeps each sling within its space on the beam: 1, 2 and 4", () => {
+    it("keeps each sling within its space on the beam: 1, 2, 4 and 5", () => {
         const middle = (p: (typeof sling)[number]) =>
             p.kind === "strand" ? p.points.reduce((t, q) => t + q.z, 0) / p.points.length : NaN;
         for (const p of sling) {
@@ -24,7 +26,7 @@ describe("the first east face rig", () => {
                 const { z0, z1 } = overheadSpace(n);
                 return z > z0 && z < z1;
             };
-            expect(inSpace(1) || inSpace(2) || inSpace(4)).toBe(true);
+            expect([1, 2, 4, 5].some(inSpace)).toBe(true);
         }
     });
 
@@ -71,36 +73,45 @@ describe("the first east face rig", () => {
         expect(Math.min(...zs) - topOpening().z1).toBeLessThan(0.15);
     });
 
-    it("hangs the belay rope just past the east rail, not down to the ground", () => {
+    it("hangs the belay ropes just past the east rail, not down to the ground", () => {
         const white = ropes.filter(
             (p) => p.kind === "strand" && p.color === "var(--rig-white)" && p.shell?.out.x === 1,
         );
+        // The red belay's too: the only red rope past the east rail.
+        const red = ropes.filter(
+            (p) => p.kind === "strand" && p.color === "var(--knot-red)" && p.shell?.out.x === 1,
+        );
+        expect(red).toHaveLength(1);
         expect(white).toHaveLength(1);
-        const end = white[0].kind === "strand" ? white[0].points.at(-1)! : vec3(0, 0, 0);
-        expect(end.x).toBeGreaterThan(EAST_EDGE.rail.x);
-        expect(end.y).toBeGreaterThan(EAST_EDGE.rail.y - 0.5);
+        for (const rope of [...white, ...red]) {
+            const end = rope.kind === "strand" ? rope.points.at(-1)! : vec3(0, 0, 0);
+            expect(end.x).toBeGreaterThan(EAST_EDGE.rail.x);
+            expect(end.y).toBeGreaterThan(EAST_EDGE.rail.y - 0.5);
+        }
     });
 
-    it("stands the belay's bucket east of the stairs' steel railing, clear of the opening", () => {
+    it("stands the first belay's bucket east of the stairs' steel railing, clear of the opening", () => {
         const yellow = pieces.filter(
             (p) => p.material === "bucket" && p.color === "var(--knot-yellow)",
         );
-        const extra = pieces
-            .filter((p) => p.material === "bucket")
-            .filter((p) => !abseil.some((q) => q.material === "bucket" && sameFace(p, q)));
         expect(yellow.length).toBeGreaterThan(0);
-        expect(extra.length).toBeGreaterThan(0);
-        for (const p of extra)
+        for (const p of yellow)
             if (p.kind === "face")
                 for (const q of p.points) {
                     expect(q.x).toBeGreaterThan(topOpening().x1);
                     expect(q.x).toBeLessThan(SIDE);
                 }
     });
-});
 
-const sameFace = (a: Piece, b: Piece) =>
-    a.kind === "face" &&
-    b.kind === "face" &&
-    a.points.length === b.points.length &&
-    a.points.every((p, i) => p.distanceTo(b.points[i]) < 1e-9);
+    it("stands the second belay's bucket directly under the beam's space 5", () => {
+        const blue = pieces.filter(
+            (p) => p.material === "bucket" && p.color === "var(--knot-blue)",
+        );
+        expect(blue.length).toBeGreaterThan(0);
+        const pts = blue.flatMap((p) => (p.kind === "face" ? p.points : []));
+        const mid = (vs: number[]) => (Math.min(...vs) + Math.max(...vs)) / 2;
+        const { z0, z1 } = overheadSpace(5);
+        expect(mid(pts.map((p) => p.x))).toBeCloseTo(OVERHEAD.x);
+        expect(mid(pts.map((p) => p.z))).toBeCloseTo((z0 + z1) / 2);
+    });
+});

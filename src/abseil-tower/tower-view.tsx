@@ -10,7 +10,7 @@ import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
-import { describe, layoutRig, rigColor, RIGS, type RigLabel } from "./rig";
+import { layoutRig, legend, RIGS, type RigLabel } from "./rig";
 import {
     groundAt,
     groundCorners,
@@ -360,21 +360,30 @@ export default function TowerView() {
         </>
     );
 
+    const key = legend(rig);
     const readouts = (
         <>
             <h2 className="text-sm font-medium text-ink-strong">{rig.name}</h2>
-            <ol className="flex flex-col gap-1.5 text-sm text-ink-soft">
-                {rig.items.map((item) => (
-                    <li key={item.id} className="flex items-baseline gap-2">
-                        <span
-                            aria-hidden
-                            className="inline-block size-2.5 shrink-0 rounded-full ring-1 ring-line"
-                            style={{ background: rigColor(item.color) }}
-                        />
-                        {describe(item, rig)}
+            <ul className="flex flex-col gap-2 text-sm text-ink-soft">
+                {key.cylinders.map((c) => (
+                    <li key={c.text} className="flex items-center gap-3">
+                        <CylinderSwatch text={c.text} colors={c.colors} />
+                        <span>{c.name}</span>
                     </li>
                 ))}
-            </ol>
+            </ul>
+            <ul className="flex flex-col gap-1.5 text-sm text-ink-soft">
+                {key.lines.map((l) => (
+                    <li key={l.name} className="flex items-center gap-3">
+                        <span className="flex w-16 shrink-0 flex-col gap-1">
+                            {l.colors.map((c) => (
+                                <StrandSwatch key={c} color={c} look={l.look} />
+                            ))}
+                        </span>
+                        {l.name}
+                    </li>
+                ))}
+            </ul>
             <p className="text-xs text-ink-muted">
                 The overhead beam&rsquo;s spaces are numbered 1 to 5 from the south, between its
                 steel rods.
@@ -392,6 +401,84 @@ function centreOf(piece: Piece): Vector3 {
 }
 
 const MONO = "var(--font-geist-mono), monospace";
+
+/** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */
+function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
+    const [w, h] = [64, 8];
+    const thick = look === "tape" ? 6 : 3.5;
+    const line = { x1: thick / 2 + 1, x2: w - thick / 2 - 1, y1: h / 2, y2: h / 2 };
+    return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="block">
+            <line
+                {...line}
+                stroke={`color-mix(in oklab, ${color} 40%, black)`}
+                strokeWidth={thick + 1.5}
+                strokeLinecap={look === "tape" ? "butt" : "round"}
+            />
+            <line
+                {...line}
+                stroke={color}
+                strokeWidth={thick}
+                strokeLinecap={look === "tape" ? "butt" : "round"}
+            />
+        </svg>
+    );
+}
+
+/** A legend's cylinder: a short pill in its colours (split along its length if two), its label on it. */
+function CylinderSwatch({ text, colors }: { text: string; colors: string[] }) {
+    const [w, h] = [64, 20];
+    const light = colors.length > 1;
+    return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="shrink-0">
+            <defs>
+                <clipPath id={`pill-${text}`}>
+                    <rect x={1} y={1} width={w - 2} height={h - 2} rx={(h - 2) / 2} />
+                </clipPath>
+            </defs>
+            <g clipPath={`url(#pill-${text})`}>
+                {colors.map((c, i) => (
+                    <rect
+                        key={i}
+                        x={(i * w) / colors.length}
+                        y={0}
+                        width={w / colors.length}
+                        height={h}
+                        fill={c}
+                    />
+                ))}
+            </g>
+            <rect
+                x={1}
+                y={1}
+                width={w - 2}
+                height={h - 2}
+                rx={(h - 2) / 2}
+                fill="none"
+                stroke="var(--rig-on-rope)"
+                strokeOpacity={0.5}
+            />
+            <text
+                x={w / 2}
+                y={h / 2 + 0.5}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={10.5}
+                fontWeight={600}
+                fontFamily={MONO}
+                fill={light ? "var(--ink-bright)" : "var(--rig-on-rope)"}
+                {...(light && {
+                    paintOrder: "stroke",
+                    stroke: "var(--rig-on-rope)",
+                    strokeWidth: 2.5,
+                    strokeLinejoin: "round",
+                })}
+            >
+                {text}
+            </text>
+        </svg>
+    );
+}
 /** A monospaced character's width, as a fraction of the font size. */
 const MONO_WIDTH = 0.6;
 
