@@ -135,12 +135,16 @@ describe("the first east face rig", () => {
     });
 
     it("stops the maroon fixed line just below the outrigger, not at the ground", () => {
-        const maroon = ropes.filter(
-            (p) => p.kind === "strand" && p.color === "var(--rig-maroon)" && p.shell?.out.x === -1,
+        // Where it finishes: the bottom of the figure 8 on its end, outside the west side.
+        const knots = pieces.filter(
+            (p) =>
+                p.kind === "rod" &&
+                p.material === "rope" &&
+                p.color === "var(--rig-maroon)" &&
+                p.shell?.out.x === -1,
         );
-        const ends = maroon.filter((p) => p.kind === "strand" && p.capB);
-        expect(ends).toHaveLength(1);
-        const end = ends[0].kind === "strand" ? ends[0].points.at(-1)! : vec3(0, 0, 0);
+        expect(knots).toHaveLength(1);
+        const end = knots[0].kind === "rod" ? knots[0].b : vec3(0, 0, 0);
         const { x, y, r } = WEST_EDGE.outrigger;
         expect(end.x).toBeLessThan(x - r);
         expect(end.y).toBeLessThan(y - r);

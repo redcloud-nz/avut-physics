@@ -336,8 +336,14 @@ html {
   --rig-dark-red: #991b1b;
   --rig-maroon: #9f1239;
   --rig-dark-blue: #1d4ed8;
-  /* Where a person stands on a deck: a pale disc that shows on the boards. */
+  /* Where a person stands on a deck: a pale disc that shows on the boards, a pastel for each role. The plain one is
+     for a disc without a role's colour. */
   --rig-person: #cbd5e1;
+  --person-abseiler: #bfdbfe;
+  --person-belayer: #bbf7d0;
+  --person-edge: #fef08a;
+  --person-supervisor: #fbcfe8;
+  --person-photographer: #ddd6fe;
 
   /* The knot editor's ropes, by the colour names its files use: each rope's body, the weave of its sheath and the
      highlight along its top. Blue and red are the knot pages' two ropes. Then the outline every rope and arrow

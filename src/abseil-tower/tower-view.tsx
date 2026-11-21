@@ -304,9 +304,10 @@ export default function TowerView() {
     // A label sorts just after the nearer end of the cylinder it's written on (or its point, without one), so it's
     // drawn over its own cylinder but under whatever's in front of it.
     const labelKey = (l: RigLabel) => {
-        if (!l.on) return cam.depth(l.at) + 0.01;
-        const half = l.on.along.scale(l.on.length / 2);
-        return Math.max(cam.depth(l.at.add(half)), cam.depth(l.at.sub(half))) + 0.01;
+        const half = l.on ? l.on.along.scale(l.on.length / 2) : vec3(0, 0, 0);
+        const depth = Math.max(cam.depth(l.at.add(half)), cam.depth(l.at.sub(half))) + 0.01;
+        if (!l.shell) return depth;
+        return depth + (l.shell.out.dot(cam.toward) > 0 ? 1 : -1) * l.shell.layer * 100;
     };
     const sorted: ({ piece: Piece } | { label: RigLabel })[] = [
         ...pieces.filter(shown).map((piece) => ({ piece, key: sortKey(piece) })),
@@ -467,7 +468,11 @@ export default function TowerView() {
                         <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
                             {key.cylinders.map((c) => (
                                 <li key={c.text} className="flex items-center gap-2">
-                                    <CylinderSwatch text={c.text} colors={c.colors} />
+                                    <CylinderSwatch
+                                        text={c.text}
+                                        colors={c.colors}
+                                        light={c.light}
+                                    />
                                     <span>{c.name}</span>
                                 </li>
                             ))}
@@ -489,7 +494,7 @@ export default function TowerView() {
                                 {key.people.map((p) => (
                                     <li key={p.letter} className="flex items-center gap-2">
                                         <span className="flex w-16 shrink-0 justify-center">
-                                            <PersonSwatch letter={p.letter} />
+                                            <PersonSwatch letter={p.letter} color={p.color} />
                                         </span>
                                         {p.name}
                                     </li>
@@ -638,11 +643,11 @@ function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" })
 
 /** A legend's cylinder: a short pill in its colours (split along its length if two), its label on it. */
 /** A legend's person: their pale disc with its letter. */
-function PersonSwatch({ letter }: { letter: string }) {
+function PersonSwatch({ letter, color }: { letter: string; color: string }) {
     const d = 20;
     return (
         <svg width={d} height={d} viewBox={`0 0 ${d} ${d}`} aria-hidden className="shrink-0">
-            <circle cx={d / 2} cy={d / 2} r={d / 2 - 1} fill="var(--rig-person)" />
+            <circle cx={d / 2} cy={d / 2} r={d / 2 - 1} fill={color} />
             <text
                 x={d / 2}
                 y={d / 2}
@@ -659,9 +664,16 @@ function PersonSwatch({ letter }: { letter: string }) {
     );
 }
 
-function CylinderSwatch({ text, colors }: { text: string; colors: string[] }) {
+function CylinderSwatch({
+    text,
+    colors,
+    light,
+}: {
+    text: string;
+    colors: string[];
+    light: boolean;
+}) {
     const [w, h] = [64, 20];
-    const light = colors.length > 1;
     return (
         <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden className="shrink-0">
             <defs>
