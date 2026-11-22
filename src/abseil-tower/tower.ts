@@ -80,7 +80,13 @@ export type Strand = {
  * middle; `over` puts a piece over the rest of its group from every side. A railing's pieces are a group, so its posts
  * keep one order against its boards whatever their position, and a stair railing's newels cover its rails' ends.
  */
-export type Group = { at: Vector3; ahead?: Vector3; over?: boolean };
+export type Group = {
+    at: Vector3;
+    ahead?: Vector3;
+    over?: boolean;
+    /** Other groups' middles it lies across too (a coil over two deck boards): it sorts with the nearest of them all. */
+    across?: Vector3[];
+};
 
 export type Piece = (Rod | Face | Strand) & { shell?: Shell; group?: Group };
 

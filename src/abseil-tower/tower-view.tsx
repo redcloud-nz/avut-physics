@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Toggle } from "@/components/diagram/controls";
 import { Label } from "@/components/diagram/svg";
@@ -24,6 +25,10 @@ import {
     type Material,
     type Piece,
 } from "./tower";
+import type { GLHandle } from "./tower-gl";
+
+/** The WebGL view, loaded only when it's first shown. */
+const TowerGL = dynamic(() => import("./tower-gl"), { ssr: false });
 
 /** The least room (SVG units) the whole tower needs unzoomed. The drawing widens or deepens past it to fill its box. */
 const W = 800;
@@ -98,7 +103,7 @@ const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: numbe
  * or in 3D, turned and tilted by dragging. Each starts at its own frame, which the reset button goes back to: a fixed
  * one, or the closest that fits a box round a point.
  */
-type Mode = "plan" | "west" | "east" | "3d";
+type Mode = "plan" | "west" | "east" | "3d" | "gl";
 type Start = Frame | { fit: { centre: Vector3; width: number; height: number } };
 /** The elevations' box: levels 3 and 4 and the beam over them, the outrigger and the ropes just past the sides. */
 const UPPER = (() => {
@@ -136,6 +141,7 @@ const MODES: Record<
         side: "east",
     },
     "3d": { label: "3D", start: WHOLE },
+    gl: { label: "3D (WebGL)", start: WHOLE },
 };
 
 /** Where a view starts, in a drawing `size` (SVG units). */
@@ -150,8 +156,8 @@ function startOf(start: Start, size: Vector2): Frame {
 const WIDE = "(min-width: 640px)";
 
 /**
- * A person's disc or rope coiled on a deck, put in the group of the deck rectangle it lies on and over it, so it's
- * drawn just after that rectangle from every side. Anything else comes back as it is.
+ * A person's disc or rope coiled on a deck, put in the group of the deck rectangles it lies on and over them, so it's
+ * drawn just after the nearest of them from every side. Anything else comes back as it is.
  */
 function onDeck(piece: Piece, tower: Piece[]): Piece {
     // A person's disc, or a short run of rope lying on the deck or just coming off it (a coil and its ends).
@@ -160,21 +166,27 @@ function onDeck(piece: Piece, tower: Piece[]): Piece {
         (piece.kind === "face" && piece.material === "person") ||
         (piece.kind === "strand" && Math.max(...ys) - Math.min(...ys) < 0.15);
     if (!low) return piece;
-    // It's on the deck at its lowest point, wherever its middle is.
-    const c = vec3(centreOf(piece).x, Math.min(...ys), centreOf(piece).z);
-    const under = tower.find((t) => {
+    // It's on the deck at its lowest point, over every rectangle its outline reaches.
+    const pts = piece.points;
+    const [x0, x1] = [Math.min(...pts.map((q) => q.x)), Math.max(...pts.map((q) => q.x))];
+    const [z0, z1] = [Math.min(...pts.map((q) => q.z)), Math.max(...pts.map((q) => q.z))];
+    const y = Math.min(...ys);
+    const under = tower.filter((t) => {
         if (t.kind !== "face" || t.material !== "deck" || !t.group) return false;
         const xs = t.points.map((q) => q.x);
         const zs = t.points.map((q) => q.z);
         return (
-            Math.abs(t.points[0].y - c.y) < 0.03 &&
-            c.x >= Math.min(...xs) &&
-            c.x <= Math.max(...xs) &&
-            c.z >= Math.min(...zs) &&
-            c.z <= Math.max(...zs)
+            Math.abs(t.points[0].y - y) < 0.03 &&
+            x1 >= Math.min(...xs) &&
+            x0 <= Math.max(...xs) &&
+            z1 >= Math.min(...zs) &&
+            z0 <= Math.max(...zs)
         );
     });
-    return under?.group ? { ...piece, group: { ...under.group, over: true } } : piece;
+    const [first, ...rest] = under.flatMap((t) => (t.group ? [t.group.at] : []));
+    return first
+        ? { ...piece, group: { at: first, over: true, across: rest.length ? rest : undefined } }
+        : piece;
 }
 
 /** The highest point of a piece, for darkening what's below a level looked down on. */
@@ -230,6 +242,13 @@ export default function TowerView() {
         return [...tower, ...rigging.map((p) => onDeck(p, tower))];
     }, [laid, showPeople]);
     const [frame, setFrame] = useState<Frame>(WHOLE);
+    // The WebGL view keeps its own camera: the page reaches it through this, and it says which way it's looking.
+    const [glView, setGlView] = useState<GLHandle | null>(null);
+    const [glTurned, setGlTurned] = useState({ azimuth: 0, elevation: 0 });
+    const onGlTurn = useCallback(
+        (azimuth: number, elevation: number) => setGlTurned({ azimuth, elevation }),
+        [],
+    );
     // Whether the legend's open: until it's toggled, open on wide screens and closed on phones, where it'd cover the
     // tower.
     const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
@@ -293,7 +312,7 @@ export default function TowerView() {
         };
         svg.addEventListener("wheel", onWheel, { passive: false });
         return () => svg.removeEventListener("wheel", onWheel);
-    }, [azimuth, elevation, size]);
+    }, [azimuth, elevation, size, mode]);
 
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). A timber's sides
@@ -303,7 +322,7 @@ export default function TowerView() {
         // A group's pieces sort together by its middle, then those facing the eye with `ahead` first, then by their own.
         const own = cam.depth(centreOf(p));
         const depth = p.group
-            ? cam.depth(p.group.at) +
+            ? Math.max(...[p.group.at, ...(p.group.across ?? [])].map((q) => cam.depth(q))) +
               (p.group.ahead ? Math.sign(p.group.ahead.dot(cam.toward)) * 0.01 : 0) +
               (p.group.over ? 0.02 : 0) +
               own * 1e-4
@@ -327,8 +346,9 @@ export default function TowerView() {
             .map((label) => ({ label, key: labelKey(label) })),
     ].sort((a, b) => a.key - b.key);
 
+    const looking = mode === "gl" ? glTurned : turned;
     const view = (Object.keys(VIEWS) as ViewName[]).find(
-        (k) => VIEWS[k].azimuth === turned.azimuth && VIEWS[k].elevation === turned.elevation,
+        (k) => VIEWS[k].azimuth === looking.azimuth && VIEWS[k].elevation === looking.elevation,
     );
 
     // In 3D a drag turns the tower; in the flat views, it moves the view, as on a map.
@@ -443,7 +463,9 @@ export default function TowerView() {
     );
 
     const zoomBy = (factor: number) =>
-        setFrame((f) => reframe(cam, origin, f, origin, origin, f.zoom * factor));
+        mode === "gl"
+            ? glView?.zoomBy(factor)
+            : setFrame((f) => reframe(cam, origin, f, origin, origin, f.zoom * factor));
     const start = startOf(MODES[mode].start, size);
     const key = legend(rig);
 
@@ -454,7 +476,16 @@ export default function TowerView() {
             ref={boxRef}
             className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface"
         >
-            {diagram}
+            {mode === "gl" ? (
+                <TowerGL
+                    pieces={pieces}
+                    labels={laid.labels}
+                    onReady={setGlView}
+                    onTurn={onGlTurn}
+                />
+            ) : (
+                diagram
+            )}
             <section className="absolute top-2 right-2 max-h-[calc(100%-1rem)] w-64 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur">
                 <button
                     type="button"
@@ -538,10 +569,12 @@ export default function TowerView() {
                                 type="button"
                                 aria-pressed={view === k}
                                 onClick={() =>
-                                    setTurned({
-                                        azimuth: VIEWS[k].azimuth,
-                                        elevation: VIEWS[k].elevation,
-                                    })
+                                    mode === "gl"
+                                        ? glView?.look(VIEWS[k].azimuth, VIEWS[k].elevation)
+                                        : setTurned({
+                                              azimuth: VIEWS[k].azimuth,
+                                              elevation: VIEWS[k].elevation,
+                                          })
                                 }
                                 className={`px-2.5 py-1 text-xs transition-colors ${
                                     view === k
@@ -585,18 +618,19 @@ export default function TowerView() {
                         label: "Zoom in",
                         icon: <Plus />,
                         onClick: () => zoomBy(1.4),
-                        off: frame.zoom >= MAX_ZOOM,
+                        off: mode !== "gl" && frame.zoom >= MAX_ZOOM,
                     },
                     {
                         label: "Zoom out",
                         icon: <Minus />,
                         onClick: () => zoomBy(1 / 1.4),
-                        off: frame.zoom <= 1,
+                        off: mode !== "gl" && frame.zoom <= 1,
                     },
                     {
                         label: "Show the whole view again",
                         icon: <RotateCcw />,
                         onClick: () => {
+                            if (mode === "gl") return glView?.reset();
                             setFrame(start);
                             if (!camera)
                                 setTurned({
