@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentRef, type RefObject
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-import { OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 
 import { rad } from "@/lib/math";
@@ -40,8 +40,8 @@ const COLOR: Record<Material, string> = {
     bucket: "var(--rig-black)",
     person: "var(--rig-person)",
 };
-/** The thinnest some things are drawn (metres of radius), so a rope stays visible from across the tower. */
-const MIN_R: Partial<Record<Material, number>> = { sling: 0.014, rope: 0.012, steel: 0.01 };
+/** The thinnest some things are drawn (metres of radius), by their material. */
+type MinR = Partial<Record<Material, number>>;
 
 /** What the page around it can do to the view: zoom, go back to where it started, or look from a bearing. */
 export type GLHandle = {
@@ -50,10 +50,55 @@ export type GLHandle = {
     look: (azimuth: number, elevation: number) => void;
 };
 
-/** Where the camera turns about to start with, and how far from it it sits. */
-const CENTRE = vec3(4.5 / 2, 5.4, 4.5 / 2);
-const DISTANCE = 30;
-const START_TARGET = T(CENTRE);
+/**
+ * What a 3D scene needs besides its pieces: where the camera turns about to start with, how far from it it sits and
+ * which way it looks from (degrees: the compass bearing to the eye, and how far above level), how far out it may zoom,
+ * the ground, the compass letters round it and how tall they're drawn, the thinnest each material's drawn (metres of
+ * radius), how many pixels wide thin pieces' centrelines are also drawn (if at all), so they still show from far off,
+ * and whether the point it turns about moves to the depth of whatever's under the pointer as it's zoomed or dragged, as
+ * a long scene needs.
+ */
+export type SceneConfig = {
+    centre: Vector3;
+    distance: number;
+    azimuth: number;
+    elevation: number;
+    maxDistance: number;
+    ground: Piece[];
+    compass: [string, Vector3][];
+    letter: number;
+    minR: MinR;
+    hairlines?: number;
+    pivotToPointer?: boolean;
+    /** What the canvas is, for a screen reader. */
+    label: string;
+};
+
+/** The abseil tower's scene. */
+const TOWER: SceneConfig = {
+    centre: vec3(4.5 / 2, 5.4, 4.5 / 2),
+    distance: 30,
+    azimuth: 135,
+    elevation: 25,
+    maxDistance: 80,
+    ground: [
+        {
+            kind: "face",
+            points: groundCorners(),
+            material: "deck",
+            color: "var(--tower-ground)",
+        },
+    ],
+    compass: [
+        ["N", vec3(4.5 / 2, groundAt(4.5 / 2), 4.5 + 1.8)],
+        ["S", vec3(4.5 / 2, groundAt(4.5 / 2), -1.8)],
+        ["E", vec3(4.5 + 1.8, groundAt(4.5 + 1.8), 4.5 / 2)],
+        ["W", vec3(-2.2, groundAt(-2.2), 4.5 / 2)],
+    ],
+    letter: 0.7,
+    minR: { sling: 0.014, rope: 0.012, steel: 0.01 },
+    label: "The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
+};
 const FOV = 30;
 
 /** Where the camera sits for a compass bearing to the eye and a height above level (degrees). */
@@ -270,7 +315,7 @@ const JOINT = "joint:";
  * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
  * of the boards they're between.
  */
-function buildScene(pieces: Piece[]) {
+function buildScene(pieces: Piece[], minR: MinR) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     const add = (color: string, g: THREE.BufferGeometry | null) => {
         if (!g) return;
@@ -280,7 +325,7 @@ function buildScene(pieces: Piece[]) {
     };
     for (const p of pieces) {
         const color = p.color || COLOR[p.material];
-        const r = Math.max("r" in p ? p.r : 0, MIN_R[p.material] ?? 0);
+        const r = Math.max("r" in p ? p.r : 0, minR[p.material] ?? 0);
         if (p.kind === "rod")
             for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB)) add(color, g);
         else if (p.kind === "strand" && p.tape) {
@@ -334,6 +379,27 @@ function buildScene(pieces: Piece[]) {
         return { color, geometry };
     });
     return solids;
+}
+
+/** How thick a piece may be (metres of radius) and still get a hairline. */
+const HAIRLINE_R = 0.03;
+
+/**
+ * Every thin rod's and strand's centreline, as line segments merged per colour: drawn a pixel wide however far off,
+ * so wire and rope still show when they're thinner than a pixel. Up close they're inside their solids, so hidden.
+ */
+function buildHairlines(pieces: Piece[]) {
+    const byColor = new Map<string, [number, number, number][]>();
+    for (const p of pieces) {
+        if (p.kind === "face" || p.r > HAIRLINE_R) continue;
+        const color = p.color || COLOR[p.material];
+        const list = byColor.get(color) ?? [];
+        const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
+        for (let i = 0; i + 1 < pts.length; i++)
+            list.push(T(pts[i]).toArray(), T(pts[i + 1]).toArray());
+        byColor.set(color, list);
+    }
+    return [...byColor].map(([color, points]) => ({ color, points }));
 }
 
 /** A label's text drawn on a canvas, for a texture: `fill` letters, with an outline in `stroke` if given. */
@@ -462,13 +528,22 @@ function PersonLetter({ face, colors }: { face: Face; colors: Colors }) {
 }
 
 /** A compass letter standing on the ground, always facing the eye. */
-function CompassLetter({ text, at, colors }: { text: string; at: Vector3; colors: Colors }) {
+function CompassLetter({
+    text,
+    at,
+    h,
+    colors,
+}: {
+    text: string;
+    at: Vector3;
+    h: number;
+    colors: Colors;
+}) {
     const card = useMemo(
         () => textTexture(text, colors.font, `#${colors.read("var(--ink-muted)").getHexString()}`),
         [text, colors],
     );
     useEffect(() => () => card.texture.dispose(), [card]);
-    const h = 0.7;
     return (
         <sprite
             position={T(at).add(new THREE.Vector3(0, h / 2, 0))}
@@ -480,11 +555,31 @@ function CompassLetter({ text, at, colors }: { text: string; at: Vector3; colors
 }
 
 /** The solids and lines, built once for each set of pieces. */
-function Solids({ pieces, colors }: { pieces: Piece[]; colors: Colors }) {
-    const solids = useMemo(() => buildScene(pieces), [pieces]);
+function Solids({
+    pieces,
+    colors,
+    minR,
+    hairlines,
+}: {
+    pieces: Piece[];
+    colors: Colors;
+    minR: MinR;
+    hairlines: number;
+}) {
+    const solids = useMemo(() => buildScene(pieces, minR), [pieces, minR]);
     useEffect(() => () => solids.forEach((s) => s.geometry.dispose()), [solids]);
+    const lines = useMemo(() => (hairlines ? buildHairlines(pieces) : []), [pieces, hairlines]);
     return (
         <>
+            {lines.map((s) => (
+                <Line
+                    key={`line:${s.color}`}
+                    points={s.points}
+                    segments
+                    lineWidth={hairlines}
+                    color={colors.read(s.color)}
+                />
+            ))}
             {solids.map((s) =>
                 s.color.startsWith(JOINT) ? (
                     // A gap between boards: their colour, in shadow.
@@ -514,6 +609,51 @@ function Solids({ pieces, colors }: { pieces: Piece[]; colors: Colors }) {
     );
 }
 
+/**
+ * Moves the point the view turns about to the depth of whatever's under the pointer, as a zoom or drag starts: along the
+ * line through the middle of the view, so nothing on the screen moves. Zooming towards the pointer then carries it
+ * onto what's there, and turning swings about something near what's being looked at rather than a point far behind or
+ * in front of it.
+ */
+function PivotToPointer({
+    controls,
+}: {
+    controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
+}) {
+    const { camera, gl, scene, raycaster } = useThree();
+    useEffect(() => {
+        const el = gl.domElement;
+        const pick = (e: PointerEvent | WheelEvent) => {
+            const c = controls.current;
+            if (!c) return;
+            const box = el.getBoundingClientRect();
+            const at = new THREE.Vector2(
+                ((e.clientX - box.left) / box.width) * 2 - 1,
+                -((e.clientY - box.top) / box.height) * 2 + 1,
+            );
+            raycaster.setFromCamera(at, camera);
+            // Solids only: not the labels drawn over them or the compass letters.
+            const hit = raycaster
+                .intersectObjects(scene.children, true)
+                .find((h) => h.object.type === "Mesh" && h.object.renderOrder === 0);
+            if (!hit) return;
+            const ahead = c.target.clone().sub(camera.position).normalize();
+            const depth = hit.point.clone().sub(camera.position).dot(ahead);
+            if (depth <= 0.5) return;
+            c.target.copy(camera.position).add(ahead.multiplyScalar(depth));
+            c.update();
+        };
+        // Before the orbit controls see the event.
+        el.addEventListener("pointerdown", pick, { capture: true });
+        el.addEventListener("wheel", pick, { capture: true, passive: true });
+        return () => {
+            el.removeEventListener("pointerdown", pick, { capture: true });
+            el.removeEventListener("wheel", pick, { capture: true });
+        };
+    }, [camera, gl, scene, raycaster, controls]);
+    return null;
+}
+
 /** Says when the first frame has been drawn. */
 function FirstFrame({ onDrawn }: { onDrawn: () => void }) {
     const done = useRef(false);
@@ -527,10 +667,12 @@ function FirstFrame({ onDrawn }: { onDrawn: () => void }) {
 
 /** Hands the page its controls, once the camera and orbit controls exist. */
 function Handle({
+    scene,
     onReady,
     controls,
     onTurn,
 }: {
+    scene: SceneConfig;
     onReady: (handle: GLHandle | null) => void;
     controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
     onTurn: (azimuth: number, elevation: number) => void;
@@ -549,7 +691,11 @@ function Handle({
                 const out = camera.position.clone().sub(c.target).divideScalar(factor);
                 move(c.target.clone().add(out), c.target.clone());
             },
-            reset: () => move(eyeAt(T(CENTRE), DISTANCE, 135, 25), T(CENTRE)),
+            reset: () =>
+                move(
+                    eyeAt(T(scene.centre), scene.distance, scene.azimuth, scene.elevation),
+                    T(scene.centre),
+                ),
             look: (azimuth, elevation) => {
                 const distance = camera.position.distanceTo(c.target);
                 move(eyeAt(c.target, distance, azimuth, elevation), c.target.clone());
@@ -569,21 +715,30 @@ function Handle({
             c.removeEventListener("change", report);
             onReady(null);
         };
-    }, [camera, controls, onReady, onTurn]);
+    }, [camera, controls, onReady, onTurn, scene]);
     return null;
 }
 
-export default function TowerGL({
-    pieces,
-    labels,
-    onReady,
-    onTurn,
-}: {
+type ViewProps = {
     pieces: Piece[];
     labels: RigLabel[];
     onReady: (handle: GLHandle | null) => void;
     onTurn: (azimuth: number, elevation: number) => void;
-}) {
+};
+
+/** The abseil tower in 3D. */
+export default function TowerGL(props: ViewProps) {
+    return <SceneGL scene={TOWER} {...props} />;
+}
+
+/** A scene's pieces in 3D, with its ground and compass, turned, zoomed and moved by dragging. */
+export function SceneGL({
+    scene,
+    pieces,
+    labels,
+    onReady,
+    onTurn,
+}: ViewProps & { scene: SceneConfig }) {
     const box = useRef<HTMLDivElement>(null);
     const [colors, setColors] = useState<Colors | null>(null);
     useEffect(() => {
@@ -595,22 +750,8 @@ export default function TowerGL({
     const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
     // Until the first frame's drawn, the loading message stays up.
     const [drawn, setDrawn] = useState(false);
-    const ground: Piece = useMemo(
-        () => ({
-            kind: "face",
-            points: groundCorners(),
-            material: "deck",
-            color: "var(--tower-ground)",
-        }),
-        [],
-    );
-    const all = useMemo(() => [ground, ...pieces], [ground, pieces]);
-    const compass: [string, Vector3][] = [
-        ["N", vec3(4.5 / 2, groundAt(4.5 / 2), 4.5 + 1.8)],
-        ["S", vec3(4.5 / 2, groundAt(4.5 / 2), -1.8)],
-        ["E", vec3(4.5 + 1.8, groundAt(4.5 + 1.8), 4.5 / 2)],
-        ["W", vec3(-2.2, groundAt(-2.2), 4.5 / 2)],
-    ];
+    const all = useMemo(() => [...scene.ground, ...pieces], [scene, pieces]);
+    const target = useMemo(() => T(scene.centre), [scene]);
     const light = T(vec3(0.3, 0.8, 0.5)).multiplyScalar(20);
     return (
         <div ref={box} className="absolute inset-0 touch-none">
@@ -619,17 +760,22 @@ export default function TowerGL({
                 <Canvas
                     camera={{
                         fov: FOV,
-                        position: eyeAt(START_TARGET, DISTANCE, 135, 25),
+                        position: eyeAt(target, scene.distance, scene.azimuth, scene.elevation),
                         near: 0.3,
-                        far: 200,
+                        far: scene.maxDistance * 2.5,
                     }}
                     gl={{ antialias: true, alpha: true }}
                     dpr={[1, 2]}
-                    aria-label="The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it."
+                    aria-label={scene.label}
                 >
                     <hemisphereLight args={[0xffffff, 0x445544, 1.6]} />
                     <directionalLight position={light} intensity={1.6} />
-                    <Solids pieces={all} colors={colors} />
+                    <Solids
+                        pieces={all}
+                        colors={colors}
+                        minR={scene.minR}
+                        hairlines={scene.hairlines ?? 0}
+                    />
                     {labels
                         .filter((l) => l.on)
                         .map((l, i) => (
@@ -640,20 +786,27 @@ export default function TowerGL({
                             <PersonLetter key={i} face={p} colors={colors} />
                         ) : null,
                     )}
-                    {compass.map(([text, at]) => (
-                        <CompassLetter key={text} text={text} at={at} colors={colors} />
+                    {scene.compass.map(([text, at]) => (
+                        <CompassLetter
+                            key={text}
+                            text={text}
+                            at={at}
+                            h={scene.letter}
+                            colors={colors}
+                        />
                     ))}
                     <OrbitControls
                         ref={controls}
-                        target={START_TARGET}
+                        target={target}
                         enableDamping={false}
                         zoomToCursor
                         minDistance={1.5}
-                        maxDistance={80}
+                        maxDistance={scene.maxDistance}
                         maxPolarAngle={Math.PI / 2}
                         makeDefault
                     />
-                    <Handle onReady={onReady} controls={controls} onTurn={onTurn} />
+                    <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />
+                    {scene.pivotToPointer && <PivotToPointer controls={controls} />}
                     <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>
             )}

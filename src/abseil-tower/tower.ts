@@ -179,7 +179,7 @@ export function rod(
  * A sawn timber from `a` to `b` (the middles of its ends), `w` wide and `h` deep, its depth as near `up` as it can be:
  * its four long sides, and its two ends unless they're hidden (`ends` false).
  */
-function timber(
+export function timber(
     a: Vector3,
     b: Vector3,
     up: Vector3,
@@ -232,7 +232,7 @@ function timber(
 const UP = vec3(0, 1, 0);
 
 /** A parallelogram from `origin` along `u` and `v`, cut into tiles no bigger than `TILE` each way. */
-function panel(
+export function panel(
     origin: Vector3,
     u: Vector3,
     v: Vector3,

@@ -648,7 +648,7 @@ export default function TowerView({ slug }: { slug: string }) {
     );
 }
 
-function centreOf(piece: Piece): Vector3 {
+export function centreOf(piece: Piece): Vector3 {
     if (piece.kind === "rod") return piece.a.lerp(piece.b, 0.5);
     // A strand by its middle along its length would do better, but its points' average is near enough.
     return piece.points.reduce((s, p) => s.add(p), vec3(0, 0, 0)).scale(1 / piece.points.length);
@@ -657,7 +657,7 @@ function centreOf(piece: Piece): Vector3 {
 const MONO = "var(--font-geist-mono), monospace";
 
 /** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */
-function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
+export function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
     const [w, h] = [64, 9];
     const thick = look === "tape" ? 6 : 3.5;
     const line = { x1: thick / 2 + 1, x2: w - thick / 2 - 1, y1: h / 2, y2: h / 2 };
@@ -862,7 +862,7 @@ const CALLOUT = { font: 11, gap: 14, line: 14 };
  * out to the side of the tower its knot is on (`middle` is where the tower's middle is drawn, so panning never moves a
  * label across), unless its knot says otherwise, and moves down past any already written there.
  */
-function Callouts({
+export function Callouts({
     labels,
     toSvg,
     ppm,
@@ -934,24 +934,27 @@ function Callouts({
 }
 
 /** Where a point on the screen is in the drawing's SVG units. */
-function toDrawing(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
+export function toDrawing(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
     const m = svg.getScreenCTM();
     if (!m) return vec2(clientX, clientY);
     const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
     return vec2(p.x, p.y);
 }
 
-function PieceDrawing({
+export function PieceDrawing({
     piece,
     toSvg,
     ppm,
     dim = 1,
+    minWidth = MIN_WIDTH,
 }: {
     piece: Piece;
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
     /** How bright it's drawn, darker for what's below the level looked down on. */
     dim?: number;
+    /** The narrowest each material's drawn (SVG units), if not the tower's. */
+    minWidth?: Partial<Record<Material, number>>;
 }) {
     const own = piece.color || COLOR[piece.material];
     const color = dim < 1 ? shade(own, dim * 100) : own;
@@ -1007,7 +1010,7 @@ function PieceDrawing({
         // Tape is drawn as its flat layers, each its width wide; rope and wire as round as they are.
         const w = piece.tape
             ? Math.max(piece.tape.width * ppm, 1.5)
-            : Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
+            : Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
         return (
             <g>
                 {tapeLayers(piece).map((layer, k) => (
@@ -1026,7 +1029,7 @@ function PieceDrawing({
     }
     const a = toSvg(piece.a);
     const b = toSvg(piece.b);
-    const w = Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
+    const w = Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
     const outline = w > 3;
     // A round end only where the rod really ends: between its lengths the joins must not show.
     const ends = (cap: boolean, p: Vector2) =>
