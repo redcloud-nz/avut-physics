@@ -13,7 +13,7 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata(
-    props: PageProps<"/cracroft-abseil-tower/[rig]">,
+    props: PageProps<"/abseil-towers/cracroft/[rig]">,
 ): Promise<Metadata> {
     const { rig: slug } = await props.params;
     const rig = RIGS.find((r) => r.slug === slug);
@@ -32,7 +32,7 @@ export const instant = false;
  * the drawing taking whatever room the title leaves, out to the window's edges. The view's in the address
  * (`?view=overhead`, `west`, `east` or `3d`), so each can be linked to.
  */
-export default async function Page(props: PageProps<"/cracroft-abseil-tower/[rig]">) {
+export default async function Page(props: PageProps<"/abseil-towers/cracroft/[rig]">) {
     const { rig: slug } = await props.params;
     const rig = RIGS.find((r) => r.slug === slug);
     if (!rig) notFound();

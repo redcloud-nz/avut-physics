@@ -180,7 +180,7 @@ export type Person = {
 export type SafetyLine = { kind: "safety"; id: string; from: string; person: string; dc: RigColor };
 
 export type RigItem = Sling | WrapSling | Rope | Bucket | Belay | Person | SafetyLine;
-/** A rig, with its `slug` for its page's address (`/cracroft-abseil-tower/<slug>`). */
+/** A rig, with its `slug` for its page's address (`/abseil-towers/cracroft/<slug>`). */
 export type Rig = { slug: string; name: string; items: RigItem[] };
 
 export const RIGS: Rig[] = [
