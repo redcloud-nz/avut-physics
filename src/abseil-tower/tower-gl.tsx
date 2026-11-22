@@ -10,6 +10,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { rad } from "@/lib/math";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import Loading3D from "./loading-3d";
 import type { RigLabel } from "./rig";
 import {
     groundAt,
@@ -513,6 +514,17 @@ function Solids({ pieces, colors }: { pieces: Piece[]; colors: Colors }) {
     );
 }
 
+/** Says when the first frame has been drawn. */
+function FirstFrame({ onDrawn }: { onDrawn: () => void }) {
+    const done = useRef(false);
+    useFrame(() => {
+        if (done.current) return;
+        done.current = true;
+        onDrawn();
+    });
+    return null;
+}
+
 /** Hands the page its controls, once the camera and orbit controls exist. */
 function Handle({
     onReady,
@@ -581,6 +593,8 @@ export default function TowerGL({
         return reader.dispose;
     }, []);
     const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
+    // Until the first frame's drawn, the loading message stays up.
+    const [drawn, setDrawn] = useState(false);
     const ground: Piece = useMemo(
         () => ({
             kind: "face",
@@ -600,6 +614,7 @@ export default function TowerGL({
     const light = T(vec3(0.3, 0.8, 0.5)).multiplyScalar(20);
     return (
         <div ref={box} className="absolute inset-0 touch-none">
+            {!drawn && <Loading3D />}
             {colors && (
                 <Canvas
                     camera={{
@@ -639,6 +654,7 @@ export default function TowerGL({
                         makeDefault
                     />
                     <Handle onReady={onReady} controls={controls} onTurn={onTurn} />
+                    <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>
             )}
         </div>

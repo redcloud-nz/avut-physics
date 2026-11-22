@@ -14,6 +14,7 @@ import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import Loading3D from "./loading-3d";
 import { layoutRig, legend, RIGS, rigSide, type RigLabel } from "./rig";
 import {
     groundAt,
@@ -30,8 +31,8 @@ import {
 } from "./tower";
 import type { GLHandle } from "./tower-gl";
 
-/** The WebGL view, loaded only when it's first shown. */
-const TowerGL = dynamic(() => import("./tower-gl"), { ssr: false });
+/** The WebGL view, loaded only when it's first shown, with a message while it loads. */
+const TowerGL = dynamic(() => import("./tower-gl"), { ssr: false, loading: () => <Loading3D /> });
 
 /** The least room (SVG units) the whole tower needs unzoomed. The drawing widens or deepens past it to fill its box. */
 const W = 800;
