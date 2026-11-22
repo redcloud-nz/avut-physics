@@ -123,6 +123,12 @@ const SCENE: SceneConfig = {
     minR: {},
     hairlines: 2.5,
     pivotToPointer: true,
+    // Turning about somewhere on the site, from no further out than half as far again as it starts.
+    bounds: {
+        lo: vec3(GROUND.x0, Math.min(groundY(GROUND.x0), groundY(GROUND.x1)) - 2, -GROUND.z),
+        hi: vec3(GROUND.x1, groundY(TREE.x) + TREE.height + 5, GROUND.z),
+    },
+    zoomOut: 1.5,
     label: "The flying fox in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
 };
 
@@ -202,13 +208,25 @@ function reframe(
     to: Vector2,
     zoom: number,
     least: number,
+    fit: Fit,
 ): Frame {
     const z = clamp(zoom, least, MAX_ZOOM);
     const inView = (s: Vector2, ppm: number) =>
         vec2((s.x - origin.x) / ppm, (origin.y - s.y) / ppm);
     const [u, v] = [inView(from, PPM * start.zoom), inView(to, PPM * z)];
     const shift = cam.right.scale(u.x - v.x).add(cam.up.scale(u.y - v.y));
-    return { zoom: z, target: start.target.add(shift) };
+    return { zoom: z, target: inFit(cam, fit, start.target.add(shift)) };
+}
+
+/** `target` kept inside the view's fit box, so the middle of the view never leaves the site. */
+function inFit(cam: OrbitCamera, fit: Fit, target: Vector3): Vector3 {
+    const d = target.sub(fit.centre);
+    const [x, y] = [d.dot(cam.right), d.dot(cam.up)];
+    const [cx, cy] = [
+        clamp(x, -fit.width / 2, fit.width / 2),
+        clamp(y, -fit.height / 2, fit.height / 2),
+    ];
+    return target.add(cam.right.scale(cx - x)).add(cam.up.scale(cy - y));
 }
 
 /** The flying fox, in the view the page's address names (`?view=side` or `overhead`; 3D unless it names one). */
@@ -331,6 +349,7 @@ export default function FoxView() {
                     at,
                     f.zoom * Math.exp(-delta * rate),
                     first.zoom,
+                    fit,
                 );
             });
         };
@@ -374,10 +393,10 @@ export default function FoxView() {
             if (pointers.current.size !== 2) return;
             const [a, b] = [...pointers.current.values()];
             const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
-            setMoved(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom, least));
+            setMoved(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom, least, fit));
             return;
         }
-        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom, least));
+        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom, least, fit));
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         pointers.current.delete(e.pointerId);
@@ -458,7 +477,9 @@ export default function FoxView() {
     const zoomBy = (factor: number) =>
         mode === "3d"
             ? glView?.zoomBy(factor)
-            : setMoved(reframe(cam, origin, frame, origin, origin, frame.zoom * factor, least));
+            : setMoved(
+                  reframe(cam, origin, frame, origin, origin, frame.zoom * factor, least, fit),
+              );
 
     return (
         <div

@@ -107,6 +107,12 @@ export default function PartsView() {
             azimuth: 145,
             elevation: 20,
             maxDistance: box.size * 12,
+            // Out to twice as far as it starts, turning about somewhere on the part.
+            zoomOut: 2,
+            bounds: {
+                lo: box.centre.sub(vec3(1, 1, 1).scale(box.size * 0.6)),
+                hi: box.centre.add(vec3(1, 1, 1).scale(box.size * 0.6)),
+            },
             minDistance: box.size * 0.3,
             below: true,
             ground: [],

@@ -78,7 +78,18 @@ export type SceneConfig = {
     minDistance?: number;
     /** Whether it may look up from below the ground's level, as at a part with no ground. */
     below?: boolean;
+    /** The box the point the view turns about stays inside, so the scene can't be moved out of sight. */
+    bounds?: { lo: Vector3; hi: Vector3 };
+    /** How many times its starting distance out it may zoom, as well as no further than `maxDistance`. */
+    zoomOut?: number;
 };
+
+/** A scene's `bounds` in three.js's coordinates (z flipped), as a box. */
+function boundsBox(scene: SceneConfig): THREE.Box3 | null {
+    if (!scene.bounds) return null;
+    const [a, b] = [T(scene.bounds.lo), T(scene.bounds.hi)];
+    return new THREE.Box3(a.clone().min(b), a.clone().max(b));
+}
 
 /** The abseil tower's scene. */
 const TOWER: SceneConfig = {
@@ -745,8 +756,10 @@ function Solids({
  */
 function PivotToPointer({
     controls,
+    limits,
 }: {
     controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
+    limits: THREE.Box3 | null;
 }) {
     const { camera, gl, scene, raycaster } = useThree();
     useEffect(() => {
@@ -768,7 +781,10 @@ function PivotToPointer({
             const ahead = c.target.clone().sub(camera.position).normalize();
             const depth = hit.point.clone().sub(camera.position).dot(ahead);
             if (depth <= 0.5) return;
-            c.target.copy(camera.position).add(ahead.multiplyScalar(depth));
+            const pivot = camera.position.clone().add(ahead.multiplyScalar(depth));
+            // Not out past the scene's bounds, where the view would jump back as it's kept inside them.
+            if (limits && !limits.containsPoint(pivot)) return;
+            c.target.copy(pivot);
             c.update();
         };
         // Before the orbit controls see the event.
@@ -778,7 +794,7 @@ function PivotToPointer({
             el.removeEventListener("pointerdown", pick, { capture: true });
             el.removeEventListener("wheel", pick, { capture: true });
         };
-    }, [camera, gl, scene, raycaster, controls]);
+    }, [camera, gl, scene, raycaster, controls, limits]);
     return null;
 }
 
@@ -841,6 +857,22 @@ function Handle({
                 move(eyeAt(c.target, distance, azimuth, elevation), c.target.clone());
             },
         });
+        // Kept within limits as it's moved: the point it turns about inside the scene's bounds (the eye moving with it,
+        // so the view slides to a stop at the edge rather than turning), and no further out than the scene allows.
+        const box = boundsBox(scene);
+        const furthest = Math.min(scene.maxDistance, start * (scene.zoomOut ?? Infinity));
+        const keep = () => {
+            if (box) {
+                const shift = box.clampPoint(c.target, new THREE.Vector3()).sub(c.target);
+                c.target.add(shift);
+                camera.position.add(shift);
+            }
+            const out = camera.position.clone().sub(c.target);
+            if (out.length() > furthest)
+                camera.position.copy(c.target).add(out.setLength(furthest));
+        };
+        c.addEventListener("change", keep);
+        keep();
         // Tell the page which way the eye is, so its compass buttons can show a match.
         const report = () => {
             const d = camera.position.clone().sub(c.target);
@@ -852,6 +884,7 @@ function Handle({
         c.addEventListener("change", report);
         report();
         return () => {
+            c.removeEventListener("change", keep);
             c.removeEventListener("change", report);
             onReady(null);
         };
@@ -906,6 +939,7 @@ export function SceneGL({
     const [drawn, setDrawn] = useState(false);
     const all = useMemo(() => [...scene.ground, ...pieces], [scene, pieces]);
     const target = useMemo(() => T(scene.centre), [scene]);
+    const limits = useMemo(() => boundsBox(scene), [scene]);
     const light = T(vec3(0.3, 0.8, 0.5)).multiplyScalar(20);
     return (
         <div ref={box} className="absolute inset-0 touch-none">
@@ -970,7 +1004,7 @@ export function SceneGL({
                         makeDefault
                     />
                     <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />
-                    {scene.pivotToPointer && <PivotToPointer controls={controls} />}
+                    {scene.pivotToPointer && <PivotToPointer controls={controls} limits={limits} />}
                     <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>
             )}
