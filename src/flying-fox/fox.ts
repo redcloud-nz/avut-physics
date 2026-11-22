@@ -11,6 +11,8 @@ import {
     eyeFrame,
     grigri,
     pulley,
+    STOP_BLOCK,
+    stopBlock,
     wrap,
     zipTrolley,
 } from "./hardware";
@@ -281,6 +283,16 @@ export const TROLLEY_COLORS = {
     steel: "var(--tower-steel)",
     bumper: "var(--rig-black)",
 };
+/** The size of the stop blocks' eyes, which the joining rope's tied round. */
+const STOP_BLOCK_EYE = STOP_BLOCK.eye.size;
+
+/** The stop blocks' colours: the nylon body, steel eye bolts and brass bolts. */
+export const STOP_BLOCK_COLORS = {
+    body: "var(--fox-nylon)",
+    steel: "var(--tower-steel)",
+    brass: "var(--fox-brass)",
+};
+
 export const PULLEY_COLORS = {
     plates: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
@@ -1223,15 +1235,10 @@ function dynamicBrake(): Piece[] {
         const along = onHawser(BLOCKS_X + 0.1, s)
             .sub(onHawser(BLOCKS_X - 0.1, s))
             .unit();
-        pieces.push(
-            ...section(at.sub(along.scale(0.05)), at.add(along.scale(0.05)), UP, 0.1, 0.1, C.nylon),
-        );
-        // Eye bolts either side, below the hawser.
-        for (const t of [-1, 1]) {
-            const eye = at.add(vec3(0, -0.03, t * 0.08));
-            pieces.push(...bar(eye, eye.add(vec3(0, 0, t * 0.03)), 0.012, C.steel));
-            if (t === -s) eyes.push(eye.add(vec3(0, 0, t * 0.03)));
-        }
+        // The joining rope's tied to the eye on the inside, towards the other hawser.
+        const block = stopBlock(at, along, UP, vec3(0, 0, -s), HAWSER_R, STOP_BLOCK_COLORS);
+        pieces.push(...block.pieces);
+        eyes.push(block.inner);
     }
     // The joining rope: 2.5 m with its knots tied, its middle drawn up the span by the brake line.
     const half = 1.25;
@@ -1239,7 +1246,20 @@ function dynamicBrake(): Piece[] {
     const apex = eyes[0]
         .lerp(eyes[1], 0.5)
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
-    for (const e of eyes) pieces.push(...line(hanging(e, apex, 0.03, 8), 0.004, C.joining));
+    // Tied straight to each eye: a turn round the eye's bar on the side towards the middle knot, the rope on from it.
+    const ropeR = 0.004;
+    for (const e of eyes) {
+        const level = apex.sub(e);
+        const w = vec3(level.x, 0, level.z).unit();
+        const bar = e.add(w.scale(STOP_BLOCK_EYE.r));
+        const around = STOP_BLOCK_EYE.bar + ropeR;
+        const turn = Array.from({ length: 13 }, (_, i) => {
+            const t = (2 * Math.PI * i) / 12;
+            return bar.add(w.scale(around * Math.cos(t))).add(UP.scale(around * Math.sin(t)));
+        });
+        pieces.push(...line(turn, ropeR, C.joining));
+        pieces.push(...line(hanging(bar.add(w.scale(around)), apex, 0.03, 8), ropeR, C.joining));
+    }
     pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
     const from = apex.add(vec3(-0.04, 0, 0));

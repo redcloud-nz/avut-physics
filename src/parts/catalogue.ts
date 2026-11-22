@@ -1,5 +1,6 @@
 import { timber, type Piece } from "@/abseil-tower/tower";
 import {
+    BLOCKS_X,
     BRAKE,
     C,
     foxPieces,
@@ -11,6 +12,7 @@ import {
     rigPulley,
     rigTrolley,
     SHEAR_LEG,
+    STOP_BLOCK_COLORS,
     TROLLEY_COLORS,
     TROLLEY_X,
 } from "@/flying-fox/fox";
@@ -21,6 +23,7 @@ import {
     grigri,
     pulley,
     sheave,
+    stopBlock,
     wrap,
     zipTrolley,
 } from "@/flying-fox/hardware";
@@ -133,6 +136,16 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "stop-block",
+        name: "Stop block",
+        group: "Hardware",
+        about: "The team's stop block, from their drawing and a photo: two nylon halves split along 11 mm wire, 100 mm each way, held by four 10 mm brass bolts sunk flush top and bottom, with two eye bolts across it, one high with its eye on the +z side at the −x end, the other low on the far side at the far end.",
+        pieces: () => [
+            ...stopBlock(ORIGIN, ALONG, UP, ACROSS, HAWSER_R, STOP_BLOCK_COLORS).pieces,
+            ...wire(ORIGIN, 0.25),
+        ],
+    },
+    {
         slug: "fox-trolley",
         name: "Trolley, rigged",
         group: "Flying fox",
@@ -212,6 +225,30 @@ export const PARTS: Part[] = [
                 lo: at.add(vec3(-0.4, -2.4, -0.3)),
                 hi: at.add(vec3(0.4, 0.2, 0.3)),
             });
+        },
+    },
+    {
+        slug: "fox-brake-blocks",
+        name: "Brake blocks, rigged",
+        group: "Flying fox",
+        about: "The dynamic brake's stop blocks as the flying fox rigs them, cut out of the whole: one on each hawser, the joining rope tied between their inner eyes and drawn up the span by the brake line, trolley B against its block.",
+        pieces: () => {
+            const at = onHawser(BLOCKS_X, 1);
+            // The hawsers run the whole span, so the box leaves them out: a stretch of each, put back.
+            const hawsers = [-1, 1].flatMap((side) =>
+                line(
+                    Array.from({ length: 9 }, (_, i) => onHawser(BLOCKS_X - 1.6 + 0.25 * i, side)),
+                    HAWSER_R,
+                    C.hawser,
+                ),
+            );
+            return [
+                ...within(foxPieces(), {
+                    lo: vec3(at.x - 1.6, at.y - 0.6, -1),
+                    hi: vec3(at.x + 0.3, at.y + 0.3, 1),
+                }),
+                ...hawsers,
+            ];
         },
     },
     {

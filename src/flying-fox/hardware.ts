@@ -217,6 +217,16 @@ export const EYE_BOLT = {
     collar: { r: 0.015, h: 0.01 },
     thread: { r: 0.006, length: 0.021 },
 };
+export type EyeBoltSize = typeof EYE_BOLT;
+
+/** An M10 eye bolt to DIN 580: 45 mm outside its eye and 25 mm inside, 45 mm to the eye's top, a 25 mm collar. */
+export const EYE_BOLT_M10: EyeBoltSize = {
+    r: 0.0175,
+    bar: 0.005,
+    centre: 0.0225,
+    collar: { r: 0.0125, h: 0.008 },
+    thread: { r: 0.005, length: 0.018 },
+};
 
 /**
  * The eye of a bolt standing out towards `out`, turned into the plane of `out` and `toward`: those two directions in it,
@@ -240,10 +250,11 @@ export function eyeBolt(
     out: Vector3,
     toward: Vector3,
     color: string,
+    size: EyeBoltSize = EYE_BOLT,
 ): { pieces: Piece[]; eye: Vector3 } {
     const { o, w } = eyeFrame(out, toward);
-    const { r, bar, collar, thread } = EYE_BOLT;
-    const eye = base.add(o.scale(EYE_BOLT.centre));
+    const { r, bar, collar, thread } = size;
+    const eye = base.add(o.scale(size.centre));
     const points = Array.from({ length: 25 }, (_, i) => {
         const t = (2 * Math.PI * i) / 24;
         return eye.add(o.scale(r * Math.cos(t))).add(w.scale(r * Math.sin(t)));
@@ -266,7 +277,7 @@ export function eyeBolt(
             ...part(
                 base.add(o.scale(collar.h)),
                 base.add(o.scale(collar.h + 0.004)),
-                0.011,
+                collar.r * 0.73,
                 color,
                 0.004,
             ),
@@ -786,4 +797,115 @@ export function grigri(
         return [...curve, p3.add(down.scale(Math.max(drop - 0.1, 0.01)))];
     };
     return { pieces, rope, brakeOut, holeR, brake };
+}
+
+/** A hexagon nut on `axis` at `at` (the middle of its thickness): `across` its flats and `thick` thick. */
+export function nut(
+    at: Vector3,
+    axis: Vector3,
+    across: number,
+    thick: number,
+    color: string,
+): Face[] {
+    const n = axis.unit();
+    const any = Math.abs(n.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0);
+    const u = any.sub(n.scale(any.dot(n))).unit();
+    const corner = across / Math.sqrt(3);
+    return plate({ o: at, u, v: u.cross(n), n }, circle([0, 0], corner, 6), [], thick, color);
+}
+
+/**
+ * The team's stop block (metres), from their drawing and a photo of one: two nylon halves `half` across, `long` along
+ * the wire and `high`, split down the middle, the wire through a hole on the split halfway up. Four 10 mm brass bolts
+ * stand through it, one in each half `bolt.in` from the split at each end `bolt.end` in from it, their heads and nuts
+ * sunk flush in the top and bottom. Two eye bolts go across through both halves `eye.end` in from either end, one
+ * `eye.high` up and the other as far down, their eyes lying flat and their nuts on the far side. The eyes are smaller
+ * than an M10's to DIN 580, about 37 mm outside and 22 mm inside in the photo (`eye.size`).
+ */
+export const STOP_BLOCK = {
+    half: 0.05,
+    long: 0.1,
+    high: 0.1,
+    gap: 0.001,
+    bolt: { in: 0.012, end: 0.016 },
+    eye: {
+        end: 0.025,
+        high: 0.025,
+        size: { ...EYE_BOLT_M10, r: 0.0147, bar: 0.0038, centre: 0.02 } as EyeBoltSize,
+    },
+    nut: { across: 0.017, thick: 0.008 },
+};
+
+/**
+ * A stop block on the wire at `at`, its length along `along` and its top towards `up`. The high eye bolt's eye is on
+ * the `inner` side, at the end towards `along`'s back (uphill, where the trolley meets the block); the low one's on the
+ * other side at the other end. Returns its pieces and the two eyes' middles.
+ */
+export function stopBlock(
+    at: Vector3,
+    along: Vector3,
+    up: Vector3,
+    inner: Vector3,
+    wireR: number,
+    colors: { body: string; steel: string; brass: string },
+): { pieces: Piece[]; inner: Vector3; outer: Vector3 } {
+    const { half, long, high, gap, bolt: b, eye, nut: nt } = STOP_BLOCK;
+    const d = along.unit();
+    const vUp = up.sub(d.scale(up.dot(d))).unit();
+    // Across, towards the inner side.
+    const x = inner
+        .sub(d.scale(inner.dot(d)))
+        .sub(vUp.scale(inner.dot(vUp)))
+        .unit();
+    const p = (a: number, y: number, l: number) =>
+        at.add(x.scale(a)).add(vUp.scale(y)).add(d.scale(l));
+    const pieces: Piece[] = [];
+    // The halves, each cut round half the wire's hole at the split.
+    const hole = wireR + 0.0015;
+    for (const s of [-1, 1]) {
+        const edge = (s * gap) / 2;
+        const notch: Flat[] = Array.from({ length: 9 }, (_, i) => {
+            const t = -Math.PI / 2 + (Math.PI * i) / 8;
+            return [edge + s * hole * Math.cos(t), hole * Math.sin(t)];
+        });
+        const outline: Flat[] = [
+            [edge, -high / 2],
+            [edge + s * half, -high / 2],
+            [edge + s * half, high / 2],
+            [edge, high / 2],
+            ...notch.reverse(),
+        ];
+        const frame: Frame = { o: at, u: x, v: vUp, n: x.cross(vUp) };
+        pieces.push(...plate(frame, outline, [], long, colors.body));
+    }
+    // The upright bolts' heads on top and their nuts underneath, sunk flush (just proud, so they show).
+    for (const s of [-1, 1])
+        for (const e of [-1, 1])
+            for (const t of [-1, 1]) {
+                const centre = p(
+                    s * (gap / 2 + b.in),
+                    t * (high / 2 - 0.0005),
+                    e * (long / 2 - b.end),
+                );
+                pieces.push(
+                    ...nut(centre, vUp, nt.across, 0.002, t > 0 ? colors.brass : colors.steel),
+                );
+            }
+    // The eye bolts across, each eye lying flat, a nut on the far side.
+    const side = gap / 2 + half;
+    const eyes: Vector3[] = [];
+    for (const [s, y, l] of [
+        [1, eye.high, -(long / 2 - eye.end)],
+        [-1, -eye.high, long / 2 - eye.end],
+    ] as const) {
+        const out = x.scale(s);
+        const size = { ...eye.size, thread: { r: 0.005, length: 2 * side + nt.thick + 0.006 } };
+        const bolt = eyeBolt(p(s * side, y, l), out, d, colors.steel, size);
+        pieces.push(...bolt.pieces);
+        pieces.push(
+            ...nut(p(-s * (side + nt.thick / 2), y, l), x, nt.across, nt.thick, colors.steel),
+        );
+        eyes.push(bolt.eye);
+    }
+    return { pieces, inner: eyes[0], outer: eyes[1] };
 }
