@@ -336,6 +336,7 @@ html {
   --rig-dark-red: #991b1b;
   --rig-maroon: #9f1239;
   --rig-dark-blue: #1d4ed8;
+  --rig-mid-blue: #3b82f6;
   /* Where a person stands on a deck: a pale disc that shows on the boards, a pastel for each role. The plain one is
      for a disc without a role's colour. */
   --rig-person: #cbd5e1;

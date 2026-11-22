@@ -12,13 +12,6 @@ describe("the first east face rig", () => {
     const sling = pieces.filter(
         (p) => p.kind === "strand" && p.material === "sling" && p.points[0].y > TOP + 1,
     );
-    // The abseil lines alone, without the belay and its bucket.
-    const abseil = layoutRig({
-        ...RIGS[0],
-        items: RIGS[0].items.filter(
-            (i) => i.kind !== "belay" && !["bucket-3", "bucket-4", "bucket-6"].includes(i.id),
-        ),
-    }).pieces;
 
     it("hangs each sling at its distance along the beam", () => {
         // The beam slings' carabiners: those clipped to them start where each sling's legs meet.
@@ -31,16 +24,6 @@ describe("the first east face rig", () => {
             expect(Math.min(...at.map((z) => Math.abs(middle(p) - z)))).toBeLessThan(0.15);
         // And every sling has tape there.
         for (const z of at) expect(sling.some((p) => Math.abs(middle(p) - z) < 0.1)).toBe(true);
-    });
-
-    it("mirrors the second line's bucket across the tower's middle", () => {
-        const middles = abseil
-            .filter((p) => p.material === "bucket" && p.kind === "face" && p.points.length > 4)
-            .map((p) =>
-                p.kind === "face" ? p.points.reduce((t, q) => t + q.z, 0) / p.points.length : 0,
-            );
-        expect(middles).toHaveLength(2);
-        expect(middles[0] + middles[1]).toBeCloseTo(SIDE);
     });
 
     it("lines the sling's legs and the rope up towards the rail", () => {
@@ -66,16 +49,40 @@ describe("the first east face rig", () => {
         for (const q of onGround) expect(q.x).toBeGreaterThan(SIDE + 0.15);
     });
 
-    it("stands the bucket on the top deck under the beam, just north of the stairs' steel railing", () => {
-        const bucket = abseil.filter((p) => p.material === "bucket");
-        expect(bucket.length).toBeGreaterThan(0);
-        const pts = bucket.flatMap((p) => (p.kind === "face" ? p.points : []));
-        const xs = pts.map((p) => p.x);
-        const zs = pts.map((p) => p.z);
+    // A bucket's outline on the top deck, by the colour it's drawn.
+    const bucketOnTop = (color: string) =>
+        pieces
+            .filter(
+                (p) =>
+                    p.material === "bucket" &&
+                    p.color === color &&
+                    p.kind === "face" &&
+                    p.points.every((q) => q.y > TOP - 0.01),
+            )
+            .flatMap((p) => (p.kind === "face" ? p.points : []));
+
+    it("stands the black bucket on the top deck clear of the beam to its east, just north of the stairs' opening", () => {
+        // The black bucket north of the opening (the other is in the SW corner).
+        const pts = bucketOnTop("var(--rig-black)").filter((q) => q.z > topOpening().z1);
+        expect(pts.length).toBeGreaterThan(0);
         expect(Math.min(...pts.map((p) => p.y))).toBeCloseTo(TOP);
-        expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(OVERHEAD.x);
-        expect(Math.min(...zs)).toBeGreaterThan(topOpening().z1);
-        expect(Math.min(...zs) - topOpening().z1).toBeLessThan(0.15);
+        expect(Math.min(...pts.map((p) => p.x))).toBeGreaterThan(OVERHEAD.x + OVERHEAD.r);
+        expect(Math.min(...pts.map((p) => p.z))).toBeGreaterThan(topOpening().z1);
+        expect(Math.min(...pts.map((p) => p.z)) - topOpening().z1).toBeLessThan(0.3);
+    });
+
+    it("stands the northern buckets clear of the beam to its west, the red ropes' north of the light blue's", () => {
+        const pts = bucketOnTop("var(--rig-mid-blue)");
+        expect(pts.length).toBeGreaterThan(0);
+        expect(Math.max(...pts.map((p) => p.x))).toBeLessThan(OVERHEAD.x - OVERHEAD.r);
+        // Two buckets, split by the gap between them along the beam.
+        const zs = pts.map((p) => p.z).sort((a, b) => a - b);
+        const gap = zs.findIndex((z, i) => i > 0 && z - zs[i - 1] > 0.05);
+        expect(gap).toBeGreaterThan(0);
+        const at = (id: string) =>
+            RIGS[0].items.flatMap((i) => (i.kind === "sling" && i.id === id ? [i.at] : []))[0];
+        // The red ropes' bucket (the northern one) reaches past the red belays' slings' middle.
+        expect(zs.at(-1)!).toBeGreaterThan((at("sling-6") + at("sling-7")) / 2);
     });
 
     it("hangs the belay ropes just past the east rail, not down to the ground", () => {
@@ -114,25 +121,6 @@ describe("the first east face rig", () => {
         expect(mid(yellow.map((q) => q.z))).toBeCloseTo(mid(black.map((q) => q.z)));
         const { x0, x1, z0, z1 } = topOpening();
         for (const q of yellow) expect(q.x < x0 || q.x > x1 || q.z < z0 || q.z > z1).toBe(true);
-    });
-
-    it("stands the red belays' bucket directly under the beam, between their slings", () => {
-        // The blue bucket at the north end (the other blue one is the space 4 line's, further south).
-        const blue = pieces.filter(
-            (p) =>
-                p.material === "bucket" &&
-                p.color === "var(--knot-blue)" &&
-                p.kind === "face" &&
-                p.points.every((q) => q.z > 3.25),
-        );
-        expect(blue.length).toBeGreaterThan(0);
-        const pts = blue.flatMap((p) => (p.kind === "face" ? p.points : []));
-        const mid = (vs: number[]) => (Math.min(...vs) + Math.max(...vs)) / 2;
-        const at = (id: string) =>
-            RIGS[0].items.flatMap((i) => (i.kind === "sling" && i.id === id ? [i.at] : []))[0];
-        expect(mid(pts.map((p) => p.x))).toBeCloseTo(OVERHEAD.x);
-        expect(mid(pts.map((p) => p.z))).toBeGreaterThan(at("sling-7"));
-        expect(mid(pts.map((p) => p.z))).toBeLessThan(at("sling-6"));
     });
 
     it("stops the maroon fixed line just below the outrigger, not at the ground", () => {

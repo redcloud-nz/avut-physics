@@ -38,7 +38,8 @@ export type RigColor =
     | "black"
     | "white"
     | "maroon"
-    | "dark-blue";
+    | "dark-blue"
+    | "mid-blue";
 
 /**
  * A sling round the overhead beam, both its ends clipped to one carabiner (a basket). `length` is its length laid flat
@@ -76,7 +77,12 @@ export type Rope = {
      */
     end?: "below-outrigger" | { drop: number; carabiner: boolean };
     /** How it's tied to its carabiner: a munter and two half hitches (the default) or a figure 8 on a bight. */
-    knot?: "M+2HH" | "F8oB";
+    knot?: "M+2HH" | "F8OB";
+    /**
+     * Which side of its knot the elevation it shows in writes that knot's label, where the side of the drawing it's on
+     * would crowd it.
+     */
+    labelSide?: "left" | "right";
 };
 
 /**
@@ -182,7 +188,8 @@ export const RIGS: Rig[] = [
                 color: "red",
                 configuration: "basket",
             },
-            { kind: "bucket", id: "bucket-1", color: "black", place: "by-stair-railing" },
+            // Clear of the beam to its east, so it shows from above, just north of the stairs' opening.
+            { kind: "bucket", id: "bucket-1", color: "black", place: { east: 2.6, north: 1.47 } },
             {
                 kind: "rope",
                 id: "rope-1",
@@ -191,6 +198,7 @@ export const RIGS: Rig[] = [
                 length: 60,
                 route: "east-face",
                 spare: "bucket-1",
+                labelSide: "right",
             },
             // The second line mirrors the first, from south to north.
             {
@@ -201,11 +209,12 @@ export const RIGS: Rig[] = [
                 color: "red",
                 configuration: "basket",
             },
+            // Clear of the beam to its west, so it shows from above.
             {
                 kind: "bucket",
                 id: "bucket-2",
-                color: "blue",
-                place: { mirrorOf: "bucket-1" },
+                color: "mid-blue",
+                place: { east: 1.9, north: 3.05 },
                 height: 0.55,
             },
             {
@@ -216,6 +225,7 @@ export const RIGS: Rig[] = [
                 length: 100,
                 route: "east-face",
                 spare: "bucket-2",
+                labelSide: "left",
             },
             // The west lines. The first, in space 1 on a longer sling, goes over the outrigger, its spare in its own
             // bucket in the top deck's SW corner; the second, the other end of the space 4 rope sharing its bucket,
@@ -254,6 +264,7 @@ export const RIGS: Rig[] = [
                 length: 100,
                 route: "west-face",
                 spare: "bucket-2",
+                labelSide: "right",
             },
             // The belays, one at a time.
             {
@@ -270,7 +281,7 @@ export const RIGS: Rig[] = [
                 kind: "bucket",
                 id: "bucket-3",
                 color: "yellow",
-                place: { dueEastOf: "bucket-1", east: 2.95 },
+                place: { dueEastOf: "bucket-1", east: 3.0 },
             },
             {
                 kind: "belay",
@@ -283,7 +294,7 @@ export const RIGS: Rig[] = [
                 route: "east-face",
                 beside: "rope-1",
                 spare: "bucket-3",
-                coil: { east: 3.4, north: 1.8 },
+                coil: { east: 3.4, north: 1.6 },
             },
             {
                 kind: "sling",
@@ -296,9 +307,9 @@ export const RIGS: Rig[] = [
             {
                 kind: "bucket",
                 id: "bucket-4",
-                color: "blue",
-                // Between the two red belays' slings, clear of the light blue bucket to its south.
-                place: { underBeamAt: 3.5 },
+                color: "mid-blue",
+                // Clear of the beam to its west, north of the light blue ropes' bucket.
+                place: { east: 1.9, north: 3.6 },
                 height: 0.55,
             },
             {
@@ -334,7 +345,7 @@ export const RIGS: Rig[] = [
                 route: "west-outrigger",
                 beside: "rope-4",
                 spare: "bucket-4",
-                coil: { east: 1.6, north: 3.4 },
+                coil: { east: 1.5, north: 3.4 },
             },
             // A fixed line from space 1 over the outrigger, ending in a carabiner just below it.
             {
@@ -353,6 +364,7 @@ export const RIGS: Rig[] = [
                 length: 12,
                 route: "west-outrigger",
                 end: "below-outrigger",
+                labelSide: "left",
             },
             // The belay for it, on level 3: a sling round the stairs' stringer, and its rope up through the redirect.
             {
@@ -394,7 +406,7 @@ export const RIGS: Rig[] = [
                 color: "maroon",
                 length: 12,
                 route: "east-face",
-                knot: "F8oB",
+                knot: "F8OB",
                 end: { drop: 1, carabiner: true },
             },
             {
@@ -412,8 +424,9 @@ export const RIGS: Rig[] = [
                 color: "maroon",
                 length: 12,
                 route: "east-face",
-                knot: "F8oB",
+                knot: "F8OB",
                 end: { drop: 2, carabiner: false },
+                labelSide: "right",
             },
             // Where people stand.
             // The white belay's belayer, by its prusiks and bucket.
@@ -506,7 +519,15 @@ export const RIGS: Rig[] = [
 /** Each rig colour as drawn: the knot pages' colour of that name, or the rig's own for those they don't have. */
 export const rigColor = (c: RigColor) =>
     OWN_COLORS.includes(c) ? `var(--rig-${c})` : `var(--knot-${c})`;
-const OWN_COLORS: RigColor[] = ["black", "white", "dark-green", "dark-red", "maroon", "dark-blue"];
+const OWN_COLORS: RigColor[] = [
+    "black",
+    "white",
+    "dark-green",
+    "dark-red",
+    "maroon",
+    "dark-blue",
+    "mid-blue",
+];
 /** Colours dark enough that a label on them is written light. */
 const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "dark-blue"];
 
@@ -649,6 +670,8 @@ export type RigLabel = {
     light?: boolean;
     /** Where it is in the tower's shell, as what it's written on is, so it sorts with it. */
     shell?: Piece["shell"];
+    /** Which side of it an elevation writes it, if not the side of the drawing it's on. */
+    side?: "left" | "right";
 };
 
 /** How a rope's tied to a carabiner (a munter and two half hitches), drawn as a short cylinder in the rope's colour. */
@@ -657,7 +680,7 @@ const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
  * A figure 8 on a bight clipped to a carabiner, drawn the same way but shorter and slimmer: where a rope's tied to the
  * beam's sling, and on every rope's end that finishes in a carabiner.
  */
-const F8_BIGHT = { text: "F8oB", r: 0.045, length: 0.16 };
+const F8_BIGHT = { text: "F8OB", r: 0.045, length: 0.16 };
 /** A figure 8 stopper, on the end of every rope that finishes with nothing clipped to it, drawn as the figure 8 is. */
 const F8_STOPPER = { ...F8_BIGHT, text: "F8" };
 
@@ -761,7 +784,7 @@ function ropeOverSide(
     // Every end has a knot: a figure 8 for its carabiner, or a stopper.
     const tail = endKnot(last, rope.color, { out, layer: 3 }, endKrab ? F8_BIGHT : F8_STOPPER);
     const color = rigColor(rope.color);
-    const knot = rope.knot === "F8oB" ? F8_BIGHT : HITCH;
+    const knot = rope.knot === "F8OB" ? F8_BIGHT : HITCH;
     const hitch = clip.add(along.scale(knot.length));
     // The hitch starts a little back over the carabiner's end, round which it's tied.
     const tied = clip.sub(along.scale(0.02));
@@ -790,6 +813,7 @@ function ropeOverSide(
                 text: knot.text,
                 on: { along, length: hitch.distanceTo(tied), r: knot.r },
                 light: DARK_COLORS.includes(rope.color),
+                side: rope.labelSide,
             },
         ],
         // A rope round a fixed line's end carabiner bears on the inside of its lower end.
@@ -841,7 +865,11 @@ function toGround(
             .scale(Math.min(0.3, off.distanceTo(foot) / 2)),
     );
     const past = [nearRail, rail, landing, ...beyond.slice(0, -1), leaving, foot];
-    const cuts = [0, 2, past.length - 2, past.length - 1].filter((c, i, cs) => cs.indexOf(c) === i);
+    // It's cut at the edge it goes over too, so the stretch lying across what's below the rail (the top deck's ledge
+    // outside the east railing) sorts above the deck, apart from the drop.
+    const cuts = [0, 2, 3, past.length - 2, past.length - 1].filter(
+        (c, i, cs) => cs.indexOf(c) === i && c < past.length,
+    );
     return [
         strand([...from, nearRail], ROPE_R, "rope", color, true, false),
         ...cuts.slice(1).map((c, i) => ({
@@ -1465,12 +1493,12 @@ export function legend(rig: Rig): {
     const ropes = rig.items.filter((i): i is Rope => i.kind === "rope");
     const belays = rig.items.filter((i): i is Belay => i.kind === "belay");
     const cylinders: LegendCylinder[] = [];
-    const munter = ropes.filter((r) => r.knot !== "F8oB");
+    const munter = ropes.filter((r) => r.knot !== "F8OB");
     // Figure 8s: ropes tied to their slings with one, and every rope or belay ending in a carabiner.
     const f8 = [
         ...ropes.filter(
             (r) =>
-                r.knot === "F8oB" ||
+                r.knot === "F8OB" ||
                 r.end === "below-outrigger" ||
                 (typeof r.end === "object" && r.end.carabiner),
         ),

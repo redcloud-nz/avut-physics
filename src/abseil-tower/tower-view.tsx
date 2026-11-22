@@ -859,7 +859,7 @@ function Callouts({
         .map((label) => ({ label, at: toSvg(label.at) }))
         .sort((a, b) => a.at.y - b.at.y)
         .map(({ label, at }) => {
-            const right = at.x >= middle;
+            const right = label.side ? label.side === "right" : at.x >= middle;
             const width = label.text.length * MONO_WIDTH * CALLOUT.font + 4;
             // Clear of the knot's side as it's drawn, however close the view.
             const gap = CALLOUT.gap + (label.on ? label.on.r * ppm : 0);
