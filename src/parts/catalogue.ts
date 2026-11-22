@@ -3,14 +3,27 @@ import {
     BRAKE,
     C,
     foxPieces,
+    groundY,
     HAWSER_R,
     line,
+    onHawser,
     PULLEY_COLORS,
     rigPulley,
     rigTrolley,
+    SHEAR_LEG,
     TROLLEY_COLORS,
+    TROLLEY_X,
 } from "@/flying-fox/fox";
-import { bolt, carabiner, eyeBolt, pulley, sheave, wrap, zipTrolley } from "@/flying-fox/hardware";
+import {
+    bolt,
+    carabiner,
+    eyeBolt,
+    grigri,
+    pulley,
+    sheave,
+    wrap,
+    zipTrolley,
+} from "@/flying-fox/hardware";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
@@ -95,6 +108,31 @@ export const PARTS: Part[] = [
         ],
     },
     {
+        slug: "grigri",
+        name: "GRIGRI+",
+        group: "Hardware",
+        about: "A Petzl GRIGRI+ (assisted-braking belay device), about 115 mm long, hanging from its carabiner: the loaded strand up out of its top by the climber's mark, the brake strand out by the hand's at the far end.",
+        pieces: () => {
+            // Its coloured front towards the Front view.
+            const g = grigri(ORIGIN, UP, ACROSS.neg(), {
+                body: "var(--fox-grigri)",
+                dark: "var(--rig-black)",
+                handle: "var(--fox-grigri-handle)",
+                steel: STEEL,
+            });
+            const clip = 0.11 - g.holeR + 0.005;
+            return [
+                ...g.pieces,
+                ...carabiner(vec3(0, -g.holeR + 0.005, 0), DOWN, ACROSS, STEEL, clip),
+                ...line(
+                    [g.rope[0].add(vec3(0, 0.2, 0)), ...g.rope, ...g.brake(0.25)],
+                    0.0055,
+                    C.dropper,
+                ),
+            ];
+        },
+    },
+    {
         slug: "fox-trolley",
         name: "Trolley, rigged",
         group: "Flying fox",
@@ -161,6 +199,32 @@ export const PARTS: Part[] = [
                 (q) => ({ ...q, color: STEEL }),
             );
             return [...beam, ...p.pieces, ...line([a, ...p.round, b], 0.004, C.brakeLine)];
+        },
+    },
+    {
+        slug: "fox-dropper",
+        name: "Trolley and dropper, rigged",
+        group: "Flying fox",
+        about: "Trolley A on its hawser at the launch, cut out of the whole: the dropper down through the GRIGRI+ to the rider's tie-in, its brake strand hanging below, and the safety line beside it to its own carabiner.",
+        pieces: () => {
+            const at = onHawser(TROLLEY_X.a, 1);
+            return within(foxPieces(), {
+                lo: at.add(vec3(-0.4, -2.4, -0.3)),
+                hi: at.add(vec3(0.4, 0.2, 0.3)),
+            });
+        },
+    },
+    {
+        slug: "fox-stabiliser",
+        name: "Stabiliser pulley on the shear leg",
+        group: "Flying fox",
+        about: "The stabiliser's pulley as the flying fox hangs it, cut out of the whole: from a round sling basketed over the shear leg's top spar, swung to line up with the pull of the shock cord through it.",
+        pieces: () => {
+            const spar = vec3(SHEAR_LEG.x, groundY(SHEAR_LEG.x) + SHEAR_LEG.spar, 0);
+            return within(foxPieces(), {
+                lo: spar.add(vec3(-0.8, -0.8, -1.3)),
+                hi: spar.add(vec3(0.5, 0.3, 1.3)),
+            });
         },
     },
     {

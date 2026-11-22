@@ -53,6 +53,11 @@ export type Face = {
     text?: string;
     /** Holes through it (a plate's), each a loop of points in its plane. */
     holes?: Vector3[][];
+    /**
+     * A colour at each corner (CSS, one per point), blended across the face in 3D, as for ground that shades smoothly
+     * from grass to bare; the flat views keep to `color`.
+     */
+    shades?: string[];
 };
 
 /**

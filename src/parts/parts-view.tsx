@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Loading3D from "@/abseil-tower/loading-3d";
 import type { Piece } from "@/abseil-tower/tower";
 import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
-import { centreOf, PieceDrawing } from "@/abseil-tower/tower-view";
+import { nearness, PieceDrawing } from "@/abseil-tower/tower-view";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -49,6 +49,7 @@ const FLATS = [
 const LOOKS = [
     { label: "Three-quarter", azimuth: 145, elevation: 20 },
     ...FLATS,
+    { label: "Back", azimuth: 0, elevation: 0 },
     { label: "Below", azimuth: 180, elevation: -89 },
 ];
 
@@ -278,7 +279,7 @@ function FlatView({
     const sorted = pieces
         .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
-        .map((piece) => ({ piece, key: cam.depth(centreOf(piece)) }))
+        .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
         .sort((a, b) => a.key - b.key);
     const bar = roundLength((size.x * 0.25) / ppm);
     return (
@@ -303,38 +304,41 @@ function FlatView({
                             depth={(p) => cam.depth(p)}
                         />
                     ))}
-                <g
-                    transform={`translate(${svgNumber(size.x - 12 - bar * ppm)} ${svgNumber(size.y - 12)})`}
-                >
-                    <line
-                        x1={0}
-                        x2={bar * ppm}
-                        y1={0}
-                        y2={0}
-                        stroke="var(--ink-muted)"
-                        strokeWidth={1.5}
-                    />
-                    {[0, bar * ppm].map((x) => (
+                {/* The scale bar, like the drawing, once in the browser: its length is worked out from the part. */}
+                {inBrowser && (
+                    <g
+                        transform={`translate(${svgNumber(size.x - 12 - bar * ppm)} ${svgNumber(size.y - 12)})`}
+                    >
                         <line
-                            key={x}
-                            x1={x}
-                            x2={x}
-                            y1={-4}
+                            x1={0}
+                            x2={bar * ppm}
+                            y1={0}
                             y2={0}
                             stroke="var(--ink-muted)"
                             strokeWidth={1.5}
                         />
-                    ))}
-                    <text
-                        x={(bar * ppm) / 2}
-                        y={-6}
-                        textAnchor="middle"
-                        fontSize={11}
-                        fill="var(--ink-muted)"
-                    >
-                        {lengthText(bar)}
-                    </text>
-                </g>
+                        {[0, bar * ppm].map((x) => (
+                            <line
+                                key={x}
+                                x1={x}
+                                x2={x}
+                                y1={-4}
+                                y2={0}
+                                stroke="var(--ink-muted)"
+                                strokeWidth={1.5}
+                            />
+                        ))}
+                        <text
+                            x={(bar * ppm) / 2}
+                            y={-6}
+                            textAnchor="middle"
+                            fontSize={11}
+                            fill="var(--ink-muted)"
+                        >
+                            {lengthText(bar)}
+                        </text>
+                    </g>
+                )}
             </svg>
             <span className="absolute top-1.5 left-2 text-xs text-ink-muted">{view.label}</span>
         </div>

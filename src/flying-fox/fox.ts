@@ -4,7 +4,16 @@ import { G } from "@/lib/constants";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
-import { carabiner, EYE_BOLT, eyeBolt, eyeFrame, pulley, wrap, zipTrolley } from "./hardware";
+import {
+    carabiner,
+    EYE_BOLT,
+    eyeBolt,
+    eyeFrame,
+    grigri,
+    pulley,
+    wrap,
+    zipTrolley,
+} from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
 
 /**
@@ -257,7 +266,7 @@ export const C = {
     steel: "var(--tower-steel)",
     trolley: "var(--knot-red)",
     nylon: "var(--fox-nylon)",
-    sling: "var(--knot-red)",
+    sling: "var(--fox-sling)",
     tirfor: "var(--rig-black)",
     tree: "var(--tower-log)",
     spar: "var(--fox-spar)",
@@ -337,6 +346,29 @@ export function hanging(a: Vector3, b: Vector3, sag: number, n = 40): Vector3[] 
     });
 }
 
+/**
+ * How far a line from `a` to `b` sags at its middle hanging as the hawsers do, `times` as much: a hanging line's sag
+ * goes as the square of its length for the same tension per weight, so it's scaled from the unloaded hawsers'. If
+ * that would bring it within `clear` of the ground, it sags only as far as keeps it that far up.
+ */
+export function sagLike(a: Vector3, b: Vector3, times = 1, clear = 0.5): number {
+    const span = RIG.to.x - RIG.from.x;
+    const mid = (RIG.from.x + RIG.to.x) / 2;
+    const hawser = (RIG.from.y + RIG.to.y) / 2 - hawserY(mid);
+    const want = times * hawser * (a.distanceTo(b) / span) ** 2;
+    const clears = (sag: number) =>
+        hanging(a, b, sag, 60).every((p) => p.y >= groundY(p.x) + clear);
+    if (clears(want)) return want;
+    // As much as still clears, by halving the difference.
+    let [lo, hi] = [0, want];
+    for (let i = 0; i < 30; i++) {
+        const m = (lo + hi) / 2;
+        if (clears(m)) lo = m;
+        else hi = m;
+    }
+    return lo;
+}
+
 /** A hawser's height along the span, unloaded, at `x` (from the tower's cradle to the shear leg's saddle). */
 export function hawserY(x: number): number {
     return heightAt(UNLOADED, x);
@@ -397,6 +429,9 @@ function guy(from: Vector3, at: Vector3, r: number, color: string): Piece[] {
 /** The bar of a pulley's carabiner (its radius). */
 const CARABINER_BAR = 0.0045;
 
+/** A round sling's thickness (its radius), as it lies over a spar. */
+const SLING_R = 0.01;
+
 /**
  * A rescue pulley, its rope running off towards points `a` and `b`, and the rope round it from `a`'s side to `b`'s.
  * Clipped into an eye bolt screwed into a post or arm at `base`, standing out towards `out`, it's moved from `near`
@@ -408,15 +443,44 @@ export function rigPulley(
     a: Vector3,
     b: Vector3,
     ropeR: number,
-    hung: { eyeBolt: { base: Vector3; out: Vector3; toward?: Vector3 } } | { sling: Vector3 },
+    hung:
+        | { eyeBolt: { base: Vector3; out: Vector3; toward?: Vector3 } }
+        | { basket: { spar: Vector3; along: Vector3; r: number; drop: number } },
 ) {
     const build = (centre: Vector3) =>
         pulley({ centre, toA: a.sub(centre), toB: b.sub(centre), ropeR, colors: PULLEY_COLORS });
     let centre = near;
     let p = build(centre);
     const extra: Piece[] = [];
-    if ("sling" in hung) extra.push(...line([p.hook, hung.sling], 0.008, C.sling, "sling"));
-    else {
+    if ("basket" in hung) {
+        // A round sling basketed over a spar (its middle `spar`, running along `along`), its two legs down to the
+        // carabiner `drop` below the spar's middle. The pulley swings until the sling lines up with the pull of its
+        // rope, as with an eye, moving half way each time so it settles.
+        const { spar, along, r, drop } = hung.basket;
+        const axis = along.unit();
+        const square = (v: Vector3) => v.sub(axis.scale(v.dot(axis)));
+        for (let i = 0; i < 100; i++) {
+            const hangs = square(p.up).unit();
+            const hook = spar.sub(hangs.scale(drop));
+            const next = centre.lerp(hook.sub(p.hook.sub(centre)), 0.5);
+            const moved = next.distanceTo(centre);
+            centre = next;
+            p = build(centre);
+            if (moved < 1e-5) break;
+        }
+        // Over the spar from where each leg leaves it, round the far side from the carabiner.
+        const R = r + SLING_R;
+        const out = square(p.hook.sub(spar));
+        const d = out.len();
+        const e = out.unit();
+        const f = axis.cross(e);
+        const a = Math.acos(Math.min(1, R / d));
+        const round = Array.from({ length: 17 }, (_, i) => {
+            const t = a + ((2 * Math.PI - 2 * a) * i) / 16;
+            return spar.add(e.scale(R * Math.cos(t))).add(f.scale(R * Math.sin(t)));
+        });
+        extra.push(...line([p.hook, ...round, p.hook], SLING_R, C.sling, "sling"));
+    } else {
         const { base, out, toward } = hung.eyeBolt;
         const mount = base.add(out.unit().scale(EYE_BOLT.centre));
         // Where the carabiner's top bar sits: on the eye's bar, at the edge the pull draws it to (across the hole
@@ -1092,30 +1156,28 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         .unit();
     const { pieces, hang, backUp } = rigTrolley(at, ahead);
     const back = backUp.add(vec3(0, 0.01, 0));
-    // The dropper: the rider's rope down to the descender, its running end hanging on below, and the back-up line.
-    // The descender sits just above the harness's tie-in, the rider's drop below the hawser.
-    const rig = at.add(vec3(0, -DESCENDER, 0));
-    pieces.push(...line([hang, rig], 0.0055, C.dropper));
-    pieces.push(
-        ...section(rig, rig.add(vec3(0, -0.16, 0)), vec3(1, 0, 0), 0.03, 0.07, "var(--rig-black)"),
-    );
-    pieces.push(
-        ...line(
-            smooth(
-                [
-                    rig.add(vec3(0.02, -0.16, 0)),
-                    rig.add(vec3(0.05, -0.6, 0.03)),
-                    rig.add(vec3(0.02, -1.0, 0.0)),
-                ],
-                4,
-            ),
-            0.0055,
-            C.dropper,
-        ),
-    );
-    pieces.push(
-        ...line(hanging(backUp, rig.add(vec3(0.06, -0.2, 0)), -0.05, 8), 0.0055, C.dropper),
-    );
+    // The dropper: the rider's rope down through the descender, a GRIGRI+ clipped to the harness's tie-in (the
+    // rider's drop below the hawser) and reaching up to about `DESCENDER` below it, the rope's brake strand hanging on
+    // below; and the back-up line, down to the harness too.
+    const tieIn = at.add(vec3(0, -RIDER.harness, 0));
+    const down = vec3(0, -1, 0);
+    const clipLength = 0.11;
+    // Its coloured side towards hawser B, so its body reaches downhill, clear of the back-up line behind it.
+    const g = grigri(tieIn.add(vec3(0, clipLength, 0)), UP, ACROSS.neg(), {
+        body: "var(--fox-grigri)",
+        dark: "var(--rig-black)",
+        handle: "var(--fox-grigri-handle)",
+        steel: C.steel,
+    });
+    pieces.push(...g.pieces);
+    // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in.
+    const holeBottom = tieIn.add(vec3(0, clipLength - g.holeR + 0.005, 0));
+    pieces.push(...carabiner(holeBottom, down, ACROSS, C.steel, clipLength - g.holeR + 0.005));
+    pieces.push(...line([hang, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
+    // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
+    const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
+    pieces.push(...line(hanging(backUp, safetyClip, -0.05, 8), 0.0055, C.dropper));
+    pieces.push(...carabiner(safetyClip, down, ACROSS, C.steel, clipLength));
     return { pieces, back };
 }
 
@@ -1128,7 +1190,10 @@ function trolleysAndReturn(): Piece[] {
     const b = trolley(TROLLEY_X.b, -1);
     const [ca, cb] = [RETURN_PULLEY(1), RETURN_PULLEY(-1)];
     // Each pulley clipped into the inner eye bolt on its side, its eye lying flat.
-    const out = hanging(cb, b.back, 2.2, 60);
+    // Out to trolley B, sagging well below hawser B: slacker than the hawsers, twice their sag for its length (as long
+    // as it stays clear of the ground).
+    const slack = (a: Vector3, z: Vector3) => sagLike(a, z, 2);
+    const out = hanging(cb, b.back, slack(cb, b.back), 60);
     const bolt = (s: number) => ({
         eyeBolt: { base: topEye(s * TOP_EYES.inner), out: vec3(1, 0, 0), toward: ACROSS },
     });
@@ -1141,7 +1206,7 @@ function trolleysAndReturn(): Piece[] {
         ...pb.pieces,
         ...line([a.back, ...pa.round, ...pb.round], 0.004, C.returnLine),
         // Out to trolley B, sagging under its own weight below hawser B.
-        ...line(hanging(pb.b, b.back, 2.2, 60), 0.004, C.returnLine),
+        ...line(hanging(pb.b, b.back, slack(pb.b, b.back), 60), 0.004, C.returnLine),
     ];
 }
 
@@ -1178,13 +1243,14 @@ function dynamicBrake(): Piece[] {
     pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
     const from = apex.add(vec3(-0.04, 0, 0));
-    const reach = hanging(from, BRAKE.pulley, 0.4, 50);
+    // Sagging much as the hawsers do.
+    const reach = hanging(from, BRAKE.pulley, sagLike(from, BRAKE.pulley), 50);
     // Clipped into the eye bolt under the arm, its eye turned to face the pull.
     const brake = rigPulley(BRAKE.pulley, reach[reach.length - 3], BRAKE.chainTop, 0.004, {
         eyeBolt: { base: BRAKE.eye, out: vec3(0, -1, 0) },
     });
     pieces.push(...brake.pieces);
-    pieces.push(...line(hanging(from, brake.a, 0.4, 50), 0.004, C.brakeLine));
+    pieces.push(...line(hanging(from, brake.a, sagLike(from, brake.a), 50), 0.004, C.brakeLine));
     pieces.push(...line([...brake.round, BRAKE.chainTop], 0.004, C.brakeLine));
     // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
     // and down from it, tied off to the bottom spar with natural fibre rope.
@@ -1194,7 +1260,12 @@ function dynamicBrake(): Piece[] {
     const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
     const cord = apex.add(vec3(0.04, 0, 0));
     const stabiliser = rigPulley(centre, cord, tie, 0.005, {
-        sling: vec3(SPAR_X, g + SHEAR_LEG.spar - SHEAR_LEG.r, 0),
+        basket: {
+            spar: vec3(SPAR_X, g + SHEAR_LEG.spar, 0),
+            along: ACROSS,
+            r: SHEAR_LEG.r,
+            drop: SHEAR_LEG.r + 0.25,
+        },
     });
     pieces.push(...stabiliser.pieces);
     pieces.push(...line([cord, ...stabiliser.round, tie], 0.005, C.shockCord));
@@ -1345,9 +1416,12 @@ function dryness(x: number, z: number): number {
  * The ground as faces: tiles 2 m square following its fall and dip, each one of a few shades from grass to dry ground,
  * so it isn't one flat colour.
  */
-export function groundFaces(): Piece[] {
-    const nx = Math.ceil((GROUND.x1 - GROUND.x0) / 2);
-    const nz = Math.ceil((2 * GROUND.z) / 2);
+export function groundFaces(step = 2): Piece[] {
+    const nx = Math.ceil((GROUND.x1 - GROUND.x0) / step);
+    const nz = Math.ceil((2 * GROUND.z) / step);
+    // Each corner's own shade too, in finer steps, for the 3D view to blend across the tile.
+    const tint = (x: number, z: number) =>
+        `color-mix(in oklab, var(--fox-ground-dry) ${Math.round(Math.min(1, Math.max(0, dryness(x, z))) * 25) * 4}%, var(--fox-ground))`;
     const xAt = (i: number) => GROUND.x0 + ((GROUND.x1 - GROUND.x0) * i) / nx;
     const zAt = (j: number) => -GROUND.z + (2 * GROUND.z * j) / nz;
     const faces: Piece[] = [];
@@ -1367,6 +1441,7 @@ export function groundFaces(): Piece[] {
                 ],
                 material: "deck",
                 color: groundShade(k),
+                shades: [tint(a, c), tint(b, c), tint(b, d), tint(a, d)],
             });
         }
     return faces;

@@ -563,18 +563,15 @@ export function zipTrolley(
     pieces.push(
         ...part(at(f, ZIP.middle, -gap / 2), at(f, ZIP.middle, gap / 2), 0.0065, colors.bumper),
     );
-    // The bumper: a block between the plates, on the pin, from just above the wire, its nose rounded and standing a
+    // The bumper: a block between the plates, on the pin, from just above the wire, its end square and standing a
     // little past the plates' ends, where it meets the brake blocks.
     pieces.push(...bolt(at(f, ZIP.pin), n, through, 0.005, colors.steel));
     const nose = 0.11;
     const [b0, b1] = [wireR + 0.002, 0.046];
-    const r = (b1 - b0) / 2;
     const bumperOutline: Flat[] = [
         [0.066, b0],
-        ...Array.from({ length: 9 }, (_, i): Flat => {
-            const t = -Math.PI / 2 + (Math.PI * i) / 8;
-            return [nose - r + r * Math.cos(t), (b0 + b1) / 2 + r * Math.sin(t)];
-        }),
+        [nose, b0],
+        [nose, b1],
         [0.066, b1],
     ];
     pieces.push(...plate(f, bumperOutline, [circle(ZIP.pin, 0.005, 10)], gap, colors.bumper));
@@ -587,4 +584,206 @@ export function zipTrolley(
         towSide: at(f, [ZIP.lower[1].at[0], ZIP.lower[1].at[1] + ZIP.lower[1].r]),
         frame: f,
     };
+}
+
+/**
+ * A Petzl GRIGRI+ (an assisted-braking belay device), measured in pixels off Petzl's square-on product photo, its
+ * carabiner hole at the left and the handle along the top, and scaled to about 115 mm long (Petzl doesn't give its
+ * size; that's from a photo of one in use, about eleven 10 mm ropes long).
+ */
+// prettier-ignore
+const GRIGRI_PX = {
+    scale: 0.115 / 520,
+    hole: { at: [95, 340] as Flat, r: 30 },
+    /** The coloured side plate, the one that stays put. */
+    fixed: [
+        [30, 283],
+        [40, 255],
+        [50, 234],
+        [60, 220],
+        [70, 205],
+        [80, 193],
+        [90, 177],
+        [100, 167],
+        [110, 159],
+        [120, 156],
+        [150, 162],
+        [200, 169],
+        [250, 177],
+        [300, 184],
+        [330, 189],
+        [350, 195],
+        [370, 202],
+        [390, 210],
+        [410, 219],
+        [430, 230],
+        [450, 244],
+        [470, 258],
+        [490, 274],
+        [500, 287],
+        [510, 302],
+        [515, 322],
+        [510, 341],
+        [500, 353],
+        [480, 366],
+        [460, 379],
+        [440, 390],
+        [420, 400],
+        [400, 412],
+        [380, 423],
+        [360, 431],
+        [340, 438],
+        [320, 443],
+        [300, 447],
+        [250, 448],
+        [200, 449],
+        [180, 448],
+        [160, 444],
+        [140, 441],
+        [120, 436],
+        [100, 431],
+        [80, 424],
+        [60, 415],
+        [40, 397],
+        [30, 386],
+        [24, 335],
+    ] as Flat[],
+    /** The side plate that swings open to load the rope: much the fixed one's shape, with a tail past the far end. */
+    moving: [
+        [30, 283], [40, 255], [50, 234], [60, 220], [70, 205], [80, 193], [90, 177], [100, 167], [110, 159],
+        [120, 156], [150, 162], [200, 169], [250, 177], [300, 184], [350, 195], [400, 212], [450, 240], [490, 262],
+        [520, 272], [534, 295], [530, 322], [515, 335], [500, 355], [460, 380], [400, 413], [340, 439], [300, 449],
+        [200, 450], [140, 445], [100, 435], [60, 420], [40, 403], [30, 389], [24, 335],
+    ] as Flat[],
+    /**
+     * A steel piece standing up from the moving plate at the hole's end, above the other plates (the grey lobe in the
+     * front photo): the rope runs between it and the cam.
+     */
+    ramp: [
+        [45, 205], [50, 159], [60, 142], [70, 130], [80, 122], [90, 115], [100, 110], [120, 105], [140, 106],
+        [158, 116], [170, 140], [172, 200], [165, 250], [140, 265], [100, 252], [60, 228],
+    ] as Flat[],
+    /**
+     * The cam: a big rounded block of steel in the middle, between the plates, turning on the central pin near its
+     * lower right (as in a photo of one open). The rope wraps round it.
+     */
+    cam: [
+        [240, 170], [325, 170], [348, 185], [352, 210], [352, 320], [340, 342], [318, 348], [240, 348],
+        [218, 335], [212, 310], [212, 200], [220, 180],
+    ] as Flat[],
+    /**
+     * The handle, on the back, outside the moving plate (from the back photo, turned over): a big rounded root on its
+     * own axle just above the carabiner hole, and an arm reaching along the top to the far end.
+     */
+    handleAxle: { at: [125, 215] as Flat, r: 88, cap: 26 },
+    handleArm: {
+        top: [[530, 292], [500, 253], [450, 212], [400, 179], [350, 152], [300, 134], [250, 125], [200, 117]],
+        bottom: [[240, 172], [300, 174], [350, 190], [400, 216], [450, 250], [490, 286], [512, 300], [526, 304]],
+    } as { top: Flat[]; bottom: Flat[] },
+    /** The cam's axle, and the pin at the far end holding the plates together. */
+    pivot: [290, 290] as Flat,
+    pin: [465, 320] as Flat,
+    /**
+     * The rope's way through: in at the top between the steel piece and the cam, down the cam's side by the hole, under
+     * it, and up its far side and out.
+     */
+    rope: [
+        [192, 100], [192, 180], [192, 260], [200, 320], [228, 365], [285, 377], [340, 368], [375, 335], [380, 270],
+        [382, 215], [395, 180], [420, 160],
+    ] as Flat[],
+};
+
+/**
+ * A GRIGRI+ hanging from its carabiner hole at `hole`, the rope's loaded strand leaving its top towards `toLoad`, its
+ * plates square to `across` (its coloured side that way). Returns its pieces, the rope's way through it (in at the
+ * top, out at the far end), the direction the brake strand leaves, and the brake strand hanging `drop` below the way
+ * out, curving over from that direction.
+ */
+export function grigri(
+    hole: Vector3,
+    toLoad: Vector3,
+    across: Vector3,
+    colors: { body: string; dark: string; handle: string; steel: string },
+): {
+    pieces: Piece[];
+    rope: Vector3[];
+    brakeOut: Vector3;
+    holeR: number;
+    brake: (drop: number) => Vector3[];
+} {
+    const G = GRIGRI_PX;
+    const px = ([x, y]: Flat): Flat => [(x - G.hole.at[0]) * G.scale, (G.hole.at[1] - y) * G.scale];
+    const n = across.unit();
+    const d = toLoad.sub(n.scale(toLoad.dot(n))).unit();
+    // Turned so the rope's way in at the top is straight up the load from the hole.
+    const [eu, ev] = px(G.rope[0]);
+    const t = Math.atan2(ev, eu);
+    // The scene's axes are left-handed (x east, y up, z north), so seen from its coloured side (from `across`), `u`
+    // runs to the right when `v` is `u` × `n`.
+    const u = d.scale(Math.cos(t)).sub(d.cross(n).scale(Math.sin(t)));
+    const f: Frame = { o: hole, u, v: u.cross(n), n };
+    // The handle's outline: along the arm's top, round its root, and back along the arm's underside.
+    const A = G.handleAxle;
+    const root = Array.from({ length: 23 }, (_, i): Flat => {
+        const a = ((70 + (260 * i) / 22) * Math.PI) / 180;
+        return [A.at[0] + A.r * Math.cos(a), A.at[1] - A.r * Math.sin(a)];
+    });
+    const handle = [...G.handleArm.top, ...root, ...G.handleArm.bottom];
+    const holeR = G.hole.r * G.scale;
+    const holes = [circle([0, 0], holeR, 16)];
+    // The plates either side of the rope's channel, and the handle outside the moving one.
+    const gap = 0.014;
+    const plateThick = 0.004;
+    const side = gap / 2 + plateThick / 2;
+    const pieces: Piece[] = [
+        ...plate({ ...f, o: at(f, [0, 0], side) }, G.fixed.map(px), holes, plateThick, colors.body),
+        ...plate(
+            { ...f, o: at(f, [0, 0], -side) },
+            G.moving.map(px),
+            holes,
+            plateThick,
+            colors.dark,
+        ),
+        ...plate(
+            { ...f, o: at(f, [0, 0], -side - plateThick / 2 - 0.004) },
+            handle.map(px),
+            [],
+            0.006,
+            colors.handle,
+        ),
+        // The handle's axle, its cap showing on the back only.
+        ...part(
+            at(f, px(A.at), -side),
+            at(f, px(A.at), -side - plateThick / 2 - 0.008),
+            A.cap * G.scale,
+            colors.steel,
+        ),
+        // The cam between the plates on its axle, and the axle and the far pin through them.
+        ...plate(f, G.cam.map(px), [], gap - 0.002, colors.steel),
+        ...plate({ ...f, o: at(f, [0, 0], -gap / 4) }, G.ramp.map(px), [], gap / 2, colors.steel),
+        ...bolt(at(f, px(G.pivot)), n, gap + 2 * plateThick, 0.0035, colors.steel),
+        ...bolt(at(f, px(G.pin)), n, gap + 2 * plateThick, 0.003, colors.steel),
+    ];
+    const rope = G.rope.map((p) => at(f, px(p)));
+    const out = rope.at(-1)!;
+    const brakeOut = out.sub(rope.at(-2)!).unit();
+    const brake = (drop: number) => {
+        // Over a curve (a cubic Bézier) from the way out, out past the device's far end, to hanging straight down.
+        const down = vec3(0, -1, 0);
+        const level = vec3(brakeOut.x, 0, brakeOut.z).unit();
+        const p1 = out.add(brakeOut.scale(0.04));
+        const p2 = out.add(level.scale(0.06));
+        const p3 = p2.add(down.scale(0.1));
+        const curve = Array.from({ length: 10 }, (_, i) => {
+            const t = (i + 1) / 10;
+            const r = 1 - t;
+            return out
+                .scale(r ** 3)
+                .add(p1.scale(3 * r * r * t))
+                .add(p2.scale(3 * r * t * t))
+                .add(p3.scale(t ** 3));
+        });
+        return [...curve, p3.add(down.scale(Math.max(drop - 0.1, 0.01)))];
+    };
+    return { pieces, rope, brakeOut, holeR, brake };
 }

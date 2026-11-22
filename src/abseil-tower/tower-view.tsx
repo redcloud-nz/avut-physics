@@ -656,6 +656,20 @@ export function centreOf(piece: Piece): Vector3 {
     return piece.points.reduce((s, p) => s.add(p), vec3(0, 0, 0)).scale(1 / piece.points.length);
 }
 
+/**
+ * How near a piece comes to the eye looking along `toward` (the larger, the nearer), for drawing back to front: its
+ * middle, and for a rod, the side of it facing the eye, so a thin rod inside a thick one (an axle in its wheel) is
+ * drawn before it.
+ */
+export function nearness(piece: Piece, toward: Vector3): number {
+    const middle = centreOf(piece).dot(toward);
+    if (piece.kind !== "rod") return middle;
+    const along = piece.b.sub(piece.a);
+    const len = along.len();
+    const across = len > 0 ? Math.sqrt(Math.max(0, 1 - (along.dot(toward) / len) ** 2)) : 1;
+    return middle + piece.r * across;
+}
+
 const MONO = "var(--font-geist-mono), monospace";
 
 /** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */

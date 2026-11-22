@@ -324,9 +324,10 @@ function faceGeometry(
     holes: THREE.Vector3[][] = [],
 ): THREE.BufferGeometry {
     const [p0, p1, p2] = points;
-    const n = holes.length
-        ? newell(points)
-        : p1.clone().sub(p0).cross(p2.clone().sub(p0)).normalize();
+    // A face with holes, or more corners than a quad (perhaps concave, as a cut plate's outline), is cut into
+    // triangles properly; a triangle or quad is simply fanned.
+    const cut = holes.length > 0 || points.length > 4;
+    const n = cut ? newell(points) : p1.clone().sub(p0).cross(p2.clone().sub(p0)).normalize();
     const all = [...points, ...holes.flat()];
     const g = new THREE.BufferGeometry();
     g.setAttribute(
@@ -344,7 +345,7 @@ function faceGeometry(
         ),
     );
     const index: number[] = [];
-    if (holes.length) {
+    if (cut) {
         // Laid flat in its own plane, and cut into triangles round its holes (its outline may be concave too).
         const u = p1.clone().sub(p0).normalize();
         const v = n.clone().cross(u);
@@ -392,6 +393,9 @@ const JOINT = "joint:";
  */
 function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
+    // Faces shaded corner to corner, gathered into one mesh, with their corners' colours in order.
+    const shadedParts: THREE.BufferGeometry[] = [];
+    const shades: string[] = [];
     const add = (color: string, g: THREE.BufferGeometry | null) => {
         if (!g) return;
         const list = byColor.get(color) ?? [];
@@ -430,6 +434,9 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
                         bare(new THREE.SphereGeometry(r, sides, 6).translate(at.x, at.y, at.z)),
                     );
                 }
+        } else if (p.shades && !p.holes?.length) {
+            shadedParts.push(faceGeometry(p.points.map(T)));
+            shades.push(...p.shades);
         } else {
             add(
                 color,
@@ -465,7 +472,9 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
         parts.forEach((g) => g.dispose());
         return { color, geometry };
     });
-    return solids;
+    const shaded = shadedParts.length ? mergeGeometries(shadedParts)! : null;
+    shadedParts.forEach((g) => g.dispose());
+    return { solids, shaded: shaded && { geometry: shaded, shades } };
 }
 
 /** How thick a piece may be (metres of radius) and still get a hairline. */
@@ -655,8 +664,27 @@ function Solids({
     hairlines: number;
     sides: number;
 }) {
-    const solids = useMemo(() => buildScene(pieces, minR, sides), [pieces, minR, sides]);
-    useEffect(() => () => solids.forEach((s) => s.geometry.dispose()), [solids]);
+    const { solids, shaded } = useMemo(
+        () => buildScene(pieces, minR, sides),
+        [pieces, minR, sides],
+    );
+    useEffect(
+        () => () => {
+            solids.forEach((s) => s.geometry.dispose());
+            shaded?.geometry.dispose();
+        },
+        [solids, shaded],
+    );
+    // The shaded faces' corner colours, worked out by the browser and set on their mesh.
+    const shadedGeometry = useMemo(() => {
+        if (!shaded) return null;
+        const rgb = shaded.shades.flatMap((c) => {
+            const color = colors.read(c);
+            return [color.r, color.g, color.b];
+        });
+        shaded.geometry.setAttribute("color", new THREE.Float32BufferAttribute(rgb, 3));
+        return shaded.geometry;
+    }, [shaded, colors]);
     const lines = useMemo(() => (hairlines ? buildHairlines(pieces) : []), [pieces, hairlines]);
     return (
         <>
@@ -669,6 +697,17 @@ function Solids({
                     color={colors.read(s.color)}
                 />
             ))}
+            {shadedGeometry && (
+                <mesh geometry={shadedGeometry}>
+                    <meshLambertMaterial
+                        vertexColors
+                        side={THREE.DoubleSide}
+                        polygonOffset
+                        polygonOffsetFactor={1}
+                        polygonOffsetUnits={1}
+                    />
+                </mesh>
+            )}
             {solids.map((s) =>
                 s.color.startsWith(JOINT) ? (
                     // A gap between boards: their colour, in shadow.

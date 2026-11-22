@@ -22,7 +22,7 @@ import type { Piece } from "@/abseil-tower/tower";
 import type { FrameRate, GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
 import {
     Callouts,
-    centreOf,
+    nearness,
     PieceDrawing,
     StrandSwatch,
     toDrawing,
@@ -114,11 +114,10 @@ const SCENE: SceneConfig = {
     elevation: 18,
     // Far enough out to fit the whole site across a phone held upright.
     maxDistance: 700,
-    ground: GROUND_FACES,
-    compass: [
-        ["Top end", vec3(TREE.x - 3.5, groundY(TREE.x - 3.5), 0)],
-        ["Bottom end", vec3(LOG.x + 4, groundY(LOG.x + 4), 0)],
-    ],
+    // Finer for 3D, where each tile's shaded smoothly from corner to corner rather than all one colour.
+    ground: groundFaces(1),
+    // No end labels on the ground: the tree and the shear leg show which end is which.
+    compass: [],
     letter: 1.4,
     // Ropes and wire drawn their true size, in proportion with the hardware, and never thinner than 2.5 pixels.
     minR: {},
@@ -348,7 +347,7 @@ export default function FoxView() {
     const sorted = pieces
         .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
-        .map((piece) => ({ piece, key: cam.depth(centreOf(piece)) }))
+        .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
         .sort((a, b) => a.key - b.key);
 
     const drag = (at: Vector2): NonNullable<typeof gesture.current> => ({ kind: "pan", at, frame });
