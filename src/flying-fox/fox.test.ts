@@ -2,21 +2,28 @@ import { describe, expect, it } from "vitest";
 
 import {
     ANCHOR_SHACKLE,
+    CLEARANCE,
+    clearanceAt,
     CRADLE_Y,
+    DESCENDER,
+    DISMOUNT,
     FALL,
     foxPieces,
     GRADE,
     groundY,
     hawserY,
+    loaded,
     LOG,
+    REST_X,
     RIDER,
     SADDLE,
     SAG,
     SHEAR_LEG,
     SLING_Z,
     SPAN,
+    STAFF_REACH,
     STATIC_X,
-    STEEPEST,
+    TEST_LOAD,
     TOWER,
     TREE,
     TREE_SHACKLE,
@@ -29,14 +36,16 @@ const degrees = (rad: number) => (rad * 180) / Math.PI;
  * exported positions rather than from how the pieces are built.
  */
 describe("flying fox layout", () => {
-    it("sags 5% of the span at mid-span, unloaded", () => {
-        const [a, b] = [
-            hawserY(TOWER.shs / 2 + TOWER.rhs.w / 2),
-            hawserY(SHEAR_LEG.x + 2 * SHEAR_LEG.r),
-        ];
-        const mid = hawserY((TOWER.shs / 2 + TOWER.rhs.w / 2 + SHEAR_LEG.x + 2 * SHEAR_LEG.r) / 2);
-        expect((a + b) / 2 - mid).toBeCloseTo(0.05 * SPAN, 6);
+    it("sags 5% of the span at mid-span under the test load, and less unloaded (section 5.5.3)", () => {
+        const x0 = TOWER.shs / 2 + TOWER.rhs.w / 2;
+        const x1 = SHEAR_LEG.x + 2 * SHEAR_LEG.r;
+        const [a, b] = [hawserY(x0), hawserY(x1)];
+        const mid = (x0 + x1) / 2;
+        const tested = loaded(mid, TEST_LOAD).load!;
+        expect((a + b) / 2 - tested.y).toBeCloseTo(0.05 * SPAN, 4);
         expect(SAG).toBeCloseTo(0.05 * SPAN, 9);
+        expect(TEST_LOAD).toBeGreaterThanOrEqual(150);
+        expect((a + b) / 2 - hawserY(mid)).toBeLessThan(SAG);
         expect(a).toBeCloseTo(CRADLE_Y, 9);
     });
 
@@ -66,27 +75,69 @@ describe("flying fox layout", () => {
 
     it("falls towards the bottom end, the span line at 10° or less (section 4.7)", () => {
         expect(GRADE).toBeGreaterThanOrEqual(0);
-        expect(STEEPEST).toBeLessThanOrEqual(0.1);
+        expect(groundY(SHEAR_LEG.x) - groundY(0)).toBeCloseTo(-GRADE * SPAN, 9);
         const x0 = TOWER.shs / 2 + TOWER.rhs.w / 2;
         const x1 = SHEAR_LEG.x + 2 * SHEAR_LEG.r;
         const fall = hawserY(x0) - hawserY(x1);
         expect(degrees(Math.atan2(fall, x1 - x0))).toBeLessThanOrEqual(10);
     });
 
-    it("keeps the ground level round each end, out past the guys, with the fall and dip between", () => {
-        for (const x of [TREE.x, 0, 1.6 * TOWER.top]) expect(groundY(x)).toBeCloseTo(0, 9);
-        for (const x of [SHEAR_LEG.x - 1.6 * SHEAR_LEG.top, SHEAR_LEG.x, LOG.x])
-            expect(groundY(x)).toBeCloseTo(-FALL, 9);
-        expect(groundY(40)).toBeLessThan(-FALL * (40 / SPAN));
+    it("keeps the ground level round each end, out past the guys, and smooth between", () => {
+        for (const x of [TREE.x, 0, SHEAR_LEG.x, LOG.x]) {
+            const level = x < SPAN / 2 ? 0 : -FALL;
+            expect(groundY(x)).toBeCloseTo(level, 9);
+        }
+        // Roughly level out to the guys' pickets.
+        expect(Math.abs(groundY(1.6 * TOWER.top))).toBeLessThan(0.05);
+        expect(Math.abs(groundY(SHEAR_LEG.x - 1.6 * SHEAR_LEG.top) + FALL)).toBeLessThan(0.15);
+        // No sudden changes of slope: it bends no more sharply than a 15 m radius anywhere.
+        const d = 0.5;
+        for (let x = TREE.x + d; x < LOG.x - d; x += d) {
+            const bend = (groundY(x + d) - 2 * groundY(x) + groundY(x - d)) / (d * d);
+            expect(Math.abs(bend)).toBeLessThan(1 / 15);
+        }
     });
 
-    it("keeps a rider's feet off the ground all along the unloaded hawsers", () => {
-        const x0 = TOWER.shs / 2 + TOWER.rhs.w / 2;
-        const x1 = SHEAR_LEG.x + 2 * SHEAR_LEG.r;
-        for (let i = 0; i <= 200; i++) {
-            const x = x0 + ((x1 - x0) * i) / 200;
-            expect(hawserY(x) - groundY(x)).toBeGreaterThan(RIDER.harness + RIDER.feet);
+    /** How far a rider of `mass` kg's feet are off the ground standing up, and their descender, with them at `x`. */
+    const rider = (x: number, mass = RIDER.mass) => {
+        const trolley = loaded(x, mass, 2).load!.y;
+        return {
+            standing: trolley - RIDER.harness - RIDER.standing - groundY(x),
+            seated: trolley - RIDER.harness - RIDER.seated - groundY(x),
+            descender: trolley - DESCENDER - groundY(x),
+            trolley,
+        };
+    };
+
+    it("keeps even the heaviest rider's feet well off the ground along the ride, standing or seated", () => {
+        for (let x = 1; x < SPAN; x += 0.5) {
+            const r = rider(x);
+            expect(r.seated).toBeGreaterThan(
+                CLEARANCE.dismount + RIDER.standing - RIDER.seated - 1e-6,
+            );
+            expect(r.standing).toBeGreaterThan(clearanceAt(x) - 0.05);
         }
+    });
+
+    it("brings riders to rest in the dismount zone, whatever their weight", () => {
+        for (const mass of [30, 60, 90, 120]) {
+            let low = { x: 0, y: Infinity };
+            for (let x = 1; x < SPAN; x += 0.25) {
+                const y = rider(x, mass).trolley;
+                if (y < low.y) low = { x, y };
+            }
+            expect(low.x).toBeGreaterThan(DISMOUNT.from);
+            expect(low.x).toBeLessThan(DISMOUNT.to);
+        }
+    });
+
+    it("leaves the heaviest rider just short of standing where they rest, and every rider's descender in reach", () => {
+        const r = rider(REST_X);
+        expect(r.standing).toBeGreaterThan(0);
+        expect(r.standing).toBeLessThan(0.25);
+        for (const mass of [30, 60, 90, 120])
+            for (let x = DISMOUNT.from; x <= DISMOUNT.to; x += 0.5)
+                expect(rider(x, mass).descender).toBeLessThanOrEqual(STAFF_REACH);
     });
 
     it("keeps the unloaded hawsers clear of the ground all along the span", () => {
@@ -112,7 +163,7 @@ describe("flying fox layout", () => {
 
     it("sets the static brakes at least twice a rider's drop from the shear leg (Figure 42)", () => {
         // The drop is from the hawser to the rider's lowest point, their feet.
-        expect(SHEAR_LEG.x - STATIC_X).toBeGreaterThanOrEqual(2 * (RIDER.harness + RIDER.feet));
+        expect(SHEAR_LEG.x - STATIC_X).toBeGreaterThanOrEqual(2 * (RIDER.harness + RIDER.standing));
     });
 
     it("builds every piece from finite numbers", () => {

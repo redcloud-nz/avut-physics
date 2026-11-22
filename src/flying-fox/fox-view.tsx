@@ -23,7 +23,7 @@ import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import {
-    DIP,
+    CLEARANCE,
     FALL,
     foxLabels,
     foxLegend,
@@ -34,7 +34,9 @@ import {
     groundShade,
     groundY,
     LOG,
+    RIDER,
     SPAN,
+    TEST_LOAD,
     TREE,
 } from "./fox";
 
@@ -401,9 +403,12 @@ export default function FoxView() {
                 <p className="mt-3 border-t border-border pt-2 text-xs text-ink-muted">
                     Set up to Scouts NSW&rsquo;s flying fox procedure on a made-up site: the ground
                     is level round each end and falls {FALL} m between them (a{" "}
-                    {Math.round(GRADE * 1000) / 10}% grade over the span), with a {DIP.depth} m dip
-                    in the middle where the hawsers hang lowest. A {SPAN} m span with 5% sag. Sizes
-                    the procedure doesn&rsquo;t give are estimates.
+                    {Math.round(GRADE * 1000) / 10}% grade over the span), with a hollow between
+                    shaped to keep even a {RIDER.mass} kg rider&rsquo;s feet {CLEARANCE.ride * 100}{" "}
+                    cm clear standing up, until the dismount zone, where they can&rsquo;t quite
+                    stand. A {SPAN} m span, the hawsers tensioned to sag 5% with a {TEST_LOAD} kg
+                    test load at the middle, and drawn unloaded. Sizes the procedure doesn&rsquo;t
+                    give are estimates.
                 </p>
             </section>
             <div className="absolute bottom-2 left-2 flex flex-wrap items-end gap-2">

@@ -1,6 +1,10 @@
 import type { RigLabel } from "@/abseil-tower/rig";
 import { rod, timber, type Material, type Piece, type Strand } from "@/abseil-tower/tower";
+import { G } from "@/lib/constants";
+import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+
+import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
 
 /**
  * A dual-hawser flying fox braked by a chain weight, set up to Scouts NSW's "Flying Fox - Operations and Construction"
@@ -19,47 +23,84 @@ import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
  * How far the ground falls between the tower and the shear leg, as a grade over the span: 5%, the gentle end of a 5–10%
- * grade. The ground is roughly level round each end, from the tree to just past the tower's guys and from just short of
- * the shear leg's guys to the log, and falls between them, steepest (`STEEPEST`) in the middle. The unloaded hawsers
- * leave the tower at about 17°: steeper than section 4.7's "conventional" 15° for the unloaded rope, which is advisory
- * and doesn't say where it's measured, but well inside the 45° and 65° maximums (Figures 18 and 19).
+ * grade. The unloaded hawsers leave the tower at about 17°: steeper than section 4.7's "conventional" 15° for the
+ * unloaded rope, which is advisory and doesn't say where it's measured, but well inside the 45° and 65° maximums
+ * (Figures 18 and 19).
  */
 export const GRADE = 0.05;
 
-/** How far the dip takes the ground down at `x`: nothing outside it, easing in and out over its slopes. */
-function dipAt(x: number): number {
-    const { from, to, depth, ramp } = DIP;
-    if (x <= from || x >= to) return 0;
-    const ease = (d: number) => (depth * (1 - Math.cos((Math.PI * Math.min(d, ramp)) / ramp))) / 2;
-    return ease(Math.min(x - from, to - x));
+/**
+ * The lie of the land without the hollow: level round the tower and back to the tree, level round the shear leg and
+ * back to the log, and falling smoothly between their guys.
+ */
+function natural(x: number): number {
+    const from = 1.6 * TOWER.top;
+    const to = SHEAR_LEG.x - 1.6 * SHEAR_LEG.top;
+    if (x <= from) return 0;
+    if (x >= to) return -FALL;
+    return (-FALL * (1 - Math.cos((Math.PI * (x - from)) / (to - from)))) / 2;
 }
 
 /**
- * How far the ground has fallen at `x`, as a fraction of the whole fall. Over the same stretch as the dip, its slope
- * eases up from level over `ramp`, holds steady, and eases back to level.
+ * How far below the heaviest rider's feet, standing up, the ground is meant to be at `x`: `CLEARANCE.ride` along the
+ * ride, easing down to `CLEARANCE.dismount` over the `EASE` before the dismount zone: gently, so the hollow's floor
+ * rises smoothly into it rather than in a hump.
  */
-function fallenAt(x: number): number {
-    const { from, to, ramp } = DIP;
-    // The slope's integral from the stretch's start, `u` into it (within the first ramp or beyond it).
-    const rise = (u: number) =>
-        u <= ramp
-            ? u / 2 - (ramp / (2 * Math.PI)) * Math.sin((Math.PI * u) / ramp)
-            : ramp / 2 + (u - ramp);
-    const whole = to - from - ramp;
-    if (x <= from) return 0;
-    if (x >= to) return 1;
-    return x - from <= to - x ? rise(x - from) / whole : 1 - rise(to - x) / whole;
+const EASE = 15;
+export function clearanceAt(x: number): number {
+    const { ride, dismount } = CLEARANCE;
+    const from = DISMOUNT.from - EASE;
+    if (x <= from) return ride;
+    if (x >= DISMOUNT.from) return dismount;
+    return ride + ((dismount - ride) * (1 - Math.cos((Math.PI * (x - from)) / EASE))) / 2;
 }
 
-/** The ground's height at `x` along the run (level across it): its fall, and the dip in the middle. */
+/**
+ * The hollow's floor: where the ground would be to keep the heaviest rider's feet its clearance up off it, sampled
+ * every `step` metres along the span (worked out when first needed, once the hawsers are).
+ */
+const FLOOR_STEP = 0.25;
+let floor: number[] | undefined;
+function floorAt(x: number): number {
+    floor ??= Array.from({ length: Math.round(SPAN / FLOOR_STEP) + 1 }, (_, i) => {
+        const at = Math.min(Math.max(i * FLOOR_STEP, 0.05), SPAN);
+        const trolley = loaded(at, RIDER.mass, 2).load!.y;
+        return trolley - RIDER.harness - RIDER.standing - clearanceAt(at);
+    });
+    const u = Math.min(Math.max(x / FLOOR_STEP, 0), floor.length - 1);
+    const i = Math.min(Math.floor(u), floor.length - 2);
+    return floor[i] + (floor[i + 1] - floor[i]) * (u - i);
+}
+
+/** How far the lower of two heights is rounded off where they meet, so the ground has no crease. */
+const BLEND = 0.4;
+/** The lower of `a` and `b`, rounded off where they're within `BLEND` of each other. */
+function smoothMin(a: number, b: number): number {
+    const h = Math.max(BLEND - Math.abs(a - b), 0) / BLEND;
+    return Math.min(a, b) - (h * h * BLEND) / 4;
+}
+
+/**
+ * The ground's height at `x` along the run (level across it): the lie of the land, with a hollow between the towers
+ * shaped to the heaviest rider's path, so it keeps their feet the same height off the ground all along the ride.
+ */
 export function groundY(x: number): number {
-    return -FALL * fallenAt(x) - dipAt(x);
+    if (x <= 0 || x >= SPAN) return natural(x);
+    return smoothMin(natural(x), floorAt(x));
 }
 
 /** The span: from the tower's top cross bar to the shear leg's top spar, measured level. */
 export const SPAN = 80;
-/** The unloaded hawsers' sag at mid-span: the book's minimum catenary, 5% of the span. */
+/**
+ * The hawsers' sag at mid-span under the test load: the book's minimum catenary, 5% of the span, measured with 150 to
+ * 200 kg hanging at the middle (section 5.5.3). Unloaded they hang higher.
+ */
 export const SAG = 0.05 * SPAN;
+/**
+ * The test load the hawsers are tensioned with, in kg: two people hanging off a rope over the hawser at mid-span. The
+ * light end of the book's 150 to 200 kg, which leaves the hawser slackest, so the riders hang lowest.
+ */
+export const TEST_LOAD = 150;
 /** How far the ground falls from the tower to the shear leg. */
 export const FALL = GRADE * SPAN;
 /** How far each hawser is from the centre line: 1.5 m apart, to sit between the shear leg's uprights. */
@@ -114,25 +155,29 @@ export const SHEAR_LEG = {
     r: 0.0625,
     braceR: 0.045,
 };
-/**
- * The dip in the middle of the run, where the hawsers hang lowest: the key to a good site, as it lets them sag without
- * the riders' feet reaching the ground. A wide hollow with a flat bottom `depth` down and smooth slopes `ramp` long at
- * each end, from just past the tower's guys to just short of the shear leg's.
- */
-export const DIP = {
-    from: 1.6 * TOWER.top + 3,
-    to: SHEAR_LEG.x - 1.6 * SHEAR_LEG.top - 0.2,
-    depth: 1.5,
-    ramp: 8,
-};
-/** The ground's steepest slope, in the middle of the fall. */
-export const STEEPEST = FALL / (DIP.to - DIP.from - DIP.ramp);
-
 /** The hessian bagging round the top spar where each hawser lies on it. */
 const BAGGING_R = SHEAR_LEG.r + 0.025;
 /** Where a hawser crosses the shear leg's top spar, which is on the anchor side of the uprights (Figure 33). */
 const SPAR_X = SHEAR_LEG.x + 2 * SHEAR_LEG.r;
-const SADDLE_Y = groundY(SHEAR_LEG.x) + SHEAR_LEG.spar + BAGGING_R + HAWSER_R;
+const SADDLE_Y = -FALL + SHEAR_LEG.spar + BAGGING_R + HAWSER_R;
+
+/**
+ * A hawser between its cradle on the tower and its saddle on the shear leg, held there (it can't slide over them), so
+ * the stretch of the lengths beyond, back to the anchors, is left out.
+ */
+const RIG = {
+    from: new Vector2(BAR_X, CRADLE_Y),
+    to: new Vector2(SPAR_X, SADDLE_Y),
+    weight: WIRE_WEIGHT,
+    ea: WIRE_EA,
+};
+/** Each hawser's unstretched length between its supports, tensioned so the test load sags it 5% (section 5.5.3). */
+export const HAWSER_LENGTH = lengthForSag(RIG, TEST_LOAD * G, SAG);
+/** How the hawsers hang with nothing on them. */
+export const UNLOADED = hang({ ...RIG, length: HAWSER_LENGTH });
+/** How a hawser hangs with `mass` kg hanging from it at `x` along the span. */
+export const loaded = (x: number, mass: number, points = 200): Shape =>
+    hang({ ...RIG, length: HAWSER_LENGTH }, { x, weight: mass * G }, points);
 /** The stabiliser's pulley under the middle of the top spar, on level ground (the frame's shifted onto the ground). */
 const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.08, 0);
 
@@ -153,15 +198,40 @@ export const LOG = (() => {
 /** The dynamic brake's blocks, this far up the span from the shear leg, and the static brakes. */
 export const BLOCKS_X = SPAN - 10;
 /**
- * A rider on the dropper: their harness's tie-in this far below the hawser, just more than they can reach up from it
- * with their arms (so they can't grab the hawser or the trolley, section 6.10), and their feet hanging this far below
- * the harness.
+ * A rider on the dropper, the heaviest the book allows with their harness, trolley and hardware (120 kg, section 7.9.3).
+ * Their harness's tie-in hangs this far below the hawser, just more than they can reach up from it with their arms (so
+ * they can't grab the hawser or the trolley, section 6.10). Sitting in a waist harness, their legs are out in front,
+ * their heels about `seated` below the tie-in; standing up to land, their feet are `standing` below it.
  */
-export const RIDER = { harness: 1.4, reach: 1.3, feet: 1.0 };
-/** How far a rider's lowest point hangs below the hawser: the book's "drop" (Figure 42). */
-export const DROP = RIDER.harness + RIDER.feet;
+export const RIDER = { mass: 120, harness: 1.4, reach: 1.3, seated: 0.7, standing: 1.0 };
+/** How far a rider's lowest point can hang below the hawser, standing: the book's "drop" (Figure 42). */
+export const DROP = RIDER.harness + RIDER.standing;
 /** The static brakes: at least twice the drop from the shear leg, so a swinging rider can't reach it (Figure 42). */
 export const STATIC_X = SPAN - Math.ceil(2 * DROP);
+/**
+ * Where riders come to rest after braking: the lowest point a rider reaches on the hawser, about the same for every
+ * weight, which they roll back to from the brake blocks.
+ */
+export const REST_X = (() => {
+    let best = { x: 0, y: Infinity };
+    for (let x = SPAN / 2; x < SPAN - 1; x += 0.25) {
+        const y = loaded(x, RIDER.mass, 2).load!.y;
+        if (y < best.y) best = { x, y };
+    }
+    return best.x;
+})();
+/** The dismount zone: from a little short of where riders come to rest to the static brakes. */
+export const DISMOUNT = { from: REST_X - 4, to: STATIC_X };
+/**
+ * How far the heaviest rider's feet are off the ground standing up: well clear along the ride, but only just in the
+ * dismount zone, so they can't quite stand up by themselves, and a staff member on the ground can reach their descender
+ * (no higher than `STAFF_REACH`) to lower them.
+ */
+export const CLEARANCE = { ride: 0.5, dismount: 0.1 };
+/** How high a staff member standing on the ground can reach. */
+export const STAFF_REACH = 2.0;
+/** How far below the hawser a rider's descender is: just above their harness's tie-in. */
+export const DESCENDER = RIDER.harness - 0.16;
 
 /** The ropes and lines, and their colours. */
 const C = {
@@ -244,8 +314,7 @@ export function hanging(a: Vector3, b: Vector3, sag: number, n = 40): Vector3[] 
 
 /** A hawser's height along the span, unloaded, at `x` (from the tower's cradle to the shear leg's saddle). */
 export function hawserY(x: number): number {
-    const t = (x - BAR_X) / (SPAR_X - BAR_X);
-    return CRADLE_Y + (SADDLE_Y - CRADLE_Y) * t - 4 * SAG * t * (1 - t);
+    return heightAt(UNLOADED, x);
 }
 
 /** Where hawser `side` (+1 for A, −1 for B) is at `x` along the span. */
@@ -907,7 +976,7 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
     // The dropper: the rider's rope down to the descender, its running end hanging on below, and the back-up line.
     const hang = plate(2.2);
     // The descender sits just above the harness's tie-in, the rider's drop below the hawser.
-    const rig = at.add(vec3(0, -(RIDER.harness - 0.16), 0));
+    const rig = at.add(vec3(0, -DESCENDER, 0));
     pieces.push(...line([hang, rig], 0.0055, C.dropper));
     pieces.push(
         ...section(rig, rig.add(vec3(0, -0.16, 0)), vec3(1, 0, 0), 0.03, 0.07, "var(--rig-black)"),
