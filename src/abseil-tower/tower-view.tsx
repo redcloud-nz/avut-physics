@@ -29,6 +29,7 @@ import {
     type Face,
     type Material,
     type Piece,
+    type Rod,
 } from "./tower";
 import type { GLHandle } from "./tower-gl";
 
@@ -955,10 +956,13 @@ export function PieceDrawing({
     ppm,
     dim = 1,
     minWidth = MIN_WIDTH,
+    depth,
 }: {
     piece: Piece;
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
+    /** How near a point is to the eye (the larger, the nearer), for a true-size rod to show its nearer end. */
+    depth?: (p: Vector3) => number;
     /** How bright it's drawn, darker for what's below the level looked down on. */
     dim?: number;
     /** The narrowest each material's drawn (SVG units), if not the tower's. */
@@ -1051,6 +1055,18 @@ export function PieceDrawing({
     }
     const a = toSvg(piece.a);
     const b = toSvg(piece.b);
+    if (piece.toScale)
+        return (
+            <Cylinder
+                piece={piece}
+                a={a}
+                b={b}
+                r={Math.max(piece.r * ppm, (minWidth[piece.material] ?? 0) / 2)}
+                ppm={ppm}
+                color={color}
+                depth={depth}
+            />
+        );
     const w = Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
     const outline = w > 3;
     // A round end only where the rod really ends: between its lengths the joins must not show.
@@ -1094,6 +1110,77 @@ export function PieceDrawing({
             />
             {outline && edge(1)}
             {outline && edge(-1)}
+        </g>
+    );
+}
+
+/**
+ * A true-size rod (a part of some hardware) as the solid it is: a cylinder with flat ends, each end an ellipse as it's
+ * seen at an angle, the nearer one drawn over its side.
+ */
+function Cylinder({
+    piece,
+    a,
+    b,
+    r,
+    ppm,
+    color,
+    depth,
+}: {
+    piece: Rod;
+    a: Vector2;
+    b: Vector2;
+    /** Its radius as drawn (SVG units). */
+    r: number;
+    ppm: number;
+    color: string;
+    depth?: (p: Vector3) => number;
+}) {
+    const length = piece.a.distanceTo(piece.b) * ppm;
+    const shown = a.distanceTo(b);
+    // How round its ends look: the sine of the angle between the rod and the page.
+    const open = Math.sqrt(Math.max(0, 1 - (shown / Math.max(length, 1e-9)) ** 2));
+    const along = b.sub(a).safeUnit(vec2(1, 0));
+    const across = along.perp().scale(r);
+    const edge = shade(color, 45);
+    const end = (p: Vector2, key: string) => (
+        <ellipse
+            key={key}
+            cx={p.x}
+            cy={p.y}
+            rx={Math.max(r * open, 0.01)}
+            ry={r}
+            transform={`rotate(${svgNumber(deg(Math.atan2(along.y, along.x)))} ${svgNumber(p.x)} ${svgNumber(p.y)})`}
+            fill={shade(color, 85)}
+            stroke={edge}
+            strokeWidth={r > 1.5 ? 0.7 : 0}
+        />
+    );
+    const nearB = depth ? depth(piece.b) > depth(piece.a) : true;
+    const [far, near] = nearB ? [a, b] : [b, a];
+    return (
+        <g>
+            {end(far, "far")}
+            <polygon
+                points={svgPoints([a.add(across), b.add(across), b.sub(across), a.sub(across)])}
+                fill={color}
+            />
+            {r > 1.5 &&
+                [1, -1].map((s) => {
+                    const [p, q] = [a.add(across.scale(s)), b.add(across.scale(s))];
+                    return (
+                        <line
+                            key={s}
+                            x1={p.x}
+                            y1={p.y}
+                            x2={q.x}
+                            y2={q.y}
+                            stroke={edge}
+                            strokeWidth={0.7}
+                        />
+                    );
+                })}
+            {end(near, "near")}
         </g>
     );
 }

@@ -432,6 +432,7 @@ export default function FoxView() {
                         toSvg={toSvg}
                         ppm={ppm}
                         minWidth={MIN_WIDTH}
+                        depth={(p) => cam.depth(p)}
                     />
                 ))}
             {inBrowser && (

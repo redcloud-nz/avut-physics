@@ -74,6 +74,10 @@ export type SceneConfig = {
     width?: number;
     /** What the canvas is, for a screen reader. */
     label: string;
+    /** How close the camera may come (metres; 1.5 unless given), for a scene of small parts. */
+    minDistance?: number;
+    /** Whether it may look up from below the ground's level, as at a part with no ground. */
+    below?: boolean;
 };
 
 /** The abseil tower's scene. */
@@ -863,7 +867,7 @@ export function SceneGL({
                     camera={{
                         fov: FOV,
                         position: eyeAt(target, scene.distance, scene.azimuth, scene.elevation),
-                        near: 0.3,
+                        near: Math.min(0.3, (scene.minDistance ?? 1.5) / 5),
                         far: scene.maxDistance * 2.5,
                     }}
                     gl={{ antialias: true, alpha: true }}
@@ -912,9 +916,9 @@ export function SceneGL({
                         target={target}
                         enableDamping={false}
                         zoomToCursor
-                        minDistance={1.5}
+                        minDistance={scene.minDistance ?? 1.5}
                         maxDistance={scene.maxDistance}
-                        maxPolarAngle={Math.PI / 2}
+                        maxPolarAngle={scene.below ? Math.PI : Math.PI / 2}
                         makeDefault
                     />
                     <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />

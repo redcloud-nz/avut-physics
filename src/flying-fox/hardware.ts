@@ -1,4 +1,4 @@
-import { rod, timber, type Face, type Piece } from "@/abseil-tower/tower";
+import { rod, type Face, type Piece } from "@/abseil-tower/tower";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
@@ -329,54 +329,134 @@ export function pulley({
 }
 
 /**
- * The trolley's side plates' outline (metres), measured off a photo of an ISC Zip Speed (RP075): along the wire (u, its
- * bumper end towards +u) and up from it (v), the wire at the origin. A lobe at the −u end carries the tow hole.
+ * The ISC Zip Speed (RP075) trolley's measurements (metres), taken off a side-on photo scaled to its data sheet's 206 mm
+ * by 111 mm plates: along the wire (u, its bumper end towards +u) and up from it (v), the wire at the origin, for 50 mm
+ * wheels on 11 mm wire. A lobe at the −u end carries the tow hole, and the pin at the +u end holds the bumper.
  */
-const TOW_HOLE: Flat = [-0.089, 0.027];
-const TROLLEY_OUTLINE: Flat[] = closedSmooth(
-    [
-        [0, -0.066],
-        [0.03, -0.062],
-        [0.055, -0.054],
-        [0.08, -0.042],
-        [0.098, -0.028],
-        [0.104, -0.005],
-        [0.104, 0.03],
-        [0.098, 0.05],
-        [0.085, 0.058],
-        [0.05, 0.06],
-        [0, 0.06],
-        [-0.05, 0.059],
-        [-0.07, 0.054],
-        // Round the tow hole's lobe.
-        ...[70, 110, 150, 190, 230, 270].map((deg): Flat => {
-            const t = (deg * Math.PI) / 180;
-            return [TOW_HOLE[0] + 0.021 * Math.cos(t), TOW_HOLE[1] + 0.021 * Math.sin(t)];
-        }),
-        [-0.08, 0.0],
-        [-0.082, -0.02],
-        [-0.07, -0.04],
-        [-0.05, -0.054],
-        [-0.03, -0.062],
+const ZIP = {
+    outline: [
+        [0.1046, 0.029],
+        [0.0972, 0.0383],
+        [0.0898, 0.0417],
+        [0.0788, 0.0455],
+        [0.0715, 0.0502],
+        [0.0604, 0.0519],
+        [0.0383, 0.0519],
+        [0.02, 0.0497],
+        [0.0016, 0.0468],
+        [-0.0132, 0.0497],
+        [-0.0315, 0.0523],
+        [-0.0499, 0.0531],
+        [-0.0647, 0.0519],
+        [-0.072, 0.0485],
+        [-0.0794, 0.0421],
+        [-0.0904, 0.0379],
+        [-0.0978, 0.0315],
+        [-0.1001, 0.026],
+        [-0.1001, 0.0226],
+        [-0.0978, 0.0158],
+        [-0.0886, 0.0091],
+        [-0.0752, 0.0023],
+        [-0.072, -0.0007],
+        [-0.0683, -0.0053],
+        [-0.0647, -0.013],
+        [-0.061, -0.0231],
+        [-0.0573, -0.0312],
+        [-0.0499, -0.0418],
+        [-0.0389, -0.0486],
+        [-0.0205, -0.0553],
+        [0.0016, -0.0579],
+        [0.0236, -0.0545],
+        [0.0383, -0.049],
+        [0.0531, -0.0371],
+        [0.0604, -0.024],
+        [0.0641, -0.0147],
+        [0.0715, -0.0036],
+        [0.0825, 0.0036],
+        [0.0935, 0.0069],
+        [0.1009, 0.0112],
+        [0.1055, 0.0192],
+        [0.1059, 0.0226],
+    ] as Flat[],
+    /** The rider's hole: a rounded five-sided hole, its point up. */
+    main: [
+        [-0.0132, -0.0281],
+        [-0.0137, -0.0249],
+        [-0.0137, -0.0211],
+        [-0.0117, -0.0179],
+        [-0.0085, -0.0154],
+        [-0.005, -0.0129],
+        [0, -0.0116],
+        [0.005, -0.0129],
+        [0.0085, -0.0154],
+        [0.0117, -0.0179],
+        [0.0132, -0.0215],
+        [0.0132, -0.0247],
+        [0.0132, -0.0281],
+        [0.0123, -0.0313],
+        [0.0111, -0.0343],
+        [0.0095, -0.0374],
+        [0.0072, -0.0406],
+        [0.0039, -0.0436],
+        [0, -0.0444],
+        [-0.0039, -0.0436],
+        [-0.0072, -0.0406],
+        [-0.0095, -0.0374],
+        [-0.0111, -0.0343],
+        [-0.0124, -0.031],
+    ] as Flat[],
+    mainTop: [0, -0.0116] as Flat,
+    tow: { at: [-0.083, 0.025] as Flat, r: 0.0078 },
+    /** The holes below either side of the rider's: the bumper end's a little bigger. */
+    lower: [
+        { at: [0.0308, -0.0278] as Flat, r: 0.0086 },
+        { at: [-0.0319, -0.0262] as Flat, r: 0.0075 },
     ],
-    3,
-);
+    small: { at: [0.001, 0.018] as Flat, r: 0.003 },
+    axles: [0.0372, -0.0372],
+    /** The middle axle, a redundancy should a wheel's fail, above the wire. */
+    middle: [0.001, 0.0347] as Flat,
+    pin: [0.0874, 0.0251] as Flat,
+    /** The wheels: 50 mm across, a deep groove. */
+    groove: 0.0185,
+    rim: 0.025,
+    /** The plates: 4 mm thick, 31 mm across both. */
+    plate: 0.004,
+    across: 0.031,
+};
 
-/** A curved slot round `centre`, between radii `r0` and `r1`, `half` radians either side of angle `mid`. */
+/**
+ * A curved slot round `centre`, between radii `r0` and `r1`, `half` radians either side of angle `mid`, its ends
+ * rounded.
+ */
 function slot(centre: Flat, r0: number, r1: number, mid: number, half: number, n = 8): Flat[] {
+    const around = (r: number, t: number): Flat => [
+        centre[0] + r * Math.cos(t),
+        centre[1] + r * Math.sin(t),
+    ];
     const arc = (r: number, from: number, to: number) =>
-        Array.from({ length: n + 1 }, (_, i): Flat => {
-            const t = from + ((to - from) * i) / n;
-            return [centre[0] + r * Math.cos(t), centre[1] + r * Math.sin(t)];
+        Array.from({ length: n + 1 }, (_, i) => around(r, from + ((to - from) * i) / n));
+    // A half circle round each end, from one side of the slot to the other.
+    const cap = (t: number, from: number) => {
+        const [c, w] = [around((r0 + r1) / 2, t), (r1 - r0) / 2];
+        return Array.from({ length: 5 }, (_, i): Flat => {
+            const a = from + (Math.PI * (i + 1)) / 6;
+            return [c[0] + w * Math.cos(a), c[1] + w * Math.sin(a)];
         });
-    return [...arc(r1, mid - half, mid + half), ...arc(r0, mid + half, mid - half)];
+    };
+    return [
+        ...arc(r1, mid - half, mid + half),
+        ...cap(mid + half, mid + half),
+        ...arc(r0, mid + half, mid - half),
+        ...cap(mid - half, mid - half + Math.PI),
+    ];
 }
 
 /**
- * A twin-sheave zip line trolley riding on a wire at `wire`, after the ISC Zip Speed in the book's Figure 78 and the
- * user's photos: two sheaves on the wire between alloy side plates, each showing through two curved slots; a black
- * bumper at one end (towards `bumper`, along the wire) and a lobe with a tow hole at the other; and three holes below,
- * the middle one five-sided for the rider's carabiner. `across` is through the plates.
+ * A twin-sheave zip line trolley riding on a wire at `wire`, an ISC Zip Speed (RP075): two wheels on the wire between
+ * alloy side plates, each showing through two curved windows, and a redundancy axle between them; a black bumper on the
+ * pin at one end (towards `bumper`, along the wire), between the plates; a lobe with a tow hole at the other end; and
+ * three holes below, the middle one five-sided for the rider's carabiner. `across` is through the plates.
  */
 export function zipTrolley(
     wire: Vector3,
@@ -398,78 +478,66 @@ export function zipTrolley(
     const u = bumper.unit();
     const up = n.cross(u).unit();
     const f: Frame = { o: wire, u, v: up.y < 0 ? up.neg() : up, n };
-    const groove = 0.02;
-    const axleV = groove + wireR;
-    const axles: Flat[] = [
-        [-0.042, axleV],
-        [0.042, axleV],
-    ];
-    const lower: Flat[] = [
-        [-0.037, -0.035],
-        [0.037, -0.035],
-    ];
-    const lowerR = 0.01;
-    const pentagon = closedSmooth(
-        [
-            [0, -0.022],
-            [0.014, -0.031],
-            [0.012, -0.05],
-            [-0.012, -0.05],
-            [-0.014, -0.031],
-        ],
-        2,
-    );
-    const towR = 0.011;
+    // The wheels sit on the wire, their groove's floor on it.
+    const axleV = ZIP.groove + wireR;
+    const axles: Flat[] = ZIP.axles.map((a) => [a, axleV]);
+    const tilt = 0.44;
     const holes = [
-        circle(TOW_HOLE, towR, 14),
-        ...lower.map((c) => circle(c, lowerR, 14)),
-        pentagon,
-        circle([0.002, 0.016], 0.004, 8),
-        // The sheaves' windows, either side of each axle.
+        circle(ZIP.tow.at, ZIP.tow.r, 14),
+        ...ZIP.lower.map((h) => circle(h.at, h.r, 14)),
+        ZIP.main,
+        circle(ZIP.small.at, ZIP.small.r, 8),
+        // The wheels' windows, either side of each axle, tilted down.
         ...axles.flatMap((c) => [
-            slot(c, 0.019, 0.025, 0, 0.7),
-            slot(c, 0.019, 0.025, Math.PI, 0.7),
+            slot(c, 0.016, 0.025, -tilt, 0.55),
+            slot(c, 0.016, 0.025, Math.PI + tilt, 0.55),
         ]),
     ];
     const pieces: Piece[] = [];
+    const side = (ZIP.across - ZIP.plate) / 2;
+    const gap = ZIP.across - 2 * ZIP.plate;
     for (const s of [-1, 1])
         pieces.push(
             ...plate(
-                { ...f, o: at(f, [0, 0], s * 0.014) },
-                TROLLEY_OUTLINE,
+                { ...f, o: at(f, [0, 0], s * side) },
+                closedSmooth(ZIP.outline, 3),
                 holes,
-                0.006,
+                ZIP.plate,
                 colors.plates,
             ),
         );
+    const through = ZIP.across + 0.002;
     for (const c of axles) {
-        pieces.push(...sheave(at(f, c), n, groove, 0.027, 0.014, colors.sheave));
-        pieces.push(...bolt(at(f, c), n, 0.034, 0.006, colors.steel));
+        pieces.push(...sheave(at(f, c), n, ZIP.groove, ZIP.rim, gap - 0.003, colors.sheave));
+        pieces.push(...bolt(at(f, c), n, through, 0.006, colors.steel));
     }
-    pieces.push(...bolt(at(f, [0.004, 0.038]), n, 0.034, 0.005, colors.steel));
-    pieces.push(...bolt(at(f, [0.085, 0.03]), n, 0.034, 0.005, colors.steel));
-    // The bumper across the plates' end, above and below the wire.
-    for (const [v0, v1] of [
-        [-0.03, -0.008],
-        [0.008, 0.045],
-    ])
-        pieces.push(
-            ...timber(
-                at(f, [0.096, (v0 + v1) / 2]),
-                at(f, [0.118, (v0 + v1) / 2]),
-                f.v,
-                0.05,
-                v1 - v0,
-                "steel",
-            ).map((p) => ({ ...p, color: colors.bumper })),
-        );
+    // The middle axle, with its collar coloured for the wire it suits: black for 13 mm.
+    pieces.push(...bolt(at(f, ZIP.middle), n, through, 0.005, colors.steel));
+    pieces.push(
+        ...part(at(f, ZIP.middle, -gap / 2), at(f, ZIP.middle, gap / 2), 0.0065, colors.bumper),
+    );
+    // The bumper: a block between the plates, on the pin, from just above the wire, its nose rounded and standing a
+    // little past the plates' ends, where it meets the brake blocks.
+    pieces.push(...bolt(at(f, ZIP.pin), n, through, 0.005, colors.steel));
+    const nose = 0.11;
+    const [b0, b1] = [wireR + 0.002, 0.046];
+    const r = (b1 - b0) / 2;
+    const bumperOutline: Flat[] = [
+        [0.066, b0],
+        ...Array.from({ length: 9 }, (_, i): Flat => {
+            const t = -Math.PI / 2 + (Math.PI * i) / 8;
+            return [nose - r + r * Math.cos(t), (b0 + b1) / 2 + r * Math.sin(t)];
+        }),
+        [0.066, b1],
+    ];
+    pieces.push(...plate(f, bumperOutline, [circle(ZIP.pin, 0.005, 10)], gap, colors.bumper));
     return {
         pieces,
-        tow: at(f, TOW_HOLE),
-        towR,
-        main: at(f, [0, -0.022]),
-        bumperSide: at(f, [lower[1][0], lower[1][1] + lowerR]),
-        towSide: at(f, [lower[0][0], lower[0][1] + lowerR]),
+        tow: at(f, ZIP.tow.at),
+        towR: ZIP.tow.r,
+        main: at(f, ZIP.mainTop),
+        bumperSide: at(f, [ZIP.lower[0].at[0], ZIP.lower[0].at[1] + ZIP.lower[0].r]),
+        towSide: at(f, [ZIP.lower[1].at[0], ZIP.lower[1].at[1] + ZIP.lower[1].r]),
         frame: f,
     };
 }

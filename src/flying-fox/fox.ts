@@ -107,7 +107,7 @@ export const FALL = GRADE * SPAN;
 /** How far each hawser is from the centre line: 1.5 m apart, to sit between the shear leg's uprights. */
 export const HAWSER_Z = 0.75;
 /** The hawsers' radius: 11 mm galvanised wire rope. */
-const HAWSER_R = 0.0055;
+export const HAWSER_R = 0.0055;
 
 /** The steel tower (Appendix E): two SHS 75 uprights and RHS 75 × 50 cross bars, braces and brake support. */
 export const TOWER = {
@@ -235,7 +235,7 @@ export const STAFF_REACH = 2.0;
 export const DESCENDER = RIDER.harness - 0.16;
 
 /** The ropes and lines, and their colours. */
-const C = {
+export const C = {
     hawser: "var(--tower-steel)",
     returnLine: "var(--knot-green)",
     brakeLine: "var(--knot-yellow)",
@@ -261,13 +261,13 @@ const C = {
     sheave: "var(--fox-sheave)",
 };
 /** The trolleys' and pulleys' colours. */
-const TROLLEY_COLORS = {
+export const TROLLEY_COLORS = {
     plates: "var(--knot-red)",
     sheave: "var(--fox-sheave)",
     steel: "var(--tower-steel)",
     bumper: "var(--rig-black)",
 };
-const PULLEY_COLORS = {
+export const PULLEY_COLORS = {
     plates: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
     steel: "var(--tower-steel)",
@@ -301,7 +301,12 @@ const section = (a: Vector3, b: Vector3, up: Vector3, w: number, h: number, colo
     colored(timber(a, b, up, w, h, "steel"), color);
 
 /** A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. */
-function line(points: Vector3[], r: number, color: string, material: Material = "rope"): Strand[] {
+export function line(
+    points: Vector3[],
+    r: number,
+    color: string,
+    material: Material = "rope",
+): Strand[] {
     const piece = 12;
     const out: Strand[] = [];
     for (let i = 0; i < points.length - 1; i += piece) {
@@ -378,7 +383,7 @@ const CARABINER_BAR = 0.0045;
  * Hung from a steel ring at `mount` (on a post or arm, `from` being the point on it the ring's welded to), it's moved
  * from `near` until its carabiner hangs in the ring; hung from a sling, it stays at `near` with the sling up to `mount`.
  */
-function rigPulley(
+export function rigPulley(
     near: Vector3,
     a: Vector3,
     b: Vector3,
@@ -394,11 +399,16 @@ function rigPulley(
     if (hung === "sling") extra.push(...line([p.hook, mount], 0.008, C.sling, "sling"));
     else {
         // Its carabiner's top in the bottom of the ring, the way the pulley pulls.
-        for (let i = 0; i < 4; i++) {
+        // Until it settles. Each move turns it, as its rope's angles change, and with the rope running off close by it
+        // would swing past where it settles, so it moves only halfway each time.
+        for (let i = 0; i < 100; i++) {
             // Through the ring like links of a chain: the carabiner's top bar rests on the ring's bottom bar.
             const hook = mount.sub(p.up.scale(RING.r - RING.bar - CARABINER_BAR));
-            centre = hook.sub(p.hook.sub(centre));
+            const next = centre.lerp(hook.sub(p.hook.sub(centre)), 0.5);
+            const moved = next.distanceTo(centre);
+            centre = next;
             p = build(centre);
+            if (moved < 1e-5) break;
         }
         extra.push(...steelRing(mount, p.up, p.up.cross(p.axle), C.steel));
         extra.push(
@@ -987,25 +997,33 @@ function hawsers(): Piece[] {
     return pieces;
 }
 
-/** A trolley on hawser `s` at `x`, with its dropper: where its tow points are, back (uphill) and front. */
-function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
-    const at = onHawser(x, s);
-    const ahead = onHawser(x + 0.1, s)
-        .sub(onHawser(x - 0.1, s))
-        .unit();
-    // Its bumper downhill, where it meets the brake blocks.
+/**
+ * A trolley on the wire at `at`, its bumper towards `ahead` (downhill, where it meets the brake blocks), with its two
+ * carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the back-up line
+ * and the return line together on the one behind it, uphill. Returns where each carabiner's bottom is.
+ */
+export function rigTrolley(
+    at: Vector3,
+    ahead: Vector3,
+): { pieces: Piece[]; hang: Vector3; backUp: Vector3 } {
     const t = zipTrolley(at, ahead, ACROSS, HAWSER_R, TROLLEY_COLORS);
     const pieces: Piece[] = [...t.pieces];
-    // Two carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the
-    // back-up line and the return line together on the one behind it, uphill.
     const down = vec3(0, -1, 0);
     const clip = (top: Vector3, length: number) => {
         const bar = top.add(vec3(0, -0.005, 0));
         pieces.push(...carabiner(bar, down, ACROSS, C.steel, length));
         return bar.add(down.scale(length));
     };
-    const hang = clip(t.main, 0.11);
-    const backUp = clip(t.towSide, 0.1);
+    return { pieces, hang: clip(t.main, 0.11), backUp: clip(t.towSide, 0.1) };
+}
+
+/** A trolley on hawser `s` at `x`, with its dropper: where its tow points are, back (uphill) and front. */
+function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
+    const at = onHawser(x, s);
+    const ahead = onHawser(x + 0.1, s)
+        .sub(onHawser(x - 0.1, s))
+        .unit();
+    const { pieces, hang, backUp } = rigTrolley(at, ahead);
     const back = backUp.add(vec3(0, 0.01, 0));
     // The dropper: the rider's rope down to the descender, its running end hanging on below, and the back-up line.
     // The descender sits just above the harness's tie-in, the rider's drop below the hawser.
