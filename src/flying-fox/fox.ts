@@ -5,6 +5,8 @@ import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import {
+    baseClamp,
+    baseClampWire,
     carabiner,
     CARABINER_R,
     CARABINER_WIDTH,
@@ -13,9 +15,12 @@ import {
     eyeFrame,
     grigri,
     pulley,
+    shackle,
     STOP_BLOCK,
     stopBlock,
+    thimble,
     tiedRound,
+    turnbuckle,
     wrap,
     zipTrolley,
 } from "./hardware";
@@ -269,6 +274,9 @@ export const C = {
     picket: "var(--fox-picket)",
     cap: "var(--knot-yellow)",
     steel: "var(--tower-steel)",
+    brass: "var(--fox-brass)",
+    /** Shackles' painted screw pins. */
+    pin: "var(--fox-shackle-pin)",
     trolley: "var(--knot-red)",
     nylon: "var(--fox-nylon)",
     sling: "var(--fox-sling)",
@@ -583,9 +591,6 @@ function squareLashing(
 }
 
 /** A double base clamp on a wire at `at`, the wire running along `along`. */
-const clamp = (at: Vector3, along: Vector3) =>
-    section(at.sub(along.unit().scale(0.025)), at.add(along.unit().scale(0.025)), UP, 0.05, 0.06);
-
 /** A ring of chain or rope `r` round at `at`, level, as points. */
 const ring = (at: Vector3, r: number, n = 16) =>
     Array.from({ length: n + 1 }, (_, i) => {
@@ -832,7 +837,6 @@ function tree(): Piece[] {
         });
         // Round the trunk from the choke and back to it, then out through itself to the shackle.
         pieces.push(...line([...around, shackle], 0.016, C.sling, "sling"));
-        pieces.push(...bar(shackle, shackle.add(vec3(0.07, 0, 0)), 0.014, C.steel));
     }
     // The backstay's own sling, basketed round the trunk just above the others, to a carabiner in front.
     const tie = BACKSTAY_TIE.add(vec3(0, -groundY(TREE.x), 0));
@@ -1016,58 +1020,117 @@ function logAnchor(): Piece[] {
     return pieces;
 }
 
-/**
- * The in-line hardware from a sling's bow shackle up the hawser, by distance along it (Figure 66): the bow shackle, the
- * turnbuckle, three D shackles, then the hawser's in-line eye round its thimble, held by three double base clamps,
- * its tail running on past them and lying on the ground.
- */
-const HARDWARE = {
-    shackle: 0.1,
-    turnbuckle: 0.65,
-    dShackles: 0.92,
-    eye: 1.02,
-    clamps: [1.12, 1.3, 1.48],
-};
+/** Where a made-off eye's three double base clamps are, from the thimble's point along the hawser (Figure 66). */
+const EYE_CLAMPS = [0.1, 0.25, 0.4];
 
-/** A hawser's bottom end: from the saddle down to its hardware at the anchor, with its tail. */
+/**
+ * A level frame for a line of hardware along `along`: `flat` square to the links that lie flat, `upright` square to
+ * the ones that stand on edge between them.
+ */
+function linkPlanes(along: Vector3): { flat: Vector3; upright: Vector3 } {
+    const d = along.unit();
+    const flat = UP.sub(d.scale(UP.dot(d))).unit();
+    return { flat, upright: d.cross(flat) };
+}
+
+/**
+ * A hawser's end made off round a thimble: the thimble's crown hooked on at `near`, its point along `along`, lying
+ * square to `m`; the hawser's eye round it, its live part on to `live`, and its dead end back beside the live part
+ * through three double base clamps and on through `tail` (given the dead end's last point and the way across from the
+ * live part to the dead).
+ */
+function madeOff(
+    near: Vector3,
+    along: Vector3,
+    m: Vector3,
+    live: Vector3,
+    tail: (end: Vector3, side: Vector3) => Vector3[],
+): Piece[] {
+    const d = along.unit();
+    const th = thimble(near, d, m, HAWSER_R, C.steel, baseClampWire(HAWSER_R));
+    const [first, last] = [th.wire[0], th.wire.at(-1)!];
+    const tip = first.lerp(last, 0.5);
+    const pieces: Piece[] = [...th.pieces];
+    for (const k of EYE_CLAMPS)
+        pieces.push(...baseClamp(tip.add(d.scale(k)), d, th.side, HAWSER_R, C.steel));
+    const deadEnd = last.add(d.scale(EYE_CLAMPS.at(-1)! + 0.1));
+    const path = [
+        ...tail(deadEnd, th.side).reverse(),
+        deadEnd,
+        last,
+        ...th.wire.slice(1, -1).reverse(),
+        first,
+        live,
+    ];
+    pieces.push(...line(path, HAWSER_R, C.hawser, "steel"));
+    return pieces;
+}
+
+/**
+ * A hawser's bottom end: from the saddle down to the anchor through its in-line hardware (Figure 66), from the sling a
+ * 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye made off round its thimble,
+ * its tail lying on the ground. Each link lies a quarter turn from the last.
+ */
 function hawserFoot(s: number): Piece[] {
     const pieces: Piece[] = [];
     const a = ANCHOR_SHACKLE(s * SLING_Z);
     const saddle = SADDLE(s);
     const along = saddle.sub(a).unit();
-    const at = (d: number) => a.add(along.scale(d));
-    const H = HARDWARE;
-    pieces.push(...bar(at(0), at(H.shackle), 0.016, C.steel));
-    pieces.push(...bar(at(H.shackle), at(H.turnbuckle), 0.022, C.steel));
-    pieces.push(...bar(at(H.turnbuckle), at(H.dShackles), 0.013, C.steel));
-    pieces.push(...bar(at(H.dShackles), at(H.eye), 0.02, C.steel));
-    // The live hawser from the eye up to the saddle, and the dead end beside it through the clamps, then its tail.
-    const side = ACROSS.scale(0.016 * s);
-    pieces.push(...line([at(H.eye), saddle], HAWSER_R, C.hawser, "steel"));
-    for (const d of H.clamps) pieces.push(...clamp(at(d).add(side.scale(0.5)), along));
-    const tailStart = at(H.clamps[2] + 0.12).add(side);
-    const tail = [
-        at(H.eye).add(side),
-        tailStart,
-        tailStart.add(along.scale(0.4)).add(vec3(0, -0.3, s * 0.15)),
-        onGround(tailStart.x - 0.2, 0.02, s * 1.6),
-        onGround(LOG.x - 0.6, 0.02, s * 2.2),
-        onGround(LOG.x + 0.2, 0.02, s * 1.7),
-        onGround(LOG.x - 0.4, 0.02, s * 1.3),
-    ];
-    pieces.push(...line(smooth(tail, 6), HAWSER_R, C.hawser, "steel"));
+    const { flat, upright } = linkPlanes(along);
+    const bow = shackle("bow", a, along, flat, C.steel, C.pin);
+    const tb = turnbuckle(bow.far, along, upright, C.steel);
+    const d1 = shackle("d", tb.far, along, flat, C.steel, C.pin);
+    const d2 = shackle("d", d1.far, along, upright, C.steel, C.pin);
+    const d3 = shackle("d", d2.far, along, flat, C.steel, C.pin);
+    pieces.push(...bow.pieces, ...tb.pieces, ...d1.pieces, ...d2.pieces, ...d3.pieces);
+    pieces.push(
+        ...madeOff(d3.far, along, upright, saddle, (end, side) => {
+            const k = Math.sign(side.z) || s;
+            const out = end.add(along.scale(0.1));
+            return smooth(
+                [
+                    out,
+                    out.add(along.scale(0.4)).add(vec3(0, -0.3, k * 0.15)),
+                    onGround(out.x - 0.2, 0.02, s * 1.6),
+                    onGround(LOG.x - 0.6, 0.02, s * 2.2),
+                    onGround(LOG.x + 0.2, 0.02, s * 1.7),
+                    onGround(LOG.x - 0.4, 0.02, s * 1.3),
+                ],
+                6,
+            );
+        }),
+    );
     return pieces;
 }
 
+/** Where the turnbuckle is on hawser `s`'s in-line hardware, for its label: a little out from the anchor. */
+export const TURNBUCKLE_AT = (s: number) => {
+    const a = ANCHOR_SHACKLE(s * SLING_Z);
+    return a.add(SADDLE(s).sub(a).unit().scale(0.35));
+};
+
 /** The lizard on hawser A, left slack in line to the Tirfor as a back-up once the hardware takes the load. */
 export const LIZARD = { clamps: [2.9, 3.05, 3.2] };
+/** The lizard's wire's radius. */
+const LIZARD_R = 0.004;
 function lizardAndTirfor(): Piece[] {
     const pieces: Piece[] = [];
     const a = ANCHOR_SHACKLE(SLING_Z);
     const along = SADDLE(1).sub(a).unit();
     const on = (d: number) => a.add(along.scale(d));
-    const side = vec3(0, -0.016, -0.012);
-    for (const d of LIZARD.clamps) pieces.push(...clamp(on(d).add(side.scale(0.5)), along));
+    // The way from the hawser to the lizard, which lie in a clamp's two throats.
+    const toward = vec3(0, -0.016, -0.012).unit();
+    const side = toward.scale(baseClampWire(HAWSER_R) + baseClampWire(LIZARD_R));
+    for (const d of LIZARD.clamps)
+        pieces.push(
+            ...baseClamp(
+                on(d).add(toward.scale(baseClampWire(HAWSER_R))),
+                along,
+                toward,
+                HAWSER_R,
+                C.steel,
+            ),
+        );
     // The Tirfor, hooked to the middle sling, its cable out to the lizard.
     const hook = ANCHOR_SHACKLE(0);
     const dir = on(LIZARD.clamps[0]).sub(hook).unit();
@@ -1080,8 +1143,10 @@ function lizardAndTirfor(): Piece[] {
     // The lizard: a length of wire from the Tirfor to the clamps, slack, then along the hawser through them.
     const start = body[1].add(dir.scale(0.05));
     const reach = on(LIZARD.clamps[0] - 0.12).add(side);
-    pieces.push(...line(hanging(start, reach, 0.12, 16), 0.004, C.hawser, "steel"));
-    pieces.push(...line([reach, on(LIZARD.clamps[2] + 0.12).add(side)], 0.004, C.hawser, "steel"));
+    pieces.push(...line(hanging(start, reach, 0.12, 16), LIZARD_R, C.hawser, "steel"));
+    pieces.push(
+        ...line([reach, on(LIZARD.clamps[2] + 0.12).add(side)], LIZARD_R, C.hawser, "steel"),
+    );
     return pieces;
 }
 
@@ -1116,24 +1181,17 @@ function smooth(pts: Vector3[], n: number): Vector3[] {
 function hawsers(): Piece[] {
     const pieces: Piece[] = [];
     for (const s of [-1, 1]) {
-        const shackle = TREE_SHACKLE(s);
+        const shackleAt = TREE_SHACKLE(s);
         const cradle = vec3(BAR_X, CRADLE_Y, s * HAWSER_Z);
-        // The eye at the tree: round its thimble, the dead end beside it through three clamps.
-        const back = cradle.sub(shackle).unit();
-        const eye = shackle.add(back.scale(0.12));
-        const side = ACROSS.scale(0.016);
-        pieces.push(...line([eye, cradle], HAWSER_R, C.hawser, "steel"));
+        // The eye at the tree: a bow shackle on the sling, the hawser's eye round its thimble on the pin, the dead end
+        // back beside it through three clamps.
+        const back = cradle.sub(shackleAt).unit();
+        const { flat, upright } = linkPlanes(back);
+        const bow = shackle("bow", shackleAt, back, flat, C.steel, C.pin);
+        pieces.push(...bow.pieces);
         pieces.push(
-            ...line(
-                [eye.add(side), eye.add(side).add(back.scale(0.65))],
-                HAWSER_R,
-                C.hawser,
-                "steel",
-            ),
+            ...madeOff(bow.far, back, upright, cradle, (end) => [end.add(back.scale(0.12))]),
         );
-        for (const d of [0.2, 0.38, 0.56])
-            pieces.push(...clamp(eye.add(back.scale(d)).add(side.scale(0.5)), back));
-        pieces.push(...bar(shackle.add(vec3(0.07, 0, 0)), eye, 0.018, C.steel));
         const span = Array.from({ length: 61 }, (_, i) =>
             onHawser(BAR_X + ((SPAR_X - BAR_X) * i) / 60, s),
         );
@@ -1439,7 +1497,7 @@ export function foxLabels(): RigLabel[] {
         { text: "Brake blocks", at: onHawser(BLOCKS_X, -1), side: "right" },
         { text: "Static brakes", at: onHawser(STATIC_X, -1).add(vec3(0, -0.05, 0)), side: "right" },
         { text: "H-frame shear leg", at: onGround(SHEAR_LEG.x, SHEAR_LEG.top, 0), side: "right" },
-        { text: "Turnbuckle", at: ANCHOR_SHACKLE(-SLING_Z).lerp(SADDLE(-1), 0.04), side: "right" },
+        { text: "Turnbuckle", at: TURNBUCKLE_AT(-1), side: "right" },
         {
             text: "Lizard",
             at: ANCHOR_SHACKLE(SLING_Z).add(

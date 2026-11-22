@@ -937,3 +937,337 @@ export function stopBlock(
     }
     return { pieces, inner: eyes[0], outer: eyes[1] };
 }
+
+/*
+ * In-line hardware, built to hook together: each link from its near inside end (the inside of its hole at the end
+ * towards the anchor) along `d`, lying in the plane square to `m`, and returning its far inside end. Two links pulled
+ * apart meet where their insides touch, so the next link starts where the last one ends; each lies a quarter turn from
+ * the last, as linked hardware does.
+ */
+
+/** A frame for a link: `d` along it, `w` across it in its plane, `m` square to its plane. */
+function linkFrame(d: Vector3, m: Vector3) {
+    const dd = d.unit();
+    const mm = m.sub(dd.scale(m.dot(dd))).unit();
+    return { d: dd, m: mm, w: mm.cross(dd) };
+}
+
+/** A strand of steel through `points`, true to size, open or (if its ends meet) closed. */
+function steelStrand(points: Vector3[], r: number, color: string): Piece {
+    return {
+        kind: "strand",
+        points,
+        r,
+        material: "steel",
+        color,
+        capA: true,
+        capB: true,
+        toScale: true,
+    };
+}
+
+/**
+ * A 19 mm shackle (metres, after Crosby's G-209 and G-210): its body's and pin's radii, the inside width between its
+ * ears and its inside length from the crown to the pin; a bow shackle's bow widens to `bow` inside.
+ */
+export const SHACKLE_19 = { body: 0.0095, pin: 0.0112, width: 0.032, length: 0.073, bow: 0.052 };
+
+/**
+ * A shackle, `kind` bow or D, its crown's inside at `near` and its pin across the far end, the pin's axis `m` × `d`
+ * (so the link through the pin lies square to `w`). Its body is galvanised `color`, its screw pin painted `pinColor`:
+ * a collar against one ear and a flat eye beyond it to turn it by, its threaded end just through the other ear.
+ * Returns its pieces and the pin's inside face (its far end).
+ */
+export function shackle(
+    kind: "bow" | "d",
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    color: string,
+    pinColor: string,
+    size = SHACKLE_19,
+): { pieces: Piece[]; far: Vector3 } {
+    const f = linkFrame(d, m);
+    const { body: r, pin, width, length, bow } = size;
+    const p = (u: number, v: number) => near.add(f.d.scale(u)).add(f.w.scale(v));
+    const ear = width / 2 + r;
+    const pinAt = length + pin;
+    // The body's middle line, from one ear round the crown to the other.
+    const pts: Vector3[] = [];
+    if (kind === "d") {
+        const rr = ear;
+        pts.push(p(pinAt, ear));
+        pts.push(p(pinAt - 0.4 * (pinAt + r - rr), ear));
+        for (let i = 0; i <= 24; i++) {
+            const t = Math.PI / 2 + (Math.PI * i) / 24;
+            pts.push(p(-r + rr + rr * Math.cos(t), rr * Math.sin(t)));
+        }
+        pts.push(p(pinAt - 0.4 * (pinAt + r - rr), -ear));
+        pts.push(p(pinAt, -ear));
+    } else {
+        // The bow: round, wider than the ears, its legs easing straight back into them.
+        const rr = bow / 2 + r;
+        const c = -r + rr;
+        const open = Math.asin(Math.min(1, ear / rr)) + 0.25;
+        pts.push(p(pinAt, ear));
+        pts.push(p(pinAt - 0.012, ear + 0.0005));
+        for (let i = 0; i <= 32; i++) {
+            const t = open + ((2 * Math.PI - 2 * open) * i) / 32;
+            pts.push(p(c + rr * Math.cos(t), rr * Math.sin(t)));
+        }
+        pts.push(p(pinAt - 0.012, -ear - 0.0005));
+        pts.push(p(pinAt, -ear));
+    }
+    const pieces: Piece[] = [steelStrand(pts, r, color)];
+    // The ears: thick bosses round the pin.
+    const boss = r * 1.5;
+    for (const s of [-1, 1])
+        pieces.push(...part(p(pinAt, s * (ear - r)), p(pinAt, s * (ear + r)), boss, color, r));
+    // The pin, from just through the far ear to its collar against the near one, then its flat eye.
+    const face = ear + r;
+    pieces.push(...part(p(pinAt, -face - 0.002), p(pinAt, face), pin, pinColor));
+    pieces.push(...part(p(pinAt, face), p(pinAt, face + 0.003), pin * 1.4, pinColor, 0.003));
+    const tab = { o: p(pinAt, face + 0.003), u: f.w, v: f.d, n: f.m };
+    const long = 0.026;
+    const half = pin * 1.05;
+    const outline: Flat[] = [
+        [0, -pin],
+        ...Array.from({ length: 9 }, (_, i): Flat => {
+            const t = -Math.PI / 2 + (Math.PI * i) / 8;
+            return [long - half + half * Math.cos(t), half * Math.sin(t)];
+        }),
+        [0, pin],
+    ];
+    pieces.push(
+        ...plate(tab, outline, [circle([long - half, 0], half * 0.45, 12)], pin * 0.8, pinColor),
+    );
+    return { pieces, far: p(length, 0) };
+}
+
+/**
+ * A 24 mm turnbuckle, eye to eye (metres), in proportion to a photo of a galvanised one with its rod 24 mm across: its
+ * threaded rods' radius, its eyes (inside length and width, and the bar's radius round them), its forged frame (length
+ * between its hexagon bosses, width, thickness, and the window through it), the bosses (across their flats and long),
+ * how far each rod reaches into the window and how far it stands out of the frame, here wound partly out.
+ */
+export const TURNBUCKLE_24 = {
+    rod: 0.012,
+    eye: { length: 0.078, width: 0.049, bar: 0.011 },
+    frame: { length: 0.36, width: 0.098, thick: 0.026, window: { long: 0.32, wide: 0.05 } },
+    boss: { across: 0.05, long: 0.045 },
+    into: 0.1,
+    out: 0.06,
+};
+
+/** A turnbuckle along `d`, its eyes in the plane square to `m`, the near eye's inside end at `near`. */
+export function turnbuckle(
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    color: string,
+    size = TURNBUCKLE_24,
+): { pieces: Piece[]; far: Vector3 } {
+    const f = linkFrame(d, m);
+    const { rod, eye, frame, boss, into, out } = size;
+    const p = (u: number, v = 0) => near.add(f.d.scale(u)).add(f.w.scale(v));
+    const pieces: Piece[] = [];
+    // An eye: a rounded slot round its hole, from `u0` (its hole's inside end) along `dir`.
+    const eyeAt = (u0: number, dir: number) => {
+        const rr = eye.width / 2 + eye.bar;
+        const straight = eye.length - eye.width;
+        const c0 = u0 + dir * (eye.width / 2);
+        const c1 = c0 + dir * straight;
+        const pts: Vector3[] = [];
+        for (let i = 0; i <= 10; i++) {
+            const t = Math.PI / 2 + (Math.PI * i) / 10;
+            pts.push(p(c0 + dir * rr * Math.cos(t), rr * Math.sin(t)));
+        }
+        for (let i = 0; i <= 10; i++) {
+            const t = -Math.PI / 2 + (Math.PI * i) / 10;
+            pts.push(p(c1 + dir * rr * Math.cos(t), rr * Math.sin(t)));
+        }
+        pts.push(pts[0]);
+        pieces.push(steelStrand(pts, eye.bar, color));
+        return u0 + dir * (eye.length + eye.bar);
+    };
+    const neck = eyeAt(0, 1);
+    // Along the turnbuckle: each boss, and the frame between them.
+    const boss0 = neck + out;
+    const frame0 = boss0 + boss.long;
+    const frame1 = frame0 + frame.length;
+    const boss1 = frame1 + boss.long;
+    const total = boss1 + out + eye.bar + eye.length;
+    const window0 = frame0 + (frame.length - frame.window.long) / 2;
+    const window1 = window0 + frame.window.long;
+    // The rods, from each eye's neck through its boss and on into the window.
+    pieces.push(...part(p(neck - 0.004), p(window0 + into), rod, color));
+    pieces.push(...part(p(window1 - into), p(total - eye.length - eye.bar + 0.004), rod, color));
+    // The bosses, hexagons round the rods.
+    for (const u of [boss0, frame1])
+        pieces.push(...nut(p(u + boss.long / 2), f.d, boss.across, boss.long, color));
+    // The frame: flat, tapering from the bosses out to its full width, a long window through it.
+    const [hb, hw] = [boss.across / 2, frame.width / 2];
+    const taper = 0.06;
+    const outline: Flat[] = [
+        [0, -hb],
+        [taper, -hw],
+        [frame.length - taper, -hw],
+        [frame.length, -hb],
+        [frame.length, hb],
+        [frame.length - taper, hw],
+        [taper, hw],
+        [0, hb],
+    ];
+    const r = frame.window.wide / 2;
+    const w0 = window0 - frame0 + r;
+    const w1 = window1 - frame0 - r;
+    const slot: Flat[] = [
+        ...Array.from({ length: 9 }, (_, i): Flat => {
+            const t = -Math.PI / 2 + (Math.PI * i) / 8;
+            return [w1 + r * Math.cos(t), r * Math.sin(t)];
+        }),
+        ...Array.from({ length: 9 }, (_, i): Flat => {
+            const t = Math.PI / 2 + (Math.PI * i) / 8;
+            return [w0 + r * Math.cos(t), r * Math.sin(t)];
+        }),
+    ];
+    pieces.push(
+        ...plate({ o: p(frame0), u: f.d, v: f.w, n: f.m }, outline, [slot], frame.thick, color),
+    );
+    eyeAt(total, -1);
+    return { pieces, far: p(total) };
+}
+
+/**
+ * A heavy wire rope thimble for 11 mm wire (metres): its inside length from the crown to its point, its inside width
+ * across the crown, its channel's thickness, and how far (radians) past a half turn round the wire its flanges curl.
+ */
+export const THIMBLE_11 = { length: 0.072, width: 0.034, web: 0.0035, flange: 0.35 };
+
+/**
+ * A thimble with a wire's eye round it, its crown's inside at `near`, its point towards `d`, lying square to `m`.
+ * Returns the thimble's pieces and the wire's path round it, from its point on one side round the crown to the point
+ * on the other, the two `apart` either side of the middle (`side` is the way from the first to the second).
+ */
+export function thimble(
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    wireR: number,
+    color: string,
+    apart = wireR + 0.0005,
+    size = THIMBLE_11,
+): { pieces: Piece[]; wire: Vector3[]; side: Vector3 } {
+    const f = linkFrame(d, m);
+    const { length, width, web, flange } = size;
+    // The teardrop `off` out from the inside, lifted `lift` off its plane: from the point round the crown and back to
+    // the point, its two ends `ends` either side of the middle.
+    const R = width / 2;
+    const path = (off: number, lift: number, ends: number) => {
+        const rr = R + off;
+        const tip = length + off;
+        const phi = Math.acos(Math.min(1, rr / (tip - R)));
+        const q = (u: number, v: number) =>
+            near.add(f.d.scale(u)).add(f.w.scale(v)).add(f.m.scale(lift));
+        const pts: Vector3[] = [q(tip, -ends)];
+        for (let i = 0; i <= 18; i++) {
+            const a = -(Math.PI - phi) + (2 * (Math.PI - phi) * i) / 18;
+            pts.push(q(R - rr * Math.cos(a), rr * Math.sin(a)));
+        }
+        pts.push(q(tip, ends));
+        return pts;
+    };
+    const groove = web + wireR;
+    // The channel: a U round the wire's inside, swept round the teardrop as strands side by side across it, its edges
+    // (the flanges) curling a little past halfway round the wire.
+    const rho = wireR + web / 2;
+    const reach = Math.PI / 2 + flange;
+    const pieces: Piece[] = Array.from({ length: 11 }, (_, i) => {
+        const t = -reach + (2 * reach * i) / 10;
+        return steelStrand(
+            path(groove - rho * Math.cos(t), rho * Math.sin(t), 0.0015),
+            web / 2 + 0.0004,
+            color,
+        );
+    });
+    return { pieces, wire: path(groove, 0, apart), side: f.w };
+}
+
+/**
+ * A double base (double throat) wire rope grip for 11 mm wire (metres), after a maker's drawing of one: a forged body
+ * with a throat either side, a wire in each, and two U-bolts, staggered along the wires, each hooked over one wire with
+ * its legs through the body and nutted on the far side. The body's web between the throats, each throat's half-width,
+ * how far the body stands out either side of its middle (`lug`) and across (`wide`, half), and how long it is along the
+ * wires; the U-bolts' legs (radius and how far either side of the middle), how far apart along the wires the two
+ * U-bolts are, and their nuts.
+ */
+export const BASE_CLAMP = {
+    web: 0.006,
+    throat: 0.006,
+    lug: 0.018,
+    wide: 0.021,
+    long: 0.032,
+    leg: 0.0055,
+    legAt: 0.012,
+    stagger: 0.016,
+    nut: { across: 0.017, thick: 0.009 },
+};
+
+/** How far each wire's middle is from a base clamp's middle, for a wire `wireR` thick. */
+export const baseClampWire = (wireR: number, size = BASE_CLAMP) => size.web / 2 + wireR;
+
+/**
+ * A double base clamp at `at` (its body's middle, between the two wires), the wires along `d`, `side` the way from one
+ * wire to the other, each wire `wireR` thick and lying `baseClampWire(wireR)` from the middle. All galvanised `color`.
+ */
+export function baseClamp(
+    at: Vector3,
+    d: Vector3,
+    side: Vector3,
+    wireR: number,
+    color: string,
+    size = BASE_CLAMP,
+): Piece[] {
+    const f = linkFrame(d, side);
+    // Here `f.m` is the way between the wires and `f.w` across them both.
+    const { web, throat, lug, wide, long, leg, legAt, stagger, nut: nt } = size;
+    const pieces: Piece[] = [];
+    // The body: an H across the wires, each throat's floor rounded to its wire.
+    const floor = (s: number): Flat[] =>
+        Array.from({ length: 9 }, (_, i) => {
+            const t = Math.PI + (Math.PI * i) / 8;
+            return [throat * Math.cos(t), s * (web / 2 + throat + throat * Math.sin(t))];
+        });
+    const outline: Flat[] = [
+        [-wide, -lug],
+        [-throat, -lug],
+        ...floor(-1),
+        [throat, -lug],
+        [wide, -lug],
+        [wide, lug],
+        [throat, lug],
+        ...floor(1).reverse(),
+        [-throat, lug],
+        [-wide, lug],
+    ];
+    pieces.push(...plate({ o: at, u: f.w, v: f.m, n: f.d }, outline, [], long, color));
+    // The U-bolts: one hooked over each wire, its legs through the body, its nuts on the far side.
+    const reach = lug + nt.thick + 0.005;
+    for (const s of [-1, 1]) {
+        const c = at.add(f.d.scale((s * stagger) / 2));
+        const q = (w: number, m: number) => c.add(f.w.scale(w)).add(f.m.scale(s * m));
+        const wire = baseClampWire(wireR, size);
+        const pts = [q(legAt, -reach)];
+        for (let i = 0; i <= 16; i++) {
+            const t = (Math.PI * i) / 16;
+            pts.push(q(legAt * Math.cos(t), wire + legAt * Math.sin(t)));
+        }
+        pts.push(q(-legAt, -reach));
+        pieces.push(steelStrand(pts, leg, color));
+        for (const k of [-1, 1])
+            pieces.push(
+                ...nut(q(k * legAt, -(lug + nt.thick / 2)), f.m, nt.across, nt.thick, color),
+            );
+    }
+    return pieces;
+}

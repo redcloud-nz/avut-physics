@@ -1,5 +1,6 @@
 import { timber, type Piece } from "@/abseil-tower/tower";
 import {
+    ANCHOR_SHACKLE,
     BLOCKS_X,
     BRAKE,
     C,
@@ -11,21 +12,29 @@ import {
     PULLEY_COLORS,
     rigPulley,
     rigTrolley,
+    SADDLE,
     SHEAR_LEG,
+    SLING_Z,
     STATIC_X,
     STOP_BLOCK_COLORS,
     tiedTo,
+    TREE_SHACKLE,
     TROLLEY_COLORS,
     TROLLEY_X,
 } from "@/flying-fox/fox";
 import {
+    baseClamp,
+    baseClampWire,
     bolt,
     carabiner,
     eyeBolt,
     grigri,
     pulley,
+    shackle,
     sheave,
     stopBlock,
+    thimble,
+    turnbuckle,
     wrap,
     zipTrolley,
 } from "@/flying-fox/hardware";
@@ -146,6 +155,61 @@ export const PARTS: Part[] = [
             ...stopBlock(ORIGIN, ALONG, UP, ACROSS, HAWSER_R, STOP_BLOCK_COLORS).pieces,
             ...wire(ORIGIN, 0.25),
         ],
+    },
+    {
+        slug: "bow-shackle",
+        name: "Bow shackle (19 mm)",
+        group: "Hardware",
+        about: "A 19 mm bow shackle with a yellow screw pin, after Crosby's G-209: 32 mm between its ears, 73 mm inside from the crown to the pin, its bow 52 mm across inside. Its crown at the origin, its pin towards +x.",
+        pieces: () => shackle("bow", ORIGIN, ALONG, UP, STEEL, C.pin).pieces,
+    },
+    {
+        slug: "d-shackle",
+        name: "D shackle (19 mm)",
+        group: "Hardware",
+        about: "A 19 mm D (chain) shackle with a yellow screw pin, after Crosby's G-210: 32 mm between its ears, 73 mm inside from the crown to the pin. Its crown at the origin, its pin towards +x.",
+        pieces: () => shackle("d", ORIGIN, ALONG, UP, STEEL, C.pin).pieces,
+    },
+    {
+        slug: "turnbuckle",
+        name: "Turnbuckle (24 mm)",
+        group: "Hardware",
+        about: "A 24 mm turnbuckle, eye to eye, its rods partly wound out: a forged frame 360 mm long between its hexagon bosses with a window through it, an eye at each end 78 mm long inside.",
+        pieces: () => turnbuckle(ORIGIN, ALONG, UP, STEEL).pieces,
+    },
+    {
+        slug: "thimble",
+        name: "Thimble and eye",
+        group: "Hardware",
+        about: "A wire rope thimble for 11 mm wire, 72 mm long and 34 mm wide inside, with the wire's eye round it and its two parts running on side by side.",
+        pieces: () => {
+            const t = thimble(ORIGIN, ALONG, UP, HAWSER_R, STEEL);
+            const [first, last] = [t.wire[0], t.wire.at(-1)!];
+            return [
+                ...t.pieces,
+                ...line(
+                    [...t.wire.slice(1, -1).reverse(), first, first.add(ALONG.scale(0.15))],
+                    HAWSER_R,
+                    C.hawser,
+                ),
+                ...line([last, last.add(ALONG.scale(0.15))], HAWSER_R, C.hawser),
+            ];
+        },
+    },
+    {
+        slug: "base-clamp",
+        name: "Double base clamp",
+        group: "Hardware",
+        about: "A double base (double throat) wire rope grip for 11 mm wire: a forged body with a wire in the throat either side, and two U-bolts staggered along the wires, each hooked over one wire and nutted on the far side.",
+        pieces: () => {
+            const side = vec3(0, 0, 1);
+            const off = side.scale(baseClampWire(HAWSER_R));
+            return [
+                ...baseClamp(ORIGIN, ALONG, side, HAWSER_R, STEEL),
+                ...wire(off, 0.1),
+                ...wire(off.neg(), 0.1),
+            ];
+        },
     },
     {
         slug: "fox-trolley",
@@ -269,6 +333,34 @@ export const PARTS: Part[] = [
                     hi: at.add(vec3(0.3, 0.1, 0.3)),
                 }),
             ];
+        },
+    },
+    {
+        slug: "fox-in-line",
+        name: "In-line hardware, rigged",
+        group: "Flying fox",
+        about: "Hawser A's in-line hardware at the log anchor, cut out of the whole (Figure 66): from the round sling, a 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye round its thimble, its dead end held beside the live part by three double base clamps.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(SLING_Z);
+            const along = SADDLE(1).sub(a).unit();
+            const far = a.add(along.scale(1.7));
+            return within(foxPieces(), {
+                lo: vec3(Math.min(a.x, far.x) - 0.2, Math.min(a.y, far.y) - 0.2, a.z - 0.25),
+                hi: vec3(Math.max(a.x, far.x) + 0.15, Math.max(a.y, far.y) + 0.2, a.z + 0.25),
+            });
+        },
+    },
+    {
+        slug: "fox-tree-eye",
+        name: "Hawser eye at the tree, rigged",
+        group: "Flying fox",
+        about: "Hawser A's end at the tree, cut out of the whole: a 19 mm bow shackle on the round sling choked round the trunk, the hawser's eye round its thimble on the pin, its dead end held beside the live part by three double base clamps.",
+        pieces: () => {
+            const a = TREE_SHACKLE(1);
+            return within(foxPieces(), {
+                lo: a.add(vec3(-0.75, -0.35, -0.6)),
+                hi: a.add(vec3(0.85, 0.35, 0.4)),
+            });
         },
     },
     {
