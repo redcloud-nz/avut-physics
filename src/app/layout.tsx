@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             lang="en"
             className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
         >
-            {/* The site's chrome is in `(site)/layout.tsx`; the knot editor, in `(editor)`, has its own. */}
+            {/* The site's chrome is in `(site)/layout.tsx`; the knot editor, in `(editor)`, and the full-window viewers, in `(viewer)`, have their own. */}
             <body className="h-dvh overflow-hidden font-sans">{children}</body>
         </html>
     );
