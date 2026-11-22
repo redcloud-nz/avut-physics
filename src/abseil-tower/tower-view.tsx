@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Minus, Plus, RotateCcw } from "lucide-react";
+import { Info, Minus, Plus, RotateCcw, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -19,6 +19,7 @@ import {
     groundCorners,
     LEVELS,
     OVERHEAD,
+    plankLines,
     SIDE,
     towerPieces,
     type Face,
@@ -86,6 +87,9 @@ const MIN_WIDTH: Partial<Record<Material, number>> = { sling: 4.5, rope: 3.5, st
 const shade = (color: string, percent: number) =>
     `color-mix(in oklab, ${color} ${Math.round(percent)}%, black)`;
 
+/** How wide the gaps between boards are (metres), drawn no thinner than a pixel. */
+const JOINT_GAP = 0.01;
+
 /** Where the light comes from: high in the north, as the sun is here. */
 const LIGHT = vec3(0.3, 0.8, 0.5).unit();
 
@@ -152,9 +156,6 @@ function startOf(start: Start, size: Vector2): Frame {
     return { zoom, target: centre };
 }
 
-/** Screens wide enough to open the legend over the drawing to start with (Tailwind's `sm`). */
-const WIDE = "(min-width: 640px)";
-
 /**
  * A person's disc or rope coiled on a deck, put in the group of the deck rectangles it lies on and over them, so it's
  * drawn just after the nearest of them from every side. Anything else comes back as it is.
@@ -200,25 +201,6 @@ function faceShade(f: Face): number {
     const [p0, p1, , p3] = f.points;
     const n = f.normal ?? p1.sub(p0).cross(p3.sub(p0)).unit();
     return 55 + 45 * Math.abs(n.dot(LIGHT));
-}
-
-/** Where level board joints `spacing` apart cross a convex face, as pairs of points. */
-function plankLines(f: Face, spacing: number): [Vector3, Vector3][] {
-    const ys = f.points.map((p) => p.y);
-    const lines: [Vector3, Vector3][] = [];
-    for (
-        let h = Math.ceil(Math.min(...ys) / spacing + 1e-9) * spacing;
-        h < Math.max(...ys) - 1e-9;
-        h += spacing
-    ) {
-        const hits: Vector3[] = [];
-        f.points.forEach((a, i) => {
-            const b = f.points[(i + 1) % f.points.length];
-            if ((a.y - h) * (b.y - h) < 0) hits.push(a.lerp(b, (h - a.y) / (b.y - a.y)));
-        });
-        if (hits.length === 2) lines.push([hits[0], hits[1]]);
-    }
-    return lines;
 }
 
 export default function TowerView() {
@@ -474,7 +456,7 @@ export default function TowerView() {
     return (
         <div
             ref={boxRef}
-            className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface"
+            className="relative min-h-0 flex-1 overflow-hidden border-t border-border bg-surface"
         >
             {mode === "gl" ? (
                 <TowerGL
@@ -486,26 +468,34 @@ export default function TowerView() {
             ) : (
                 diagram
             )}
-            <section className="absolute top-2 right-2 max-h-[calc(100%-1rem)] w-64 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur">
+            {/* Closed, the legend is just an info button. */}
+            <button
+                type="button"
+                onClick={() => setLegendOpen(true)}
+                aria-label="Show the legend"
+                title="Legend"
+                className={`absolute top-2 right-2 size-9 items-center justify-center rounded-lg border border-border bg-surface/90 text-ink-soft shadow-lg backdrop-blur transition-colors hover:bg-line-faint [&_svg]:size-4 ${
+                    legendOpen === null ? "flex sm:hidden" : legendOpen ? "hidden" : "flex"
+                }`}
+            >
+                <Info />
+            </button>
+            <section
+                className={`absolute top-2 right-2 max-h-[calc(100%-1rem)] w-64 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur ${
+                    legendOpen === null ? "hidden sm:block" : legendOpen ? "block" : "hidden"
+                }`}
+            >
                 <button
                     type="button"
-                    onClick={() => setLegendOpen((o) => !(o ?? window.matchMedia(WIDE).matches))}
-                    aria-expanded={legendOpen ?? undefined}
+                    onClick={() => setLegendOpen(false)}
+                    aria-label="Hide the legend"
                     className="flex w-full items-center justify-between text-sm font-medium text-ink-strong"
                 >
                     Legend
-                    <ChevronDown
-                        className={`size-4 transition-transform ${
-                            legendOpen === null ? "sm:rotate-180" : legendOpen ? "rotate-180" : ""
-                        }`}
-                    />
+                    <X className="size-4 text-ink-soft" />
                 </button>
                 {
-                    <div
-                        className={`mt-2 flex-col gap-2 ${
-                            legendOpen === null ? "hidden sm:flex" : legendOpen ? "flex" : "hidden"
-                        }`}
-                    >
+                    <div className="mt-2 flex flex-col gap-2">
                         <h3 className="text-xs font-medium text-ink-strong">Rigging</h3>
                         <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
                             {key.cylinders.map((c) => (
@@ -556,7 +546,32 @@ export default function TowerView() {
                     </div>
                 }
             </section>
-            <div className="absolute bottom-2 left-2 flex flex-col items-start gap-2">
+            {/* The views, and beside them along the bottom the 3D views' compass presets. */}
+            <div className="absolute bottom-2 left-2 flex items-end gap-2">
+                <div
+                    role="group"
+                    aria-label="View"
+                    className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
+                >
+                    {(Object.keys(MODES) as Mode[]).map((m) => (
+                        <button
+                            key={m}
+                            type="button"
+                            aria-pressed={mode === m}
+                            onClick={() => {
+                                setMode(m);
+                                setFrame(startOf(MODES[m].start, size));
+                            }}
+                            className={`px-3 py-1.5 text-left text-xs transition-colors ${
+                                mode === m
+                                    ? "bg-action text-primary-foreground"
+                                    : "text-ink-soft hover:bg-line-faint"
+                            }`}
+                        >
+                            {MODES[m].label}
+                        </button>
+                    ))}
+                </div>
                 {!camera && (
                     <div
                         role="group"
@@ -587,30 +602,6 @@ export default function TowerView() {
                         ))}
                     </div>
                 )}
-                <div
-                    role="group"
-                    aria-label="View"
-                    className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
-                >
-                    {(Object.keys(MODES) as Mode[]).map((m) => (
-                        <button
-                            key={m}
-                            type="button"
-                            aria-pressed={mode === m}
-                            onClick={() => {
-                                setMode(m);
-                                setFrame(startOf(MODES[m].start, size));
-                            }}
-                            className={`px-3 py-1.5 text-left text-xs transition-colors ${
-                                mode === m
-                                    ? "bg-action text-primary-foreground"
-                                    : "text-ink-soft hover:bg-line-faint"
-                            }`}
-                        >
-                            {MODES[m].label}
-                        </button>
-                    ))}
-                </div>
             </div>
             <div className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur">
                 {[
@@ -892,8 +883,8 @@ function PieceDrawing({
                                 y1={p.y}
                                 x2={q.x}
                                 y2={q.y}
-                                stroke={shade(color, 40)}
-                                strokeWidth={1}
+                                stroke={shade(color, 30)}
+                                strokeWidth={Math.max(1, JOINT_GAP * ppm)}
                             />
                         );
                     })}

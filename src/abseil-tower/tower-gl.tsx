@@ -11,7 +11,7 @@ import { rad } from "@/lib/math";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import type { RigLabel } from "./rig";
-import { groundAt, groundCorners, type Face, type Material, type Piece } from "./tower";
+import { groundAt, groundCorners, plankLines, type Face, type Material, type Piece } from "./tower";
 
 /**
  * The tower in 3D drawn with WebGL: the same pieces as the SVG views, as shaded solids, so whatever's nearer covers
@@ -179,26 +179,15 @@ function bare(g: THREE.BufferGeometry): THREE.BufferGeometry {
     return g;
 }
 
-/** Where level board joints `spacing` apart cross a convex face, as pairs of points. */
-function plankLines(f: Face, spacing: number): [Vector3, Vector3][] {
-    const ys = f.points.map((p) => p.y);
-    const lines: [Vector3, Vector3][] = [];
-    for (
-        let h = Math.ceil(Math.min(...ys) / spacing + 1e-9) * spacing;
-        h < Math.max(...ys) - 1e-9;
-        h += spacing
-    ) {
-        const hits: Vector3[] = [];
-        f.points.forEach((a, i) => {
-            const b = f.points[(i + 1) % f.points.length];
-            if ((a.y - h) * (b.y - h) < 0) hits.push(a.lerp(b, (h - a.y) / (b.y - a.y)));
-        });
-        if (hits.length === 2) lines.push([hits[0], hits[1]]);
-    }
-    return lines;
-}
+/** How wide the gaps between boards are (metres). */
+const JOINT_GAP = 0.01;
+/** What a gap's colour key starts with, before the colour of its boards. */
+const JOINT = "joint:";
 
-/** Every piece's solid, merged into one geometry per colour, and the board joints as lines. */
+/**
+ * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
+ * of the boards they're between.
+ */
 function buildScene(pieces: Piece[]) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     const add = (color: string, g: THREE.BufferGeometry | null) => {
@@ -207,7 +196,6 @@ function buildScene(pieces: Piece[]) {
         list.push(g);
         byColor.set(color, list);
     };
-    const joints = new Map<string, number[]>();
     for (const p of pieces) {
         const color = p.color || COLOR[p.material];
         const r = Math.max("r" in p ? p.r : 0, MIN_R[p.material] ?? 0);
@@ -232,10 +220,24 @@ function buildScene(pieces: Piece[]) {
         } else {
             add(color, faceGeometry(p.points.map(T)));
             if (p.planks) {
-                const list = joints.get(color) ?? [];
-                for (const [a, b] of plankLines(p, p.planks))
-                    list.push(...T(a).toArray(), ...T(b).toArray());
-                joints.set(color, list);
+                // The gaps between boards, as thin strips lying in the face (which is pushed back a touch, so they show).
+                const [p0, p1, p2] = p.points.map(T);
+                const n = p1.clone().sub(p0).cross(p2.clone().sub(p0)).normalize();
+                for (const [a, b] of plankLines(p, p.planks)) {
+                    const [qa, qb] = [T(a), T(b)];
+                    const half = n
+                        .clone()
+                        .cross(qb.clone().sub(qa))
+                        .normalize()
+                        .multiplyScalar(JOINT_GAP / 2);
+                    const strip = [
+                        qa.clone().sub(half),
+                        qb.clone().sub(half),
+                        qb.clone().add(half),
+                        qa.clone().add(half),
+                    ];
+                    add(`${JOINT}${color}`, faceGeometry(strip));
+                }
             }
         }
     }
@@ -244,12 +246,7 @@ function buildScene(pieces: Piece[]) {
         parts.forEach((g) => g.dispose());
         return { color, geometry };
     });
-    const lines = [...joints].map(([color, list]) => {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute("position", new THREE.Float32BufferAttribute(list, 3));
-        return { color, geometry };
-    });
-    return { solids, lines };
+    return solids;
 }
 
 /** A label's text drawn on a canvas, for a texture: `fill` letters, with an outline in `stroke` if given. */
@@ -397,33 +394,35 @@ function CompassLetter({ text, at, colors }: { text: string; at: Vector3; colors
 
 /** The solids and lines, built once for each set of pieces. */
 function Solids({ pieces, colors }: { pieces: Piece[]; colors: Colors }) {
-    const built = useMemo(() => buildScene(pieces), [pieces]);
-    useEffect(
-        () => () => {
-            built.solids.forEach((s) => s.geometry.dispose());
-            built.lines.forEach((l) => l.geometry.dispose());
-        },
-        [built],
-    );
+    const solids = useMemo(() => buildScene(pieces), [pieces]);
+    useEffect(() => () => solids.forEach((s) => s.geometry.dispose()), [solids]);
     return (
         <>
-            {built.solids.map((s) => (
-                <mesh key={s.color} geometry={s.geometry}>
-                    {/* Pushed back a touch so the board joints drawn on them show. */}
-                    <meshLambertMaterial
-                        color={colors.read(s.color)}
-                        side={THREE.DoubleSide}
-                        polygonOffset
-                        polygonOffsetFactor={1}
-                        polygonOffsetUnits={1}
-                    />
-                </mesh>
-            ))}
-            {built.lines.map((l) => (
-                <lineSegments key={l.color} geometry={l.geometry}>
-                    <lineBasicMaterial color={colors.read(l.color).clone().multiplyScalar(0.45)} />
-                </lineSegments>
-            ))}
+            {solids.map((s) =>
+                s.color.startsWith(JOINT) ? (
+                    // A gap between boards: their colour, in shadow.
+                    <mesh key={s.color} geometry={s.geometry}>
+                        <meshBasicMaterial
+                            color={colors
+                                .read(s.color.slice(JOINT.length))
+                                .clone()
+                                .multiplyScalar(0.3)}
+                            side={THREE.DoubleSide}
+                        />
+                    </mesh>
+                ) : (
+                    <mesh key={s.color} geometry={s.geometry}>
+                        {/* Pushed back a touch so the gaps between boards, lying on them, show. */}
+                        <meshLambertMaterial
+                            color={colors.read(s.color)}
+                            side={THREE.DoubleSide}
+                            polygonOffset
+                            polygonOffsetFactor={1}
+                            polygonOffsetUnits={1}
+                        />
+                    </mesh>
+                ),
+            )}
         </>
     );
 }

@@ -442,7 +442,7 @@ export const RIGS: Rig[] = [
                 kind: "person",
                 id: "person-4",
                 role: "Edge",
-                place: { east: 4.15, north: 2.25, level: 4 },
+                place: { east: 3.95, north: 2.25, level: 4 },
             },
             // West side, against the railing in the middle.
             {
@@ -463,7 +463,7 @@ export const RIGS: Rig[] = [
                 kind: "person",
                 id: "person-7",
                 role: "Abseiler",
-                place: { east: 4.15, north: 1.39, level: 4 },
+                place: { east: 3.95, north: 1.39, level: 4 },
             },
             // NW: at the west railing, under its pair of ropes (the light blue abseil and red belay).
             {
@@ -477,7 +477,7 @@ export const RIGS: Rig[] = [
                 kind: "person",
                 id: "person-9",
                 role: "Abseiler",
-                place: { east: 4.15, north: 3.41, level: 4 },
+                place: { east: 3.95, north: 3.41, level: 4 },
             },
             {
                 kind: "person",
@@ -1315,10 +1315,12 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
         } else if (item.kind === "person") {
             const { place } = item;
             const inside = LOG_R + PERSON_R + 0.05;
+            // On the top deck the east railing stands in from the side.
+            const east = place.level === 4 ? EAST_EDGE.inside - PERSON_R - 0.05 : SIDE - inside;
             const [x, z] =
                 "inCorner" in place
                     ? [
-                          place.inCorner.includes("E") ? SIDE - inside : inside,
+                          place.inCorner.includes("E") ? east : inside,
                           place.inCorner.includes("N") ? SIDE - inside : inside,
                       ]
                     : [place.east, place.north];
@@ -1479,7 +1481,7 @@ export function legend(rig: Rig): {
             },
             {
                 text: TBP.text,
-                name: "Tandem belay prusiks",
+                name: "Tandem belay prusiks + pulley",
                 colors: belays[0].tbp.map(rigColor),
                 light: true,
             },
