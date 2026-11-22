@@ -512,6 +512,8 @@ const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "d
 
 /** Tape and rope, as round as they're drawn. */
 const SLING_R = 0.0125;
+/** The beam slings' flat tape. */
+const TAPE = { width: 0.035, thickness: 0.003 };
 const ROPE_R = 0.0055;
 /** How far from an abseil rope a belay beside it crosses the rail. */
 const BESIDE_GAP = 0.12;
@@ -595,8 +597,20 @@ function basketSling(
     const along = vec3(pull.x, pull.y, slant).unit();
     const across = vec3(-pull.y, pull.x, 0);
     const krab = carabiner(at(clip), along, across);
+    // It's flat tape: a loop basketed over the beam, so two layers side by side along it, each going down both legs.
+    const near = at(clip);
+    const tape = {
+        ...TAPE,
+        across: vec3(0, 0, 1),
+        layers: 2,
+        gather: near,
+        ramp: 0.7 * near.distanceTo(vec3(centre.x, centre.y, near.z)),
+    };
     return {
-        pieces: [...run(loop, cuts, SLING_R, "sling", color), krab.piece],
+        pieces: [
+            ...run(loop, cuts, SLING_R, "sling", color).map((p) => ({ ...p, tape })),
+            krab.piece,
+        ],
         clip: krab.far,
         along,
     };

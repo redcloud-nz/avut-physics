@@ -74,6 +74,19 @@ export type Strand = {
     /** Whether each end is a real end, drawn rounded, or a join to the next strand, drawn so it doesn't show. */
     capA: boolean;
     capB: boolean;
+    /**
+     * Flat tape, for the views that can draw it so: `layers` of it side by side, each `width` wide (lying `across`) and
+     * `thickness` thick, fanned apart where they run round what they're on and gathered together at `gather` (a
+     * carabiner), over the last `ramp` metres to it.
+     */
+    tape?: {
+        width: number;
+        thickness: number;
+        across: Vector3;
+        layers: number;
+        gather: Vector3;
+        ramp: number;
+    };
 };
 
 /**
@@ -364,7 +377,7 @@ function flight(
             const [a, b] = [foot.add(out).add(onTop), head.add(out).add(onTop)];
             pieces.push(
                 ...(steel
-                    ? steelRailing(a, b, head.y, across, steel[s < 0 ? 0 : 1])
+                    ? steelRailing(a, b, head.y, across, steel[s < 0 ? 0 : 1], s < 0)
                     : railing(a, b, across.scale(s), "ends")),
             );
         }
@@ -402,6 +415,7 @@ function steelRailing(
     top: number,
     across: Vector3,
     reach: number,
+    endPost: boolean,
 ): Piece[] {
     const lift = (h: number) => vec3(0, h, 0);
     const t = (top - a.y) / (b.y - a.y);
@@ -409,6 +423,10 @@ function steelRailing(
     const to = turn.add(across.scale(reach - turn.dot(across)));
     return [
         ...rod(a, a.add(lift(RAIL_HEIGHT)), PIPE_R, "steel"),
+        // Where it reaches a timber railing, a post stands hard against it.
+        ...(endPost
+            ? rod(to.add(lift(-(to.y - top))), to.add(lift(RAIL_HEIGHT)), PIPE_R, "steel")
+            : []),
         ...[
             [RAIL_HEIGHT, PIPE_R],
             [RAIL_HEIGHT / 2, 0.008],
@@ -525,6 +543,8 @@ const SIDE_BOARDS = (() => {
 })();
 /** How far the top deck's railing stands out from the corner logs' middles: its boards just clear of the logs. */
 const TOP_OUT = LOG_R + BOARD.w + POST / 2;
+/** Where a steel post stands hard against the top deck's south railing, inside its boards (by the plan's x). */
+const AGAINST_SOUTH = -TOP_OUT + POST / 2 + BOARD.w + PIPE_R;
 /** How far in from the east side the top deck's east railing stands, its posts just inside the corner logs. */
 const EAST_IN = LOG_R + POST / 2;
 
@@ -737,11 +757,9 @@ function planPieces(): Piece[] {
                 LEVELS[i + 1] - LEVELS[i],
                 s.ladder ? 0.45 : STAIR_WIDTH,
                 s.ladder,
-                // The flight up to the top deck has a steel railing: its south side's turns to the tower's railing
-                // (the inner face of its boards), and its north side's to the steel railing round the opening.
-                i === STAIRS.length - 1
-                    ? [-TOP_OUT + POST / 2 + BOARD.w, OPENINGS[3].x1]
-                    : undefined,
+                // The flight up to the top deck has a steel railing: its south side's turns to a post hard against the
+                // tower's railing, and its north side's to the steel railing round the opening.
+                i === STAIRS.length - 1 ? [AGAINST_SOUTH, OPENINGS[3].x1] : undefined,
             ),
         );
     }
@@ -860,14 +878,15 @@ function planPieces(): Piece[] {
     ]) {
         const up = (x: number, z: number) => vec3(x, TOP + h, z);
         pieces.push(...rod(up(o.x1, o.z0), up(o.x1, o.z1), r, "steel"));
-        pieces.push(...rod(up(o.x0, o.z0), up(o.x1, o.z0), r, "steel"));
+        pieces.push(...rod(up(AGAINST_SOUTH, o.z0), up(o.x1, o.z0), r, "steel"));
     }
-    // A post at each corner, at the open end, and halfway along its east–west side.
+    // A post at each corner (its south-east one hard against the tower's railing), at the open end, and halfway along
+    // its east–west side.
     for (const [x, z] of [
         [o.x1, o.z0],
         [o.x1, (o.z0 + o.z1) / 2],
         [o.x1, o.z1],
-        [o.x0 + 0.1, o.z0],
+        [AGAINST_SOUTH, o.z0],
     ])
         pieces.push(...rod(vec3(x, TOP, z), vec3(x, TOP + RAIL_HEIGHT, z), PIPE_R, "steel"));
 

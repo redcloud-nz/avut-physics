@@ -147,6 +147,79 @@ function tubeGeometry(points: THREE.Vector3[], r: number): THREE.BufferGeometry 
     return g;
 }
 
+/**
+ * A flat ribbon along a polyline: `width` wide lying as near `across` as it can, square to the line, and `thickness`
+ * thick. Each of its four sides has its own normals, so it shades flat.
+ */
+function ribbonGeometry(
+    points: THREE.Vector3[],
+    across: THREE.Vector3,
+    width: number,
+    thickness: number,
+): THREE.BufferGeometry | null {
+    const pts = points.filter((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
+    if (pts.length < 2) return null;
+    const tangent = (i: number) =>
+        pts[Math.min(i + 1, pts.length - 1)]
+            .clone()
+            .sub(pts[Math.max(i - 1, 0)])
+            .normalize();
+    // Each point's half-width and half-thickness directions.
+    const frames = pts.map((_, i) => {
+        const t = tangent(i);
+        const w = across
+            .clone()
+            .sub(t.clone().multiplyScalar(across.dot(t)))
+            .normalize();
+        const n = t.clone().cross(w);
+        return { w: w.multiplyScalar(width / 2), n: n.multiplyScalar(thickness / 2) };
+    });
+    const position: number[] = [];
+    const normal: number[] = [];
+    const index: number[] = [];
+    // The four sides: the two faces (±n) and the two edges (±w), each a strip of quads.
+    for (const [sw, sn, face] of [
+        [1, 1, "n"],
+        [-1, -1, "n"],
+        [1, -1, "w"],
+        [-1, 1, "w"],
+    ] as const) {
+        const base = position.length / 3;
+        pts.forEach((p, i) => {
+            const { w, n } = frames[i];
+            // A side's two corners: across the face for a face, through the thickness for an edge.
+            const corners =
+                face === "n"
+                    ? [w.clone().multiplyScalar(-sw), w.clone().multiplyScalar(sw)]
+                    : [n.clone().multiplyScalar(-sn), n.clone().multiplyScalar(sn)];
+            const off = face === "n" ? n.clone().multiplyScalar(sn) : w.clone().multiplyScalar(sw);
+            const dir = (face === "n" ? n : w)
+                .clone()
+                .normalize()
+                .multiplyScalar(face === "n" ? sn : sw);
+            for (const c of corners) {
+                const q = p.clone().add(off).add(c);
+                position.push(q.x, q.y, q.z);
+                normal.push(dir.x, dir.y, dir.z);
+            }
+        });
+        for (let i = 0; i < pts.length - 1; i++) {
+            const [a, b, c, d] = [
+                base + 2 * i,
+                base + 2 * i + 1,
+                base + 2 * i + 2,
+                base + 2 * i + 3,
+            ];
+            index.push(a, c, b, b, c, d);
+        }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute(normal, 3));
+    g.setIndex(index);
+    return g;
+}
+
 /** A flat convex polygon, as a fan of triangles. */
 function faceGeometry(points: THREE.Vector3[]): THREE.BufferGeometry {
     const [p0, p1, p2] = points;
@@ -201,7 +274,20 @@ function buildScene(pieces: Piece[]) {
         const r = Math.max("r" in p ? p.r : 0, MIN_R[p.material] ?? 0);
         if (p.kind === "rod")
             for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB)) add(color, g);
-        else if (p.kind === "strand") {
+        else if (p.kind === "strand" && p.tape) {
+            // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
+            const { width, thickness, layers, gather, ramp } = p.tape;
+            const across = T(p.tape.across).normalize();
+            const pitch = width + 0.004;
+            for (let k = 0; k < layers; k++) {
+                const slot = k - (layers - 1) / 2;
+                const points = p.points.map((q) => {
+                    const spread = 0.15 + 0.85 * Math.min(1, q.distanceTo(gather) / ramp);
+                    return T(q).add(across.clone().multiplyScalar(slot * pitch * spread));
+                });
+                add(color, ribbonGeometry(points, across, width, thickness));
+            }
+        } else if (p.kind === "strand") {
             // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
             const lift = new THREE.Vector3(0, r - p.r, 0);
             const points = p.points.map((q) => T(q).add(lift));
