@@ -328,6 +328,24 @@ html {
   --tower-deck: #675646;
   --tower-steel: #a8b4c4;
   --tower-ground: #1d3527;
+  /* The flying fox's drawing: natural fibre rope (sisal guys and lashings), hessian bagging, black star pickets,
+     the nylon brake blocks, the shear leg's spars, and the platform's aluminium grate. */
+  --fox-fibre: #d6b97a;
+  --fox-hessian: #a68a5b;
+  --fox-picket: #3a3a42;
+  --fox-nylon: #f1e7c8;
+  --fox-spar: #c9a36b;
+  --fox-grate: #8e9aab;
+  --fox-pulley: #4a78b8;
+  --fox-sheave: #d3d9e1;
+  /* The GRIGRI+'s coloured side plate (Petzl's yellow-green). */
+  --fox-grigri: #c3cc1e;
+  /* The round slings (pastel purple). */
+  --fox-sling: #b9a3e3;
+  --fox-grigri-handle: #4b4f56;
+  /* The flying fox's ground: grass, and the dry, bare ground it shades into in patches. */
+  --fox-ground: #2f5238;
+  --fox-ground-dry: #6b6447;
   /* Black rigging gear (a rope bucket), dark but lighter than the page so it shows. */
   --rig-black: #2b2b31;
   --rig-on-rope: #0f172a;

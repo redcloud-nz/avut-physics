@@ -14,6 +14,7 @@ import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import { placeLabel, type Box, type ObstacleGrid } from "./callout-layout";
 import Loading3D from "./loading-3d";
 import { layoutRig, legend, RIGS, rigSide, type RigLabel } from "./rig";
 import {
@@ -28,6 +29,7 @@ import {
     type Face,
     type Material,
     type Piece,
+    type Rod,
 } from "./tower";
 import type { GLHandle } from "./tower-gl";
 
@@ -648,16 +650,30 @@ export default function TowerView({ slug }: { slug: string }) {
     );
 }
 
-function centreOf(piece: Piece): Vector3 {
+export function centreOf(piece: Piece): Vector3 {
     if (piece.kind === "rod") return piece.a.lerp(piece.b, 0.5);
     // A strand by its middle along its length would do better, but its points' average is near enough.
     return piece.points.reduce((s, p) => s.add(p), vec3(0, 0, 0)).scale(1 / piece.points.length);
 }
 
+/**
+ * How near a piece comes to the eye looking along `toward` (the larger, the nearer), for drawing back to front: its
+ * middle, and for a rod, the side of it facing the eye, so a thin rod inside a thick one (an axle in its wheel) is
+ * drawn before it.
+ */
+export function nearness(piece: Piece, toward: Vector3): number {
+    const middle = centreOf(piece).dot(toward);
+    if (piece.kind !== "rod") return middle;
+    const along = piece.b.sub(piece.a);
+    const len = along.len();
+    const across = len > 0 ? Math.sqrt(Math.max(0, 1 - (along.dot(toward) / len) ** 2)) : 1;
+    return middle + piece.r * across;
+}
+
 const MONO = "var(--font-geist-mono), monospace";
 
 /** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */
-function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
+export function StrandSwatch({ color, look }: { color: string; look: "tape" | "rope" }) {
     const [w, h] = [64, 9];
     const thick = look === "tape" ? 6 : 3.5;
     const line = { x1: thick / 2 + 1, x2: w - thick / 2 - 1, y1: h / 2, y2: h / 2 };
@@ -862,18 +878,20 @@ const CALLOUT = { font: 11, gap: 14, line: 14 };
  * out to the side of the tower its knot is on (`middle` is where the tower's middle is drawn, so panning never moves a
  * label across), unless its knot says otherwise, and moves down past any already written there.
  */
-function Callouts({
+export function Callouts({
     labels,
     toSvg,
     ppm,
     middle,
+    avoid,
 }: {
     labels: RigLabel[];
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
     middle: number;
+    /** What's drawn, for the labels to keep off too, searching round their knots for a clear place. */
+    avoid?: ObstacleGrid;
 }) {
-    type Box = { x0: number; x1: number; y0: number; y1: number };
     const placed: Box[] = [];
     const overlaps = (b: Box) =>
         placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
@@ -892,6 +910,11 @@ function Callouts({
                 y0: y - CALLOUT.font / 2 - 1,
                 y1: y + CALLOUT.font / 2 + 1,
             });
+            if (avoid) {
+                const spot = placeLabel(at, width, CALLOUT.font, right, gap, placed, avoid);
+                placed.push(spot.box);
+                return { label, at, x: spot.x, y: spot.y, right: spot.right };
+            }
             let y = at.y;
             for (let tries = 0; tries < 40 && overlaps(box(y)); tries++) y += CALLOUT.line / 2;
             placed.push(box(y));
@@ -934,24 +957,30 @@ function Callouts({
 }
 
 /** Where a point on the screen is in the drawing's SVG units. */
-function toDrawing(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
+export function toDrawing(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
     const m = svg.getScreenCTM();
     if (!m) return vec2(clientX, clientY);
     const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
     return vec2(p.x, p.y);
 }
 
-function PieceDrawing({
+export function PieceDrawing({
     piece,
     toSvg,
     ppm,
     dim = 1,
+    minWidth = MIN_WIDTH,
+    depth,
 }: {
     piece: Piece;
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
+    /** How near a point is to the eye (the larger, the nearer), for a true-size rod to show its nearer end. */
+    depth?: (p: Vector3) => number;
     /** How bright it's drawn, darker for what's below the level looked down on. */
     dim?: number;
+    /** The narrowest each material's drawn (SVG units), if not the tower's. */
+    minWidth?: Partial<Record<Material, number>>;
 }) {
     const own = piece.color || COLOR[piece.material];
     const color = dim < 1 ? shade(own, dim * 100) : own;
@@ -959,13 +988,27 @@ function PieceDrawing({
         const fill = shade(color, faceShade(piece));
         return (
             <g>
-                <polygon
-                    points={svgPoints(piece.points.map(toSvg))}
-                    fill={fill}
-                    stroke={piece.normal ? shade(color, 40) : fill}
-                    strokeWidth={piece.normal ? 0.7 : 0.8}
-                    strokeLinejoin="round"
-                />
+                {piece.holes?.length ? (
+                    // Its holes cut out: each loop a subpath, filled even-odd.
+                    <path
+                        d={[piece.points, ...piece.holes]
+                            .map((loop) => `M${svgPoints(loop.map(toSvg))}Z`)
+                            .join("")}
+                        fill={fill}
+                        fillRule="evenodd"
+                        stroke={piece.normal ? shade(color, 40) : fill}
+                        strokeWidth={piece.normal ? 0.7 : 0.8}
+                        strokeLinejoin="round"
+                    />
+                ) : (
+                    <polygon
+                        points={svgPoints(piece.points.map(toSvg))}
+                        fill={fill}
+                        stroke={piece.normal ? shade(color, 40) : fill}
+                        strokeWidth={piece.normal ? 0.7 : 0.8}
+                        strokeLinejoin="round"
+                    />
+                )}
                 {piece.planks &&
                     plankLines(piece, piece.planks).map(([a, b], i) => {
                         const [p, q] = [toSvg(a), toSvg(b)];
@@ -1007,7 +1050,7 @@ function PieceDrawing({
         // Tape is drawn as its flat layers, each its width wide; rope and wire as round as they are.
         const w = piece.tape
             ? Math.max(piece.tape.width * ppm, 1.5)
-            : Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
+            : Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
         return (
             <g>
                 {tapeLayers(piece).map((layer, k) => (
@@ -1026,7 +1069,19 @@ function PieceDrawing({
     }
     const a = toSvg(piece.a);
     const b = toSvg(piece.b);
-    const w = Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
+    if (piece.toScale)
+        return (
+            <Cylinder
+                piece={piece}
+                a={a}
+                b={b}
+                r={Math.max(piece.r * ppm, (minWidth[piece.material] ?? 0) / 2)}
+                ppm={ppm}
+                color={color}
+                depth={depth}
+            />
+        );
+    const w = Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
     const outline = w > 3;
     // A round end only where the rod really ends: between its lengths the joins must not show.
     const ends = (cap: boolean, p: Vector2) =>
@@ -1074,6 +1129,77 @@ function PieceDrawing({
 }
 
 /**
+ * A true-size rod (a part of some hardware) as the solid it is: a cylinder with flat ends, each end an ellipse as it's
+ * seen at an angle, the nearer one drawn over its side.
+ */
+function Cylinder({
+    piece,
+    a,
+    b,
+    r,
+    ppm,
+    color,
+    depth,
+}: {
+    piece: Rod;
+    a: Vector2;
+    b: Vector2;
+    /** Its radius as drawn (SVG units). */
+    r: number;
+    ppm: number;
+    color: string;
+    depth?: (p: Vector3) => number;
+}) {
+    const length = piece.a.distanceTo(piece.b) * ppm;
+    const shown = a.distanceTo(b);
+    // How round its ends look: the sine of the angle between the rod and the page.
+    const open = Math.sqrt(Math.max(0, 1 - (shown / Math.max(length, 1e-9)) ** 2));
+    const along = b.sub(a).safeUnit(vec2(1, 0));
+    const across = along.perp().scale(r);
+    const edge = shade(color, 45);
+    const end = (p: Vector2, key: string) => (
+        <ellipse
+            key={key}
+            cx={p.x}
+            cy={p.y}
+            rx={Math.max(r * open, 0.01)}
+            ry={r}
+            transform={`rotate(${svgNumber(deg(Math.atan2(along.y, along.x)))} ${svgNumber(p.x)} ${svgNumber(p.y)})`}
+            fill={shade(color, 85)}
+            stroke={edge}
+            strokeWidth={r > 1.5 ? 0.7 : 0}
+        />
+    );
+    const nearB = depth ? depth(piece.b) > depth(piece.a) : true;
+    const [far, near] = nearB ? [a, b] : [b, a];
+    return (
+        <g>
+            {end(far, "far")}
+            <polygon
+                points={svgPoints([a.add(across), b.add(across), b.sub(across), a.sub(across)])}
+                fill={color}
+            />
+            {r > 1.5 &&
+                [1, -1].map((s) => {
+                    const [p, q] = [a.add(across.scale(s)), b.add(across.scale(s))];
+                    return (
+                        <line
+                            key={s}
+                            x1={p.x}
+                            y1={p.y}
+                            x2={q.x}
+                            y2={q.y}
+                            stroke={edge}
+                            strokeWidth={0.7}
+                        />
+                    );
+                })}
+            {end(near, "near")}
+        </g>
+    );
+}
+
+/**
  * One line of rope or tape through `pts` (SVG units), `w` wide with a dark edge. Where it joins another strand its ends
  * are cut square, with the fill running a little past so no line shows across the join; real ends are rounded, or
  * square for tape.
@@ -1107,6 +1233,16 @@ function StrandLine({
         strokeLinejoin: square ? "miter" : "round",
     } as const;
     const caps = square ? [] : [capA && pts[0], capB && pts[n]].filter((p): p is Vector2 => !!p);
+    // A closed loop (a ring, a carabiner) is drawn as one, so it joins round where it starts and ends.
+    if (!capA && !capB && n > 2 && pts[0].distanceTo(pts[n]) < 1e-3) {
+        const d = `M${svgPoints(pts.slice(0, n))}Z`;
+        return (
+            <g>
+                <path {...cut} d={d} stroke={shade(color, 40)} strokeWidth={w + 2} />
+                <path {...cut} d={d} stroke={color} strokeWidth={w} />
+            </g>
+        );
+    }
     return (
         <g>
             <polyline
