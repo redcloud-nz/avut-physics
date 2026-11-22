@@ -173,7 +173,13 @@ export type Person = {
     place: ({ inCorner: "NE" | "SE" | "SW" | "NW" } | OnDeck) & { level: 1 | 2 | 3 | 4 };
 };
 
-export type RigItem = Sling | WrapSling | Rope | Bucket | Belay | Person;
+/**
+ * An edge person's safety line: their daisy chain (of colour `dc`) from the carabiner on the sling `from`, which is
+ * pulled towards their harness, to them.
+ */
+export type SafetyLine = { kind: "safety"; id: string; from: string; person: string; dc: RigColor };
+
+export type RigItem = Sling | WrapSling | Rope | Bucket | Belay | Person | SafetyLine;
 /** A rig, with its `slug` for its page's address (`/cracroft-abseil-tower/<slug>`). */
 export type Rig = { slug: string; name: string; items: RigItem[] };
 
@@ -466,6 +472,26 @@ export const RIGS: Rig[] = [
                 role: "Edge",
                 place: { east: 0.35, north: 2.25, level: 4 },
             },
+            // The edge people's safety lines: a 3 m sling each in the beam's middle space, a little apart, and a
+            // daisy chain to them.
+            {
+                kind: "sling",
+                id: "sling-11",
+                at: 2.2,
+                length: 3,
+                color: "green",
+                configuration: "basket",
+            },
+            { kind: "safety", id: "safety-1", from: "sling-11", person: "person-4", dc: "yellow" },
+            {
+                kind: "sling",
+                id: "sling-12",
+                at: 2.3,
+                length: 3,
+                color: "green",
+                configuration: "basket",
+            },
+            { kind: "safety", id: "safety-2", from: "sling-12", person: "person-5", dc: "yellow" },
             // Just east of the middle, clear of the beam.
             {
                 kind: "person",
@@ -890,6 +916,26 @@ function toGround(
 
 /** A load-release hitch, as it's drawn: a cylinder of cord, longer and thinner than a rope's hitch. */
 const LRH = { text: "LRH", r: 0.035, length: 0.35 };
+/** A daisy chain, drawn as a cylinder as thick as the load-release hitch, as long as it takes to reach its person. */
+const DC = { text: "DC", r: LRH.r };
+/** How high above the deck a person's harness is, where their daisy chain clips in. */
+const HARNESS_H = 1.0;
+
+/** Where a person stands: the middle of their disc, just on their deck. */
+function personCentre(person: Person): Vector3 {
+    const { place } = person;
+    const inside = LOG_R + PERSON_R + 0.05;
+    // On the top deck the east railing stands in from the side.
+    const east = place.level === 4 ? EAST_EDGE.inside - PERSON_R - 0.05 : SIDE - inside;
+    const [x, z] =
+        "inCorner" in place
+            ? [
+                  place.inCorner.includes("E") ? east : inside,
+                  place.inCorner.includes("N") ? SIDE - inside : inside,
+              ]
+            : [place.east, place.north];
+    return vec3(x, LEVELS[place.level] + 0.01, z);
+}
 /** Tandem belay prusiks, drawn as one cylinder round the rope: its upper half one cord's colour, its lower the other's. */
 const TBP = { text: "TBP", r: 0.04, length: 0.26, bands: 2, cordR: 0.0035 };
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
@@ -1324,7 +1370,44 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
     }
     return { pieces, labels };
 
+    /** Where a person stands (the middle of their disc, on their deck). */
+    function personAt(id: string): Vector3 | undefined {
+        const p = rig.items.find((i): i is Person => i.kind === "person" && i.id === id);
+        return p && personCentre(p);
+    }
+
     function layOut(item: RigItem) {
+        if (item.kind === "safety") {
+            // The daisy chain from the sling's carabiner straight to the person, as long as it takes: its carabiner
+            // clips in at their harness, over the middle of where they stand.
+            const from = clips.get(item.from);
+            const harness = personAt(item.person)?.add(vec3(0, HARNESS_H, 0));
+            if (!from || !harness) return;
+            const along = harness.sub(from.clip).unit();
+            const end = harness.sub(along.scale(KRAB_L));
+            const color = rigColor(item.dc);
+            const start = from.clip.sub(along.scale(0.02));
+            pieces.push({
+                kind: "rod",
+                a: start,
+                b: end,
+                r: DC.r,
+                material: "rope",
+                color,
+                capA: true,
+                capB: true,
+            });
+            // Its carabiner, lying along it, flat in the upright plane it's in.
+            const across = vec3(-along.y, along.x, 0).unit();
+            pieces.push(carabiner(end.sub(along.scale(0.01)), along, across).piece);
+            labels.push({
+                at: start.lerp(end, 0.5),
+                text: DC.text,
+                on: { along, length: start.distanceTo(end), r: DC.r },
+                light: DARK_COLORS.includes(item.dc),
+            });
+            return;
+        }
         if (item.kind === "sling") {
             const z = item.at;
             const rope = lineFrom(item.id);
@@ -1341,10 +1424,19 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
                 const centre = vec2(OVERHEAD.x, (OVERHEAD.lowerY + OVERHEAD.upperY) / 2);
                 slant = (aim - z) / PULL[rope.route].distanceTo(centre);
             }
+            // A safety line's sling is pulled towards its person's harness.
+            const safety = rig.items.find(
+                (i): i is SafetyLine => i.kind === "safety" && i.from === item.id,
+            );
+            const harness = safety && personAt(safety.person);
             const s = basketSling(
                 z,
                 item.length,
-                rope?.route ? PULL[rope.route] : null,
+                harness
+                    ? vec2(harness.x, harness.y + HARNESS_H)
+                    : rope?.route
+                      ? PULL[rope.route]
+                      : null,
                 rigColor(item.color),
                 slant,
             );
@@ -1373,18 +1465,7 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
             pieces.push(...s.pieces);
             clips.set(item.id, s);
         } else if (item.kind === "person") {
-            const { place } = item;
-            const inside = LOG_R + PERSON_R + 0.05;
-            // On the top deck the east railing stands in from the side.
-            const east = place.level === 4 ? EAST_EDGE.inside - PERSON_R - 0.05 : SIDE - inside;
-            const [x, z] =
-                "inCorner" in place
-                    ? [
-                          place.inCorner.includes("E") ? east : inside,
-                          place.inCorner.includes("N") ? SIDE - inside : inside,
-                      ]
-                    : [place.east, place.north];
-            const centre = vec3(x, LEVELS[place.level] + 0.01, z);
+            const centre = personCentre(item);
             pieces.push({
                 kind: "face",
                 points: Array.from({ length: 24 }, (_, i) => {
@@ -1546,6 +1627,14 @@ export function legend(rig: Rig): {
                 light: true,
             },
         );
+    const safety = rig.items.filter((i): i is SafetyLine => i.kind === "safety");
+    if (safety.length)
+        cylinders.push({
+            text: DC.text,
+            name: "Daisy chain",
+            colors: [rigColor(safety[0].dc)],
+            light: DARK_COLORS.includes(safety[0].dc),
+        });
     // A line for each length of sling and of rope, with every colour that length comes in.
     const byLength = (
         items: { length: number; color: RigColor }[],
@@ -1594,8 +1683,20 @@ export function rigSide(rig: Rig, side: "east" | "west"): Set<string> {
     );
     // People are on every side's view.
     const people = rig.items.filter((i) => i.kind === "person").map((i) => i.id);
+    // A safety line goes with the side its person's on.
+    const safety = rig.items.filter(
+        (i): i is SafetyLine =>
+            i.kind === "safety" &&
+            rig.items.some(
+                (p) =>
+                    p.kind === "person" &&
+                    p.id === i.person &&
+                    (personCentre(p).x > SIDE / 2 ? "east" : "west") === side,
+            ),
+    );
     return new Set([
         ...people,
+        ...safety.flatMap((l) => [l.id, l.from]),
         ...lines.flatMap((l) => [l.id, l.from, ...(l.spare ? [l.spare] : [])]),
     ]);
 }
