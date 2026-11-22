@@ -12,7 +12,9 @@ import {
     rigPulley,
     rigTrolley,
     SHEAR_LEG,
+    STATIC_X,
     STOP_BLOCK_COLORS,
+    tiedTo,
     TROLLEY_COLORS,
     TROLLEY_X,
 } from "@/flying-fox/fox";
@@ -160,9 +162,21 @@ export const PARTS: Part[] = [
                     HAWSER_R,
                     C.hawser,
                 ),
-                ...line([t.hang, t.hang.add(vec3(0, -0.25, 0))], 0.0055, C.dropper),
-                ...line([t.backUp, t.backUp.add(vec3(-0.03, -0.22, 0))], 0.0055, C.dropper),
-                ...line([t.backUp, t.backUp.add(vec3(-0.2, 0.03, 0))], 0.004, C.returnLine),
+                ...tiedTo(t.hang, [t.hang.add(vec3(0, -0.25, 0))], 0.0055, C.dropper),
+                ...tiedTo(
+                    t.backUp,
+                    [t.backUp.add(vec3(-0.03, -0.22, 0))],
+                    0.0055,
+                    C.dropper,
+                    -0.007,
+                ),
+                ...tiedTo(
+                    t.backUp,
+                    [t.backUp.add(vec3(-0.2, 0.03, 0))],
+                    0.004,
+                    C.returnLine,
+                    0.007,
+                ),
             ];
         },
     },
@@ -248,6 +262,27 @@ export const PARTS: Part[] = [
                     hi: vec3(at.x + 0.3, at.y + 0.3, 1),
                 }),
                 ...hawsers,
+            ];
+        },
+    },
+    {
+        slug: "fox-static-brake",
+        name: "Static brake, rigged",
+        group: "Flying fox",
+        about: "A static brake as the flying fox rigs it, cut out of the whole: a carabiner clipped round the hawser, hanging towards the pull of its rope, which is tied round the carabiner's bottom bar and runs out to a picket.",
+        pieces: () => {
+            const at = onHawser(STATIC_X, 1);
+            const hawser = line(
+                Array.from({ length: 5 }, (_, i) => onHawser(STATIC_X - 0.5 + 0.25 * i, 1)),
+                HAWSER_R,
+                C.hawser,
+            );
+            return [
+                ...within(foxPieces(), {
+                    lo: at.add(vec3(-0.3, -0.5, -0.3)),
+                    hi: at.add(vec3(0.3, 0.1, 0.3)),
+                }),
+                ...hawser,
             ];
         },
     },

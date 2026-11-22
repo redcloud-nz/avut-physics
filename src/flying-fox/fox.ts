@@ -6,6 +6,8 @@ import { vec3, type Vector3 } from "@/lib/vector3";
 
 import {
     carabiner,
+    CARABINER_R,
+    CARABINER_WIDTH,
     EYE_BOLT,
     eyeBolt,
     eyeFrame,
@@ -13,6 +15,7 @@ import {
     pulley,
     STOP_BLOCK,
     stopBlock,
+    tiedRound,
     wrap,
     zipTrolley,
 } from "./hardware";
@@ -1141,6 +1144,23 @@ function hawsers(): Piece[] {
 }
 
 /**
+ * A rope from a carabiner hanging down with its gate towards `ACROSS`, tied for now round its bottom bar (whose middle
+ * is `at`) and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend towards the spine.
+ */
+export function tiedTo(at: Vector3, rest: Vector3[], r: number, color: string, spine = 0): Piece[] {
+    const end = CARABINER_WIDTH / 2;
+    const down = vec3(0, -1, 0);
+    // Round the bottom bend's middle line, from the bottom towards the spine (away from the gate).
+    const bend = at.sub(down.scale(end));
+    const bar = bend
+        .sub(ACROSS.scale(end * Math.sin(spine)))
+        .add(down.scale(end * Math.cos(spine)));
+    const axis = ACROSS.scale(Math.cos(spine)).add(down.scale(Math.sin(spine)));
+    const t = tiedRound(bar, axis, CARABINER_R, rest[0], r);
+    return [...line(t.turn, r, color), ...line([t.from, ...rest], r, color)];
+}
+
+/**
  * A trolley on the wire at `at`, its bumper towards `ahead` (downhill, where it meets the brake blocks), with its two
  * carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the back-up line
  * and the return line together on the one behind it, uphill. Returns where each carabiner's bottom is.
@@ -1167,7 +1187,8 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         .sub(onHawser(x - 0.1, s))
         .unit();
     const { pieces, hang, backUp } = rigTrolley(at, ahead);
-    const back = backUp.add(vec3(0, 0.01, 0));
+    // The return line's tied on beside the back-up line, round the bend on the carabiner's spine side.
+    const back = backUp;
     // The dropper: the rider's rope down through the descender, a GRIGRI+ clipped to the harness's tie-in (the
     // rider's drop below the hawser) and reaching up to about `DESCENDER` below it, the rope's brake strand hanging on
     // below; and the back-up line, down to the harness too.
@@ -1185,13 +1206,18 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
     // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in.
     const holeBottom = tieIn.add(vec3(0, clipLength - g.holeR + 0.005, 0));
     pieces.push(...carabiner(holeBottom, down, ACROSS, C.steel, clipLength - g.holeR + 0.005));
-    pieces.push(...line([hang, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
+    pieces.push(...tiedTo(hang, [...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
-    pieces.push(...line(hanging(backUp, safetyClip, -0.05, 8), 0.0055, C.dropper));
+    const safety = hanging(backUp, safetyClip, -0.05, 8);
+    pieces.push(...tiedTo(backUp, safety.slice(1, -1), 0.0055, C.dropper));
+    pieces.push(...tiedTo(safetyClip, safety.slice(1, -1).reverse(), 0.0055, C.dropper));
     pieces.push(...carabiner(safetyClip, down, ACROSS, C.steel, clipLength));
     return { pieces, back };
 }
+
+/** How far round its carabiner's bottom bend towards the spine the return line's tied (radians). */
+const RETURN_SPINE = 1.1;
 
 /** Where the trolleys sit: A at the launch, just out from the platform, and B at the bottom against its brake block. */
 export const TROLLEY_X = { a: 1.4, b: BLOCKS_X - 0.15 };
@@ -1216,9 +1242,15 @@ function trolleysAndReturn(): Piece[] {
         ...b.pieces,
         ...pa.pieces,
         ...pb.pieces,
-        ...line([a.back, ...pa.round, ...pb.round], 0.004, C.returnLine),
+        ...tiedTo(a.back, [...pa.round, ...pb.round], 0.004, C.returnLine, RETURN_SPINE),
         // Out to trolley B, sagging under its own weight below hawser B.
-        ...line(hanging(pb.b, b.back, slack(pb.b, b.back), 60), 0.004, C.returnLine),
+        ...tiedTo(
+            b.back,
+            hanging(pb.b, b.back, slack(pb.b, b.back), 60).reverse().slice(1),
+            0.004,
+            C.returnLine,
+            RETURN_SPINE,
+        ),
     ];
 }
 
@@ -1246,19 +1278,20 @@ function dynamicBrake(): Piece[] {
     const apex = eyes[0]
         .lerp(eyes[1], 0.5)
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
-    // Tied straight to each eye: a turn round the eye's bar on the side towards the middle knot, the rope on from it.
+    // Tied straight to each eye, round its bar on the side towards the middle knot.
     const ropeR = 0.004;
     for (const e of eyes) {
         const level = apex.sub(e);
         const w = vec3(level.x, 0, level.z).unit();
-        const bar = e.add(w.scale(STOP_BLOCK_EYE.r));
-        const around = STOP_BLOCK_EYE.bar + ropeR;
-        const turn = Array.from({ length: 13 }, (_, i) => {
-            const t = (2 * Math.PI * i) / 12;
-            return bar.add(w.scale(around * Math.cos(t))).add(UP.scale(around * Math.sin(t)));
-        });
-        pieces.push(...line(turn, ropeR, C.joining));
-        pieces.push(...line(hanging(bar.add(w.scale(around)), apex, 0.03, 8), ropeR, C.joining));
+        const t = tiedRound(
+            e.add(w.scale(STOP_BLOCK_EYE.r)),
+            UP.cross(w),
+            STOP_BLOCK_EYE.bar,
+            apex,
+            ropeR,
+        );
+        pieces.push(...line(t.turn, ropeR, C.joining));
+        pieces.push(...line(hanging(t.from, apex, 0.03, 8), ropeR, C.joining));
     }
     pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
@@ -1319,16 +1352,29 @@ function chainWeight(): Piece[] {
     return pieces;
 }
 
-/** The static brakes: a shackle on each hawser, with a rope out to a picket 2.5 m to its side (Figure 55). */
+/**
+ * The static brakes: a carabiner clipped round each hawser, hanging towards the pull of a rope tied to it and out to a
+ * picket 2.5 m to its side (Figure 55).
+ */
 function staticBrakes(): Piece[] {
     const pieces: Piece[] = [];
+    const length = 0.11;
     for (const s of [-1, 1]) {
         const at = onHawser(STATIC_X, s);
-        const shackle = at.add(vec3(0, -0.05, 0));
-        pieces.push(...bar(at.add(vec3(0, 0.02, 0)), shackle, 0.012, C.steel));
         const base = vec3(STATIC_X, 0, s * (HAWSER_Z + 2.5));
-        const pk = picket(base, towards(shackle, base));
-        pieces.push(...pk.pieces, ...line([shackle, pk.tie], 0.0055, C.staticBrake));
+        const pk = picket(base, towards(at, base));
+        // Square to the hawser, swung to the rope's pull, the wire in its top bend.
+        const pull = pk.tie.sub(at);
+        const down = vec3(0, pull.y, pull.z).unit();
+        const across = down.cross(vec3(1, 0, 0)).unit();
+        const top = at.sub(down.scale(HAWSER_R + CARABINER_R));
+        pieces.push(...carabiner(top, down, across, C.steel, length));
+        const t = tiedRound(top.add(down.scale(length)), across, CARABINER_R, pk.tie, 0.0055);
+        pieces.push(
+            ...pk.pieces,
+            ...line(t.turn, 0.0055, C.staticBrake),
+            ...line([t.from, pk.tie], 0.0055, C.staticBrake),
+        );
     }
     return pieces;
 }

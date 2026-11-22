@@ -287,6 +287,34 @@ export function eyeBolt(
     };
 }
 
+/**
+ * A rope tied straight round a bar, standing in for its knot until the knots are drawn: a turn round the bar at `at`
+ * (on its middle line), which runs along `axis` and is `barR` thick, on the side the rope leaves towards `toward`.
+ * Returns the turn's points and where the rope goes on from.
+ */
+export function tiedRound(
+    at: Vector3,
+    axis: Vector3,
+    barR: number,
+    toward: Vector3,
+    ropeR: number,
+): { turn: Vector3[]; from: Vector3 } {
+    const a = axis.unit();
+    const off = toward.sub(at);
+    const w = off.sub(a.scale(off.dot(a))).unit();
+    const n = a.cross(w);
+    const around = barR + ropeR;
+    const turn = Array.from({ length: 13 }, (_, i) => {
+        const t = (2 * Math.PI * i) / 12;
+        return at.add(w.scale(around * Math.cos(t))).add(n.scale(around * Math.sin(t)));
+    });
+    return { turn, from: at.add(w.scale(around)) };
+}
+
+/** A carabiner's wire thickness (radius) and width, as `carabiner` draws it by default. */
+export const CARABINER_R = 0.005;
+export const CARABINER_WIDTH = 0.06;
+
 /** The way a rope leaves a sheave: its direction away, and where it touches the sheave. */
 export type Lead = { dir: Vector3; at: Vector3 };
 
