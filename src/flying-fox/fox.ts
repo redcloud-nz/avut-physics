@@ -1278,24 +1278,43 @@ function dynamicBrake(): Piece[] {
     const apex = eyes[0]
         .lerp(eyes[1], 0.5)
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
-    // Tied straight to each eye, round its bar on the side towards the middle knot.
+    // The middle: one carabiner lying along the span (Figure 55), the brake line clipped into its uphill end, and the
+    // joining rope's middle and the stabiliser side by side in its downhill end. The real knots, for when they're
+    // drawn: the brake line and the stabiliser each end in a figure 8 on a bight, and the joining rope's middle is an
+    // alpine butterfly. Until then, each rope takes a turn round the carabiner's bar.
     const ropeR = 0.004;
+    const clip = 0.11;
+    const ahead = vec3(1, 0, 0);
+    const downhill = apex.sub(ahead.scale(CARABINER_R + ropeR));
+    const uphill = downhill.sub(ahead.scale(clip));
+    pieces.push(...carabiner(uphill, ahead, ACROSS, C.steel, clip));
+    const knot = tiedRound(
+        downhill.add(ACROSS.scale(0.008)),
+        ACROSS,
+        CARABINER_R,
+        apex.add(ahead),
+        ropeR,
+    );
+    pieces.push(...line(knot.turn, ropeR, C.joining));
+    // The joining rope's legs, out from the knot to each block's eye, tied straight round the eye's bar: really a
+    // rethreaded figure 8 (drawn as a figure 8 on a bight).
     for (const e of eyes) {
-        const level = apex.sub(e);
+        const level = knot.from.sub(e);
         const w = vec3(level.x, 0, level.z).unit();
         const t = tiedRound(
             e.add(w.scale(STOP_BLOCK_EYE.r)),
             UP.cross(w),
             STOP_BLOCK_EYE.bar,
-            apex,
+            knot.from,
             ropeR,
         );
         pieces.push(...line(t.turn, ropeR, C.joining));
-        pieces.push(...line(hanging(t.from, apex, 0.03, 8), ropeR, C.joining));
+        pieces.push(...line(hanging(t.from, knot.from, 0.03, 8), ropeR, C.joining));
     }
-    pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
-    const from = apex.add(vec3(-0.04, 0, 0));
+    const brakeEye = tiedRound(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
+    pieces.push(...line(brakeEye.turn, 0.004, C.brakeLine));
+    const from = brakeEye.from;
     // Sagging much as the hawsers do.
     const reach = hanging(from, BRAKE.pulley, sagLike(from, BRAKE.pulley), 50);
     // Clipped into the eye bolt under the arm, its eye turned to face the pull.
@@ -1311,7 +1330,10 @@ function dynamicBrake(): Piece[] {
     const centre = STABILISER_PULLEY.add(vec3(0, g, 0));
     const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
     const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
-    const cord = apex.add(vec3(0.04, 0, 0));
+    // From its eye in the carabiner's downhill end, beside the joining rope's knot.
+    const eye = tiedRound(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
+    pieces.push(...line(eye.turn, 0.005, C.shockCord));
+    const cord = eye.from;
     const stabiliser = rigPulley(centre, cord, tie, 0.005, {
         basket: {
             spar: vec3(SPAR_X, g + SHEAR_LEG.spar, 0),

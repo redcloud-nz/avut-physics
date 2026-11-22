@@ -248,20 +248,11 @@ export const PARTS: Part[] = [
         about: "The dynamic brake's stop blocks as the flying fox rigs them, cut out of the whole: one on each hawser, the joining rope tied between their inner eyes and drawn up the span by the brake line, trolley B against its block.",
         pieces: () => {
             const at = onHawser(BLOCKS_X, 1);
-            // The hawsers run the whole span, so the box leaves them out: a stretch of each, put back.
-            const hawsers = [-1, 1].flatMap((side) =>
-                line(
-                    Array.from({ length: 9 }, (_, i) => onHawser(BLOCKS_X - 1.6 + 0.25 * i, side)),
-                    HAWSER_R,
-                    C.hawser,
-                ),
-            );
             return [
                 ...within(foxPieces(), {
                     lo: vec3(at.x - 1.6, at.y - 0.6, -1),
                     hi: vec3(at.x + 0.3, at.y + 0.3, 1),
                 }),
-                ...hawsers,
             ];
         },
     },
@@ -272,17 +263,11 @@ export const PARTS: Part[] = [
         about: "A static brake as the flying fox rigs it, cut out of the whole: a carabiner clipped round the hawser, hanging towards the pull of its rope, which is tied round the carabiner's bottom bar and runs out to a picket.",
         pieces: () => {
             const at = onHawser(STATIC_X, 1);
-            const hawser = line(
-                Array.from({ length: 5 }, (_, i) => onHawser(STATIC_X - 0.5 + 0.25 * i, 1)),
-                HAWSER_R,
-                C.hawser,
-            );
             return [
                 ...within(foxPieces(), {
                     lo: at.add(vec3(-0.3, -0.5, -0.3)),
                     hi: at.add(vec3(0.3, 0.1, 0.3)),
                 }),
-                ...hawser,
             ];
         },
     },
@@ -312,15 +297,52 @@ export const PARTS: Part[] = [
     },
 ];
 
-/** The pieces whose middles are inside the box from `lo` to `hi`, to look at one place in a whole rig. */
+/**
+ * The pieces inside the box from `lo` to `hi`, to look at one place in a whole rig: rods and faces whose middles are
+ * in it, and the stretches of ropes and wires that run through it.
+ */
 function within(pieces: Piece[], { lo, hi }: { lo: Vector3; hi: Vector3 }): Piece[] {
-    return pieces.filter((p) => {
+    const inside = (c: Vector3) =>
+        c.x >= lo.x && c.x <= hi.x && c.y >= lo.y && c.y <= hi.y && c.z >= lo.z && c.z <= hi.z;
+    return pieces.flatMap((p): Piece[] => {
+        if (p.kind === "strand") {
+            // Each stretch inside, as a strand of its own: every segment cut where it crosses the box's walls.
+            const runs: Vector3[][] = [];
+            let open = false;
+            for (let i = 1; i < p.points.length; i++) {
+                const cut = clip(p.points[i - 1], p.points[i], lo, hi);
+                if (!cut) {
+                    open = false;
+                    continue;
+                }
+                if (!open) runs.push([cut[0]]);
+                runs[runs.length - 1].push(cut[1]);
+                open = cut[1] === p.points[i];
+            }
+            return runs.map((points) => ({ ...p, points }));
+        }
         const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
-        const c = pts.reduce((sum, q) => sum.add(q), vec3(0, 0, 0)).scale(1 / pts.length);
-        return (
-            c.x >= lo.x && c.x <= hi.x && c.y >= lo.y && c.y <= hi.y && c.z >= lo.z && c.z <= hi.z
-        );
+        return inside(pts.reduce((sum, q) => sum.add(q), vec3(0, 0, 0)).scale(1 / pts.length))
+            ? [p]
+            : [];
     });
+}
+
+/** The part of the segment from `a` to `b` inside the box (Liang–Barsky), its ends kept as they are when inside. */
+function clip(a: Vector3, b: Vector3, lo: Vector3, hi: Vector3): [Vector3, Vector3] | null {
+    const d = b.sub(a);
+    let [t0, t1] = [0, 1];
+    for (const k of ["x", "y", "z"] as const) {
+        if (Math.abs(d[k]) < 1e-12) {
+            if (a[k] < lo[k] || a[k] > hi[k]) return null;
+            continue;
+        }
+        const [ta, tb] = [(lo[k] - a[k]) / d[k], (hi[k] - a[k]) / d[k]];
+        t0 = Math.max(t0, Math.min(ta, tb));
+        t1 = Math.min(t1, Math.max(ta, tb));
+        if (t0 > t1) return null;
+    }
+    return [t0 === 0 ? a : a.add(d.scale(t0)), t1 === 1 ? b : a.add(d.scale(t1))];
 }
 
 export const GROUPS = [...new Set(PARTS.map((p) => p.group))];
