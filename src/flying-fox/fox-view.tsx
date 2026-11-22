@@ -68,6 +68,8 @@ const GROUND_BAND = (() => {
 
 /** The narrowest ropes and wire are drawn in the flat views (SVG units), however far out: just enough to pick out. */
 const MIN_WIDTH = { rope: 2, steel: 1.5, sling: 3 };
+/** How big fine detail must be drawn (SVG units) to be drawn at all. */
+const FINE_PX = 1.5;
 
 /** The middle of the site, which the views start centred on. */
 const MIDDLE = (() => {
@@ -88,8 +90,8 @@ const SCENE: SceneConfig = {
         ["Bottom end", vec3(LOG.x + 4, groundY(LOG.x + 4), 0)],
     ],
     letter: 1.4,
-    // Ropes and wire drawn a little thicker than they are, and never thinner than 2.5 pixels.
-    minR: { steel: 0.012, rope: 0.012, sling: 0.015 },
+    // Ropes and wire drawn their true size, in proportion with the hardware, and never thinner than 2.5 pixels.
+    minR: {},
     hairlines: 2.5,
     pivotToPointer: true,
     label: "The flying fox in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
@@ -252,7 +254,9 @@ export default function FoxView() {
     }, [flat.azimuth, flat.elevation, fit, size, mode]);
 
     // Back to front by each piece's middle; a section's sides facing away are left out.
+    // Fine detail (a plate's edge, a bolt's head) is left out where it would be too small to see.
     const sorted = pieces
+        .filter((p) => p.fine === undefined || p.fine * ppm >= FINE_PX)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
         .map((piece) => ({ piece, key: cam.depth(centreOf(piece)) }))
         .sort((a, b) => a.key - b.key);

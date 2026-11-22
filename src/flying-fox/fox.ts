@@ -4,6 +4,7 @@ import { G } from "@/lib/constants";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import { carabiner, pulley, RING, ring as steelRing, wrap, zipTrolley } from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
 
 /**
@@ -179,7 +180,7 @@ export const UNLOADED = hang({ ...RIG, length: HAWSER_LENGTH });
 export const loaded = (x: number, mass: number, points = 200): Shape =>
     hang({ ...RIG, length: HAWSER_LENGTH }, { x, weight: mass * G }, points);
 /** The stabiliser's pulley under the middle of the top spar, on level ground (the frame's shifted onto the ground). */
-const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.08, 0);
+const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.25, 0);
 
 /** The tree the hawsers are slung round, at least 2.15 times the tower's height behind it (Figure 26). */
 export const TREE = { x: -23, r: 0.36, height: 9 };
@@ -256,6 +257,20 @@ const C = {
     tree: "var(--tower-log)",
     spar: "var(--fox-spar)",
     grate: "var(--fox-grate)",
+    pulley: "var(--fox-pulley)",
+    sheave: "var(--fox-sheave)",
+};
+/** The trolleys' and pulleys' colours. */
+const TROLLEY_COLORS = {
+    plates: "var(--knot-red)",
+    sheave: "var(--fox-sheave)",
+    steel: "var(--tower-steel)",
+    bumper: "var(--rig-black)",
+};
+const PULLEY_COLORS = {
+    plates: "var(--fox-pulley)",
+    sheave: "var(--fox-sheave)",
+    steel: "var(--tower-steel)",
 };
 
 const UP = vec3(0, 1, 0);
@@ -355,8 +370,49 @@ function guy(from: Vector3, at: Vector3, r: number, color: string): Piece[] {
 }
 
 /** A pulley's sheave at `at`, its axle along `axle`. */
-const sheave = (at: Vector3, axle: Vector3, r = 0.04) =>
-    bar(at.sub(axle.unit().scale(0.012)), at.add(axle.unit().scale(0.012)), r, C.steel);
+/** The bar of a pulley's carabiner (its radius). */
+const CARABINER_BAR = 0.0045;
+
+/**
+ * A rescue pulley, its rope running off towards points `a` and `b`, and the rope round it from `a`'s side to `b`'s.
+ * Hung from a steel ring at `mount` (on a post or arm, `from` being the point on it the ring's welded to), it's moved
+ * from `near` until its carabiner hangs in the ring; hung from a sling, it stays at `near` with the sling up to `mount`.
+ */
+function rigPulley(
+    near: Vector3,
+    a: Vector3,
+    b: Vector3,
+    ropeR: number,
+    mount: Vector3,
+    hung: { ring: Vector3 } | "sling",
+) {
+    const build = (centre: Vector3) =>
+        pulley({ centre, toA: a.sub(centre), toB: b.sub(centre), ropeR, colors: PULLEY_COLORS });
+    let centre = near;
+    let p = build(centre);
+    const extra: Piece[] = [];
+    if (hung === "sling") extra.push(...line([p.hook, mount], 0.008, C.sling, "sling"));
+    else {
+        // Its carabiner's top in the bottom of the ring, the way the pulley pulls.
+        for (let i = 0; i < 4; i++) {
+            // Through the ring like links of a chain: the carabiner's top bar rests on the ring's bottom bar.
+            const hook = mount.sub(p.up.scale(RING.r - RING.bar - CARABINER_BAR));
+            centre = hook.sub(p.hook.sub(centre));
+            p = build(centre);
+        }
+        extra.push(...steelRing(mount, p.up, p.up.cross(p.axle), C.steel));
+        extra.push(
+            ...bar(hung.ring, mount.add(hung.ring.sub(mount).unit().scale(RING.r)), 0.006, C.steel),
+        );
+    }
+    return {
+        pieces: [...p.pieces, ...extra],
+        a: p.a,
+        b: p.b,
+        round: wrap(centre, p.a, p.b),
+        centre,
+    };
+}
 
 /** The lashings' rope: 12 mm natural fibre. */
 const LASHING_R = 0.007;
@@ -456,20 +512,18 @@ function tower(): Piece[] {
                 T.rhs.h,
             ),
         );
-    // The diagonal braces, in the uprights' plane, from either side of the top bar's middle down to the uprights.
-    for (const s of [-1, 1])
-        pieces.push(
-            ...section(
-                vec3(0, T.bar - 0.05, s * 0.15),
-                vec3(0, T.braceFoot, s * (T.half - T.shs / 2 - 0.03)),
-                vec3(1, 0, 0),
-                T.rhs.w,
-                T.rhs.h,
-            ),
-        );
-    // The brake support: up the middle in front of the bars, past the top bar, with an arm out at its top carrying the
-    // brake line's pulley, back and to one side, clear of the platform and the top bar.
-    const postX = BAR_X + T.rhs.w;
+    // The diagonal braces, in the uprights' plane, from the uprights up to either side of the top bar's middle, their
+    // tops standing a little above it.
+    for (const s of [-1, 1]) {
+        const foot = vec3(0, T.braceFoot, s * (T.half - T.shs / 2 - 0.03));
+        const head = vec3(0, T.bar - 0.05, s * 0.15);
+        const rise = T.bar + T.rhs.h / 2 + 0.06 - foot.y;
+        const top = foot.lerp(head, rise / (head.y - foot.y));
+        pieces.push(...section(top, foot, vec3(1, 0, 0), T.rhs.w, T.rhs.h));
+    }
+    // The brake support: up the middle behind the bars (away from the platform), past the top bar, with an arm out at
+    // its top carrying the brake line's pulley, back and to one side.
+    const postX = T.shs / 2 - T.rhs.w / 2;
     const postTop = vec3(postX, BRAKE.postTop, 0);
     pieces.push(
         ...section(vec3(postX, T.lower - 0.135, 0), postTop, vec3(1, 0, 0), T.rhs.w, T.rhs.h),
@@ -485,8 +539,6 @@ function tower(): Piece[] {
             0.04,
         ),
     );
-    pieces.push(...bar(armEnd, BRAKE.pulley, 0.008, C.steel));
-    pieces.push(...sheave(BRAKE.pulley, BRAKE.axle, 0.05));
     // The platform: an aluminium frame on the bottom bar, its floor a grate, its front corners chained up to the top
     // bar's ends.
     const floor = T.lower + T.rhs.h / 2 + 0.05;
@@ -556,19 +608,6 @@ function tower(): Piece[] {
                 ),
             );
         }
-    // The return line's pulleys, hung under the top bar between the cradles and the uprights.
-    for (const s of [-1, 1]) {
-        const at = RETURN_PULLEY(s);
-        pieces.push(
-            ...bar(
-                vec3(BAR_X, T.bar - T.rhs.h / 2, at.z),
-                at.add(vec3(0, 0.04, 0)),
-                0.006,
-                C.steel,
-            ),
-        );
-        pieces.push(...sheave(at, UP, 0.045));
-    }
     // Guys: one from each upright's top out to the front and one to the back, at 45° and 1.6 times the tower's height
     // out each way (Figure 40), and the backstay from the top bar's middle back to the tree.
     const out = 1.6 * T.top;
@@ -584,20 +623,19 @@ function tower(): Piece[] {
 }
 
 /** The return line's pulley on side `s` (+1 for hawser A's side), under the top bar. */
-const RETURN_PULLEY = (s: number) => vec3(BAR_X + 0.06, TOWER.bar - 0.18, s * 1.1);
+const RETURN_PULLEY = (s: number) => vec3(0.1, TOWER.bar - 0.3, s * 1.3);
 
 /** The chain brake: the brake support's top and arm, its pulley, and the chain weight hanging below it. */
 export const BRAKE = (() => {
     const postTop = TOWER.bar + 0.615;
-    const postX = BAR_X + TOWER.rhs.w;
+    const postX = TOWER.shs / 2 - TOWER.rhs.w / 2;
     const out = vec3(-1, 0, 1).unit().scale(0.6);
     const armEnd = vec3(postX, postTop - 0.02, 0).add(out);
-    const pulley = armEnd.add(vec3(0, -0.12, 0));
+    const pulley = armEnd.add(vec3(0, -0.24, 0));
     return {
         postTop,
         armEnd,
         pulley,
-        axle: vec3(out.z, 0, -out.x),
         /** Where the brake line ends and the chain starts, the first of it just off the ground. */
         chainTop: onGround(pulley.x - 0.05, 1.1, pulley.z),
     };
@@ -719,9 +757,6 @@ function shearLeg(): Piece[] {
     pieces.push(
         ...squareLashing(vec3(sparX, L.lower, cross.z), L.r, cross, L.braceR, ACROSS, braceDir, 3),
     );
-    // The stabiliser's pulley, hung under the middle of the top spar.
-    pieces.push(...bar(vec3(sparX, L.spar - L.r, 0), STABILISER_PULLEY, 0.008, C.steel));
-    pieces.push(...sheave(STABILISER_PULLEY, ACROSS, 0.045));
     // Square lashings where the spars cross the uprights (prusik-started at the top spar).
     for (const s of [-1, 1]) {
         for (const y of [L.spar, L.lower])
@@ -958,26 +993,21 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
     const ahead = onHawser(x + 0.1, s)
         .sub(onHawser(x - 0.1, s))
         .unit();
-    // Square to the wire and down, in the plane of the span.
-    const down = ahead.cross(ACROSS).unit();
-    const plate = (k: number) => at.add(down.scale(0.06 * k));
-    const pieces: Piece[] = [];
-    // Two sheaves riding on the wire, and the side plates hanging below them.
-    for (const d of [-0.07, 0.07])
-        pieces.push(...sheave(at.add(ahead.scale(d)).add(vec3(0, 0.02, 0)), ACROSS, 0.03));
-    for (const dz of [-0.022, 0.022])
-        pieces.push(
-            ...section(
-                plate(1).add(ahead.scale(-0.12)).add(ACROSS.scale(dz)),
-                plate(1).add(ahead.scale(0.12)).add(ACROSS.scale(dz)),
-                UP,
-                0.006,
-                0.14,
-                C.trolley,
-            ),
-        );
+    // Its bumper downhill, where it meets the brake blocks.
+    const t = zipTrolley(at, ahead, ACROSS, HAWSER_R, TROLLEY_COLORS);
+    const pieces: Piece[] = [...t.pieces];
+    // Two carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the
+    // back-up line and the return line together on the one behind it, uphill.
+    const down = vec3(0, -1, 0);
+    const clip = (top: Vector3, length: number) => {
+        const bar = top.add(vec3(0, -0.005, 0));
+        pieces.push(...carabiner(bar, down, ACROSS, C.steel, length));
+        return bar.add(down.scale(length));
+    };
+    const hang = clip(t.main, 0.11);
+    const backUp = clip(t.towSide, 0.1);
+    const back = backUp.add(vec3(0, 0.01, 0));
     // The dropper: the rider's rope down to the descender, its running end hanging on below, and the back-up line.
-    const hang = plate(2.2);
     // The descender sits just above the harness's tie-in, the rider's drop below the hawser.
     const rig = at.add(vec3(0, -DESCENDER, 0));
     pieces.push(...line([hang, rig], 0.0055, C.dropper));
@@ -999,13 +1029,9 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         ),
     );
     pieces.push(
-        ...line(
-            hanging(hang.add(vec3(0.04, 0, 0)), rig.add(vec3(0.06, -0.2, 0)), -0.05, 8),
-            0.0055,
-            C.dropper,
-        ),
+        ...line(hanging(backUp, rig.add(vec3(0.06, -0.2, 0)), -0.05, 8), 0.0055, C.dropper),
     );
-    return { pieces, back: at.add(ahead.scale(-0.13)).add(down.scale(0.04)) };
+    return { pieces, back };
 }
 
 /** Where the trolleys sit: A at the launch, just out from the platform, and B at the bottom against its brake block. */
@@ -1015,15 +1041,22 @@ export const TROLLEY_X = { a: 1.4, b: BLOCKS_X - 0.15 };
 function trolleysAndReturn(): Piece[] {
     const a = trolley(TROLLEY_X.a, 1);
     const b = trolley(TROLLEY_X.b, -1);
-    const [pa, pb] = [RETURN_PULLEY(1), RETURN_PULLEY(-1)];
-    const over = (p: Vector3) => p.add(vec3(0, 0.045, 0));
+    const [ca, cb] = [RETURN_PULLEY(1), RETURN_PULLEY(-1)];
+    // Each pulley clipped into a steel ring on the platform side of the upright on its side, just below the top bar.
+    const y = TOWER.bar - TOWER.rhs.h / 2 - 0.08;
+    const face = (s: number) => vec3(TOWER.shs / 2, y, s * TOWER.half);
+    const ringAt = (s: number) => face(s).add(vec3(RING.r + 0.006, 0, 0));
+    const out = hanging(cb, b.back, 2.2, 60);
+    const pa = rigPulley(ca, a.back, cb, 0.004, ringAt(1), { ring: face(1) });
+    const pb = rigPulley(cb, pa.centre, out[1], 0.004, ringAt(-1), { ring: face(-1) });
     return [
         ...a.pieces,
         ...b.pieces,
-        ...line([a.back, over(pa)], 0.004, C.returnLine),
-        ...line([over(pa), over(pb)], 0.004, C.returnLine),
+        ...pa.pieces,
+        ...pb.pieces,
+        ...line([a.back, ...pa.round, ...pb.round], 0.004, C.returnLine),
         // Out to trolley B, sagging under its own weight below hawser B.
-        ...line(hanging(over(pb), b.back, 2.2, 60), 0.004, C.returnLine),
+        ...line(hanging(pb.b, b.back, 2.2, 60), 0.004, C.returnLine),
     ];
 }
 
@@ -1058,24 +1091,39 @@ function dynamicBrake(): Piece[] {
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
     for (const e of eyes) pieces.push(...line(hanging(e, apex, 0.03, 8), 0.004, C.joining));
     pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
-    // The brake line, back up the span to the pulley and straight down to the chain.
-    const p = BRAKE.pulley;
-    const toward = towards(p, apex);
-    const top = p.add(vec3(0, 0.05, 0)).add(toward.scale(0.01));
-    const off = p.add(toward.scale(-0.05));
-    pieces.push(...line(hanging(apex.add(vec3(-0.04, 0, 0)), top, 0.4, 50), 0.004, C.brakeLine));
-    pieces.push(...line([top, off, BRAKE.chainTop], 0.004, C.brakeLine));
+    // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
+    const from = apex.add(vec3(-0.04, 0, 0));
+    const reach = hanging(from, BRAKE.pulley, 0.4, 50);
+    // Clipped into a steel ring under the arm's end.
+    const under = BRAKE.armEnd.add(vec3(0, -0.025, 0));
+    const brake = rigPulley(
+        BRAKE.pulley,
+        reach[reach.length - 3],
+        BRAKE.chainTop,
+        0.004,
+        under.add(vec3(0, -(RING.r + 0.006), 0)),
+        { ring: under },
+    );
+    pieces.push(...brake.pieces);
+    pieces.push(...line(hanging(from, brake.a, 0.4, 50), 0.004, C.brakeLine));
+    pieces.push(...line([...brake.round, BRAKE.chainTop], 0.004, C.brakeLine));
     // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
     // and down from it, tied off to the bottom spar with natural fibre rope.
     const g = groundY(SHEAR_LEG.x);
-    const pulley = STABILISER_PULLEY.add(vec3(0, g, 0));
-    const r = 0.045;
-    const into = pulley.add(vec3(-r, 0.01, 0));
-    const down = pulley.add(vec3(r * 0.2, -r, 0));
+    const centre = STABILISER_PULLEY.add(vec3(0, g, 0));
     const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
     const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
-    pieces.push(...line([apex.add(vec3(0.04, 0, 0)), into], 0.005, C.shockCord));
-    pieces.push(...line([into, pulley.add(vec3(0, r, 0)), down, tie], 0.005, C.shockCord));
+    const cord = apex.add(vec3(0.04, 0, 0));
+    const stabiliser = rigPulley(
+        centre,
+        cord,
+        tie,
+        0.005,
+        vec3(SPAR_X, g + SHEAR_LEG.spar - SHEAR_LEG.r, 0),
+        "sling",
+    );
+    pieces.push(...stabiliser.pieces);
+    pieces.push(...line([cord, ...stabiliser.round, tie], 0.005, C.shockCord));
     pieces.push(...line([tie, spar], 0.006, C.fibre, "rail"));
     return pieces;
 }

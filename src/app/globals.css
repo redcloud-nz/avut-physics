@@ -336,6 +336,8 @@ html {
   --fox-nylon: #f1e7c8;
   --fox-spar: #c9a36b;
   --fox-grate: #8e9aab;
+  --fox-pulley: #4a78b8;
+  --fox-sheave: #d3d9e1;
   /* The flying fox's ground: grass, and the dry, bare ground it shades into in patches. */
   --fox-ground: #2f5238;
   --fox-ground-dry: #6b6447;

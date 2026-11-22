@@ -135,12 +135,23 @@ type Colors = ReturnType<typeof colorReader>;
 const SIDES = 10;
 
 /** A cylinder from `a` to `b` (three.js points), with a ball on each real end. */
-function rodGeometry(a: THREE.Vector3, b: THREE.Vector3, r: number, capA: boolean, capB: boolean) {
+/**
+ * A rod's solid: a tube with rounded ends where `capA`/`capB`, or for hardware (`flat`), a closed cylinder with flat
+ * ends and more sides, as a bolt or a sheave is.
+ */
+function rodGeometry(
+    a: THREE.Vector3,
+    b: THREE.Vector3,
+    r: number,
+    capA: boolean,
+    capB: boolean,
+    flat = false,
+) {
     const along = b.clone().sub(a);
     const length = along.length();
     const parts: THREE.BufferGeometry[] = [];
     if (length > 1e-6) {
-        const tube = new THREE.CylinderGeometry(r, r, length, SIDES, 1, true);
+        const tube = new THREE.CylinderGeometry(r, r, length, flat ? 2 * SIDES : SIDES, 1, !flat);
         tube.applyQuaternion(
             new THREE.Quaternion().setFromUnitVectors(
                 new THREE.Vector3(0, 1, 0),
@@ -154,7 +165,8 @@ function rodGeometry(a: THREE.Vector3, b: THREE.Vector3, r: number, capA: boolea
         [capA, a],
         [capB, b],
     ] as const)
-        if (cap) parts.push(new THREE.SphereGeometry(r, SIDES, 6).translate(p.x, p.y, p.z));
+        if (cap && !flat)
+            parts.push(new THREE.SphereGeometry(r, SIDES, 6).translate(p.x, p.y, p.z));
     return parts.map(bare);
 }
 
@@ -275,28 +287,59 @@ function ribbonGeometry(
 }
 
 /** A flat convex polygon, as a fan of triangles. */
-function faceGeometry(points: THREE.Vector3[]): THREE.BufferGeometry {
+function faceGeometry(
+    points: THREE.Vector3[],
+    holes: THREE.Vector3[][] = [],
+): THREE.BufferGeometry {
     const [p0, p1, p2] = points;
-    const n = p1.clone().sub(p0).cross(p2.clone().sub(p0)).normalize();
+    const n = holes.length
+        ? newell(points)
+        : p1.clone().sub(p0).cross(p2.clone().sub(p0)).normalize();
+    const all = [...points, ...holes.flat()];
     const g = new THREE.BufferGeometry();
     g.setAttribute(
         "position",
         new THREE.Float32BufferAttribute(
-            points.flatMap((p) => p.toArray()),
+            all.flatMap((p) => p.toArray()),
             3,
         ),
     );
     g.setAttribute(
         "normal",
         new THREE.Float32BufferAttribute(
-            points.flatMap(() => n.toArray()),
+            all.flatMap(() => n.toArray()),
             3,
         ),
     );
     const index: number[] = [];
-    for (let i = 1; i < points.length - 1; i++) index.push(0, i, i + 1);
+    if (holes.length) {
+        // Laid flat in its own plane, and cut into triangles round its holes (its outline may be concave too).
+        const u = p1.clone().sub(p0).normalize();
+        const v = n.clone().cross(u);
+        const flat = (p: THREE.Vector3) => {
+            const d = p.clone().sub(p0);
+            return new THREE.Vector2(d.dot(u), d.dot(v));
+        };
+        const tris = THREE.ShapeUtils.triangulateShape(
+            points.map(flat),
+            holes.map((h) => h.map(flat)),
+        );
+        for (const [a, b, c] of tris) index.push(a, b, c);
+    } else for (let i = 1; i < points.length - 1; i++) index.push(0, i, i + 1);
     g.setIndex(index);
     return g;
+}
+
+/** A polygon's unit normal by Newell's method, which holds for a concave one. */
+function newell(points: THREE.Vector3[]): THREE.Vector3 {
+    const n = new THREE.Vector3();
+    points.forEach((p, i) => {
+        const q = points[(i + 1) % points.length];
+        n.x += (p.y - q.y) * (p.z + q.z);
+        n.y += (p.z - q.z) * (p.x + q.x);
+        n.z += (p.x - q.x) * (p.y + q.y);
+    });
+    return n.normalize();
 }
 
 /** A geometry with only positions and normals, so any of them merge together. */
@@ -325,9 +368,15 @@ function buildScene(pieces: Piece[], minR: MinR) {
     };
     for (const p of pieces) {
         const color = p.color || COLOR[p.material];
-        const r = Math.max("r" in p ? p.r : 0, minR[p.material] ?? 0);
+        // Hardware's drawn its true size; ropes and wire no thinner than the scene's least.
+        const r = p.toScale
+            ? "r" in p
+                ? p.r
+                : 0
+            : Math.max("r" in p ? p.r : 0, minR[p.material] ?? 0);
         if (p.kind === "rod")
-            for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB)) add(color, g);
+            for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB, p.toScale))
+                add(color, g);
         else if (p.kind === "strand" && p.tape) {
             // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
             const across = T(p.tape.across).normalize();
@@ -350,7 +399,13 @@ function buildScene(pieces: Piece[], minR: MinR) {
                     );
                 }
         } else {
-            add(color, faceGeometry(p.points.map(T)));
+            add(
+                color,
+                faceGeometry(
+                    p.points.map(T),
+                    p.holes?.map((h) => h.map(T)),
+                ),
+            );
             if (p.planks) {
                 // The gaps between boards, as thin strips lying in the face (which is pushed back a touch, so they show).
                 const [p0, p1, p2] = p.points.map(T);
@@ -391,7 +446,7 @@ const HAIRLINE_R = 0.03;
 function buildHairlines(pieces: Piece[]) {
     const byColor = new Map<string, [number, number, number][]>();
     for (const p of pieces) {
-        if (p.kind === "face" || p.r > HAIRLINE_R) continue;
+        if (p.kind === "face" || p.r > HAIRLINE_R || p.toScale) continue;
         const color = p.color || COLOR[p.material];
         const list = byColor.get(color) ?? [];
         const pts = p.kind === "rod" ? [p.a, p.b] : p.points;

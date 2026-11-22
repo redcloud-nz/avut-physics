@@ -51,6 +51,8 @@ export type Face = {
     color?: string;
     /** A short label written in its middle, drawn with it so what's in front of it covers both. */
     text?: string;
+    /** Holes through it (a plate's), each a loop of points in its plane. */
+    holes?: Vector3[][];
 };
 
 /**
@@ -103,7 +105,17 @@ export type Group = {
     across?: Vector3[];
 };
 
-export type Piece = (Rod | Face | Strand) & { shell?: Shell; group?: Group };
+export type Piece = (Rod | Face | Strand) & {
+    shell?: Shell;
+    group?: Group;
+    /**
+     * The size of the detail it adds (metres): a plate's edge, a bolt's head. The flat views leave it out when it would
+     * be drawn too small to see.
+     */
+    fine?: number;
+    /** Hardware: drawn its true size however far off, never thickened to stay visible as ropes and wire are. */
+    toScale?: boolean;
+};
 
 /**
  * The centrelines of a tape strand's layers: side by side `across`, a little more than the tape's width apart where

@@ -970,13 +970,27 @@ export function PieceDrawing({
         const fill = shade(color, faceShade(piece));
         return (
             <g>
-                <polygon
-                    points={svgPoints(piece.points.map(toSvg))}
-                    fill={fill}
-                    stroke={piece.normal ? shade(color, 40) : fill}
-                    strokeWidth={piece.normal ? 0.7 : 0.8}
-                    strokeLinejoin="round"
-                />
+                {piece.holes?.length ? (
+                    // Its holes cut out: each loop a subpath, filled even-odd.
+                    <path
+                        d={[piece.points, ...piece.holes]
+                            .map((loop) => `M${svgPoints(loop.map(toSvg))}Z`)
+                            .join("")}
+                        fill={fill}
+                        fillRule="evenodd"
+                        stroke={piece.normal ? shade(color, 40) : fill}
+                        strokeWidth={piece.normal ? 0.7 : 0.8}
+                        strokeLinejoin="round"
+                    />
+                ) : (
+                    <polygon
+                        points={svgPoints(piece.points.map(toSvg))}
+                        fill={fill}
+                        stroke={piece.normal ? shade(color, 40) : fill}
+                        strokeWidth={piece.normal ? 0.7 : 0.8}
+                        strokeLinejoin="round"
+                    />
+                )}
                 {piece.planks &&
                     plankLines(piece, piece.planks).map(([a, b], i) => {
                         const [p, q] = [toSvg(a), toSvg(b)];
