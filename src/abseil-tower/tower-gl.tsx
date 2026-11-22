@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentRef, type RefObject
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-import { Line, OrbitControls } from "@react-three/drei";
+import { Line, OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 
 import { rad } from "@/lib/math";
@@ -70,6 +70,8 @@ export type SceneConfig = {
     minR: MinR;
     hairlines?: number;
     pivotToPointer?: boolean;
+    /** How wide the scene is across the starting view (metres): on a narrow screen it starts far enough out to fit. */
+    width?: number;
     /** What the canvas is, for a screen reader. */
     label: string;
 };
@@ -100,6 +102,17 @@ const TOWER: SceneConfig = {
     label: "The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
 };
 const FOV = 30;
+
+/**
+ * How far out the camera starts on a screen `aspect` wide for each unit high: the scene's own distance, or further on a
+ * narrow screen, far enough to fit the scene's width across it.
+ */
+function startDistance(scene: SceneConfig, aspect: number) {
+    if (!scene.width) return scene.distance;
+    const across = Math.tan(rad(FOV / 2)) * aspect;
+    // No further than the scene lets it zoom out, with a little room to spare.
+    return Math.min(Math.max(scene.distance, scene.width / 2 / across), scene.maxDistance / 1.2);
+}
 
 /** Where the camera sits for a compass bearing to the eye and a height above level (degrees). */
 function eyeAt(target: THREE.Vector3, distance: number, azimuth: number, elevation: number) {
@@ -132,6 +145,7 @@ function colorReader(box: HTMLElement) {
 }
 type Colors = ReturnType<typeof colorReader>;
 
+/** How many sides a rope's or rod's tube has, unless a scene asks for more or fewer. */
 const SIDES = 10;
 
 /** A cylinder from `a` to `b` (three.js points), with a ball on each real end. */
@@ -146,12 +160,13 @@ function rodGeometry(
     capA: boolean,
     capB: boolean,
     flat = false,
+    sides = SIDES,
 ) {
     const along = b.clone().sub(a);
     const length = along.length();
     const parts: THREE.BufferGeometry[] = [];
     if (length > 1e-6) {
-        const tube = new THREE.CylinderGeometry(r, r, length, flat ? 2 * SIDES : SIDES, 1, !flat);
+        const tube = new THREE.CylinderGeometry(r, r, length, flat ? 2 * sides : sides, 1, !flat);
         tube.applyQuaternion(
             new THREE.Quaternion().setFromUnitVectors(
                 new THREE.Vector3(0, 1, 0),
@@ -166,12 +181,16 @@ function rodGeometry(
         [capB, b],
     ] as const)
         if (cap && !flat)
-            parts.push(new THREE.SphereGeometry(r, SIDES, 6).translate(p.x, p.y, p.z));
+            parts.push(new THREE.SphereGeometry(r, sides, 6).translate(p.x, p.y, p.z));
     return parts.map(bare);
 }
 
 /** A tube of radius `r` along a polyline, its rings kept square to the line as it bends. */
-function tubeGeometry(points: THREE.Vector3[], r: number): THREE.BufferGeometry | null {
+function tubeGeometry(
+    points: THREE.Vector3[],
+    r: number,
+    sides = SIDES,
+): THREE.BufferGeometry | null {
     const pts = points.filter((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
     if (pts.length < 2) return null;
     const tangent = (i: number) =>
@@ -189,8 +208,8 @@ function tubeGeometry(points: THREE.Vector3[], r: number): THREE.BufferGeometry 
         const t = tangent(i);
         n = n.sub(t.clone().multiplyScalar(n.dot(t))).normalize();
         const b = t.clone().cross(n);
-        for (let k = 0; k < SIDES; k++) {
-            const th = (2 * Math.PI * k) / SIDES;
+        for (let k = 0; k < sides; k++) {
+            const th = (2 * Math.PI * k) / sides;
             const dir = n
                 .clone()
                 .multiplyScalar(Math.cos(th))
@@ -201,9 +220,9 @@ function tubeGeometry(points: THREE.Vector3[], r: number): THREE.BufferGeometry 
     });
     const index: number[] = [];
     for (let i = 0; i < pts.length - 1; i++)
-        for (let k = 0; k < SIDES; k++) {
-            const [a, b] = [i * SIDES + k, i * SIDES + ((k + 1) % SIDES)];
-            const [c, d] = [a + SIDES, b + SIDES];
+        for (let k = 0; k < sides; k++) {
+            const [a, b] = [i * sides + k, i * sides + ((k + 1) % sides)];
+            const [c, d] = [a + sides, b + sides];
             index.push(a, c, b, b, c, d);
         }
     const g = new THREE.BufferGeometry();
@@ -358,7 +377,7 @@ const JOINT = "joint:";
  * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
  * of the boards they're between.
  */
-function buildScene(pieces: Piece[], minR: MinR) {
+function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     const add = (color: string, g: THREE.BufferGeometry | null) => {
         if (!g) return;
@@ -375,7 +394,7 @@ function buildScene(pieces: Piece[], minR: MinR) {
                 : 0
             : Math.max("r" in p ? p.r : 0, minR[p.material] ?? 0);
         if (p.kind === "rod")
-            for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB, p.toScale))
+            for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB, p.toScale, sides))
                 add(color, g);
         else if (p.kind === "strand" && p.tape) {
             // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
@@ -386,7 +405,7 @@ function buildScene(pieces: Piece[], minR: MinR) {
             // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
             const lift = new THREE.Vector3(0, r - p.r, 0);
             const points = p.points.map((q) => T(q).add(lift));
-            add(color, tubeGeometry(points, r));
+            add(color, tubeGeometry(points, r, sides));
             for (const [cap, q] of [
                 [p.capA, points[0]],
                 [p.capB, points.at(-1)!],
@@ -395,7 +414,7 @@ function buildScene(pieces: Piece[], minR: MinR) {
                     const at = q;
                     add(
                         color,
-                        bare(new THREE.SphereGeometry(r, SIDES, 6).translate(at.x, at.y, at.z)),
+                        bare(new THREE.SphereGeometry(r, sides, 6).translate(at.x, at.y, at.z)),
                     );
                 }
         } else {
@@ -615,13 +634,15 @@ function Solids({
     colors,
     minR,
     hairlines,
+    sides,
 }: {
     pieces: Piece[];
     colors: Colors;
     minR: MinR;
     hairlines: number;
+    sides: number;
 }) {
-    const solids = useMemo(() => buildScene(pieces, minR), [pieces, minR]);
+    const solids = useMemo(() => buildScene(pieces, minR, sides), [pieces, minR, sides]);
     useEffect(() => () => solids.forEach((s) => s.geometry.dispose()), [solids]);
     const lines = useMemo(() => (hairlines ? buildHairlines(pieces) : []), [pieces, hairlines]);
     return (
@@ -733,6 +754,9 @@ function Handle({
     onTurn: (azimuth: number, elevation: number) => void;
 }) {
     const { camera } = useThree();
+    const size = useThree((s) => s.size);
+    const start = startDistance(scene, size.width / Math.max(size.height, 1));
+    const placed = useRef(false);
     useEffect(() => {
         const c = controls.current;
         if (!c) return;
@@ -741,6 +765,15 @@ function Handle({
             camera.position.copy(position);
             c.update();
         };
+        // The first view: from the scene's own distance or, on a narrow screen, out far enough to fit it.
+        if (!placed.current) {
+            placed.current = true;
+            if (start !== scene.distance)
+                move(
+                    eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
+                    T(scene.centre),
+                );
+        }
         onReady({
             zoomBy: (factor) => {
                 const out = camera.position.clone().sub(c.target).divideScalar(factor);
@@ -748,7 +781,7 @@ function Handle({
             },
             reset: () =>
                 move(
-                    eyeAt(T(scene.centre), scene.distance, scene.azimuth, scene.elevation),
+                    eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
                     T(scene.centre),
                 ),
             look: (azimuth, elevation) => {
@@ -770,7 +803,7 @@ function Handle({
             c.removeEventListener("change", report);
             onReady(null);
         };
-    }, [camera, controls, onReady, onTurn, scene]);
+    }, [camera, controls, onReady, onTurn, scene, start]);
     return null;
 }
 
@@ -780,6 +813,12 @@ type ViewProps = {
     onReady: (handle: GLHandle | null) => void;
     onTurn: (azimuth: number, elevation: number) => void;
 };
+
+/** How finely a scene's drawn: the most pixels per CSS pixel, and how many sides its tubes have. */
+export type GLDetail = { dpr: number; sides: number };
+
+/** What a scene's told about how it's keeping up: its frame rate falling short, or with room to spare. */
+export type FrameRate = "short" | "spare";
 
 /** The abseil tower in 3D. */
 export default function TowerGL(props: ViewProps) {
@@ -793,7 +832,15 @@ export function SceneGL({
     labels,
     onReady,
     onTurn,
-}: ViewProps & { scene: SceneConfig }) {
+    detail,
+    onFrameRate,
+}: ViewProps & {
+    scene: SceneConfig;
+    /** How finely to draw it (as fine as the screen allows, up to 2 pixels a CSS pixel, unless given). */
+    detail?: GLDetail;
+    /** Told when the frame rate stays short of smooth, or has room to spare, for a choice of detail to follow. */
+    onFrameRate?: (rate: FrameRate) => void;
+}) {
     const box = useRef<HTMLDivElement>(null);
     const [colors, setColors] = useState<Colors | null>(null);
     useEffect(() => {
@@ -820,7 +867,7 @@ export function SceneGL({
                         far: scene.maxDistance * 2.5,
                     }}
                     gl={{ antialias: true, alpha: true }}
-                    dpr={[1, 2]}
+                    dpr={[1, detail?.dpr ?? 2]}
                     aria-label={scene.label}
                 >
                     <hemisphereLight args={[0xffffff, 0x445544, 1.6]} />
@@ -830,7 +877,17 @@ export function SceneGL({
                         colors={colors}
                         minR={scene.minR}
                         hairlines={scene.hairlines ?? 0}
+                        sides={detail?.sides ?? SIDES}
                     />
+                    {onFrameRate && (
+                        // Watching for a frame rate that stays under about 45 a second, or over about 58.
+                        <PerformanceMonitor
+                            bounds={() => [45, 58]}
+                            flipflops={4}
+                            onDecline={() => onFrameRate("short")}
+                            onIncline={() => onFrameRate("spare")}
+                        />
+                    )}
                     {labels
                         .filter((l) => l.on)
                         .map((l, i) => (

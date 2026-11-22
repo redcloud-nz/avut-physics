@@ -1,6 +1,17 @@
 "use client";
 
-import { Info, Minus, Plus, RotateCcw, X } from "lucide-react";
+import {
+    Box,
+    Eye,
+    Gauge,
+    Info,
+    Map as MapIcon,
+    Minus,
+    PanelBottom,
+    Plus,
+    RotateCcw,
+    X,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ObstacleGrid, obstaclesOf } from "@/abseil-tower/callout-layout";
 import Loading3D from "@/abseil-tower/loading-3d";
 import type { Piece } from "@/abseil-tower/tower";
-import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
+import type { FrameRate, GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
 import {
     Callouts,
     centreOf,
@@ -16,6 +27,14 @@ import {
     StrandSwatch,
     toDrawing,
 } from "@/abseil-tower/tower-view";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useInBrowser } from "@/components/use-in-browser";
 import { clamp, rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
@@ -23,6 +42,16 @@ import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import {
+    AUTO_START,
+    DETAILS,
+    judge,
+    loadChoice,
+    saveChoice,
+    stepDetail,
+    type Detail,
+    type DetailChoice,
+} from "./detail";
 import {
     CLEARANCE,
     FALL,
@@ -68,8 +97,6 @@ const GROUND_BAND = (() => {
 
 /** The narrowest ropes and wire are drawn in the flat views (SVG units), however far out: just enough to pick out. */
 const MIN_WIDTH = { rope: 2, steel: 1.5, sling: 3 };
-/** How big fine detail must be drawn (SVG units) to be drawn at all. */
-const FINE_PX = 1.5;
 
 /** The middle of the site, which the views start centred on. */
 const MIDDLE = (() => {
@@ -81,9 +108,12 @@ const MIDDLE = (() => {
 const SCENE: SceneConfig = {
     centre: vec3((TREE.x + LOG.x) / 2, groundY((TREE.x + LOG.x) / 2) + 2.5, 0),
     distance: 120,
+    // The whole site, from behind the tree to past the anchor, with a little to spare.
+    width: LOG.x - TREE.x + 10,
     azimuth: 198,
     elevation: 18,
-    maxDistance: 240,
+    // Far enough out to fit the whole site across a phone held upright.
+    maxDistance: 700,
     ground: GROUND_FACES,
     compass: [
         ["Top end", vec3(TREE.x - 3.5, groundY(TREE.x - 3.5), 0)],
@@ -109,6 +139,10 @@ const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: numbe
 type Frame = { zoom: number; target: Vector3 };
 type Fit = { centre: Vector3; width: number; height: number };
 
+/** The look of the round-cornered buttons over the drawing, matching the zoom buttons. */
+const CONTROL =
+    "flex h-9 items-center justify-center rounded-lg border border-border bg-surface/90 text-ink-soft shadow-lg backdrop-blur transition-colors hover:bg-line-faint [&_svg]:size-4";
+
 type Mode = "3d" | "side" | "overhead";
 const MODES: Record<
     Mode,
@@ -133,6 +167,13 @@ const MODES: Record<
             height: 2 * GROUND.z + 2,
         },
     },
+};
+
+/** Each view's icon: a box for 3D, a profile for the side elevation, a map for overhead. */
+const MODE_ICONS: Record<Mode, React.ReactNode> = {
+    "3d": <Box />,
+    side: <PanelBottom />,
+    overhead: <MapIcon />,
 };
 const modeOf = (param: string | null): Mode =>
     param === "side" || param === "overhead" ? param : "3d";
@@ -191,6 +232,51 @@ export default function FoxView() {
     );
     const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
     const inBrowser = useInBrowser();
+    // How finely it's drawn: chosen on the page, or left to Auto, which follows the frame rate. Auto gives up after a
+    // few changes of direction, rather than keep flipping between two levels.
+    // The saved choice until one's made on the page (read once it's in the browser, where it's kept).
+    const [picked, setPicked] = useState<DetailChoice | null>(null);
+    const choice = picked ?? (inBrowser ? loadChoice() : "auto");
+    const choiceRef = useRef<DetailChoice>("auto");
+    useEffect(() => {
+        choiceRef.current = choice;
+    }, [choice]);
+    const choose = (c: DetailChoice) => {
+        setPicked(c);
+        saveChoice(c);
+    };
+    const [auto, setAuto] = useState<Detail>(AUTO_START);
+    const flips = useRef<{ last: FrameRate | null; count: number }>({ last: null, count: 0 });
+    const onFrameRate = useCallback((rate: FrameRate) => {
+        if (choiceRef.current !== "auto") return;
+        const f = flips.current;
+        if (f.count >= 4) return;
+        if (f.last && f.last !== rate) f.count++;
+        f.last = rate;
+        setAuto((d) => stepDetail(d, rate));
+    }, []);
+    const detail = choice === "auto" ? auto : choice;
+    // The flat views' frame rate, timed while they're being moved or zoomed (when they redraw).
+    const watch = useRef({ busyUntil: 0, running: false, last: 0, intervals: [] as number[] });
+    const poke = useCallback(() => {
+        const w = watch.current;
+        w.busyUntil = performance.now() + 300;
+        if (w.running) return;
+        w.running = true;
+        w.last = performance.now();
+        const tick = (t: number) => {
+            w.intervals.push(t - w.last);
+            w.last = t;
+            if (w.intervals.length >= 40) {
+                const rate = judge(w.intervals);
+                w.intervals = [];
+                if (rate) onFrameRate(rate);
+            }
+            if (t < w.busyUntil) requestAnimationFrame(tick);
+            else w.running = false;
+        };
+        requestAnimationFrame(tick);
+    }, [onFrameRate]);
     const svgRef = useRef<SVGSVGElement>(null);
     const boxRef = useRef<HTMLDivElement>(null);
     const [size, setSize] = useState(vec2(W, H));
@@ -249,14 +335,18 @@ export default function FoxView() {
                 );
             });
         };
-        svg.addEventListener("wheel", onWheel, { passive: false });
-        return () => svg.removeEventListener("wheel", onWheel);
-    }, [flat.azimuth, flat.elevation, fit, size, mode]);
+        const watched = (e: WheelEvent) => {
+            poke();
+            onWheel(e);
+        };
+        svg.addEventListener("wheel", watched, { passive: false });
+        return () => svg.removeEventListener("wheel", watched);
+    }, [flat.azimuth, flat.elevation, fit, size, mode, poke]);
 
     // Back to front by each piece's middle; a section's sides facing away are left out.
     // Fine detail (a plate's edge, a bolt's head) is left out where it would be too small to see.
     const sorted = pieces
-        .filter((p) => p.fine === undefined || p.fine * ppm >= FINE_PX)
+        .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
         .map((piece) => ({ piece, key: cam.depth(centreOf(piece)) }))
         .sort((a, b) => a.key - b.key);
@@ -275,6 +365,7 @@ export default function FoxView() {
         else gesture.current = drag(at);
     };
     const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (gesture.current) poke();
         if (!pointers.current.has(e.pointerId)) return;
         const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
         pointers.current.set(e.pointerId, at);
@@ -381,6 +472,8 @@ export default function FoxView() {
                     labels={[]}
                     onReady={setGlView}
                     onTurn={onGlTurn}
+                    detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
+                    onFrameRate={choice === "auto" ? onFrameRate : undefined}
                 />
             ) : (
                 diagram
@@ -431,54 +524,101 @@ export default function FoxView() {
                     give are estimates.
                 </p>
             </section>
-            <div className="absolute bottom-2 left-2 flex flex-wrap items-end gap-2">
-                <div
-                    role="group"
-                    aria-label="View"
-                    className="flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
-                >
-                    {(Object.keys(MODES) as Mode[]).map((m) => (
+            <div className="absolute bottom-2 left-2 flex items-end gap-2">
+                {/* What's shown, where from, and how finely: each a button opening its menu. */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                         <button
-                            key={m}
                             type="button"
-                            aria-pressed={mode === m}
-                            onClick={() => {
-                                setMode(m);
+                            aria-label={`View: ${MODES[mode].label}`}
+                            title="View"
+                            className={`${CONTROL} gap-1.5 px-2.5`}
+                        >
+                            {MODE_ICONS[mode]}
+                            <span className="hidden text-xs sm:inline">{MODES[mode].label}</span>
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="start" className="min-w-44">
+                        <DropdownMenuLabel>View</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                            value={mode}
+                            onValueChange={(m) => {
+                                setMode(m as Mode);
                                 setMoved(null);
                             }}
-                            className={`px-3 py-1.5 text-left text-xs transition-colors ${
-                                mode === m
-                                    ? "bg-action text-primary-foreground"
-                                    : "text-ink-soft hover:bg-line-faint"
-                            }`}
                         >
-                            {MODES[m].label}
-                        </button>
-                    ))}
-                </div>
+                            {(Object.keys(MODES) as Mode[]).map((m) => (
+                                <DropdownMenuRadioItem key={m} value={m}>
+                                    {MODE_ICONS[m]}
+                                    {MODES[m].label}
+                                </DropdownMenuRadioItem>
+                            ))}
+                        </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 {mode === "3d" && (
-                    <div
-                        role="group"
-                        aria-label="Look at the flying fox"
-                        className="flex overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur"
-                    >
-                        {(Object.keys(VIEWS) as ViewName[]).map((k) => (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                             <button
-                                key={k}
                                 type="button"
-                                aria-pressed={view === k}
-                                onClick={() => glView?.look(VIEWS[k].azimuth, VIEWS[k].elevation)}
-                                className={`px-2.5 py-1 text-xs transition-colors ${
-                                    view === k
-                                        ? "bg-action text-primary-foreground"
-                                        : "text-ink-soft hover:bg-line-faint"
-                                }`}
+                                aria-label="Look at the flying fox from"
+                                title="Look from"
+                                className={`${CONTROL} w-9`}
                             >
-                                {VIEWS[k].label}
+                                <Eye />
                             </button>
-                        ))}
-                    </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="top" align="start" className="min-w-44">
+                            <DropdownMenuLabel>Look from</DropdownMenuLabel>
+                            <DropdownMenuRadioGroup
+                                value={view ?? ""}
+                                onValueChange={(k) =>
+                                    glView?.look(
+                                        VIEWS[k as ViewName].azimuth,
+                                        VIEWS[k as ViewName].elevation,
+                                    )
+                                }
+                            >
+                                {(Object.keys(VIEWS) as ViewName[]).map((k) => (
+                                    <DropdownMenuRadioItem key={k} value={k}>
+                                        {VIEWS[k].label}
+                                    </DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label={`Detail: ${choice === "auto" ? `Auto, ${DETAILS[auto].label}` : DETAILS[choice].label}`}
+                            title="Detail"
+                            className={`${CONTROL} w-9`}
+                        >
+                            <Gauge />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="start" className="min-w-52">
+                        <DropdownMenuLabel>Detail</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                            value={choice}
+                            onValueChange={(c) => choose(c as DetailChoice)}
+                        >
+                            {(["auto", "low", "medium", "high"] as DetailChoice[]).map((c) => (
+                                <DropdownMenuRadioItem key={c} value={c}>
+                                    {c === "auto"
+                                        ? `Auto (now ${DETAILS[auto].label.toLowerCase()})`
+                                        : DETAILS[c].label}
+                                </DropdownMenuRadioItem>
+                            ))}
+                        </DropdownMenuRadioGroup>
+                        <p className="max-w-52 px-1.5 pt-1 pb-1.5 text-xs text-ink-muted">
+                            Auto follows the frame rate: less detail if it stutters, more if
+                            there&rsquo;s room.
+                        </p>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
             <div className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur">
                 {[
