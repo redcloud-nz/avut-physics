@@ -197,20 +197,29 @@ function tubeGeometry(
 ): THREE.BufferGeometry | null {
     const pts = points.filter((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
     if (pts.length < 2) return null;
-    const tangent = (i: number) =>
-        pts[Math.min(i + 1, pts.length - 1)]
-            .clone()
-            .sub(pts[Math.max(i - 1, 0)])
-            .normalize();
+    // A closed loop (a ring, a carabiner) turns smoothly through where it starts and ends, so no seam shows there.
+    const last = pts.length - 1;
+    const closed = last > 2 && pts[0].distanceTo(pts[last]) < 1e-6;
+    const tangent = (i: number) => {
+        const next = i < last ? pts[i + 1] : closed ? pts[1] : pts[last];
+        const prev = i > 0 ? pts[i - 1] : closed ? pts[last - 1] : pts[0];
+        return next.clone().sub(prev).normalize();
+    };
     // A first ring direction square to the line, then carried along it.
     const t0 = tangent(0);
     const helper = Math.abs(t0.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     let n = helper.cross(t0).normalize();
     const position: number[] = [];
     const normal: number[] = [];
+    // Turned with the line from each point to the next (rather than squared to it, which drifts), so a loop's last
+    // ring comes back round to its first.
+    const turn = new THREE.Quaternion();
+    let before = t0;
     pts.forEach((p, i) => {
         const t = tangent(i);
+        n = n.applyQuaternion(turn.setFromUnitVectors(before, t));
         n = n.sub(t.clone().multiplyScalar(n.dot(t))).normalize();
+        before = t;
         const b = t.clone().cross(n);
         for (let k = 0; k < sides; k++) {
             const th = (2 * Math.PI * k) / sides;

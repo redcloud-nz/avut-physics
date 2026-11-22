@@ -1219,6 +1219,16 @@ function StrandLine({
         strokeLinejoin: square ? "miter" : "round",
     } as const;
     const caps = square ? [] : [capA && pts[0], capB && pts[n]].filter((p): p is Vector2 => !!p);
+    // A closed loop (a ring, a carabiner) is drawn as one, so it joins round where it starts and ends.
+    if (!capA && !capB && n > 2 && pts[0].distanceTo(pts[n]) < 1e-3) {
+        const d = `M${svgPoints(pts.slice(0, n))}Z`;
+        return (
+            <g>
+                <path {...cut} d={d} stroke={shade(color, 40)} strokeWidth={w + 2} />
+                <path {...cut} d={d} stroke={color} strokeWidth={w} />
+            </g>
+        );
+    }
     return (
         <g>
             <polyline

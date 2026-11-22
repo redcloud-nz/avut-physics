@@ -205,28 +205,75 @@ export function carabiner(
     return [loop, ...part(sleeveAt, sleeveAt.add(d.scale(straight * 0.45)), r * 1.7, color, r)];
 }
 
-/** A steel ring's radius (to its bar's middle) and its bar's. */
-export const RING = { r: 0.025, bar: 0.005 };
+/**
+ * A forged lifting eye bolt, M12 to DIN 580 (metres): the eye's radius to its bar's middle and the bar's radius (54 mm
+ * outside, 30 mm inside), how far the eye's middle is from the collar's face against the steel (53 mm to the eye's top),
+ * the collar (30 mm across, its top flowing into the eye's bottom), and the thread.
+ */
+export const EYE_BOLT = {
+    r: 0.021,
+    bar: 0.006,
+    centre: 0.026,
+    collar: { r: 0.015, h: 0.01 },
+    thread: { r: 0.006, length: 0.021 },
+};
 
-/** A steel ring centred at `centre`, in the plane of `a` and `b`. */
-export function ring(centre: Vector3, a: Vector3, b: Vector3, color: string): Piece[] {
-    const [ua, ub] = [a.unit(), b.unit()];
-    const points = Array.from({ length: 17 }, (_, i) => {
-        const t = (2 * Math.PI * i) / 16;
-        return centre.add(ua.scale(RING.r * Math.cos(t))).add(ub.scale(RING.r * Math.sin(t)));
+/**
+ * The eye of a bolt standing out towards `out`, turned into the plane of `out` and `toward`: those two directions in it,
+ * square to each other (`o` out, `w` across), and the way through its hole (`m`).
+ */
+export function eyeFrame(out: Vector3, toward: Vector3): { o: Vector3; w: Vector3; m: Vector3 } {
+    const o = out.unit();
+    const side = toward.sub(o.scale(toward.dot(o)));
+    // Pulled straight along it, the eye's turned any way at all.
+    const any = Math.abs(o.z) < 0.9 ? vec3(0, 0, 1) : vec3(0, 1, 0);
+    const w = side.len() > 1e-6 ? side.unit() : o.cross(any).unit();
+    return { o, w, m: o.cross(w) };
+}
+
+/**
+ * An eye bolt screwed into steel at `base` (the collar's face against it), standing out towards `out`, its eye turned
+ * into the plane of `out` and `toward`. Returns its pieces and the eye's middle.
+ */
+export function eyeBolt(
+    base: Vector3,
+    out: Vector3,
+    toward: Vector3,
+    color: string,
+): { pieces: Piece[]; eye: Vector3 } {
+    const { o, w } = eyeFrame(out, toward);
+    const { r, bar, collar, thread } = EYE_BOLT;
+    const eye = base.add(o.scale(EYE_BOLT.centre));
+    const points = Array.from({ length: 25 }, (_, i) => {
+        const t = (2 * Math.PI * i) / 24;
+        return eye.add(o.scale(r * Math.cos(t))).add(w.scale(r * Math.sin(t)));
     });
-    return [
-        {
-            kind: "strand",
-            points,
-            r: RING.bar,
-            material: "steel",
-            color,
-            capA: false,
-            capB: false,
-            toScale: true,
-        },
-    ];
+    const loop: Piece = {
+        kind: "strand",
+        points,
+        r: bar,
+        material: "steel",
+        color,
+        capA: false,
+        capB: false,
+        toScale: true,
+    };
+    return {
+        pieces: [
+            loop,
+            // The collar, and its neck narrowing into the eye.
+            ...part(base, base.add(o.scale(collar.h)), collar.r, color, collar.h),
+            ...part(
+                base.add(o.scale(collar.h)),
+                base.add(o.scale(collar.h + 0.004)),
+                0.011,
+                color,
+                0.004,
+            ),
+            ...part(base, base.sub(o.scale(thread.length)), thread.r, color),
+        ],
+        eye,
+    };
 }
 
 /** The way a rope leaves a sheave: its direction away, and where it touches the sheave. */

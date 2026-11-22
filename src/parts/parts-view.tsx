@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Gauge, RotateCcw } from "lucide-react";
+import { ChevronDown, Eye, Gauge, RotateCcw } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -12,6 +12,7 @@ import { centreOf, PieceDrawing } from "@/abseil-tower/tower-view";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
@@ -42,6 +43,13 @@ const FLATS = [
     { label: "Front", azimuth: 180, elevation: 0 },
     { label: "Side", azimuth: 90, elevation: 0 },
     { label: "Top", azimuth: 180, elevation: 90 },
+];
+
+/** Where the 3D view can look from: a bearing and a height (degrees). */
+const LOOKS = [
+    { label: "Three-quarter", azimuth: 145, elevation: 20 },
+    ...FLATS,
+    { label: "Below", azimuth: 180, elevation: -89 },
 ];
 
 /** Every point a piece is drawn through. */
@@ -146,7 +154,7 @@ export default function PartsView() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
-                <p className="absolute right-2 bottom-2 left-24 text-right text-xs text-ink-muted">
+                <p className="absolute right-2 bottom-2 left-36 text-right text-xs text-ink-muted">
                     {shown.about}
                 </p>
                 <div className="absolute bottom-2 left-2 flex gap-2">
@@ -173,6 +181,29 @@ export default function PartsView() {
                                     </DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label="Look at the part from"
+                                title="Look from"
+                                className={`${CONTROL} w-9`}
+                            >
+                                <Eye />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="top" align="start" className="min-w-44">
+                            <DropdownMenuLabel>Look from</DropdownMenuLabel>
+                            {LOOKS.map((l) => (
+                                <DropdownMenuItem
+                                    key={l.label}
+                                    onSelect={() => glView?.look(l.azimuth, l.elevation)}
+                                >
+                                    {l.label}
+                                </DropdownMenuItem>
+                            ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <button
@@ -221,10 +252,19 @@ function FlatView({
     }, []);
     const inBrowser = useInBrowser();
     const cam = new OrbitCamera(rad(view.azimuth), rad(view.elevation));
-    // Fitted to what this view sees of the part, with room round it.
-    const flat = pieces.flatMap(pointsOf).map((p) => cam.project(p));
-    const [x0, x1] = [Math.min(...flat.map((p) => p.x)), Math.max(...flat.map((p) => p.x))];
-    const [y0, y1] = [Math.min(...flat.map((p) => p.y)), Math.max(...flat.map((p) => p.y))];
+    // Fitted to what this view sees of the part, rods and ropes their full thickness, with room round it.
+    const flat = pieces.flatMap((piece) => {
+        const r = piece.kind === "face" ? 0 : piece.r;
+        return pointsOf(piece).map((p) => ({ at: cam.project(p), r }));
+    });
+    const [x0, x1] = [
+        Math.min(...flat.map((p) => p.at.x - p.r)),
+        Math.max(...flat.map((p) => p.at.x + p.r)),
+    ];
+    const [y0, y1] = [
+        Math.min(...flat.map((p) => p.at.y - p.r)),
+        Math.max(...flat.map((p) => p.at.y + p.r)),
+    ];
     const room = 28;
     const ppm = Math.min(
         (size.x - 2 * room) / Math.max(x1 - x0, 1e-3),
