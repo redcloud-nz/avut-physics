@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ObstacleGrid, obstaclesOf } from "@/abseil-tower/callout-layout";
 import Loading3D from "@/abseil-tower/loading-3d";
 import type { Piece } from "@/abseil-tower/tower";
 import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
@@ -65,8 +66,8 @@ const GROUND_BAND = (() => {
     return [...edge, ...edge.reverse().map((p) => p.add(vec3(0, -1.5, 0)))];
 })();
 
-/** The narrowest ropes and wire are drawn in the flat views (SVG units), however far out. */
-const MIN_WIDTH = { rope: 4, steel: 3, sling: 5 };
+/** The narrowest ropes and wire are drawn in the flat views (SVG units), however far out: just enough to pick out. */
+const MIN_WIDTH = { rope: 2, steel: 1.5, sling: 3 };
 
 /** The middle of the site, which the views start centred on. */
 const MIDDLE = (() => {
@@ -339,7 +340,22 @@ export default function FoxView() {
                     />
                 ))}
             {inBrowser && (
-                <Callouts labels={labels} toSvg={toSvg} ppm={ppm} middle={toSvg(MIDDLE).x} />
+                <Callouts
+                    labels={labels}
+                    toSvg={toSvg}
+                    ppm={ppm}
+                    middle={toSvg(MIDDLE).x}
+                    avoid={
+                        new ObstacleGrid(
+                            obstaclesOf(
+                                sorted.map((d) => d.piece as Piece),
+                                toSvg,
+                                ppm,
+                                MIN_WIDTH,
+                            ),
+                        )
+                    }
+                />
             )}
         </svg>
     );

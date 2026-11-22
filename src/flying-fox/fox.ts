@@ -242,7 +242,7 @@ const C = {
     shockCord: "var(--rig-white)",
     staticBrake: "var(--knot-red)",
     dropper: "var(--rig-maroon)",
-    towerGuy: "var(--knot-orange)",
+    guy: "var(--knot-orange)",
     backstay: "var(--rig-black)",
     fibre: "var(--fox-fibre)",
     hessian: "var(--fox-hessian)",
@@ -529,8 +529,9 @@ function tower(): Piece[] {
     // A ladder up from the front, as in the photos: resting against the bottom bar's free end, between the platform and
     // the upright on hawser B's side, its rails running on past the bar to hold onto as you step across.
     const ladderZ = (lo - T.half) / 2;
-    const ladderFoot = onGround(front + 1.6, 0, ladderZ);
+    // At the ideal 4 to 1: its foot out a quarter of the height it rests at.
     const rest = vec3(BAR_X + T.rhs.w / 2 + 0.025, T.lower + T.rhs.h / 2, ladderZ);
+    const ladderFoot = onGround(rest.x + rest.y / 4, 0, ladderZ);
     const ladderTop = rest.add(rest.sub(ladderFoot).unit().scale(0.9));
     const rungs = Math.round(ladderFoot.distanceTo(ladderTop) / 0.3);
     for (const s of [-1, 1]) {
@@ -574,7 +575,7 @@ function tower(): Piece[] {
     for (const s of [-1, 1])
         for (const f of [-1, 1]) {
             const from = vec3(0, T.top - 0.05, s * T.half);
-            pieces.push(...guy(from, vec3(f * out, 0, s * (T.half + out)), 0.006, C.towerGuy));
+            pieces.push(...guy(from, vec3(f * out, 0, s * (T.half + out)), 0.006, C.guy));
         }
     pieces.push(
         ...line(hanging(vec3(BAR_X, T.bar, 0), BACKSTAY_TIE, 0.08, 20), 0.0065, C.backstay),
@@ -757,7 +758,7 @@ function shearLeg(): Piece[] {
     for (const s of [-1, 1])
         for (const f of [-1, 1]) {
             const from = vec3(L.x, g + L.top - 0.1, s * half);
-            frame.push(...guy(from, vec3(L.x + f * out, 0, s * (half + out)), 0.006, C.fibre));
+            frame.push(...guy(from, vec3(L.x + f * out, 0, s * (half + out)), 0.006, C.guy));
         }
     return frame;
 }
@@ -783,15 +784,17 @@ function logAnchor(): Piece[] {
     );
     const back = vec3(1, 0, 0);
     for (const z of [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0]) {
-        // The front row just on the pull's side of the log, the back row 0.6 m behind it.
+        // The front row just on the pull's side of the log, the back row 0.45 m behind it.
         const front = picket(vec3(LOG.x - LOG.r - 0.02, 0, z), back);
-        const rear = picket(vec3(LOG.x + 0.6, 0, z), back);
+        const rear = picket(vec3(LOG.x + 0.45, 0, z), back);
         pieces.push(...front.pieces, ...rear.pieces);
-        // A banjo lashing from the front picket's top to the back one's foot.
+        // A banjo lashing from the front picket, just above the log, to the back one's foot.
+        const above = groundY(LOG.x) + LOG.r * 1.6 + 0.1;
+        const high = front.tie.lerp(front.top, (above - front.tie.y) / (front.top.y - front.tie.y));
         for (const dz of [-0.012, 0.012])
             pieces.push(
                 ...line(
-                    [front.top.add(vec3(0, -0.04, dz)), rear.tie.add(vec3(0, -0.04, dz))],
+                    [high.add(vec3(0, 0, dz)), rear.tie.add(vec3(0, -0.04, dz))],
                     0.006,
                     C.fibre,
                     "sling",
@@ -1174,9 +1177,9 @@ export function foxLegend(): { name: string; color: string; look: "tape" | "rope
         { name: "Stabiliser (shock cord)", color: C.shockCord, look: "rope" },
         { name: "Static brakes", color: C.staticBrake, look: "rope" },
         { name: "Droppers", color: C.dropper, look: "rope" },
-        { name: "Tower guys", color: C.towerGuy, look: "rope" },
+        { name: "Guys", color: C.guy, look: "rope" },
         { name: "Tower backstay", color: C.backstay, look: "rope" },
-        { name: "Guys and lashings (natural fibre)", color: C.fibre, look: "rope" },
+        { name: "Lashings and ties (natural fibre)", color: C.fibre, look: "rope" },
         { name: "Round slings", color: C.sling, look: "tape" },
     ];
 }

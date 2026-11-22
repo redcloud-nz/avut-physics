@@ -14,6 +14,7 @@ import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import { placeLabel, type Box, type ObstacleGrid } from "./callout-layout";
 import Loading3D from "./loading-3d";
 import { layoutRig, legend, RIGS, rigSide, type RigLabel } from "./rig";
 import {
@@ -867,13 +868,15 @@ export function Callouts({
     toSvg,
     ppm,
     middle,
+    avoid,
 }: {
     labels: RigLabel[];
     toSvg: (p: Vector3) => Vector2;
     ppm: number;
     middle: number;
+    /** What's drawn, for the labels to keep off too, searching round their knots for a clear place. */
+    avoid?: ObstacleGrid;
 }) {
-    type Box = { x0: number; x1: number; y0: number; y1: number };
     const placed: Box[] = [];
     const overlaps = (b: Box) =>
         placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
@@ -892,6 +895,11 @@ export function Callouts({
                 y0: y - CALLOUT.font / 2 - 1,
                 y1: y + CALLOUT.font / 2 + 1,
             });
+            if (avoid) {
+                const spot = placeLabel(at, width, CALLOUT.font, right, gap, placed, avoid);
+                placed.push(spot.box);
+                return { label, at, x: spot.x, y: spot.y, right: spot.right };
+            }
             let y = at.y;
             for (let tries = 0; tries < 40 && overlaps(box(y)); tries++) y += CALLOUT.line / 2;
             placed.push(box(y));
