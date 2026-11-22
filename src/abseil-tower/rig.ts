@@ -174,11 +174,13 @@ export type Person = {
 };
 
 export type RigItem = Sling | WrapSling | Rope | Bucket | Belay | Person;
-export type Rig = { name: string; items: RigItem[] };
+/** A rig, with its `slug` for its page's address (`/cracroft-abseil-tower/<slug>`). */
+export type Rig = { slug: string; name: string; items: RigItem[] };
 
 export const RIGS: Rig[] = [
     {
-        name: "Two ropes, four lines: east face and west outrigger",
+        slug: "nzrt11",
+        name: "NZRT11 4-system mixed rig",
         items: [
             {
                 kind: "sling",

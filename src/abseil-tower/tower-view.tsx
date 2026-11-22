@@ -2,6 +2,7 @@
 
 import { Info, Minus, Plus, RotateCcw, X } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Toggle } from "@/components/diagram/controls";
@@ -154,6 +155,16 @@ const MODES: Record<
     "3d": { label: "3D", start: WHOLE },
 };
 
+/** Each view's name in the page's address (`?view=`), so a view can be linked to. */
+const VIEW_PARAM: Record<Mode, string> = {
+    plan: "overhead",
+    west: "west",
+    east: "east",
+    "3d": "3d",
+};
+const modeOf = (param: string | null): Mode =>
+    (Object.keys(VIEW_PARAM) as Mode[]).find((m) => VIEW_PARAM[m] === param) ?? "3d";
+
 /** Where a view starts, in a drawing `size` (SVG units). */
 function startOf(start: Start, size: Vector2): Frame {
     if (!("fit" in start)) return start;
@@ -209,8 +220,15 @@ function faceShade(f: Face): number {
     return 55 + 45 * Math.abs(n.dot(LIGHT));
 }
 
-export default function TowerView() {
-    const [mode, setMode] = useState<Mode>("3d");
+/** The tower with the rig `slug` on it, in the view the page's address names (3D unless it names another). */
+export default function TowerView({ slug }: { slug: string }) {
+    const mode = modeOf(useSearchParams().get("view"));
+    // Changing view changes the address in place, so it can be shared.
+    const setMode = (m: Mode) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("view", VIEW_PARAM[m]);
+        window.history.replaceState(null, "", url);
+    };
     const { side } = MODES[mode];
     // The flat views' camera (the 3D view has its own).
     const camera = MODES[mode].camera ?? MODES.plan.camera!;
@@ -218,7 +236,7 @@ export default function TowerView() {
     // Looking straight down, what's well below the level looked at is drawn darker, so openings in its deck show.
     const below = plan ? LEVELS[4] - 0.3 : undefined;
     const { azimuth, elevation } = camera;
-    const rig = RIGS[0];
+    const rig = RIGS.find((r) => r.slug === slug) ?? RIGS[0];
     const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
     // Where people stand, shown only when asked for, as they crowd the rigging.
     const [showPeople, setShowPeople] = useState(false);
@@ -227,7 +245,8 @@ export default function TowerView() {
         const rigging = laid.pieces.filter((p) => showPeople || p.material !== "person");
         return [...tower, ...rigging.map((p) => onDeck(p, tower))];
     }, [laid, showPeople]);
-    const [frame, setFrame] = useState<Frame>(WHOLE);
+    // Where the view's been moved to, or where it starts until it's moved.
+    const [moved, setMoved] = useState<Frame | null>(null);
     // The WebGL view keeps its own camera: the page reaches it through this, and it says which way it's looking.
     const [glView, setGlView] = useState<GLHandle | null>(null);
     const [glTurned, setGlTurned] = useState({ azimuth: 0, elevation: 0 });
@@ -255,6 +274,8 @@ export default function TowerView() {
     >(null);
 
     const cam = new OrbitCamera(rad(azimuth), rad(elevation));
+    const start = startOf(MODES[mode].start, size);
+    const frame = moved ?? start;
     const ppm = PPM * frame.zoom;
     const toSvg = (p: Vector3): Vector2 => {
         const v = cam.project(p.sub(frame.target));
@@ -284,16 +305,17 @@ export default function TowerView() {
             // A mouse wheel's notch is around 100 pixels (or 3 lines); a pinch's steps are much smaller.
             const delta = e.deltaY * (e.deltaMode === 1 ? 33 : 1);
             const rate = e.ctrlKey ? 0.01 : 0.0025;
-            setFrame((f) =>
-                reframe(
+            setMoved((moved) => {
+                const f = moved ?? startOf(MODES[mode].start, size);
+                return reframe(
                     new OrbitCamera(rad(azimuth), rad(elevation)),
                     originOf(size),
                     f,
                     at,
                     at,
                     f.zoom * Math.exp(-delta * rate),
-                ),
-            );
+                );
+            });
         };
         svg.addEventListener("wheel", onWheel, { passive: false });
         return () => svg.removeEventListener("wheel", onWheel);
@@ -362,10 +384,10 @@ export default function TowerView() {
             if (pointers.current.size !== 2) return;
             const [a, b] = [...pointers.current.values()];
             const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
-            setFrame(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom));
+            setMoved(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom));
             return;
         }
-        setFrame(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
+        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         pointers.current.delete(e.pointerId);
@@ -427,7 +449,7 @@ export default function TowerView() {
                     labels={laid.labels}
                     toSvg={toSvg}
                     ppm={ppm}
-                    middle={toSvg(frame.target).x}
+                    middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}
                 />
             )}
         </svg>
@@ -436,8 +458,7 @@ export default function TowerView() {
     const zoomBy = (factor: number) =>
         mode === "3d"
             ? glView?.zoomBy(factor)
-            : setFrame((f) => reframe(cam, origin, f, origin, origin, f.zoom * factor));
-    const start = startOf(MODES[mode].start, size);
+            : setMoved(reframe(cam, origin, frame, origin, origin, frame.zoom * factor));
     const key = legend(rig);
 
     // Laid out like a map: the drawing fills the box, with the legend over its top right, the views bottom left and
@@ -549,7 +570,7 @@ export default function TowerView() {
                             aria-pressed={mode === m}
                             onClick={() => {
                                 setMode(m);
-                                setFrame(startOf(MODES[m].start, size));
+                                setMoved(null);
                             }}
                             className={`px-3 py-1.5 text-left text-xs transition-colors ${
                                 mode === m
@@ -604,7 +625,7 @@ export default function TowerView() {
                         icon: <RotateCcw />,
                         onClick: () => {
                             if (mode === "3d") return glView?.reset();
-                            setFrame(start);
+                            setMoved(null);
                         },
                         off: false,
                     },
@@ -837,8 +858,8 @@ const CALLOUT = { font: 11, gap: 14, line: 14 };
 /**
  * The elevations' labels, written level on the background beside what they name, with a short leader to it from its
  * middle. Each goes
- * out to the side of the drawing its knot is on (`middle` is the drawing's middle), and moves down past any already
- * written there.
+ * out to the side of the tower its knot is on (`middle` is where the tower's middle is drawn, so panning never moves a
+ * label across), unless its knot says otherwise, and moves down past any already written there.
  */
 function Callouts({
     labels,
