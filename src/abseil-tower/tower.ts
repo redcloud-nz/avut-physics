@@ -105,6 +105,24 @@ export type Group = {
 
 export type Piece = (Rod | Face | Strand) & { shell?: Shell; group?: Group };
 
+/**
+ * The centrelines of a tape strand's layers: side by side `across`, a little more than the tape's width apart where
+ * they run round what they're on, closing in to almost touching at the carabiner they gather at.
+ */
+export function tapeLayers(p: Strand): Vector3[][] {
+    if (!p.tape) return [p.points];
+    const { width, layers, gather, ramp } = p.tape;
+    const across = p.tape.across.unit();
+    const pitch = width + 0.004;
+    return Array.from({ length: layers }, (_, k) => {
+        const slot = k - (layers - 1) / 2;
+        return p.points.map((q) => {
+            const spread = 0.15 + 0.85 * Math.min(1, q.distanceTo(gather) / ramp);
+            return q.add(across.scale(slot * pitch * spread));
+        });
+    });
+}
+
 const S_OUT = vec3(-1, 0, 0);
 const N_OUT = vec3(1, 0, 0);
 const E_OUT = vec3(0, 0, -1);

@@ -21,6 +21,7 @@ import {
     OVERHEAD,
     plankLines,
     SIDE,
+    tapeLayers,
     towerPieces,
     type Face,
     type Material,
@@ -103,11 +104,11 @@ const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: numbe
 };
 
 /**
- * How the tower's shown: from straight above (north up); from level with it on one side, with only that side's lines;
- * or in 3D, turned and tilted by dragging. Each starts at its own frame, which the reset button goes back to: a fixed
- * one, or the closest that fits a box round a point.
+ * How the tower's shown: drawn flat in SVG from straight above (north up) or level with it on one side, with only that
+ * side's lines; or in 3D with WebGL, turned and tilted by dragging. Each flat view starts at its own frame, which the
+ * reset button goes back to: a fixed one, or the closest that fits a box round a point.
  */
-type Mode = "plan" | "west" | "east" | "3d" | "gl";
+type Mode = "plan" | "west" | "east" | "3d";
 type Start = Frame | { fit: { centre: Vector3; width: number; height: number } };
 /** The elevations' box: levels 3 and 4 and the beam over them, the outrigger and the ropes just past the sides. */
 const UPPER = (() => {
@@ -118,6 +119,12 @@ const UPPER = (() => {
         height: top - bottom,
     };
 })();
+/** The top deck, with a little room round it: the overhead view starts fitted to it. */
+const TOP_DECK = {
+    centre: vec3(SIDE / 2, LEVELS[4], SIDE / 2),
+    width: SIDE + 0.7,
+    height: SIDE + 0.7,
+};
 const MODES: Record<
     Mode,
     {
@@ -130,7 +137,7 @@ const MODES: Record<
     plan: {
         label: "Overhead",
         camera: { azimuth: 180, elevation: 90 },
-        start: { zoom: 1.6, target: vec3(SIDE / 2 - 0.4, LEVELS[4], SIDE / 2) },
+        start: { fit: TOP_DECK },
     },
     west: {
         label: "West elevation",
@@ -145,7 +152,6 @@ const MODES: Record<
         side: "east",
     },
     "3d": { label: "3D", start: WHOLE },
-    gl: { label: "3D (WebGL)", start: WHOLE },
 };
 
 /** Where a view starts, in a drawing `size` (SVG units). */
@@ -205,15 +211,13 @@ function faceShade(f: Face): number {
 
 export default function TowerView() {
     const [mode, setMode] = useState<Mode>("3d");
-    const { camera, side } = MODES[mode];
+    const { side } = MODES[mode];
+    // The flat views' camera (the 3D view has its own).
+    const camera = MODES[mode].camera ?? MODES.plan.camera!;
+    const plan = mode === "plan";
     // Looking straight down, what's well below the level looked at is drawn darker, so openings in its deck show.
-    const below = camera?.elevation === 90 ? LEVELS[4] - 0.3 : undefined;
-    // The 3D view's turn and tilt, kept while the other views are shown.
-    const [turned, setTurned] = useState({
-        azimuth: VIEWS.se.azimuth,
-        elevation: VIEWS.se.elevation,
-    });
-    const { azimuth, elevation } = camera ?? turned;
+    const below = plan ? LEVELS[4] - 0.3 : undefined;
+    const { azimuth, elevation } = camera;
     const rig = RIGS[0];
     const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
     // Where people stand, shown only when asked for, as they crowd the rigging.
@@ -243,9 +247,8 @@ export default function TowerView() {
     const origin = originOf(size);
     /** The pointers down on the drawing, where each is now (SVG units). */
     const pointers = useRef(new Map<number, Vector2>());
-    /** What a drag or pinch started from: turning, panning, or a pinch (two touches). */
+    /** What a drag or pinch started from: panning, or a pinch (two touches). */
     const gesture = useRef<
-        | { kind: "turn"; x: number; y: number; azimuth: number; elevation: number }
         | { kind: "pan"; at: Vector2; frame: Frame }
         | { kind: "pinch"; mid: Vector2; spread: number; frame: Frame }
         | null
@@ -297,7 +300,8 @@ export default function TowerView() {
     }, [azimuth, elevation, size, mode]);
 
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
-    // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). A timber's sides
+    // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). Looking straight
+    // down, every side is edge on, and height alone sets the order. A timber's sides
     // facing away are left out, being behind its others.
     const shown = (p: Piece) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0;
     const sortKey = (p: Piece) => {
@@ -309,7 +313,7 @@ export default function TowerView() {
               (p.group.over ? 0.02 : 0) +
               own * 1e-4
             : own;
-        if (!p.shell) return depth;
+        if (!p.shell || plan) return depth;
         return depth + (p.shell.out.dot(cam.toward) > 0 ? 1 : -1) * p.shell.layer * 100;
     };
     // A label sorts just after the nearer end of the cylinder it's written on (or its point, without one), so it's
@@ -317,27 +321,25 @@ export default function TowerView() {
     const labelKey = (l: RigLabel) => {
         const half = l.on ? l.on.along.scale(l.on.length / 2) : vec3(0, 0, 0);
         const depth = Math.max(cam.depth(l.at.add(half)), cam.depth(l.at.sub(half))) + 0.01;
-        if (!l.shell) return depth;
+        if (!l.shell || plan) return depth;
         return depth + (l.shell.out.dot(cam.toward) > 0 ? 1 : -1) * l.shell.layer * 100;
     };
+    // Looking down, labels are written on what they name, among the pieces; in the elevations they're written beside it,
+    // over everything (see `Callouts`).
     const sorted: ({ piece: Piece } | { label: RigLabel })[] = [
         ...pieces.filter(shown).map((piece) => ({ piece, key: sortKey(piece) })),
-        ...laid.labels
+        ...(plan ? laid.labels : [])
             // Looking straight down, what's under the top deck is hidden, so its labels are too.
             .filter((l) => below === undefined || l.at.y >= below)
             .map((label) => ({ label, key: labelKey(label) })),
     ].sort((a, b) => a.key - b.key);
 
-    const looking = mode === "gl" ? glTurned : turned;
     const view = (Object.keys(VIEWS) as ViewName[]).find(
-        (k) => VIEWS[k].azimuth === looking.azimuth && VIEWS[k].elevation === looking.elevation,
+        (k) => VIEWS[k].azimuth === glTurned.azimuth && VIEWS[k].elevation === glTurned.elevation,
     );
 
-    // In 3D a drag turns the tower; in the flat views, it moves the view, as on a map.
-    const drag = (at: Vector2, x: number, y: number): NonNullable<typeof gesture.current> =>
-        camera
-            ? { kind: "pan", at, frame }
-            : { kind: "turn", x, y, azimuth: turned.azimuth, elevation: turned.elevation };
+    // A drag moves the view, as on a map.
+    const drag = (at: Vector2): NonNullable<typeof gesture.current> => ({ kind: "pan", at, frame });
     const startPinch = () => {
         const [a, b] = [...pointers.current.values()];
         gesture.current = { kind: "pinch", mid: a.mid(b), spread: a.distanceTo(b), frame };
@@ -348,10 +350,7 @@ export default function TowerView() {
         pointers.current.set(e.pointerId, at);
         if (pointers.current.size === 2) startPinch();
         else if (pointers.current.size > 2) return;
-        // Shift, or the right or middle button, always pans.
-        else if (e.shiftKey || e.button === 1 || e.button === 2)
-            gesture.current = { kind: "pan", at, frame };
-        else gesture.current = drag(at, e.clientX, e.clientY);
+        else gesture.current = drag(at);
     };
     const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
         if (!pointers.current.has(e.pointerId)) return;
@@ -366,17 +365,7 @@ export default function TowerView() {
             setFrame(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom));
             return;
         }
-        if (d.kind === "pan") {
-            setFrame(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
-            return;
-        }
-        // A drag across the whole drawing turns the tower about once.
-        const perPixel = 360 / e.currentTarget.getBoundingClientRect().width;
-        setTurned({
-            azimuth:
-                ((Math.round(d.azimuth + (e.clientX - d.x) * perPixel * 0.6) % 360) + 360) % 360,
-            elevation: Math.round(clamp(d.elevation + (e.clientY - d.y) * perPixel * 0.4, 0, 89)),
-        });
+        setFrame(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         pointers.current.delete(e.pointerId);
@@ -384,11 +373,7 @@ export default function TowerView() {
         const [rest] = [...pointers.current.entries()];
         gesture.current = null;
         if (pointers.current.size === 2) startPinch();
-        else if (rest && e.pointerType === "touch") {
-            const r = svgRef.current?.getScreenCTM();
-            const client = r ? new DOMPoint(rest[1].x, rest[1].y).matrixTransform(r) : rest[1];
-            gesture.current = drag(rest[1], client.x, client.y);
-        }
+        else if (rest && e.pointerType === "touch") gesture.current = drag(rest[1]);
     };
 
     const compass: [string, Vector3][] = [
@@ -404,11 +389,7 @@ export default function TowerView() {
             viewBox={`0 0 ${svgNumber(size.x)} ${svgNumber(size.y)}`}
             className="absolute inset-0 block h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
-            aria-label={
-                camera
-                    ? `The Cracroft abseil tower: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`
-                    : "The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and shift-drag or drag with two fingers to move it."
-            }
+            aria-label={`The Cracroft abseil tower: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -441,11 +422,19 @@ export default function TowerView() {
                         <RigLabelDrawing key={i} label={d.label} toSvg={toSvg} ppm={ppm} />
                     ),
                 )}
+            {inBrowser && !plan && (
+                <Callouts
+                    labels={laid.labels}
+                    toSvg={toSvg}
+                    ppm={ppm}
+                    middle={toSvg(frame.target).x}
+                />
+            )}
         </svg>
     );
 
     const zoomBy = (factor: number) =>
-        mode === "gl"
+        mode === "3d"
             ? glView?.zoomBy(factor)
             : setFrame((f) => reframe(cam, origin, f, origin, origin, f.zoom * factor));
     const start = startOf(MODES[mode].start, size);
@@ -458,7 +447,7 @@ export default function TowerView() {
             ref={boxRef}
             className="relative min-h-0 flex-1 overflow-hidden border-t border-border bg-surface"
         >
-            {mode === "gl" ? (
+            {mode === "3d" ? (
                 <TowerGL
                     pieces={pieces}
                     labels={laid.labels}
@@ -572,7 +561,7 @@ export default function TowerView() {
                         </button>
                     ))}
                 </div>
-                {!camera && (
+                {mode === "3d" && (
                     <div
                         role="group"
                         aria-label="View the 3D tower from"
@@ -583,14 +572,7 @@ export default function TowerView() {
                                 key={k}
                                 type="button"
                                 aria-pressed={view === k}
-                                onClick={() =>
-                                    mode === "gl"
-                                        ? glView?.look(VIEWS[k].azimuth, VIEWS[k].elevation)
-                                        : setTurned({
-                                              azimuth: VIEWS[k].azimuth,
-                                              elevation: VIEWS[k].elevation,
-                                          })
-                                }
+                                onClick={() => glView?.look(VIEWS[k].azimuth, VIEWS[k].elevation)}
                                 className={`px-2.5 py-1 text-xs transition-colors ${
                                     view === k
                                         ? "bg-action text-primary-foreground"
@@ -609,25 +591,20 @@ export default function TowerView() {
                         label: "Zoom in",
                         icon: <Plus />,
                         onClick: () => zoomBy(1.4),
-                        off: mode !== "gl" && frame.zoom >= MAX_ZOOM,
+                        off: mode !== "3d" && frame.zoom >= MAX_ZOOM,
                     },
                     {
                         label: "Zoom out",
                         icon: <Minus />,
                         onClick: () => zoomBy(1 / 1.4),
-                        off: mode !== "gl" && frame.zoom <= 1,
+                        off: mode !== "3d" && frame.zoom <= 1,
                     },
                     {
                         label: "Show the whole view again",
                         icon: <RotateCcw />,
                         onClick: () => {
-                            if (mode === "gl") return glView?.reset();
+                            if (mode === "3d") return glView?.reset();
                             setFrame(start);
-                            if (!camera)
-                                setTurned({
-                                    azimuth: VIEWS.se.azimuth,
-                                    elevation: VIEWS.se.elevation,
-                                });
                         },
                         off: false,
                     },
@@ -836,8 +813,102 @@ function RigLabelDrawing({
                 {label.text}
             </text>
         );
-    // Too small to write on: zoomed out, where there'd be a label beside every knot, it goes unlabelled.
-    return null;
+    // Too small to read, it's still written on, tiny, so every knot's named: zoom in to read it.
+    return (
+        <text
+            x={at.x}
+            y={at.y}
+            transform={rotate}
+            fill={label.light ? "var(--ink-bright)" : "var(--rig-on-rope)"}
+            fontSize={Math.max(fits, 2)}
+            fontFamily={MONO}
+            fontWeight={600}
+            textAnchor="middle"
+            dominantBaseline="central"
+        >
+            {label.text}
+        </text>
+    );
+}
+
+/** The elevations' labels: their size (SVG units), and the gap between a label and its knot. */
+const CALLOUT = { font: 11, gap: 14, line: 14 };
+
+/**
+ * The elevations' labels, written level on the background beside what they name, with a short leader to it from its
+ * middle. Each goes
+ * out to the side of the drawing its knot is on (`middle` is the drawing's middle), and moves down past any already
+ * written there.
+ */
+function Callouts({
+    labels,
+    toSvg,
+    ppm,
+    middle,
+}: {
+    labels: RigLabel[];
+    toSvg: (p: Vector3) => Vector2;
+    ppm: number;
+    middle: number;
+}) {
+    type Box = { x0: number; x1: number; y0: number; y1: number };
+    const placed: Box[] = [];
+    const overlaps = (b: Box) =>
+        placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
+    const items = labels
+        .map((label) => ({ label, at: toSvg(label.at) }))
+        .sort((a, b) => a.at.y - b.at.y)
+        .map(({ label, at }) => {
+            const right = at.x >= middle;
+            const width = label.text.length * MONO_WIDTH * CALLOUT.font + 4;
+            // Clear of the knot's side as it's drawn, however close the view.
+            const gap = CALLOUT.gap + (label.on ? label.on.r * ppm : 0);
+            const x = right ? at.x + gap : at.x - gap;
+            const box = (y: number): Box => ({
+                x0: right ? x - 2 : x - width,
+                x1: right ? x + width : x + 2,
+                y0: y - CALLOUT.font / 2 - 1,
+                y1: y + CALLOUT.font / 2 + 1,
+            });
+            let y = at.y;
+            for (let tries = 0; tries < 40 && overlaps(box(y)); tries++) y += CALLOUT.line / 2;
+            placed.push(box(y));
+            return { label, at, x, y, right };
+        });
+    return (
+        <g>
+            {items.map(({ at, x, y, right }, i) => (
+                <line
+                    key={`l${i}`}
+                    x1={at.x}
+                    y1={at.y}
+                    x2={right ? x - 2 : x + 2}
+                    y2={y}
+                    stroke="var(--ink-muted)"
+                    strokeWidth={1}
+                />
+            ))}
+            {items.map(({ label, x, y, right }, i) => (
+                <text
+                    key={`t${i}`}
+                    x={x}
+                    y={y}
+                    fill="var(--ink-strong)"
+                    fontSize={CALLOUT.font}
+                    fontFamily={MONO}
+                    fontWeight={600}
+                    textAnchor={right ? "start" : "end"}
+                    dominantBaseline="central"
+                    paintOrder="stroke"
+                    stroke="var(--halo)"
+                    strokeWidth={3}
+                    strokeLinejoin="round"
+                >
+                    {label.text}
+                </text>
+            ))}
+        </g>
+    );
 }
 
 /** Where a point on the screen is in the drawing's SVG units. */
@@ -911,35 +982,22 @@ function PieceDrawing({
         );
     }
     if (piece.kind === "strand") {
-        const w = Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
-        const pts = piece.points.map(toSvg);
-        const n = pts.length - 1;
-        // Where it joins another strand the ends are cut square, with the fill running a little past so no line shows
-        // across the join; real ends are rounded.
-        const past = (end: Vector2, next: Vector2) =>
-            end.add(end.sub(next).safeUnit(vec2(0, 0)).scale(0.8));
-        const fillPts = [
-            piece.capA ? pts[0] : past(pts[0], pts[1]),
-            ...pts.slice(1, n),
-            piece.capB ? pts[n] : past(pts[n], pts[n - 1]),
-        ];
-        const line = { fill: "none", strokeLinecap: "round", strokeLinejoin: "round" } as const;
-        const cut = { ...line, strokeLinecap: "butt" } as const;
-        const caps = [piece.capA && pts[0], piece.capB && pts[n]].filter((p): p is Vector2 => !!p);
+        // Tape is drawn as its flat layers, each its width wide; rope and wire as round as they are.
+        const w = piece.tape
+            ? Math.max(piece.tape.width * ppm, 1.5)
+            : Math.max(2 * piece.r * ppm, MIN_WIDTH[piece.material] ?? 0);
         return (
             <g>
-                <polyline
-                    {...cut}
-                    points={svgPoints(pts)}
-                    stroke={shade(color, 40)}
-                    strokeWidth={w + 2}
-                />
-                {caps.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r={w / 2 + 1} fill={shade(color, 40)} />
-                ))}
-                <polyline {...cut} points={svgPoints(fillPts)} stroke={color} strokeWidth={w} />
-                {caps.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r={w / 2} fill={color} />
+                {tapeLayers(piece).map((layer, k) => (
+                    <StrandLine
+                        key={k}
+                        pts={layer.map(toSvg)}
+                        w={w}
+                        color={color}
+                        capA={piece.capA}
+                        capB={piece.capB}
+                        square={!!piece.tape}
+                    />
                 ))}
             </g>
         );
@@ -989,6 +1047,59 @@ function PieceDrawing({
             />
             {outline && edge(1)}
             {outline && edge(-1)}
+        </g>
+    );
+}
+
+/**
+ * One line of rope or tape through `pts` (SVG units), `w` wide with a dark edge. Where it joins another strand its ends
+ * are cut square, with the fill running a little past so no line shows across the join; real ends are rounded, or
+ * square for tape.
+ */
+function StrandLine({
+    pts,
+    w,
+    color,
+    capA,
+    capB,
+    square,
+}: {
+    pts: Vector2[];
+    w: number;
+    color: string;
+    capA: boolean;
+    capB: boolean;
+    square: boolean;
+}) {
+    const n = pts.length - 1;
+    const past = (end: Vector2, next: Vector2) =>
+        end.add(end.sub(next).safeUnit(vec2(0, 0)).scale(0.8));
+    const fillPts = [
+        capA ? pts[0] : past(pts[0], pts[1]),
+        ...pts.slice(1, n),
+        capB ? pts[n] : past(pts[n], pts[n - 1]),
+    ];
+    const cut = {
+        fill: "none",
+        strokeLinecap: "butt",
+        strokeLinejoin: square ? "miter" : "round",
+    } as const;
+    const caps = square ? [] : [capA && pts[0], capB && pts[n]].filter((p): p is Vector2 => !!p);
+    return (
+        <g>
+            <polyline
+                {...cut}
+                points={svgPoints(pts)}
+                stroke={shade(color, 40)}
+                strokeWidth={w + 2}
+            />
+            {caps.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={w / 2 + 1} fill={shade(color, 40)} />
+            ))}
+            <polyline {...cut} points={svgPoints(fillPts)} stroke={color} strokeWidth={w} />
+            {caps.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={w / 2} fill={color} />
+            ))}
         </g>
     );
 }

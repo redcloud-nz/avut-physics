@@ -11,7 +11,15 @@ import { rad } from "@/lib/math";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import type { RigLabel } from "./rig";
-import { groundAt, groundCorners, plankLines, type Face, type Material, type Piece } from "./tower";
+import {
+    groundAt,
+    groundCorners,
+    plankLines,
+    tapeLayers,
+    type Face,
+    type Material,
+    type Piece,
+} from "./tower";
 
 /**
  * The tower in 3D drawn with WebGL: the same pieces as the SVG views, as shaded solids, so whatever's nearer covers
@@ -276,17 +284,9 @@ function buildScene(pieces: Piece[]) {
             for (const g of rodGeometry(T(p.a), T(p.b), r, p.capA, p.capB)) add(color, g);
         else if (p.kind === "strand" && p.tape) {
             // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
-            const { width, thickness, layers, gather, ramp } = p.tape;
             const across = T(p.tape.across).normalize();
-            const pitch = width + 0.004;
-            for (let k = 0; k < layers; k++) {
-                const slot = k - (layers - 1) / 2;
-                const points = p.points.map((q) => {
-                    const spread = 0.15 + 0.85 * Math.min(1, q.distanceTo(gather) / ramp);
-                    return T(q).add(across.clone().multiplyScalar(slot * pitch * spread));
-                });
-                add(color, ribbonGeometry(points, across, width, thickness));
-            }
+            for (const layer of tapeLayers(p))
+                add(color, ribbonGeometry(layer.map(T), across, p.tape.width, p.tape.thickness));
         } else if (p.kind === "strand") {
             // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
             const lift = new THREE.Vector3(0, r - p.r, 0);

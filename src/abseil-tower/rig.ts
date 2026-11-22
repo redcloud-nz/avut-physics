@@ -539,6 +539,8 @@ const PERSON_R = 0.25;
 const BUCKET_R = 0.18;
 const BUCKET_H = 0.42;
 const BUCKET_GAP = 0.06;
+/** How much narrower a bucket is at its foot than at its rim. */
+const BUCKET_TAPER = 0.8;
 
 /** A run of rope or tape through `points`, with rounded ends unless it joins another there. */
 const strand = (
@@ -859,7 +861,7 @@ function toGround(
 /** A load-release hitch, as it's drawn: a cylinder of cord, longer and thinner than a rope's hitch. */
 const LRH = { text: "LRH", r: 0.035, length: 0.35 };
 /** Tandem belay prusiks, drawn as one cylinder round the rope: its upper half one cord's colour, its lower the other's. */
-const TBP = { text: "TBP", r: 0.03, length: 0.26, bands: 2, cordR: 0.0035 };
+const TBP = { text: "TBP", r: 0.04, length: 0.26, bands: 2, cordR: 0.0035 };
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
 const BELAY_DROP = 0.35;
 
@@ -1148,13 +1150,14 @@ function bucketPieces(
     ropeColor: string | null,
     height = BUCKET_H,
 ): Piece[] {
-    const n = 16;
+    const n = 20;
     const ring = (y: number, r: number) =>
         Array.from({ length: n }, (_, i) => {
             const a = (i / n) * Math.PI * 2;
             return base.add(vec3(r * Math.cos(a), y, r * Math.sin(a)));
         });
-    const bottom = ring(0, BUCKET_R);
+    // Tapered, narrower at the bottom, so looking down its inside wall shows round its floor; with a rolled rim.
+    const bottom = ring(0, BUCKET_R * BUCKET_TAPER);
     const rim = ring(height, BUCKET_R);
     const sides: Face[] = bottom.map((p, i) => ({
         kind: "face",
@@ -1162,18 +1165,31 @@ function bucketPieces(
         material: "bucket",
         color,
     }));
-    const floor: Face = { kind: "face", points: bottom, material: "bucket", color };
+    // Its floor's raised a touch off the deck, so it's drawn over the deck it stands on.
+    const floor: Face = {
+        kind: "face",
+        points: ring(0.01, BUCKET_R * BUCKET_TAPER),
+        material: "bucket",
+        color,
+    };
+    const lip = strand([...rim, rim[0]], 0.014, "bucket", color);
+    // The rope flaked into it, lying in a spiral a little below the rim.
     const coil = ropeColor
         ? [
               strand(
-                  [...ring(height - 0.12, 0.12), ring(height - 0.12, 0.12)[0]],
+                  Array.from({ length: 3 * n + 1 }, (_, i) => {
+                      const t = i / (3 * n);
+                      const a = t * 3 * Math.PI * 2;
+                      const r = 0.04 + 0.1 * t;
+                      return base.add(vec3(r * Math.cos(a), height - 0.1, r * Math.sin(a)));
+                  }),
                   ROPE_R,
                   "rope",
                   ropeColor,
               ),
           ]
         : [];
-    return [floor, ...sides, ...coil];
+    return [floor, ...sides, ...coil, lip];
 }
 
 /** How big a coil of spare rope lying on a deck is: its outer and inner radius and how many times it goes round. */
