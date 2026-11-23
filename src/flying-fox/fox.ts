@@ -288,6 +288,7 @@ export const C = {
     trolley: "var(--knot-red)",
     nylon: "var(--fox-nylon)",
     tirfor: "var(--fox-tirfor)",
+    oval: "var(--fox-carabiner-oval)",
     tree: "var(--tower-log)",
     spar: "var(--fox-spar)",
     grate: "var(--fox-grate)",
@@ -323,6 +324,7 @@ export const PULLEY_COLORS = {
     plates: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
     steel: "var(--tower-steel)",
+    carabiner: "var(--fox-carabiner-oval)",
 };
 
 const UP = vec3(0, 1, 0);
@@ -1961,7 +1963,9 @@ export function rigTrolley(
     const down = vec3(0, -1, 0);
     const clip = (top: Vector3, length: number) => {
         const bar = top.add(vec3(0, -0.005, 0));
-        pieces.push(...carabiner(bar, down, ACROSS, C.steel, length));
+        pieces.push(
+            ...carabiner(bar, down, ACROSS, C.oval, length, { shape: "oval", through: t.gap }),
+        );
         return bar.add(down.scale(length));
     };
     return { pieces, hang: clip(t.main, 0.11), backUp: clip(t.towSide, 0.1) };
@@ -1990,16 +1994,21 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         steel: C.steel,
     });
     pieces.push(...g.pieces);
-    // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in.
+    // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in, turned over (its gate the
+    // other way from the trolley's).
     const holeBottom = tieIn.add(vec3(0, clipLength - g.holeR + 0.005, 0));
-    pieces.push(...carabiner(holeBottom, down, ACROSS, C.steel, clipLength - g.holeR + 0.005));
+    pieces.push(
+        ...carabiner(holeBottom, down, ACROSS.neg(), C.steel, clipLength - g.holeR + 0.005, {
+            through: g.width,
+        }),
+    );
     pieces.push(...tiedTo(hang, [...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
     const safety = hanging(backUp, safetyClip, -0.05, 8);
     pieces.push(...tiedTo(backUp, safety.slice(1, -1), 0.0055, C.dropper));
     pieces.push(...tiedTo(safetyClip, safety.slice(1, -1).reverse(), 0.0055, C.dropper));
-    pieces.push(...carabiner(safetyClip, down, ACROSS, C.steel, clipLength));
+    pieces.push(...carabiner(safetyClip, down, ACROSS.neg(), C.steel, clipLength));
     return { pieces, back };
 }
 
@@ -2074,7 +2083,7 @@ function dynamicBrake(): Piece[] {
     const ahead = vec3(1, 0, 0);
     const downhill = apex.sub(ahead.scale(CARABINER_R + ropeR));
     const uphill = downhill.sub(ahead.scale(clip));
-    pieces.push(...carabiner(uphill, ahead, ACROSS, C.steel, clip));
+    pieces.push(...carabiner(uphill, ahead, ACROSS, C.oval, clip, { shape: "oval" }));
     const knot = tiedRound(
         downhill.add(ACROSS.scale(0.008)),
         ACROSS,

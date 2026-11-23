@@ -90,8 +90,18 @@ export const PARTS: Part[] = [
         slug: "carabiner",
         name: "Carabiner",
         group: "Hardware",
-        about: "A screwgate carabiner, 110 mm long and 60 mm wide, its sleeve on the gate side.",
+        about: "A D-shape triple-lock carabiner (the CT one), traced from a photo: 110 mm from its top bend to its bottom one and 60 mm wide, the narrow top bend and the wide bottom one beside its straight spine, the gate opposite behind its red knurled locking sleeve.",
         pieces: () => carabiner(vec3(0, 0.055, 0), DOWN, ALONG, STEEL),
+    },
+    {
+        slug: "carabiner-oval",
+        name: "Carabiner (oval)",
+        group: "Hardware",
+        about: "An oval triple-lock carabiner (the CT one), traced from a photo, on the pulleys and the dynamic brake: dark grey, the same round both ends, 110 mm from the middle of one end to the other and about 49 mm wide, its straight gate behind its red knurled locking sleeve.",
+        pieces: () =>
+            carabiner(vec3(0, 0.055, 0), DOWN, ALONG, PULLEY_COLORS.carabiner, 0.11, {
+                shape: "oval",
+            }),
     },
     {
         slug: "eye-bolt",

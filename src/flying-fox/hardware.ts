@@ -162,8 +162,113 @@ export function bolt(
 }
 
 /**
- * A screwgate carabiner hanging from `top` (the middle of the bar at its top end) towards `down`, its loop in the plane
- * of `down` and `across`: an oval `length` long and `width` wide, its gate on the `across` side with its sleeve.
+ * The CT triple-lock carabiners' centrelines, traced from photos (pixels, the photo's gate on the left), each round
+ * from its spine, over the top bend to the gate's nose, down the gate to its hinge, and round the bottom bend back to
+ * the spine. What it hangs from sits at `top` and what hangs from it at `bottom`, square below; `gate` is the gate's
+ * line from its nose to its hinge, `sleeve` the stretch of it the locking sleeve covers, and `knurl` its gripped
+ * middle. The D has a narrow top bend and a wide bottom one beside its straight spine, which loads sit against; the
+ * oval is the same round both ends, loads sitting in the middle of each.
+ */
+const CARABINER_SHAPES = {
+    d: {
+        loop: [
+            [405, 420],
+            [405, 330],
+            [405, 240],
+            [405, 150],
+            [402, 80],
+            [392, 44],
+            [370, 26],
+            [335, 28],
+            [295, 42],
+            [255, 60],
+            [215, 84],
+            [180, 112],
+            [158, 145],
+            [152, 175],
+            [158, 240],
+            [168, 310],
+            [180, 380],
+            [196, 440],
+            [222, 478],
+            [262, 500],
+            [310, 507],
+            [352, 500],
+            [385, 478],
+            [401, 452],
+        ] as Flat[],
+        top: [370, 26] as Flat,
+        bottom: [370, 497] as Flat,
+        width: 253,
+        gate: [
+            [152, 175],
+            [196, 440],
+        ] as Flat[],
+        sleeve: [195, 385],
+        knurl: [255, 335],
+    },
+    oval: {
+        loop: [
+            [395, 300],
+            [395, 135],
+            [387, 93],
+            [362, 57],
+            [326, 32],
+            [284, 24],
+            [242, 32],
+            [206, 57],
+            [181, 93],
+            [173, 135],
+            [173, 260],
+            [173, 330],
+            [173, 417],
+            [181, 459],
+            [206, 495],
+            [242, 520],
+            [284, 528],
+            [326, 520],
+            [362, 495],
+            [387, 459],
+            [395, 417],
+        ] as Flat[],
+        top: [284, 24] as Flat,
+        bottom: [284, 528] as Flat,
+        width: 222,
+        gate: [
+            [173, 160],
+            [173, 420],
+        ] as Flat[],
+        sleeve: [195, 392],
+        knurl: [268, 365],
+    },
+};
+
+/** A closed smooth loop through `pts` (Catmull–Rom), `n` points between each pair. */
+function closedLoop(pts: Flat[], n: number): Flat[] {
+    const out: Flat[] = [];
+    const at = (i: number) => pts[(i + pts.length) % pts.length];
+    for (let i = 0; i < pts.length; i++) {
+        const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+        for (let k = 0; k < n; k++) {
+            const t = k / n;
+            const [t2, t3] = [t * t, t * t * t];
+            const c = (j: 0 | 1) =>
+                0.5 *
+                (2 * p1[j] +
+                    (p2[j] - p0[j]) * t +
+                    (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 +
+                    (3 * p1[j] - p0[j] - 3 * p2[j] + p3[j]) * t3);
+            out.push([c(0), c(1)]);
+        }
+    }
+    return [...out, out[0]];
+}
+
+/**
+ * A triple-lock carabiner, the CT D-shape or oval (`shape`), hanging from `top` (the middle of its bar where it hangs)
+ * towards `down`, `length` on to the middle of its bar where things hang from it, its loop in the plane of `down` and
+ * `across`: `width` across (by default in proportion to the photo), its gate on the `across` side behind its locking
+ * sleeve (`sleeve`'s colour), its bar `r` thick.
  */
 export function carabiner(
     top: Vector3,
@@ -171,29 +276,79 @@ export function carabiner(
     across: Vector3,
     color: string,
     length = 0.11,
-    width = 0.06,
-    r = 0.005,
+    {
+        shape = "d",
+        width,
+        r = 0.005,
+        sleeve = "var(--fox-carabiner-sleeve)",
+        through,
+    }: {
+        shape?: keyof typeof CARABINER_SHAPES;
+        width?: number;
+        r?: number;
+        sleeve?: string;
+        through?: number;
+    } = {},
 ): Piece[] {
     const d = down.unit();
     const a = across.unit();
-    const end = width / 2;
-    const straight = length - width;
-    const pts: Vector3[] = [];
-    // The top arc, the gate side down, the bottom arc, the spine side back up.
-    const arc = (centre: Vector3, from: number, to: number) => {
-        for (let i = 0; i <= 8; i++) {
-            const t = from + ((to - from) * i) / 8;
-            pts.push(centre.add(a.scale(end * Math.cos(t))).add(d.scale(-end * Math.sin(t))));
+    const S = CARABINER_SHAPES[shape];
+    const loop = closedLoop(S.loop, 6);
+    // Metres per pixel across: `width` across, by default in proportion to the photo.
+    const span = S.bottom[1] - S.top[1];
+    const ku = (width ?? (length * S.width) / span) / S.width;
+    // Where it hangs: by default where the photo's carabiner takes its loads. Passed `through` two plates that far
+    // apart (where its bar bears on their holes' edges), it settles in contact with both: its bend level across them,
+    // turned in its own plane until what hangs from it, sitting in the lowest point of its bottom bend, is straight
+    // below the middle of the two.
+    let pts = loop;
+    let turn = (p: Flat): Flat => p;
+    let [hangX, topY, bottomY] = [S.top[0], S.top[1], S.bottom[1]];
+    if (through !== undefined) {
+        const want = through / ku;
+        const [cx, cy] = [(S.top[0] + S.bottom[0]) / 2, (S.top[1] + S.bottom[1]) / 2];
+        const settle = (angle: number) => {
+            const [c, sn] = [Math.cos(angle), Math.sin(angle)];
+            const spin = ([x, y]: Flat): Flat => [
+                cx + (x - cx) * c - (y - cy) * sn,
+                cy + (x - cx) * sn + (y - cy) * c,
+            ];
+            const turned = loop.map(spin);
+            const segments = turned.slice(1).map((q, i) => [turned[i], q] as const);
+            // The bend's width at height `y`, over the top half.
+            const across = (y: number) =>
+                segments
+                    .filter(([p, q]) => p[1] < cy && (p[1] - y) * (q[1] - y) <= 0 && p[1] !== q[1])
+                    .map(([p, q]) => p[0] + ((q[0] - p[0]) * (y - p[1])) / (q[1] - p[1]));
+            let chord: { x: number; y: number } | undefined;
+            for (let y = Math.min(...turned.map((q) => q[1])) + 0.25; y < cy; y += 0.25) {
+                const xs = across(y);
+                if (xs.length >= 2 && Math.max(...xs) - Math.min(...xs) >= want) {
+                    chord = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y };
+                    break;
+                }
+            }
+            const lowest = turned.reduce((m, q) => (q[1] > m[1] ? q : m));
+            return { turned, spin, chord, lowest };
+        };
+        let best: ReturnType<typeof settle> | undefined;
+        for (let deg = -40; deg <= 40; deg += 0.25) {
+            const tried = settle((deg * Math.PI) / 180);
+            if (!tried.chord) continue;
+            const miss = Math.abs(tried.lowest[0] - tried.chord.x);
+            if (!best?.chord || miss < Math.abs(best.lowest[0] - best.chord.x)) best = tried;
         }
-    };
-    const upper = top.add(d.scale(end));
-    const lower = upper.add(d.scale(straight));
-    arc(upper, Math.PI, 0);
-    arc(lower, 0, -Math.PI);
-    pts.push(pts[0]);
-    const loop: Piece = {
+        if (best?.chord) {
+            pts = best.turned;
+            turn = best.spin;
+            [hangX, topY, bottomY] = [best.chord.x, best.chord.y, best.lowest[1]];
+        }
+    }
+    const kv = length / (bottomY - topY);
+    const at = ([x, y]: Flat) => top.add(a.scale((hangX - x) * ku)).add(d.scale((y - topY) * kv));
+    const body: Piece = {
         kind: "strand",
-        points: pts,
+        points: pts.map(at),
         r,
         material: "steel",
         color,
@@ -201,8 +356,16 @@ export function carabiner(
         capB: false,
         toScale: true,
     };
-    const sleeveAt = upper.add(a.scale(end)).add(d.scale(straight * 0.3));
-    return [loop, ...part(sleeveAt, sleeveAt.add(d.scale(straight * 0.45)), r * 1.7, color, r)];
+    // The gate's line, where the sleeve rides on it.
+    const gate = (y: number) => {
+        const [[x0, y0], [x1, y1]] = S.gate;
+        return at(turn([x0 + ((x1 - x0) * (y - y0)) / (y1 - y0), y]));
+    };
+    return [
+        body,
+        ...part(gate(S.sleeve[0]), gate(S.sleeve[1]), r * 1.55, sleeve, r),
+        ...part(gate(S.knurl[0]), gate(S.knurl[1]), r * 1.75, sleeve, r),
+    ];
 }
 
 /**
@@ -355,7 +518,7 @@ export function pulley({
     toA: Vector3;
     toB: Vector3;
     ropeR: number;
-    colors: { plates: string; sheave: string; steel: string };
+    colors: { plates: string; sheave: string; steel: string; carabiner: string };
     axleIfStraight?: Vector3;
 }): { pieces: Piece[]; a: Vector3; b: Vector3; hook: Vector3; up: Vector3; axle: Vector3 } {
     const [da, db] = [toA.unit(), toB.unit()];
@@ -403,7 +566,9 @@ export function pulley({
     const hole0 = at(f, [0, top]);
     const length = 0.1;
     const hook = hole0.add(up.scale(length - 0.004));
-    pieces.push(...carabiner(hook, up.neg(), axle, colors.steel, length, 0.055, 0.0045));
+    pieces.push(
+        ...carabiner(hook, up.neg(), axle, colors.carabiner, length, { shape: "oval", r: 0.0045 }),
+    );
     return {
         pieces,
         a: touch(centre, da, up, R),
@@ -559,6 +724,8 @@ export function zipTrolley(
     bumperSide: Vector3;
     towSide: Vector3;
     frame: Frame;
+    /** The gap between its plates' inner faces: a carabiner hanging from its holes' tops bears on their edges there. */
+    gap: number;
 } {
     const n = across.unit();
     const u = bumper.unit();
@@ -622,6 +789,7 @@ export function zipTrolley(
         bumperSide: at(f, [ZIP.lower[0].at[0], ZIP.lower[0].at[1] + ZIP.lower[0].r]),
         towSide: at(f, [ZIP.lower[1].at[0], ZIP.lower[1].at[1] + ZIP.lower[1].r]),
         frame: f,
+        gap: ZIP.across - 2 * ZIP.plate,
     };
 }
 
@@ -748,6 +916,11 @@ export function grigri(
     rope: Vector3[];
     brakeOut: Vector3;
     holeR: number;
+    /**
+     * How far across it is over its two plates' outer faces: a carabiner pulling down through its hole bears on the
+     * hole's bottom edges there.
+     */
+    width: number;
     brake: (drop: number) => Vector3[];
 } {
     const G = GRIGRI_PX;
@@ -824,7 +997,7 @@ export function grigri(
         });
         return [...curve, p3.add(down.scale(Math.max(drop - 0.1, 0.01)))];
     };
-    return { pieces, rope, brakeOut, holeR, brake };
+    return { pieces, rope, brakeOut, holeR, width: gap + 2 * plateThick, brake };
 }
 
 /** A hexagon nut on `axis` at `at` (the middle of its thickness): `across` its flats and `thick` thick. */
