@@ -1,4 +1,6 @@
+import type { RigLabel } from "@/abseil-tower/rig";
 import { timber, type Piece } from "@/abseil-tower/tower";
+import TRIAL from "@/flying-fox/fig8-trial.json";
 import {
     ANCHOR_SHACKLE,
     BLOCKS_X,
@@ -44,6 +46,8 @@ import {
     wrap,
     zipTrolley,
 } from "@/flying-fox/hardware";
+import { axes, knotPieces, numberedRope } from "@/flying-fox/knot-3d";
+import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
@@ -57,6 +61,8 @@ export type Part = {
     group: string;
     about: string;
     pieces: () => Piece[];
+    /** What's written on it, if anything. */
+    labels?: () => RigLabel[];
 };
 
 const ORIGIN = vec3(0, 0, 0);
@@ -92,6 +98,50 @@ export const PARTS: Part[] = [
         group: "Hardware",
         about: "A D-shape triple-lock carabiner (the CT one), traced from a photo: 110 mm from its top bend to its bottom one and 60 mm wide, the narrow top bend and the wide bottom one beside its straight spine, the gate opposite behind its red knurled locking sleeve.",
         pieces: () => carabiner(vec3(0, 0.055, 0), DOWN, ALONG, STEEL),
+    },
+    {
+        slug: "figure-8-rethreaded",
+        name: "Figure 8, rethreaded",
+        group: "Knots",
+        about: "The rethreaded figure 8 from Rescue Knots, lifted into 3D from its drawing: each strand rises where it's on top at a crossing and sinks where it's underneath, round the drawing's bar seen end on.",
+        pieces: () => {
+            const knot = KNOTS.find((k) => k.slug === "figure-8-rethreaded")!;
+            return knotPieces(knot.file.knot, { steel: STEEL });
+        },
+    },
+    {
+        slug: "figure-8-trial",
+        name: "Figure 8, tightened (trial)",
+        group: "Knots",
+        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar, its rope numbered in segments from the standing end, with X, Y and Z arrows.",
+        ...(() => {
+            const rope = () =>
+                numberedRope(
+                    TRIAL.pts.map(([x, y, z]) => vec3(x, y, z)),
+                    0.0055,
+                    0.02,
+                    ["var(--knot-orange)", "var(--knot-purple)"],
+                );
+            const knotLow = Math.min(...TRIAL.pts.filter(([, y]) => y > -0.15).map(([, y]) => y));
+            const arrows = () => axes(vec3(-0.06, knotLow, 0), 0.03);
+            return {
+                pieces: () => [
+                    ...rope().pieces,
+                    ...arrows().pieces,
+                    {
+                        kind: "rod" as const,
+                        a: vec3(TRIAL.bar.at.x, TRIAL.bar.at.y, -0.04),
+                        b: vec3(TRIAL.bar.at.x, TRIAL.bar.at.y, 0.04),
+                        r: TRIAL.bar.r,
+                        material: "steel" as const,
+                        color: STEEL,
+                        capA: true,
+                        capB: true,
+                    },
+                ],
+                labels: () => [...rope().labels, ...arrows().labels],
+            };
+        })(),
     },
     {
         slug: "carabiner-oval",

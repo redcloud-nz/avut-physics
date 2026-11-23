@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Loading3D from "@/abseil-tower/loading-3d";
+import type { RigLabel } from "@/abseil-tower/rig";
 import type { Piece } from "@/abseil-tower/tower";
 import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
 import { nearness, PieceDrawing } from "@/abseil-tower/tower-view";
@@ -98,6 +99,7 @@ export default function PartsView() {
     };
     const [detail, setDetail] = useState<Detail>("high");
     const pieces = useMemo(() => shown.pieces(), [shown]);
+    const labels = useMemo(() => shown.labels?.() ?? [], [shown]);
     const box = useMemo(() => bounds(pieces), [pieces]);
     const [glView, setGlView] = useState<GLHandle | null>(null);
     const scene: SceneConfig = useMemo(
@@ -131,7 +133,7 @@ export default function PartsView() {
                     key={shown.slug}
                     scene={scene}
                     pieces={pieces}
-                    labels={[]}
+                    labels={labels}
                     onReady={setGlView}
                     onTurn={() => {}}
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
@@ -226,7 +228,14 @@ export default function PartsView() {
             </div>
             <div className="flex min-h-0 flex-[2] border-t border-border lg:flex-1 lg:flex-col lg:border-t-0 lg:border-l">
                 {FLATS.map((f) => (
-                    <FlatView key={f.label} part={shown} pieces={pieces} view={f} detail={detail} />
+                    <FlatView
+                        key={f.label}
+                        part={shown}
+                        pieces={pieces}
+                        labels={labels}
+                        view={f}
+                        detail={detail}
+                    />
                 ))}
             </div>
         </div>
@@ -237,11 +246,13 @@ export default function PartsView() {
 function FlatView({
     part,
     pieces,
+    labels,
     view,
     detail,
 }: {
     part: Part;
     pieces: Piece[];
+    labels: RigLabel[];
     view: (typeof FLATS)[number];
     detail: Detail;
 }) {
@@ -310,6 +321,28 @@ function FlatView({
                             depth={(p) => cam.depth(p)}
                         />
                     ))}
+                {/* What's written on the part, level at where it is, nearest last. */}
+                {inBrowser &&
+                    [...labels]
+                        .sort((a, b) => cam.depth(b.at) - cam.depth(a.at))
+                        .map((l, i) => {
+                            const at = toSvg(l.at);
+                            return (
+                                <text
+                                    key={i}
+                                    x={svgNumber(at.x)}
+                                    y={svgNumber(at.y)}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    fontSize={7}
+                                    className="fill-ink-muted stroke-surface"
+                                    strokeWidth={2}
+                                    paintOrder="stroke"
+                                >
+                                    {l.text}
+                                </text>
+                            );
+                        })}
                 {/* The scale bar, like the drawing, once in the browser: its length is worked out from the part. */}
                 {inBrowser && (
                     <g
