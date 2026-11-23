@@ -1934,11 +1934,18 @@ function hawsers(): Piece[] {
 
 /**
  * A rope from a carabiner hanging down with its gate towards `ACROSS`, tied for now round its bottom bar (whose middle
- * is `at`) and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend towards the spine.
+ * is `at`) and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend towards the spine. The
+ * carabiner hangs straight down unless it's swung towards `down`.
  */
-export function tiedTo(at: Vector3, rest: Vector3[], r: number, color: string, spine = 0): Piece[] {
+export function tiedTo(
+    at: Vector3,
+    rest: Vector3[],
+    r: number,
+    color: string,
+    spine = 0,
+    down = vec3(0, -1, 0),
+): Piece[] {
     const end = CARABINER_WIDTH / 2;
-    const down = vec3(0, -1, 0);
     // Round the bottom bend's middle line, from the bottom towards the spine (away from the gate).
     const bend = at.sub(down.scale(end));
     const bar = bend
@@ -1950,25 +1957,49 @@ export function tiedTo(at: Vector3, rest: Vector3[], r: number, color: string, s
 }
 
 /**
+ * How far below the top of its hole each of the trolley's carabiners hangs, past just touching it: the rider's, in the
+ * middle hole, and the back one's.
+ */
+const TROLLEY_CLIP_DROP = { hang: 0.022, backUp: 0.003 };
+
+/**
  * A trolley on the wire at `at`, its bumper towards `ahead` (downhill, where it meets the brake blocks), with its two
- * carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the back-up line
- * and the return line together on the one behind it, uphill. Returns where each carabiner's bottom is.
+ * carabiners hanging from the holes below: the rider's dropper on the middle one, and the back-up line and the return
+ * line together on the one behind it, uphill. Each carabiner pivots where it passes through its hole: `swing` turns its
+ * bottom that far (radians) towards `ahead`, as when the trolley's stopped by the brake blocks and the rider swings on,
+ * or back when the return line pulls. Returns where each carabiner's bottom is, and which way it hangs.
  */
 export function rigTrolley(
     at: Vector3,
     ahead: Vector3,
-): { pieces: Piece[]; hang: Vector3; backUp: Vector3 } {
+    swing: { hang?: number; backUp?: number } = {},
+): {
+    pieces: Piece[];
+    hang: Vector3;
+    backUp: Vector3;
+    hangDown: Vector3;
+    backUpDown: Vector3;
+} {
     const t = zipTrolley(at, ahead, ACROSS, HAWSER_R, TROLLEY_COLORS);
     const pieces: Piece[] = [...t.pieces];
-    const down = vec3(0, -1, 0);
-    const clip = (top: Vector3, length: number) => {
-        const bar = top.add(vec3(0, -0.005, 0));
+    const level = vec3(ahead.x, 0, ahead.z).unit();
+    const clip = (top: Vector3, length: number, drop: number, angle = 0) => {
+        const down = vec3(0, -Math.cos(angle), 0).add(level.scale(Math.sin(angle)));
+        const bar = top.add(vec3(0, -0.005 - drop, 0));
         pieces.push(
             ...carabiner(bar, down, ACROSS, C.oval, length, { shape: "oval", through: t.gap }),
         );
-        return bar.add(down.scale(length));
+        return { bottom: bar.add(down.scale(length)), down };
     };
-    return { pieces, hang: clip(t.main, 0.11), backUp: clip(t.towSide, 0.1) };
+    const hang = clip(t.main, 0.11, TROLLEY_CLIP_DROP.hang, swing.hang);
+    const backUp = clip(t.towSide, 0.1, TROLLEY_CLIP_DROP.backUp, swing.backUp);
+    return {
+        pieces,
+        hang: hang.bottom,
+        backUp: backUp.bottom,
+        hangDown: hang.down,
+        backUpDown: backUp.down,
+    };
 }
 
 /** A trolley on hawser `s` at `x`, with its dropper: where its tow points are, back (uphill) and front. */

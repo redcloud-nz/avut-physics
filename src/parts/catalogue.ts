@@ -281,13 +281,21 @@ export const PARTS: Part[] = [
                     HAWSER_R,
                     C.hawser,
                 ),
-                ...tiedTo(t.hang, [t.hang.add(vec3(0, -0.25, 0))], 0.0055, C.dropper),
+                ...tiedTo(
+                    t.hang,
+                    [t.hang.add(t.hangDown.scale(0.25))],
+                    0.0055,
+                    C.dropper,
+                    0,
+                    t.hangDown,
+                ),
                 ...tiedTo(
                     t.backUp,
                     [t.backUp.add(vec3(-0.03, -0.22, 0))],
                     0.0055,
                     C.dropper,
                     -0.007,
+                    t.backUpDown,
                 ),
                 ...tiedTo(
                     t.backUp,
@@ -295,6 +303,7 @@ export const PARTS: Part[] = [
                     0.004,
                     C.returnLine,
                     0.007,
+                    t.backUpDown,
                 ),
             ];
         },
