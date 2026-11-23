@@ -93,8 +93,11 @@ export type Strand = {
         layers: number;
         gather: Vector3;
         ramp: number;
-        /** Its width and thickness at each point, in place of `width` and `thickness` (as where it bunches up). */
-        profile?: { width: number; thickness: number }[];
+        /**
+         * Its width and thickness at each point, in place of `width` and `thickness` (as where it bunches up), and the
+         * way its width lies there, in place of `across` (as where it twists).
+         */
+        profile?: { width: number; thickness: number; across?: Vector3 }[];
     };
 };
 

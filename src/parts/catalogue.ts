@@ -20,6 +20,7 @@ import {
     STATIC_X,
     STOP_BLOCK_COLORS,
     tiedTo,
+    TREE,
     TREE_SHACKLE,
     TROLLEY_COLORS,
     TROLLEY_X,
@@ -391,6 +392,19 @@ export const PARTS: Part[] = [
             return within(foxPieces(), {
                 lo: vec3(a.x - 0.3, a.y - 0.4, -LOG.length / 2 - 0.1),
                 hi: vec3(LOG.x + 0.5, a.y + 0.6, LOG.length / 2 + 0.1),
+            });
+        },
+    },
+    {
+        slug: "fox-tree-anchors",
+        name: "Tree anchors, rigged",
+        group: "Flying fox",
+        about: "The tree at the top end, cut out of the whole: the 4 t round sling choked round the trunk for each hawser, its bow shackle and the hawser's eye, and the backstay's own sling basketed round the trunk above them.",
+        pieces: () => {
+            const g = groundY(TREE.x);
+            return within(foxPieces(), {
+                lo: vec3(TREE.x - TREE.r - 0.3, g - 0.1, -TREE.r - 0.7),
+                hi: vec3(TREE.x + TREE.r + 1.1, g + 1.1, TREE.r + 0.7),
             });
         },
     },

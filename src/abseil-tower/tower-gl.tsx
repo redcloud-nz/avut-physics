@@ -265,11 +265,13 @@ function ribbonGeometry(
     across: THREE.Vector3,
     width: number,
     thickness: number,
-    profile?: { width: number; thickness: number }[],
+    profile?: { width: number; thickness: number; across?: THREE.Vector3 }[],
 ): THREE.BufferGeometry | null {
     const keep = points.map((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
     const pts = points.filter((_, i) => keep[i]);
-    const sizes = (profile ?? points.map(() => ({ width, thickness }))).filter((_, i) => keep[i]);
+    const sizes: { width: number; thickness: number; across?: THREE.Vector3 }[] = (
+        profile ?? points.map(() => ({ width, thickness }))
+    ).filter((_, i) => keep[i]);
     if (pts.length < 2) return null;
     const tangent = (i: number) =>
         pts[Math.min(i + 1, pts.length - 1)]
@@ -279,7 +281,7 @@ function ribbonGeometry(
     // Each point's half-width and half-thickness directions.
     const frames = pts.map((_, i) => {
         const t = tangent(i);
-        const w = across
+        const w = (sizes[i].across ?? across)
             .clone()
             .sub(t.clone().multiplyScalar(across.dot(t)))
             .normalize();
@@ -441,7 +443,10 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
                         across,
                         p.tape.width,
                         p.tape.thickness,
-                        p.tape.profile,
+                        p.tape.profile?.map((q) => ({
+                            ...q,
+                            across: q.across && T(q.across).normalize(),
+                        })),
                     ),
                 );
         } else if (p.kind === "strand") {

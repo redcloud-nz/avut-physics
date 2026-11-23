@@ -386,7 +386,8 @@ export const SLINGS = {
         thickness: TAPE.thickness,
         r: 0.0125,
         color: "var(--fox-sling)",
-        bunched: { width: 0.017, thickness: 0.0055, over: 0.06 },
+        // Climbing tape is flat already, and a carabiner's bar is wide enough for it not to bunch.
+        bunched: { width: 0.025, thickness: TAPE.thickness, over: 0.06 },
     },
 };
 
@@ -425,17 +426,22 @@ export function sling(
 /** A round sling's stripes: two dark lines along it either side of its middle, on both faces. */
 const STRIPE = { at: 0.3, width: 0.003, color: "var(--fox-round-sling-stripe)" };
 
-/** The stripes along a round sling's layer through `points`, `profile` its width and thickness at each. */
-function stripes(
-    points: Vector3[],
-    profile: { width: number; thickness: number }[],
-    across: Vector3,
-): Strand[] {
+/** A tape's width and thickness at a point, and (if it twists) the way its width lies there. */
+type TapeSize = { width: number; thickness: number; across?: Vector3 };
+
+/** The stripes along a round sling's layer through `points`, `profile` its size at each. */
+function stripes(points: Vector3[], profile: TapeSize[], across: Vector3): Strand[] {
     const a = across.unit();
     return [-1, 1].flatMap((s) =>
         tapeRun(
-            points.map((q, i) => q.add(a.scale(s * STRIPE.at * profile[i].width))),
-            profile.map((p) => ({ width: STRIPE.width, thickness: p.thickness + 0.001 })),
+            points.map((q, i) =>
+                q.add((profile[i].across ?? a).unit().scale(s * STRIPE.at * profile[i].width)),
+            ),
+            profile.map((p) => ({
+                width: STRIPE.width,
+                thickness: p.thickness + 0.001,
+                across: p.across,
+            })),
             a,
             STRIPE.color,
             0.0015,
@@ -444,12 +450,12 @@ function stripes(
 }
 
 /**
- * One layer of tape through `points`, `profile` its width and thickness at each, lying `across`, in short strands so it
- * sorts where it is; `r` is how thick the flat views draw it.
+ * One layer of tape through `points`, `profile` its size at each, lying `across` (where the profile doesn't say), in
+ * short strands so it sorts where it is; `r` is how thick the flat views draw it.
  */
 function tapeRun(
     points: Vector3[],
-    profile: { width: number; thickness: number }[],
+    profile: TapeSize[],
     across: Vector3,
     color: string,
     r: number,
@@ -499,17 +505,29 @@ export function basketedSling(
     along: Vector3,
 ): Strand[] {
     const { width, thickness, r, color, bunched } = SLINGS[kind];
+    // Worked out square to the log, then sheared along it as far as the bar rises along it, so the loop hugs the log
+    // on a slant.
+    const axis = along.unit();
     const toBar = bar.sub(log);
-    const D = toBar.len();
-    const a = toBar.unit();
-    const b = up.sub(a.scale(up.dot(a))).unit();
-    const p = (x: number, y: number) => log.add(a.scale(x)).add(b.scale(y));
+    const rise = toBar.dot(axis);
+    const flat = toBar.sub(axis.scale(rise));
+    const D = flat.len();
+    const a = flat.unit();
+    const b = up
+        .sub(a.scale(up.dot(a)))
+        .sub(axis.scale(up.dot(axis)))
+        .unit();
+    const p = (x: number, y: number) =>
+        log
+            .add(a.scale(x))
+            .add(b.scale(y))
+            .add(axis.scale((x / D) * rise));
     // Round the log the two strands of the doubled loop lie flat side by side, strand `k` (0 or 1) `side(k)` along
     // the log from the middle. Each leg ends in a bight through the bow round the crown: one strand comes in over the
     // crown and the other under it, joined round its far side. The two bights lie partly one atop the other, swapping
     // over round the far side, so each strand leaves the crown on the side away from the strands it crosses.
     const side = (k: number) => (k - 0.5) * (width + 0.004);
-    const z = along.unit();
+    const z = axis;
     const r1 = logR + thickness / 2;
     const rb = (layer: number) => barR + bunched.thickness * (layer + 0.5);
     type Flat2 = [number, number];
@@ -986,7 +1004,11 @@ function tower(): Piece[] {
             pieces.push(...guy(from, vec3(f * out, 0, s * (T.half + out)), 0.006, C.guy));
         }
     placed.push(
-        ...line(hanging(vec3(BAR_X, T.bar, T.z), BACKSTAY_TIE, 0.08, 20), 0.0065, C.backstay),
+        ...line(
+            [...hanging(BACKSTAY_TOP, BACKSTAY_TIE.from, 0.08, 20), ...BACKSTAY_TIE.turn],
+            0.0065,
+            C.backstay,
+        ),
     );
     return [...moved(pieces, vec3(0, 0, T.z)), ...placed];
 }
@@ -1043,47 +1065,213 @@ function tree(): Piece[] {
                 "log",
             ),
         );
-    // A round sling choked round the trunk for each hawser, the choke drawn round to the hawser's own side of the
-    // tree, so the two lead off either side of it.
+    // A round sling choked round the trunk for each hawser, the choke where its hawser's line touches the trunk, on
+    // the hawser's own side of the tree, so the two lead off either side of it.
     for (const s of [-1, 1]) {
-        const y = TREE_SLING_Y(s);
         // Built on level ground, and put on the ground at the tree at the end.
         const shackle = TREE_SHACKLE(s).add(vec3(0, -groundY(TREE.x), 0));
-        const choke = s * CHOKE;
-        const rr = TREE.r + 0.02;
-        const around = Array.from({ length: 25 }, (_, i) => {
-            const a = choke + s * 2 * Math.PI * (i / 24);
-            return vec3(TREE.x + rr * Math.cos(a), y, rr * Math.sin(a));
-        });
-        // Round the trunk from the choke and back to it, then out through itself to the shackle.
-        pieces.push(...sling("round", [...around, shackle], UP, shackle, 0.3));
+        const { angle, turn, at } = TREE_CHOKE(s);
+        const y = at.y - groundY(TREE.x);
+        pieces.push(...chokedSling(angle, turn, y, TREE_WRAP_R(s), shackle));
     }
-    // The backstay's own sling, basketed round the trunk just above the others, to a carabiner in front.
-    const tie = BACKSTAY_TIE.add(vec3(0, -groundY(TREE.x), 0));
-    const rr = TREE.r + 0.02;
-    const basket = Array.from({ length: 13 }, (_, i) => {
-        const a = Math.PI / 4 + ((3 * Math.PI) / 2) * (i / 12);
-        return vec3(TREE.x + rr * Math.cos(a), BACKSTAY_SLING_Y, rr * Math.sin(a));
-    });
-    pieces.push(...sling("round", [tie, ...basket, tie], UP, tie, 0.3));
-    pieces.push(...bar(tie.add(vec3(-0.03, 0, 0)), tie.add(vec3(0.05, 0, 0)), 0.012, C.steel));
+    // The backstay's own sling, basketed round the trunk above the others, up into a bow shackle in line with the
+    // backstay, which is tied to the shackle's pin.
+    const g = vec3(0, -groundY(TREE.x), 0);
+    const { crown, along: toTower } = BACKSTAY_SHACKLE;
+    // Standing on edge, its crown bar upright, so the sling's strands, on edge round the trunk, lie flat round it.
+    const { upright } = linkPlanes(toTower);
+    const bow = shackle("bow", crown.add(g), toTower, upright, C.steel, C.pin);
+    pieces.push(...bow.pieces);
+    const centre = vec3(TREE.x, BACKSTAY_SLING_Y, 0);
+    const crownBar = crown.add(g).sub(toTower.scale(SHACKLE_19.body));
+    pieces.push(...basketedSling("round", centre, TREE.r, crownBar, SHACKLE_19.body, ACROSS, UP));
     return shift(pieces, groundY(TREE.x));
 }
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
 const BACKSTAY_SLING_Y = 0.7;
-/** Where the backstay's tied to its sling: a carabiner out in front of the tree, on the centre line. */
-const BACKSTAY_TIE = vec3(TREE.x + TREE.r + 0.4, groundY(TREE.x) + BACKSTAY_SLING_Y, 0);
+/** The backstay's top end, at the middle of the tower's top bar. */
+const BACKSTAY_TOP = vec3(BAR_X, TOWER.bar, TOWER.z);
+/**
+ * The bow shackle on the backstay's sling: its crown's inside out in front of the tree, straight towards the
+ * backstay's top end, so the sling, the shackle and the backstay line up; and the way along it.
+ */
+const BACKSTAY_SHACKLE = (() => {
+    const centre = vec3(TREE.x, groundY(TREE.x) + BACKSTAY_SLING_Y, 0);
+    const along = BACKSTAY_TOP.sub(centre).unit();
+    return { crown: centre.add(along.scale(TREE.r + 0.45)), along };
+})();
+/** Where the backstay's tied to its shackle's pin, for now with a turn round it. */
+const BACKSTAY_TIE = (() => {
+    const { crown, along } = BACKSTAY_SHACKLE;
+    const { upright } = linkPlanes(along);
+    const pin = crown.add(along.scale(SHACKLE_19.length + SHACKLE_19.pin));
+    return tiedRound(pin, upright.cross(along), SHACKLE_19.pin, BACKSTAY_TOP, 0.0065);
+})();
 
-/** How far round the trunk each sling's choke is drawn from the front (radians), towards its hawser's side. */
-const CHOKE = (70 * Math.PI) / 180;
-/** How high on the trunk each sling is choked. */
-const TREE_SLING_Y = (s: number) => (s > 0 ? 0.5 : 0.35);
-/** Where hawser `s`'s eye is shackled to its sling round the tree: out from the choke on its own side. */
+/**
+ * A round sling choked round the trunk, the hawser's line touching the trunk at `angle` round it (the sling arriving
+ * there heading out going `turn` round) at height `y`, out to the bow shackle whose crown's inside is at `crown` (the
+ * shackle lying flat, its crown bar level and square to the leg). The loop goes round the trunk from the far side of
+ * its choke, out along the leg towards the shackle, and through its own bight, the choke, `TREE_CHOKE_AT` of the way
+ * out, which squeezes the leg's two strands together. Followed round: from the crown along the leg's top strand to the
+ * trunk, the long way round the tree, out from its far side to the choke, round the leg in a flat bight and back, round
+ * the tree again the other way, and out along the leg's bottom strand to the crown, round its far side and back. Round
+ * the trunk the strands lie on edge one above the other; the leg twists a quarter turn to lie flat through the bow,
+ * bunching up into it, and the choke's bight twists to lie flat round the leg.
+ */
+function chokedSling(angle: number, turn: number, y: number, R: number, crown: Vector3): Strand[] {
+    const { width, thickness, r, color, bunched } = SLINGS.round;
+    const ease = (t: number) => t * t * (3 - 2 * t);
+    const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+    const onTrunk = (a: number, h: number) => vec3(TREE.x + R * Math.cos(a), h, R * Math.sin(a));
+    const apart = (width + 0.004) / 2;
+    const touch = onTrunk(angle, y);
+    const d = crown.sub(touch).unit();
+    const { flat: up } = linkPlanes(d);
+    const w = up.cross(d);
+    const barR = SHACKLE_19.body;
+    const bar = crown.sub(d.scale(barR));
+    const rb = barR + bunched.thickness / 2;
+    const legLength = touch.distanceTo(bar);
+    // The choke, out along the leg, where the leg's strands are squeezed together.
+    const sA = TREE_CHOKE_AT;
+    const choke = touch.lerp(bar, sA);
+    const squeezed = { width: 0.036, thickness: 0.018, apart: 0.012 };
+    // Seen from above, the other line from the choke that just touches the trunk: where the loop leaves the trunk.
+    const plan = Math.hypot(choke.x - TREE.x, choke.z);
+    const wedge = 2 * Math.acos(R / plan);
+    const far = angle - turn * (2 * Math.PI - wedge);
+    const leaves = onTrunk(far, y);
+    // Out from the trunk at the choke, away from the trunk, square to the leg.
+    const outward = w.scale(Math.sign(w.dot(choke.sub(vec3(TREE.x, choke.y, 0)))));
+    const pts: Vector3[] = [];
+    const sizes: TapeSize[] = [];
+    const push = (q: Vector3, across: Vector3, size = { width, thickness }) => {
+        pts.push(q);
+        sizes.push({ ...size, across });
+    };
+    // A leg strand at `s` of the way from the trunk to the crown, above the middle (`k` 1) or below.
+    const legPoint = (k: number, s: number) => {
+        const off =
+            s < sA
+                ? apart + (squeezed.apart - apart) * ease(s / sA)
+                : squeezed.apart + (rb - squeezed.apart) * ease((s - sA) / (1 - sA));
+        const side = UP.lerp(up, ease(s)).unit();
+        const twist = (Math.PI / 2) * ease(s);
+        // Squeezed round the choke, bunched into the crown.
+        const g = ease(clamp01((Math.abs(s - sA) * legLength) / 0.08));
+        const c = ease(
+            clamp01((bar.distanceTo(touch.lerp(bar, s)) - 0.2 * bunched.over) / bunched.over),
+        );
+        const [tw, tt] = [
+            Math.min(
+                squeezed.width + (width - squeezed.width) * g,
+                bunched.width + (width - bunched.width) * c,
+            ),
+            Math.max(
+                squeezed.thickness + (thickness - squeezed.thickness) * g,
+                bunched.thickness + (thickness - bunched.thickness) * c,
+            ),
+        ];
+        push(
+            touch.lerp(bar, s).add(side.scale(k * off)),
+            UP.scale(Math.cos(twist)).add(w.scale(Math.sin(twist))),
+            { width: tw, thickness: tt },
+        );
+    };
+    const leg = (k: number, out: boolean) => {
+        for (let i = 0; i <= 24; i++) legPoint(k, out ? i / 24 : 1 - i / 24);
+    };
+    // Round the trunk from angle `a0` to `a1`, `h` above or below the middle. The loop round the trunk lies in the plane
+    // of the leg and the other line to the choke, which both pull towards the choke: tilted, so it meets both without
+    // a corner and is lowest round the back.
+    const tilt = choke.sub(touch).cross(choke.sub(leaves));
+    const planeY = (x: number, z: number) =>
+        choke.y - (tilt.x * (x - choke.x) + tilt.z * (z - choke.z)) / tilt.y;
+    const round = (a0: number, a1: number, h: number) => {
+        for (let i = 1; i < 30; i++) {
+            const q = onTrunk(a0 + ((a1 - a0) * i) / 30, 0);
+            push(vec3(q.x, planeY(q.x, q.z) + h, q.z), UP);
+        }
+    };
+    // The choke's bight round the squeezed leg: a smooth curve, open towards the trunk, lying flat along the leg.
+    const high = squeezed.apart + squeezed.width / 2 + thickness / 2 + 0.003;
+    const reach = squeezed.width / 2 + thickness / 2 + 0.003;
+    const bightPoint = (phi: number) =>
+        choke
+            .add(up.scale(high * Math.cos(phi)))
+            .add(outward.scale(reach * (1.65 * Math.sin(phi) - 0.5)));
+    // Between the trunk and the choke, along the other line, twisting a quarter turn smoothly all the way from where
+    // it leaves the trunk to the bight.
+    const across = (from: Vector3, to: Vector3, toChoke: boolean) => {
+        for (let i = 1; i < 20; i++) {
+            const t = i / 20;
+            const twist = ease(toChoke ? t : 1 - t);
+            push(from.lerp(to, t), UP.lerp(d, twist).unit());
+        }
+    };
+    // From the crown along the leg's top strand to the trunk, the long way round to the far side.
+    leg(1, false);
+    round(angle, far, apart);
+    push(leaves.add(UP.scale(apart)), UP);
+    // Out to the choke, round the leg and back.
+    across(leaves.add(UP.scale(apart)), bightPoint(0), true);
+    for (let i = 0; i <= 16; i++) push(bightPoint((Math.PI * i) / 16), d);
+    across(bightPoint(Math.PI), leaves.sub(UP.scale(apart)), false);
+    push(leaves.sub(UP.scale(apart)), UP);
+    // Round the trunk again the other way, and out along the leg's bottom strand to the crown.
+    round(far, angle, -apart);
+    leg(-1, true);
+    // Round the crown's far side, from its bottom to its top, back to the start.
+    for (let i = 1; i < 12; i++) {
+        const t = -Math.PI / 2 + (Math.PI * i) / 12;
+        push(bar.add(d.scale(rb * Math.cos(t))).add(up.scale(rb * Math.sin(t))), w, bunched);
+    }
+    push(pts[0], sizes[0].across!, sizes[0]);
+    return [...tapeRun(pts, sizes, w, color, r), ...stripes(pts, sizes, w)];
+}
+
+/** How far out along a tree sling's leg, from the trunk towards the shackle, its choke sits. */
+const TREE_CHOKE_AT = 0.5;
+
+/** How high on the trunk both slings are choked, level with each other so the hawsers lie alike. */
+const TREE_SLING_Y = 0.42;
+/**
+ * The radius hawser `s`'s sling round the trunk lies at: the trunk's, out to the middle of the sling's thickness. The
+ * two cross round the back, hawser A's over hawser B's, so it lies a layer further out.
+ */
+const TREE_WRAP_R = (s: number) => TREE.r + SLINGS.round.thickness * (s > 0 ? 1.5 : 0.5);
+/** How far each tree sling's choke is from its shackle (the inside of the bow's crown). */
+const TREE_LEG = 0.7;
+/**
+ * Where hawser `s`'s sling is choked round the trunk: seen from above, where the line from its cradle on the tower
+ * just touches the sling round the trunk, on the hawser's own side, so the sling leaves the trunk in line with the
+ * hawser. Its angle round the trunk (anticlockwise from +x, seen with +z towards that angle's sine), which way round
+ * the sling runs to arrive there heading out (`turn`, ±1), and the point, at the sling's height.
+ */
+const TREE_CHOKE = (s: number) => {
+    const [cx, cz] = [BAR_X - TREE.x, s * HAWSER_Z];
+    const d = Math.hypot(cx, cz);
+    const R = TREE_WRAP_R(s);
+    const angle = Math.atan2(cz, cx) + s * Math.acos(R / d);
+    const at = vec3(
+        TREE.x + R * Math.cos(angle),
+        groundY(TREE.x) + TREE_SLING_Y,
+        R * Math.sin(angle),
+    );
+    // Heading round the trunk anticlockwise at the choke is (-sin, cos); the sling arrives heading towards the cradle.
+    const heading = -Math.sin(angle) * (cx + TREE.x - at.x) + Math.cos(angle) * (cz - at.z);
+    return { angle, turn: Math.sign(heading), at };
+};
+/**
+ * Where hawser `s`'s eye is shackled to its sling round the tree: out from the choke along the line to the hawser's
+ * cradle on the tower, so the sling's leg, the shackle and the hawser line up.
+ */
 export const TREE_SHACKLE = (s: number) => {
-    const rr = TREE.r + 0.02;
-    const choke = vec3(TREE.x + rr * Math.cos(CHOKE), 0, s * rr * Math.sin(CHOKE));
-    return choke.add(vec3(0.45, groundY(TREE.x) + TREE_SLING_Y(s), s * 0.1));
+    const { at } = TREE_CHOKE(s);
+    const cradle = vec3(BAR_X, CRADLE_Y, s * HAWSER_Z);
+    return at.add(cradle.sub(at).unit().scale(TREE_LEG));
 };
 
 /** The H-frame shear leg at the bottom end, its lashings, bagging and guys. */
