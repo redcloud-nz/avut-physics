@@ -265,8 +265,11 @@ function ribbonGeometry(
     across: THREE.Vector3,
     width: number,
     thickness: number,
+    profile?: { width: number; thickness: number }[],
 ): THREE.BufferGeometry | null {
-    const pts = points.filter((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
+    const keep = points.map((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
+    const pts = points.filter((_, i) => keep[i]);
+    const sizes = (profile ?? points.map(() => ({ width, thickness }))).filter((_, i) => keep[i]);
     if (pts.length < 2) return null;
     const tangent = (i: number) =>
         pts[Math.min(i + 1, pts.length - 1)]
@@ -281,7 +284,10 @@ function ribbonGeometry(
             .sub(t.clone().multiplyScalar(across.dot(t)))
             .normalize();
         const n = t.clone().cross(w);
-        return { w: w.multiplyScalar(width / 2), n: n.multiplyScalar(thickness / 2) };
+        return {
+            w: w.multiplyScalar(sizes[i].width / 2),
+            n: n.multiplyScalar(sizes[i].thickness / 2),
+        };
     });
     const position: number[] = [];
     const normal: number[] = [];
@@ -428,7 +434,16 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
             // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
             const across = T(p.tape.across).normalize();
             for (const layer of tapeLayers(p))
-                add(color, ribbonGeometry(layer.map(T), across, p.tape.width, p.tape.thickness));
+                add(
+                    color,
+                    ribbonGeometry(
+                        layer.map(T),
+                        across,
+                        p.tape.width,
+                        p.tape.thickness,
+                        p.tape.profile,
+                    ),
+                );
         } else if (p.kind === "strand") {
             // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
             const lift = new THREE.Vector3(0, r - p.r, 0);

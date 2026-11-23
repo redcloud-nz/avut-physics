@@ -561,8 +561,8 @@ const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "d
 
 /** Tape and rope, as round as they're drawn. */
 const SLING_R = 0.0125;
-/** The beam slings' flat tape. */
-const TAPE = { width: 0.035, thickness: 0.003 };
+/** The beam slings' flat tape (climbing slings, sewn from tubular tape). */
+export const TAPE = { width: 0.035, thickness: 0.003 };
 const ROPE_R = 0.0055;
 /** How far from an abseil rope a belay beside it crosses the rail. */
 const BESIDE_GAP = 0.12;

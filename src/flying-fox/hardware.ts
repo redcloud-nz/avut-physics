@@ -1140,9 +1140,10 @@ export function turnbuckle(
 
 /**
  * A heavy wire rope thimble for 11 mm wire (metres): its inside length from the crown to its point, its inside width
- * across the crown, its channel's thickness, and how far (radians) past a half turn round the wire its flanges curl.
+ * across the crown, its metal's thickness, and how far round the wire (radians, either way from its inside) the channel
+ * hugs it before its flanges flare out.
  */
-export const THIMBLE_11 = { length: 0.072, width: 0.034, web: 0.0035, flange: 0.35 };
+export const THIMBLE_11 = { length: 0.072, width: 0.034, web: 0.003, flange: 1.15 };
 
 /**
  * A thimble with a wire's eye round it, its crown's inside at `near`, its point towards `d`, lying square to `m`.
@@ -1178,18 +1179,61 @@ export function thimble(
         return pts;
     };
     const groove = web + wireR;
-    // The channel: a U round the wire's inside, swept round the teardrop as strands side by side across it, its edges
-    // (the flanges) curling a little past halfway round the wire.
+    // The channel's section, a line through the middle of its metal (out from the wire's middle, and across): hugging
+    // the inside of the wire, then its flanges flaring out either side to thin flat edges past the wire's middle.
     const rho = wireR + web / 2;
-    const reach = Math.PI / 2 + flange;
-    const pieces: Piece[] = Array.from({ length: 11 }, (_, i) => {
-        const t = -reach + (2 * reach * i) / 10;
-        return steelStrand(
-            path(groove - rho * Math.cos(t), rho * Math.sin(t), 0.0015),
-            web / 2 + 0.0004,
-            color,
-        );
+    const half: Flat[] = Array.from({ length: 7 }, (_, k): Flat => {
+        const t = (flange * k) / 6;
+        return [-rho * Math.cos(t), rho * Math.sin(t)];
     });
+    const [er, ez] = half[6];
+    half.push([er + 0.0025, ez + 0.0018], [er + 0.0055, ez + 0.0025]);
+    const section: Flat[] = [
+        ...half
+            .slice(1)
+            .reverse()
+            .map(([r, z]): Flat => [r, -z]),
+        ...half,
+    ];
+    // Each section point moved `by` across the metal (positive towards the wire), along the section's normal there.
+    const offset = (by: number): Flat[] =>
+        section.map(([r, z], j) => {
+            const [a, b] = [
+                section[Math.max(j - 1, 0)],
+                section[Math.min(j + 1, section.length - 1)],
+            ];
+            const [tr, tz] = [b[0] - a[0], b[1] - a[1]];
+            const len = Math.hypot(tr, tz);
+            return [r + (by * tz) / len, z - (by * tr) / len];
+        });
+    const centres = path(groove, 0, 0.0015);
+    const sweep = ([r, z]: Flat) => path(groove + r, z, 0.0015);
+    const pieces: Piece[] = [];
+    // A surface between two lines across the section, swept round, facing away from the wire or towards it.
+    const surface = (line: Flat[], outward: boolean) => {
+        const grid = line.map(sweep);
+        for (let j = 0; j + 1 < grid.length; j++)
+            for (let i = 0; i + 1 < centres.length; i++) {
+                const points = [grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]];
+                const mid = points[0].lerp(points[2], 0.5);
+                const n = points[1].sub(points[0]).cross(points[3].sub(points[0])).unit();
+                const away = mid.sub(centres[i].lerp(centres[i + 1], 0.5)).dot(n) > 0;
+                pieces.push({
+                    kind: "face",
+                    points,
+                    material: "steel",
+                    normal: away === outward ? n : n.neg(),
+                    color,
+                    toScale: true,
+                });
+            }
+    };
+    const [inner, outer] = [offset(web / 2), offset(-web / 2)];
+    surface(inner, false);
+    surface(outer, true);
+    // The flanges' flat edges.
+    surface([inner[0], outer[0]], true);
+    surface([inner.at(-1)!, outer.at(-1)!], true);
     return { pieces, wire: path(groove, 0, apart), side: f.w };
 }
 

@@ -344,6 +344,8 @@ html {
   --fox-grigri: #c3cc1e;
   /* The round slings (pastel purple). */
   --fox-sling: #b9a3e3;
+  --fox-round-sling: #12876b;
+  --fox-round-sling-stripe: #1d2b25;
   --fox-grigri-handle: #4b4f56;
   /* The flying fox's ground: grass, and the dry, bare ground it shades into in patches. */
   --fox-ground: #2f5238;

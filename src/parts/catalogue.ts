@@ -8,12 +8,14 @@ import {
     groundY,
     HAWSER_R,
     line,
+    LOG,
     onHawser,
     PULLEY_COLORS,
     rigPulley,
     rigTrolley,
     SADDLE,
     SHEAR_LEG,
+    sling,
     SLING_Z,
     STATIC_X,
     STOP_BLOCK_COLORS,
@@ -67,6 +69,16 @@ const wire = (at: Vector3, half: number): Piece[] =>
 /** A rope round a pulley, out to `a` and `b`. */
 function reeved(p: { a: Vector3; b: Vector3 }, centre: Vector3, a: Vector3, b: Vector3, r = 0.004) {
     return line([a, ...wrap(centre, p.a, p.b), b], r, C.returnLine);
+}
+
+/** A sling laid out flat on edge as an oval: its two parts `long` apart end to end, round ends `r` across. */
+function slingLoop(kind: "round" | "climbing", long: number, r: number): Piece[] {
+    const pts = Array.from({ length: 41 }, (_, i) => {
+        const t = (2 * Math.PI * i) / 40;
+        const end = Math.cos(t) >= 0 ? long / 2 - r : -(long / 2 - r);
+        return vec3(end + r * Math.cos(t), 0, r * Math.sin(t));
+    });
+    return sling(kind, pts, UP, ORIGIN, 1, 1);
 }
 
 export const PARTS: Part[] = [
@@ -188,11 +200,16 @@ export const PARTS: Part[] = [
             return [
                 ...t.pieces,
                 ...line(
-                    [...t.wire.slice(1, -1).reverse(), first, first.add(ALONG.scale(0.15))],
+                    [
+                        last.add(ALONG.scale(0.15)),
+                        last,
+                        ...t.wire.slice(1, -1).reverse(),
+                        first,
+                        first.add(ALONG.scale(0.15)),
+                    ],
                     HAWSER_R,
                     C.hawser,
                 ),
-                ...line([last, last.add(ALONG.scale(0.15))], HAWSER_R, C.hawser),
             ];
         },
     },
@@ -210,6 +227,20 @@ export const PARTS: Part[] = [
                 ...wire(off.neg(), 0.1),
             ];
         },
+    },
+    {
+        slug: "round-sling",
+        name: "Round sling (4 t)",
+        group: "Hardware",
+        about: "A round sling, as the book calls the anchors' 4 t slings, here 1 m long: an endless loop of yarn in a woven sleeve. It isn't round: the sleeve squashes semi-flat, about 50 mm wide and 14 mm thick. Laid out on edge, its two parts either side.",
+        pieces: () => slingLoop("round", 1, 0.04),
+    },
+    {
+        slug: "climbing-sling",
+        name: "Climbing sling",
+        group: "Hardware",
+        about: "A climbing sling, 1.2 m long, as on the abseil tower and on the flying fox's bottom shear legs: tape sewn into a loop, flat, 25 mm wide and 3 mm thick. Laid out on edge.",
+        pieces: () => slingLoop("climbing", 1.2, 0.03),
     },
     {
         slug: "fox-trolley",
@@ -351,6 +382,19 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "fox-log-anchor",
+        name: "Log anchor, rigged",
+        group: "Flying fox",
+        about: "The log and picket anchor at the bottom end, cut out of the whole: the log behind two rows of pickets, and the three 4 t round slings basketed round it, one shackled to each hawser and the middle one to the Tirfor.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(0);
+            return within(foxPieces(), {
+                lo: vec3(a.x - 0.3, a.y - 0.4, -LOG.length / 2 - 0.1),
+                hi: vec3(LOG.x + 0.5, a.y + 0.6, LOG.length / 2 + 0.1),
+            });
+        },
+    },
+    {
         slug: "fox-tree-eye",
         name: "Hawser eye at the tree, rigged",
         group: "Flying fox",
@@ -367,7 +411,7 @@ export const PARTS: Part[] = [
         slug: "fox-stabiliser",
         name: "Stabiliser pulley on the shear leg",
         group: "Flying fox",
-        about: "The stabiliser's pulley as the flying fox hangs it, cut out of the whole: from a round sling basketed over the shear leg's top spar, swung to line up with the pull of the shock cord through it.",
+        about: "The stabiliser's pulley as the flying fox hangs it, cut out of the whole: from a climbing sling basketed over the shear leg's top spar, each leg's bight round the carabiner's bar, swung to line up with the pull of the shock cord through it.",
         pieces: () => {
             const spar = vec3(SHEAR_LEG.x, groundY(SHEAR_LEG.x) + SHEAR_LEG.spar, 0);
             return within(foxPieces(), {
