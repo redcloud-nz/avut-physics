@@ -412,7 +412,7 @@ export const PARTS: Part[] = [
         slug: "fox-tirfor",
         name: "Tirfor and lizard, rigged",
         group: "Flying fox",
-        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable and the lizard making one slack curve up to hawser A, the cable's hook in the lizard's bottom eye, and the lizard clamped along the hawser by three double base clamps, its free eye a little way past them. Its slack tail runs back over the log. Hawser B's lizard hangs free, waiting.",
+        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable and the lizard making one slack curve up to hawser A, the cable's hook on a swaged eye, in the lizard's bottom eye, and the lizard clamped along the hawser by three double base clamps, its free eye a little way past them. Its slack tail runs back over the log. Hawser B's lizard hangs free, waiting.",
         pieces: () => {
             const a = ANCHOR_SHACKLE(0);
             const top = ANCHOR_SHACKLE(SLING_Z).add(

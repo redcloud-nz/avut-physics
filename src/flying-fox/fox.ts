@@ -415,7 +415,21 @@ export function sling(
     const { width, thickness, r, color } = SLINGS[kind];
     const tape = { width, thickness, across, layers, gather, ramp };
     const strands = line(points, r, color, "sling").map((p) => ({ ...p, tape }));
-    if (kind !== "round") return strands;
+    if (kind !== "round")
+        return [
+            ...strands,
+            ...strands
+                .flatMap((p) =>
+                    tapeLayers(p).map((layer) => ({ layer, size: { width, thickness } })),
+                )
+                .flatMap(({ layer, size }) =>
+                    stitching(
+                        layer,
+                        layer.map(() => size),
+                        across,
+                    ),
+                ),
+        ];
     // A round sling's stripes, along each layer.
     return [
         ...strands,
@@ -455,6 +469,71 @@ function stripes(points: Vector3[], profile: TapeSize[], across: Vector3): Stran
             0.0015,
         ).map((p) => ({ ...p, fine: STRIPE.width })),
     );
+}
+
+/**
+ * A climbing sling's stitching, the pattern woven along its tape: two rows of short light dashes, on both faces.
+ */
+const STITCH = {
+    rows: [-0.22, 0.22],
+    dash: 0.008,
+    gap: 0.008,
+    width: 0.0012,
+    color: "var(--fox-sling-stitch)",
+};
+
+/** The stitching along a climbing sling's layer through `points`, `profile` its size at each. */
+function stitching(points: Vector3[], profile: TapeSize[], across: Vector3): Strand[] {
+    const a = across.unit();
+    const at = [0];
+    for (let i = 1; i < points.length; i++)
+        at.push(at[i - 1] + points[i].distanceTo(points[i - 1]));
+    // The point and size `d` along the tape, `off` (of its width) out from its middle.
+    const sample = (d: number, off: number): { q: Vector3; size: TapeSize } => {
+        const i = Math.min(
+            points.length - 1,
+            Math.max(
+                1,
+                at.findIndex((x) => x >= d),
+            ),
+        );
+        const k = Math.min(1, Math.max(0, (d - at[i - 1]) / (at[i] - at[i - 1] || 1)));
+        const p = profile[i];
+        const w = (p.across ?? a).unit();
+        return { q: points[i - 1].lerp(points[i], k).add(w.scale(off * p.width)), size: p };
+    };
+    const out: Strand[] = [];
+    const step = STITCH.dash + STITCH.gap;
+    // Fine detail, which the flat views leave out when it's too small to see.
+    const fine = { fine: STITCH.width };
+    for (const off of STITCH.rows)
+        for (let d = 0; d + STITCH.dash < at.at(-1)!; d += step) {
+            const ends = [sample(d, off), sample(d + STITCH.dash, off)];
+            out.push({
+                ...fine,
+                kind: "strand",
+                points: ends.map((e) => e.q),
+                r: 0.0008,
+                material: "sling",
+                color: STITCH.color,
+                capA: true,
+                capB: true,
+                tape: {
+                    width: STITCH.width,
+                    thickness: ends[0].size.thickness + 0.0008,
+                    across: a,
+                    layers: 1,
+                    gather: ends[0].q,
+                    ramp: 1,
+                    profile: ends.map((e) => ({
+                        width: STITCH.width,
+                        thickness: e.size.thickness + 0.0008,
+                        across: e.size.across,
+                    })),
+                },
+            });
+        }
+    return out;
 }
 
 /**
@@ -534,6 +613,9 @@ export function basketedSling(
     // the log from the middle. Each leg ends in a bight through the bow round the crown: one strand comes in over the
     // crown and the other under it, joined round its far side. The two bights lie partly one atop the other, swapping
     // over round the far side, so each strand leaves the crown on the side away from the strands it crosses.
+    // A climbing sling's thin flat tape comes together in the carabiner, one bight on the other; its legs close
+    // from side by side round the rail to one on the other there.
+    const stacked = kind === "climbing";
     const side = (k: number) => (k - 0.5) * (width + 0.004);
     const z = axis;
     const r1 = logR + thickness / 2;
@@ -558,7 +640,7 @@ export function basketedSling(
     const ease = (t: number) => t * t * (3 - 2 * t);
     // In the bow each bight is pushed to one side, the top leg's towards +z; each strand runs straight from there to
     // its place round the log, so the one whose place is on the far side angles across more.
-    const lap = 0.3 * bunched.width;
+    const lap = stacked ? 0 : 0.3 * bunched.width;
     const inBow = (bight: number) => (bight === 0 ? lap : -lap);
     const pts: Vector3[] = [];
     // A leg of strand `k` between the crown (in `bight`) and the log.
@@ -613,7 +695,10 @@ export function basketedSling(
         };
     });
     const tape = tapeRun(points, profile, z, color, r);
-    return kind === "round" ? [...tape, ...stripes(points, profile, z)] : tape;
+    return [
+        ...tape,
+        ...(kind === "round" ? stripes(points, profile, z) : stitching(points, profile, z)),
+    ];
 }
 
 /** Points along a hanging line from `a` to `b`, `sag` below the straight line between them at its middle. */
@@ -1622,18 +1707,24 @@ function alongPath(path: Vector3[], d: number): { at: Vector3; dir: Vector3; i: 
 }
 
 /**
- * The lizard's eye at one end: a thimble with its crown's inside at `near`, pointing `d` along the wire, square to `m`,
- * the wire's tail pressed into a ferrule. Returns its pieces and the end of the ferrule, where the wire runs on.
+ * A swaged eye in a wire of radius `wireR` (a lizard's ends, the Tirfor cable's hook end): a thimble with its crown's
+ * inside at `near`, pointing `d` along the wire, square to `m`, the wire's tail pressed into a ferrule ten times the
+ * wire's radius long. Returns its pieces and the end of the ferrule, where the wire runs on.
  */
-function lizardEye(near: Vector3, d: Vector3, m: Vector3): { pieces: Piece[]; end: Vector3 } {
-    const th = thimble(near, d, m, LIZARD_R, C.steel);
+function swagedEye(
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    wireR = LIZARD_R,
+): { pieces: Piece[]; end: Vector3 } {
+    const th = thimble(near, d, m, wireR, C.steel);
     const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
-    const ferrule = [tips.add(d.scale(0.015)), tips.add(d.scale(0.055))];
+    const ferrule = [tips.add(d.scale(3.75 * wireR)), tips.add(d.scale(13.75 * wireR))];
     return {
         pieces: [
             ...th.pieces,
-            ...bar(ferrule[0], ferrule[1], LIZARD_R * 2.2, C.steel),
-            ...line([ferrule[0], ...th.wire, ferrule[0]], LIZARD_R, C.hawser, "steel"),
+            ...bar(ferrule[0], ferrule[1], wireR * 2.2, C.steel),
+            ...line([ferrule[0], ...th.wire, ferrule[0]], wireR, C.hawser, "steel"),
         ],
         end: ferrule[1],
     };
@@ -1660,7 +1751,7 @@ function lizard(s: number, hang: Vector3[]): Piece[] {
     const past = on(LIZARD.clamps[2] + 0.05).add(side);
     const droop = along.scale(0.45).sub(UP).unit();
     const tip = past.add(along.scale(LIZARD.tail - 0.2)).sub(UP.scale(0.06));
-    const top = lizardEye(tip.add(droop.scale(LIZARD_EYE)), droop.neg(), along.cross(UP).unit());
+    const top = swagedEye(tip.add(droop.scale(LIZARD_EYE)), droop.neg(), along.cross(UP).unit());
     pieces.push(...top.pieces);
     const free = bezier3(
         past,
@@ -1705,15 +1796,25 @@ function lizardAndTirfor(): Piece[] {
     const toEye = c.bowl + c.r + c.shank + c.eye + c.r;
     const cableHook = hook(j.at.sub(j.dir.scale(toEye)), j.dir, pinWay, C.steel, c);
     pieces.push(...cableHook.pieces);
-    // The cable from the rope guide to round the hook's eye.
-    const cableEnd = j.at.sub(j.dir.scale(toEye + c.eye + c.r));
+    // The cable from the rope guide to its swaged eye, its thimble through the hook's eye (its crown bearing on the
+    // far side of the eye's bar from the Tirfor).
+    const hookEye = j.at.sub(j.dir.scale(toEye));
+    const cableEye = swagedEye(
+        hookEye.sub(j.dir.scale(c.eye)),
+        j.dir.neg(),
+        cableHook.along,
+        TIRFOR_CABLE_R,
+    );
+    pieces.push(...cableEye.pieces);
     const before = alongPath(
         run,
-        total - LIZARD.hang - eyeLength - c.r - toEye - c.eye - c.r - 0.03,
+        total - LIZARD.hang - eyeLength - c.r - toEye - hookEye.distanceTo(cableEye.end) - 0.03,
     );
-    pieces.push(...line([...run.slice(0, before.i), cableEnd], TIRFOR_CABLE_R, C.hawser, "steel"));
+    pieces.push(
+        ...line([...run.slice(0, before.i), cableEye.end], TIRFOR_CABLE_R, C.hawser, "steel"),
+    );
     // The lizard's bottom eye round the hook's bar at the bottom of its bowl, its crown on the Tirfor's side.
-    const bottomA = lizardEye(cableHook.bar.sub(j.dir.scale(c.r)), j.dir, cableHook.along);
+    const bottomA = swagedEye(cableHook.bar.sub(j.dir.scale(c.r)), j.dir, cableHook.along);
     pieces.push(...bottomA.pieces);
     const after = alongPath(run, total - LIZARD.hang + 0.02);
     pieces.push(...lizard(1, [bottomA.end, ...run.slice(after.i)]));
@@ -1722,7 +1823,7 @@ function lizardAndTirfor(): Piece[] {
     const B = lizardLine(-1);
     const footB = lizardFoot(-1);
     const across = B.along.cross(UP).unit();
-    const bottomB = lizardEye(
+    const bottomB = swagedEye(
         footB.sub(B.along.scale(0.22)).sub(UP.scale(0.4 + eyeLength)),
         UP,
         across,

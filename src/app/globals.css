@@ -345,7 +345,8 @@ html {
   /* The GRIGRI+'s coloured side plate (Petzl's yellow-green). */
   --fox-grigri: #c3cc1e;
   /* The round slings (pastel purple). */
-  --fox-sling: #b9a3e3;
+  --fox-sling: #2552c9;
+  --fox-sling-stitch: #8db4f2;
   --fox-round-sling: #12876b;
   --fox-round-sling-stripe: #1d2b25;
   --fox-grigri-handle: #4b4f56;
