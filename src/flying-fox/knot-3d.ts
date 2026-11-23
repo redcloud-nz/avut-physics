@@ -99,34 +99,33 @@ export function knotPieces(
 }
 
 /**
- * A rope split into numbered segments about `every` long (metres), from its start, coloured by turns so each shows,
- * with its number written on it: for talking about which parts of a knot to change.
+ * A rope split into its numbered segments (`seg`, each point's segment), coloured by turns so each shows, with its
+ * number written on it: for talking about which parts of a knot to change.
  */
 export function numberedRope(
     points: Vector3[],
     r: number,
-    every: number,
+    seg: number[],
     colors: [string, string],
 ): { pieces: Piece[]; labels: RigLabel[] } {
     const pieces: Piece[] = [];
     const labels: RigLabel[] = [];
     let from = 0;
-    let along = 0;
-    let n = 1;
-    for (let i = 1; i < points.length; i++) {
-        along += points[i].distanceTo(points[i - 1]);
-        if (along < every && i < points.length - 1) continue;
-        const run = points.slice(from, i + 1);
-        pieces.push(...line(run, r, colors[(n - 1) % 2]));
-        const mid = run[Math.floor(run.length / 2)];
+    for (let i = 1; i <= points.length; i++) {
+        if (i < points.length && seg[i] === seg[from]) continue;
+        // Each run on to the next one's first point, so there's no gap between them.
+        const run = points.slice(from, Math.min(i + 1, points.length));
+        pieces.push(...line(run, r, colors[(seg[from] - 1) % 2]));
+        let length = 0;
+        for (let k = 1; k < run.length; k++) length += run[k].distanceTo(run[k - 1]);
         const dir = run.at(-1)!.sub(run[0]);
         labels.push({
-            text: String(n),
-            at: mid,
-            on: { along: dir.len() > 0 ? dir.unit() : vec3(1, 0, 0), length: along, r },
+            text: String(seg[from]),
+            at: run[Math.floor(run.length / 2)],
+            on: { along: dir.len() > 0 ? dir.unit() : vec3(1, 0, 0), length, r },
             size: 0.55,
         });
-        [from, along, n] = [i, 0, n + 1];
+        from = i;
     }
     return { pieces, labels };
 }

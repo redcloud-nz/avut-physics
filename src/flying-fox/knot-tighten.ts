@@ -17,6 +17,8 @@ export type TightenOptions = {
     pull?: [Vector3, Vector3];
     /** How much shorter the rope gets each step (a fraction of its length), drawing the knot up evenly. */
     shrink?: number;
+    /** Which pieces shrink (each between a point and the next), if not all of them. */
+    shrinking?: boolean[];
     /** How many steps at most, and how many passes over the constraints each step. */
     steps?: number;
     iterations?: number;
@@ -24,6 +26,8 @@ export type TightenOptions = {
     minBend?: number;
     /** How much each step straightens the rope, 0 to 1: its stiffness. */
     stiffness?: number;
+    /** Points held where they are: only the rest move, kept off these as off everything else. */
+    fixed?: boolean[];
     /** Checked every so often: true once it's tight enough. */
     stop?: (points: Vector3[]) => boolean;
 };
@@ -34,12 +38,15 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
         bar,
         pull,
         shrink = 0,
+        shrinking,
         steps = 4000,
         iterations = 12,
         minBend = 0.5,
         stiffness = 0.02,
         stop,
+        fixed,
     } = options;
+    const free = (i: number) => !fixed?.[i];
     const n = start.length;
     const x = Float64Array.from(start, (p) => p.x);
     const y = Float64Array.from(start, (p) => p.y);
@@ -89,7 +96,10 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
         }
     };
 
-    const apart = (i: number, j: number, want: number, wi = 0.5, wj = 0.5) => {
+    const apart = (i: number, j: number, want: number) => {
+        const [fi, fj] = [free(i) ? 1 : 0, free(j) ? 1 : 0];
+        if (fi + fj === 0) return;
+        const [wi, wj] = [fi / (fi + fj), fj / (fi + fj)];
         const [dx, dy, dz] = [x[j] - x[i], y[j] - y[i], z[j] - z[i]];
         const len = Math.hypot(dx, dy, dz);
         if (len === 0) return;
@@ -105,8 +115,9 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
     for (let s = 0; s < steps; s++) {
         if (s % 10 === 0) findPairs();
         if (shrink) {
-            for (let i = 0; i < rest.length; i++) rest[i] *= 1 - shrink;
-            chord = chordFor(k * step * (rest[0] / start[0].distanceTo(start[1])));
+            for (let i = 0; i < rest.length; i++)
+                if (!shrinking || shrinking[i]) rest[i] *= 1 - shrink;
+            if (!shrinking) chord = chordFor(k * step * (rest[0] / start[0].distanceTo(start[1])));
         }
         // Pull the ends.
         if (pull)
@@ -114,6 +125,7 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
                 [0, pull[0]],
                 [n - 1, pull[1]],
             ] as const) {
+                if (!free(i)) continue;
                 x[i] += p.x;
                 y[i] += p.y;
                 z[i] += p.z;
@@ -122,6 +134,7 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
             // Stiffness: each point drawn a little towards the middle of its neighbours.
             if (stiffness > 0)
                 for (let i = 1; i < n - 1; i++) {
+                    if (!free(i)) continue;
                     x[i] += stiffness * ((x[i - 1] + x[i + 1]) / 2 - x[i]);
                     y[i] += stiffness * ((y[i - 1] + y[i + 1]) / 2 - y[i]);
                     z[i] += stiffness * ((z[i - 1] + z[i + 1]) / 2 - z[i]);
@@ -142,6 +155,7 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
             if (bar) {
                 const want = bar.r + d / 2;
                 for (let i = 0; i < n; i++) {
+                    if (!free(i)) continue;
                     const [dx, dy] = [x[i] - bar.at.x, y[i] - bar.at.y];
                     const len = Math.hypot(dx, dy);
                     if (len < want && len > 0) {
@@ -154,7 +168,7 @@ export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[
             for (let i = 0; i < n - 1; i++) apart(i, i + 1, rest[i]);
             for (let i = n - 2; i >= 0; i--) apart(i, i + 1, rest[i]);
         }
-        if (stop && s % 25 === 0 && stop(points())) break;
+        if (stop && s > 0 && s % 25 === 0 && stop(points())) break;
     }
     return points();
 }

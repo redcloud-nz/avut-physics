@@ -47,6 +47,7 @@ import {
     zipTrolley,
 } from "@/flying-fox/hardware";
 import { axes, knotPieces, numberedRope } from "@/flying-fox/knot-3d";
+import { segmentsOf } from "@/flying-fox/knot-edit";
 import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -115,13 +116,14 @@ export const PARTS: Part[] = [
         group: "Knots",
         about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar, its rope numbered in segments from the standing end, with X, Y and Z arrows.",
         ...(() => {
-            const rope = () =>
-                numberedRope(
-                    TRIAL.pts.map(([x, y, z]) => vec3(x, y, z)),
-                    0.0055,
-                    0.02,
-                    ["var(--knot-orange)", "var(--knot-purple)"],
-                );
+            const rope = () => {
+                const points = TRIAL.pts.map(([x, y, z]) => vec3(x, y, z));
+                const seg = (TRIAL as { seg?: number[] }).seg ?? segmentsOf(points, 0.02);
+                return numberedRope(points, 0.0055, seg, [
+                    "var(--knot-orange)",
+                    "var(--knot-purple)",
+                ]);
+            };
             const knotLow = Math.min(...TRIAL.pts.filter(([, y]) => y > -0.15).map(([, y]) => y));
             const arrows = () => axes(vec3(-0.06, knotLow, 0), 0.03);
             return {
