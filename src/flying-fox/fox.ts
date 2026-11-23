@@ -12,8 +12,10 @@ import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import {
+    ANCHOR_HOOK,
     baseClamp,
     baseClampWire,
+    CABLE_HOOK,
     carabiner,
     CARABINER_R,
     CARABINER_WIDTH,
@@ -21,6 +23,7 @@ import {
     eyeBolt,
     eyeFrame,
     grigri,
+    hook,
     pulley,
     shackle,
     SHACKLE_19,
@@ -28,6 +31,7 @@ import {
     stopBlock,
     thimble,
     tiedRound,
+    tirfor,
     turnbuckle,
     wrap,
     zipTrolley,
@@ -217,16 +221,11 @@ const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.25, 0);
 /** The tree the hawsers are slung round, at least 2.15 times the tower's height behind it (Figure 26). */
 export const TREE = { x: -23, r: 0.36, height: 9 };
 /**
- * The log and picket anchor, on the level ground past the shear leg: 2.15 times the shear leg's height past it brings the
- * hawsers down to it at 25°, so it's set back as far as keeps them at 25° down to their shackles, 0.75 m in front of the
- * log, with a little to spare.
+ * The log and picket anchor, on the level ground past the shear leg: the book's minimum is 2.15 times the height from
+ * the shear leg's base to its saddle (which brings the hawsers down at just under 25°); it's set well back from that,
+ * 3 times the height, for flatter hawsers.
  */
-export const LOG = (() => {
-    const tan = Math.tan((25 * Math.PI) / 180);
-    const high = SHEAR_LEG.spar + BAGGING_R - 0.12;
-    const out = high / tan + 0.3;
-    return { x: SHEAR_LEG.x + 2 * SHEAR_LEG.r + out + 0.75, r: 0.075, length: 2.4 };
-})();
+export const LOG = { x: SHEAR_LEG.x + 3 * (SHEAR_LEG.spar + BAGGING_R), r: 0.075, length: 2.4 };
 
 /** The dynamic brake's blocks, this far up the span from the shear leg, and the static brakes. */
 export const BLOCKS_X = SPAN - 10;
@@ -287,12 +286,20 @@ export const C = {
     pin: "var(--fox-shackle-pin)",
     trolley: "var(--knot-red)",
     nylon: "var(--fox-nylon)",
-    tirfor: "var(--rig-black)",
+    tirfor: "var(--fox-tirfor)",
     tree: "var(--tower-log)",
     spar: "var(--fox-spar)",
     grate: "var(--fox-grate)",
     pulley: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
+};
+/** The Tirfor's colours: its alloy body, steel pin and handle, yellow release lever, black grips and labels. */
+export const TIRFOR_COLORS = {
+    body: "var(--fox-tirfor)",
+    steel: "var(--tower-steel)",
+    lever: "var(--fox-tirfor-lever)",
+    grip: "var(--rig-black)",
+    label: "var(--rig-black)",
 };
 /** The trolleys' and pulleys' colours. */
 export const TROLLEY_COLORS = {
@@ -1419,12 +1426,17 @@ function logAnchor(): Piece[] {
     }
     // Round slings basketed round the log between the pickets, up into the bow shackles: one for each hawser and one
     // for the Tirfor.
-    for (const z of [-SLING_Z, 0, SLING_Z]) {
+    for (const z of [-SLING_Z, SLING_Z]) {
         const crown = ANCHOR_SHACKLE(z);
         const log = LOG_AT(z);
         const bar = crown.sub(crown.sub(log).unit().scale(SHACKLE_19.body));
         pieces.push(...basketedSling("round", log, LOG.r, bar, SHACKLE_19.body, UP, vec3(0, 0, 1)));
     }
+    // The Tirfor's, in the bowl of its anchor hook.
+    const { hook: h } = TIRFOR_RIG;
+    pieces.push(
+        ...basketedSling("round", LOG_AT(0), LOG.r, h.bar, ANCHOR_HOOK.r, UP, vec3(0, 0, 1)),
+    );
     return pieces;
 }
 
@@ -1521,11 +1533,34 @@ export const TURNBUCKLE_AT = (s: number) => {
 export const LIZARD = { clamps: [2.9, 3.05, 3.2] };
 /** The lizard's wire's radius. */
 const LIZARD_R = 0.004;
-function lizardAndTirfor(): Piece[] {
-    const pieces: Piece[] = [];
+/** The Tirfor's 11.5 mm cable's radius. */
+const TIRFOR_CABLE_R = 0.00575;
+/** Hawser A's anchor end, and the way up it to the saddle: where the lizard's clamped on. */
+const lizardLine = () => {
     const a = ANCHOR_SHACKLE(SLING_Z);
     const along = SADDLE(1).sub(a).unit();
-    const on = (d: number) => a.add(along.scale(d));
+    return { along, on: (d: number) => a.add(along.scale(d)) };
+};
+
+/**
+ * The Tirfor, lying on the ground in front of the log's middle sling, pointing (seen from above) up hawser A towards
+ * the lizard; its anchor hook, lying flat, takes the sling's bights.
+ */
+const TIRFOR_RIG = (() => {
+    const log = LOG_AT(0);
+    const { on } = lizardLine();
+    const ahead = on(LIZARD.clamps[0]).sub(log);
+    const u = vec3(ahead.x, 0, ahead.z).unit();
+    const start = log.add(u.scale(LOG.r + 0.45));
+    const anchor = vec3(start.x, groundY(start.x + u.x * 0.26) + 0.004, start.z);
+    const t = tirfor(anchor, u, UP, TIRFOR_COLORS);
+    const h = hook(t.pin, u.neg(), t.pinAlong, C.steel);
+    return { tirfor: t, hook: h };
+})();
+
+function lizardAndTirfor(): Piece[] {
+    const pieces: Piece[] = [];
+    const { along, on } = lizardLine();
     // The way from the hawser to the lizard, which lie in a clamp's two throats.
     const toward = vec3(0, -0.016, -0.012).unit();
     const side = toward.scale(baseClampWire(HAWSER_R) + baseClampWire(LIZARD_R));
@@ -1539,22 +1574,54 @@ function lizardAndTirfor(): Piece[] {
                 C.steel,
             ),
         );
-    // The Tirfor, hooked to the middle sling, its cable out to the lizard.
-    const hook = ANCHOR_SHACKLE(0);
-    const dir = on(LIZARD.clamps[0]).sub(hook).unit();
-    const body = [hook.add(dir.scale(0.15)), hook.add(dir.scale(0.75))];
-    pieces.push(...bar(hook, body[0], 0.012, C.steel));
-    pieces.push(...section(body[0], body[1], UP, 0.12, 0.26, C.tirfor));
-    // The handle, standing up from it.
-    const mid = body[0].lerp(body[1], 0.5);
-    pieces.push(...bar(mid.add(vec3(0, 0.13, 0)), mid.add(vec3(-0.15, 0.6, 0.05)), 0.014, C.steel));
-    // The lizard: a length of wire from the Tirfor to the clamps, slack, then along the hawser through them.
-    const start = body[1].add(dir.scale(0.05));
+    // The Tirfor and its anchor hook, slack.
+    const { tirfor: t, hook: anchorHook } = TIRFOR_RIG;
+    pieces.push(...t.pieces, ...anchorHook.pieces);
+    // The lizard's bottom eye, hanging slack part way up to the hawser, with the Tirfor's cable hooked into it.
     const reach = on(LIZARD.clamps[0] - 0.12).add(side);
-    pieces.push(...line(hanging(start, reach, 0.12, 16), LIZARD_R, C.hawser, "steel"));
+    const eyeAt = t.ropeOut.lerp(reach, 0.4).add(vec3(0, -0.15, 0));
+    const toLizard = reach.sub(eyeAt).unit();
+    const fromTirfor = eyeAt.sub(t.ropeOut).unit();
+    const pinWay = fromTirfor.cross(UP).unit();
+    const c = CABLE_HOOK;
+    const toEye = c.bowl + c.r + c.shank + c.eye + c.r;
+    const cableHook = hook(eyeAt.sub(fromTirfor.scale(toEye)), fromTirfor, pinWay, C.steel, c);
+    pieces.push(...cableHook.pieces);
+    // The cable from the Tirfor's rope guide, sagging, to its hook's eye; its slack tail out of the anchor end.
+    const cableEnd = eyeAt.sub(fromTirfor.scale(toEye + c.eye + c.r));
+    pieces.push(...line(hanging(t.ropeOut, cableEnd, 0.05, 16), TIRFOR_CABLE_R, C.hawser, "steel"));
+    const tail = t.tailOut;
+    const back = t.tailOut.sub(t.ropeOut).unit();
     pieces.push(
-        ...line([reach, on(LIZARD.clamps[2] + 0.12).add(side)], LIZARD_R, C.hawser, "steel"),
+        ...line(
+            smooth(
+                [
+                    tail,
+                    onGround(tail.x + back.x * 0.15, TIRFOR_CABLE_R, tail.z + back.z * 0.15),
+                    onGround(tail.x + back.x * 0.4, TIRFOR_CABLE_R, tail.z + 0.25),
+                    onGround(tail.x + back.x * 0.55, TIRFOR_CABLE_R, tail.z + 0.6),
+                ],
+                6,
+            ),
+            TIRFOR_CABLE_R,
+            C.hawser,
+            "steel",
+        ),
     );
+    // The lizard: an eye at each end round a thimble, its tail pressed into a ferrule. The bottom eye on the cable
+    // hook, the wire up to the hawser, along it through the clamps, and its free eye just past them.
+    const eye = (near: Vector3, d: Vector3, m: Vector3) => {
+        const th = thimble(near, d, m, LIZARD_R, C.steel);
+        const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
+        const ferrule = [tips.add(d.scale(0.015)), tips.add(d.scale(0.055))];
+        pieces.push(...th.pieces, ...bar(ferrule[0], ferrule[1], LIZARD_R * 2.2, C.steel));
+        pieces.push(...line([ferrule[0], ...th.wire, ferrule[0]], LIZARD_R, C.hawser, "steel"));
+        return ferrule[1];
+    };
+    const bottom = eye(cableHook.bar.add(toLizard.scale(c.r)), toLizard, cableHook.along);
+    const freeNear = on(LIZARD.clamps[2] + 0.24).add(side);
+    const top = eye(freeNear, along.neg(), toward);
+    pieces.push(...line([...hanging(bottom, reach, 0.08, 16), top], LIZARD_R, C.hawser, "steel"));
     return pieces;
 }
 
@@ -1913,7 +1980,7 @@ export function foxLabels(): RigLabel[] {
             ),
             side: "left",
         },
-        { text: "Tirfor", at: ANCHOR_SHACKLE(0).add(vec3(-0.4, 0.15, 0)), side: "left" },
+        { text: "Tirfor", at: TIRFOR_RIG.tirfor.ropeOut.add(vec3(0, 0.25, 0)), side: "left" },
         { text: "Log and picket anchor", at: onGround(LOG.x + 0.3, 0.3, 0), side: "right" },
     ];
 }

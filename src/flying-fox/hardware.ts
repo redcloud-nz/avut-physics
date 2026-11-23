@@ -1315,3 +1315,182 @@ export function baseClamp(
     }
     return pieces;
 }
+
+/**
+ * A forged hook with a latch (metres): its bar's radius, the inside radius of its bowl, its shank's length from the
+ * bowl to the eye, and its eye's inside radius. Sizes for a 1.6 t Tirfor's anchor hook and its cable's hook.
+ */
+export const ANCHOR_HOOK = { r: 0.011, bowl: 0.022, shank: 0.07, eye: 0.014 };
+export const CABLE_HOOK = { r: 0.008, bowl: 0.017, shank: 0.05, eye: 0.009 };
+
+/**
+ * A hook whose eye is round `eye` (a pin through it along `pin`), its shank and bowl out along `d` from it, the hook
+ * lying in the plane square to `pin`. What it holds sits at the bottom of its bowl, round its bar there, which runs
+ * square to `d` in its plane. Returns its pieces, the middle of its bar at the bottom of the bowl, and the way that bar
+ * runs.
+ */
+export function hook(
+    eye: Vector3,
+    d: Vector3,
+    pin: Vector3,
+    color: string,
+    size = ANCHOR_HOOK,
+): { pieces: Piece[]; bar: Vector3; along: Vector3 } {
+    const f = linkFrame(d.neg(), pin);
+    // In the hook's plane: `u` back from the bowl's bottom towards the eye, `v` across.
+    const { r, bowl, shank, eye: eyeR } = size;
+    const rho = bowl + r;
+    const toEye = rho + shank + eyeR + r;
+    const bottom = eye.sub(f.d.scale(toEye));
+    const p = (u: number, v: number) => bottom.add(f.d.scale(u)).add(f.w.scale(v));
+    // The bowl round its middle `rho` up from the bottom, from the point round the bottom to the shank's side.
+    const pts: Vector3[] = [];
+    for (let i = 0; i <= 20; i++) {
+        const phi = -2.2 + (2.2 + Math.PI / 2) * (i / 20);
+        pts.push(p(rho - rho * Math.cos(phi), rho * Math.sin(phi)));
+    }
+    // The shank easing back to the hook's middle line, then the eye round the pin.
+    pts.push(p(rho + 0.45 * shank, 0.55 * rho), p(rho + shank, 0));
+    const pieces: Piece[] = [steelStrand(pts, r, color)];
+    const ring = Array.from({ length: 17 }, (_, i) => {
+        const t = (2 * Math.PI * i) / 16;
+        return eye
+            .add(f.d.scale((eyeR + r) * Math.cos(t)))
+            .add(f.w.scale((eyeR + r) * Math.sin(t)));
+    });
+    pieces.push(steelStrand(ring, r, color));
+    // The latch: a thin spring across the throat from the shank to the point.
+    const point = pts[0];
+    pieces.push(
+        steelStrand([p(rho + 0.6 * shank, 0.35 * rho), point.add(f.d.scale(r))], 0.0018, color),
+    );
+    return { pieces, bar: bottom, along: f.w };
+}
+
+/**
+ * A Tirfor T-516D wire rope winch (metres, from Tractel's figures and in proportion to a photo of a T-508D): its alloy
+ * body's length, height and thickness, the anchor pin's height and how far out from the body's end, the rope guide's
+ * height, its handle's length closed and its radius.
+ */
+export const TIRFOR_516 = {
+    long: 0.523,
+    high: 0.2,
+    thick: 0.127,
+    pin: { high: 0.12, out: 0.03 },
+    rope: 0.05,
+    handle: { long: 0.65, r: 0.0125 },
+};
+
+/**
+ * A Tirfor lying on its side with its anchor end at `anchor` (the bottom of that end, middle of its thickness), its
+ * load end towards `along` and its top towards `up`. Returns its pieces, its anchor pin (and the pin's way), where the
+ * rope comes out of its load end, and where its slack tail comes out by the anchor.
+ */
+export function tirfor(
+    anchor: Vector3,
+    along: Vector3,
+    up: Vector3,
+    colors: { body: string; steel: string; lever: string; grip: string; label: string },
+    size = TIRFOR_516,
+): { pieces: Piece[]; pin: Vector3; pinAlong: Vector3; ropeOut: Vector3; tailOut: Vector3 } {
+    const { long: L, high: H, thick, pin, rope, handle } = size;
+    const u = along.unit();
+    const v = up.sub(u.scale(up.dot(u))).unit();
+    const n = u.cross(v);
+    const f: Frame = { o: anchor, u, v, n };
+    const p = (a: number, b: number, c = 0) => at(f, [a, b], c);
+    const pieces: Piece[] = [];
+    // The body: low at the anchor end, rising to a hump where the levers are, sloping down to the load end.
+    const outline: Flat[] = [
+        [0, 0.03],
+        [0.03, 0],
+        [L - 0.03, 0],
+        [L, 0.03],
+        [L, 0.7 * H],
+        [L - 0.07, 0.8 * H],
+        [0.6 * L, 0.84 * H],
+        [0.53 * L, H],
+        [0.24 * L, H],
+        [0.2 * L, 0.84 * H],
+        [0.03, 0.8 * H],
+        [0, 0.74 * H],
+    ];
+    pieces.push(...plate(f, outline, [], thick, colors.body));
+    // Its side covers, standing a little proud, and a label on each.
+    const inset: Flat[] = [
+        [0.04, 0.03],
+        [L - 0.04, 0.03],
+        [L - 0.04, 0.66 * H],
+        [0.04, 0.7 * H],
+    ];
+    for (const s of [-1, 1]) {
+        const side: Frame = { ...f, o: anchor.add(n.scale(s * (thick / 2 + 0.002))) };
+        pieces.push(...plate(side, inset, [], 0.004, colors.body));
+        const label: Flat[] = [
+            [0.08 * L, 0.12 * H],
+            [0.3 * L, 0.12 * H],
+            [0.3 * L, 0.5 * H],
+            [0.08 * L, 0.5 * H],
+        ];
+        const front: Frame = { ...f, o: anchor.add(n.scale(s * (thick / 2 + 0.0045))) };
+        pieces.push(...plate(front, label, [], 0.001, colors.label));
+    }
+    // The anchor pin, upright between two cheeks out from the anchor end, for the hook's eye.
+    const pinAt = p(-pin.out, pin.high);
+    for (const s of [-1, 1]) {
+        const cheek: Frame = { o: anchor.add(v.scale(pin.high + s * 0.02)), u, v: n, n: v };
+        const shape: Flat[] = [
+            [0.01, -0.03],
+            [-pin.out, -0.025],
+            ...Array.from({ length: 9 }, (_, i): Flat => {
+                const t = -Math.PI / 2 - (Math.PI * i) / 8;
+                return [-pin.out + 0.025 * Math.cos(t), 0.025 * Math.sin(t)];
+            }),
+            [-pin.out, 0.025],
+            [0.01, 0.03],
+        ];
+        pieces.push(...plate(cheek, shape, [], 0.008, colors.body));
+    }
+    pieces.push(...part(pinAt.sub(v.scale(0.03)), pinAt.add(v.scale(0.03)), 0.009, colors.steel));
+    // The rope guide at the load end, and where the tail comes out by the anchor.
+    pieces.push(...part(p(L - 0.005, rope), p(L + 0.03, rope), 0.018, colors.body, 0.03));
+    // The forward lever's socket and its handle, closed, leaning back over the load end; the reverse lever's stub.
+    const lean = u.scale(Math.cos(1.0)).add(v.scale(Math.sin(1.0)));
+    const socket = p(0.4 * L, 0.95 * H);
+    pieces.push(...part(socket, socket.add(lean.scale(0.09)), 0.02, colors.steel));
+    pieces.push(...part(socket, socket.add(lean.scale(handle.long)), handle.r, colors.steel));
+    pieces.push(
+        ...part(
+            socket.add(lean.scale(handle.long - 0.12)),
+            socket.add(lean.scale(handle.long + 0.005)),
+            handle.r + 0.004,
+            colors.grip,
+        ),
+    );
+    const back = u.scale(-Math.cos(1.2)).add(v.scale(Math.sin(1.2)));
+    const stub = p(0.68 * L, 0.82 * H);
+    pieces.push(...part(stub, stub.add(back.scale(0.08)), 0.015, colors.grip));
+    // The release lever, yellow, on top by the load end.
+    const release: Flat[] = [
+        [0.86 * L, 0.72 * H],
+        [0.92 * L, 0.72 * H],
+        [0.97 * L, 0.98 * H],
+        [0.93 * L, 1.0 * H],
+    ];
+    pieces.push(
+        ...plate(
+            { ...f, o: anchor.add(n.scale(thick / 2 - 0.015)) },
+            release,
+            [],
+            0.012,
+            colors.lever,
+        ),
+    );
+    return {
+        pieces,
+        pin: pinAt,
+        pinAlong: v,
+        ropeOut: p(L + 0.03, rope),
+        tailOut: p(-0.005, 0.3 * H),
+    };
+}

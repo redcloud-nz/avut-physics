@@ -20,6 +20,7 @@ import {
     STATIC_X,
     STOP_BLOCK_COLORS,
     tiedTo,
+    TIRFOR_COLORS,
     TREE,
     TREE_SHACKLE,
     TROLLEY_COLORS,
@@ -32,11 +33,13 @@ import {
     carabiner,
     eyeBolt,
     grigri,
+    hook,
     pulley,
     shackle,
     sheave,
     stopBlock,
     thimble,
+    tirfor,
     turnbuckle,
     wrap,
     zipTrolley,
@@ -244,6 +247,16 @@ export const PARTS: Part[] = [
         pieces: () => slingLoop("climbing", 1.2, 0.03),
     },
     {
+        slug: "tirfor",
+        name: "Tirfor T-516D",
+        group: "Hardware",
+        about: "A Tirfor T-516D wire rope winch, 1.6 t, lying on its side: its alloy body 523 mm long and 127 mm thick, the forward lever's telescopic handle closed (650 mm), the reverse lever, the yellow release lever, the rope guide at the load end, and its anchor hook with its latch on the pin at the other.",
+        pieces: () => {
+            const t = tirfor(ORIGIN, ALONG, UP, TIRFOR_COLORS);
+            return [...t.pieces, ...hook(t.pin, ALONG.neg(), t.pinAlong, STEEL).pieces];
+        },
+    },
+    {
         slug: "fox-trolley",
         name: "Trolley, rigged",
         group: "Flying fox",
@@ -392,6 +405,22 @@ export const PARTS: Part[] = [
             return within(foxPieces(), {
                 lo: vec3(a.x - 0.3, a.y - 0.4, -LOG.length / 2 - 0.1),
                 hi: vec3(LOG.x + 0.5, a.y + 0.6, LOG.length / 2 + 0.1),
+            });
+        },
+    },
+    {
+        slug: "fox-tirfor",
+        name: "Tirfor and lizard, rigged",
+        group: "Flying fox",
+        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable sagging to its hook in the lizard's bottom eye, and the lizard up to hawser A, clamped along it by three double base clamps, its free eye just past them.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(0);
+            const top = ANCHOR_SHACKLE(SLING_Z).add(
+                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(3.6),
+            );
+            return within(foxPieces(), {
+                lo: vec3(Math.min(a.x, top.x) - 0.6, a.y - 0.4, -0.5),
+                hi: vec3(LOG.x + LOG.r + 0.1, top.y + 0.3, SLING_Z + 0.4),
             });
         },
     },
