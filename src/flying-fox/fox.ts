@@ -30,6 +30,7 @@ import {
     STOP_BLOCK,
     stopBlock,
     thimble,
+    THIMBLE_11,
     tiedRound,
     tirfor,
     turnbuckle,
@@ -1375,8 +1376,11 @@ function shearLeg(): Piece[] {
 
 /** Where a hawser comes down from the shear leg to the anchor: from the saddle to the bow shackle on its sling. */
 export const SADDLE = (s: number) => vec3(SPAR_X, SADDLE_Y, s * HAWSER_Z);
-/** Where each sling round the log is: one for each hawser either side, and the Tirfor's in the middle. */
-export const SLING_Z = 0.8;
+/**
+ * Where each sling round the log is, in the gaps between its six pickets (Figure 29, dual hawser and tension setup):
+ * the hawsers' in the second and fourth gaps, the Tirfor's in the middle one.
+ */
+export const SLING_Z = 0.4;
 /** The log's middle at `z`, the log resting on the slings under it. */
 const LOG_AT = (z: number) => vec3(LOG.x, groundY(LOG.x) + LOG.r + 2 * SLINGS.round.thickness, z);
 /** How far out in front of the log's middle each sling's shackle is (the inside of its crown). */
@@ -1391,6 +1395,12 @@ export const ANCHOR_SHACKLE = (z: number) => {
     const saddle = vec3(SADDLE(1).x, SADDLE(1).y, (z / SLING_Z) * HAWSER_Z);
     return log.add(saddle.sub(log).unit().scale(SLING_REACH));
 };
+
+/**
+ * How far in front of the log's middle the front pickets are driven: leaning back 25°, they bite a little into the log
+ * at its middle's height.
+ */
+const FRONT_PICKET = 0.14;
 
 /** The log and picket anchor: the log, two rows of six pickets with banjo lashings, and three slings round it. */
 function logAnchor(): Piece[] {
@@ -1408,7 +1418,7 @@ function logAnchor(): Piece[] {
     const back = vec3(1, 0, 0);
     for (const z of [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0]) {
         // The front row just on the pull's side of the log, the back row 0.45 m behind it.
-        const front = picket(vec3(LOG.x - LOG.r - 0.02, 0, z), back);
+        const front = picket(vec3(LOG.x - FRONT_PICKET, 0, z), back);
         const rear = picket(vec3(LOG.x + 0.45, 0, z), back);
         pieces.push(...front.pieces, ...rear.pieces);
         // A banjo lashing from the front picket, just above the log, to the back one's foot.
@@ -1504,20 +1514,27 @@ function hawserFoot(s: number): Piece[] {
     const d3 = shackle("d", d2.far, along, flat, C.steel, C.pin);
     pieces.push(...bow.pieces, ...tb.pieces, ...d1.pieces, ...d2.pieces, ...d3.pieces);
     pieces.push(
-        ...madeOff(d3.far, along, upright, saddle, (end, side) => {
-            const k = Math.sign(side.z) || s;
-            const out = end.add(along.scale(0.1));
-            return smooth(
-                [
-                    out,
-                    out.add(along.scale(0.4)).add(vec3(0, -0.3, k * 0.15)),
-                    onGround(out.x - 0.2, 0.02, s * 1.6),
-                    onGround(LOG.x - 0.6, 0.02, s * 2.2),
-                    onGround(LOG.x + 0.2, 0.02, s * 1.7),
-                    onGround(LOG.x - 0.4, 0.02, s * 1.3),
-                ],
-                6,
+        ...madeOff(d3.far, along, upright, saddle, (end) => {
+            // The stiff wire carries on up the hawser's line, bends over in one long curve to the ground, and lies
+            // there curving gently out to the hawser's own side.
+            const out = vec3(-1, 0, s * 0.2).unit();
+            const land = onGround(end.x - 2.0, HAWSER_R, end.z + s * 0.25);
+            const rest = onGround(land.x - 1.0, HAWSER_R, land.z + s * 0.35);
+            const drop = bezier3(
+                end,
+                end.add(along.scale(0.4)),
+                land.sub(out.scale(0.9)),
+                land,
+                24,
             );
+            const lie = bezier3(
+                land,
+                land.add(out.scale(0.4)),
+                rest.sub(vec3(-0.35, 0, s * 0.2)),
+                rest,
+                16,
+            );
+            return [...drop.slice(1), ...lie.slice(1)];
         }),
     );
     return pieces;
@@ -1529,17 +1546,33 @@ export const TURNBUCKLE_AT = (s: number) => {
     return a.add(SADDLE(s).sub(a).unit().scale(0.35));
 };
 
-/** The lizard on hawser A, left slack in line to the Tirfor as a back-up once the hardware takes the load. */
-export const LIZARD = { clamps: [2.9, 3.05, 3.2] };
+/**
+ * The lizards, one clamped on each hawser well up from the anchor (`clamps`, metres up the hawser from its bow shackle),
+ * the wire running on `tail` past the top clamp to its free eye, and `hang` of it between the bottom clamp and the
+ * bottom eye. Hawser A's is left slack in line to the Tirfor as a back-up once the hardware takes the load.
+ */
+export const LIZARD = { clamps: [5.0, 5.15, 5.3], tail: 0.5, hang: 0.5 };
 /** The lizard's wire's radius. */
 const LIZARD_R = 0.004;
+/** About how far a lizard's eye reaches, from its thimble's crown to the end of its ferrule. */
+const LIZARD_EYE = THIMBLE_11.length + 0.065;
 /** The Tirfor's 11.5 mm cable's radius. */
 const TIRFOR_CABLE_R = 0.00575;
-/** Hawser A's anchor end, and the way up it to the saddle: where the lizard's clamped on. */
-const lizardLine = () => {
-    const a = ANCHOR_SHACKLE(SLING_Z);
-    const along = SADDLE(1).sub(a).unit();
-    return { along, on: (d: number) => a.add(along.scale(d)) };
+/**
+ * Hawser `s`'s anchor end, and the way up it to the saddle: where its lizard's clamped on. The lizard lies `side` off
+ * the hawser's middle, in the clamps' other throats, which face `toward` (down and in).
+ */
+const lizardLine = (s: number) => {
+    const a = ANCHOR_SHACKLE(s * SLING_Z);
+    const along = SADDLE(s).sub(a).unit();
+    const toward = vec3(0, -0.016, -s * 0.012).unit();
+    const side = toward.scale(baseClampWire(HAWSER_R) + baseClampWire(LIZARD_R));
+    return { along, toward, side, on: (d: number) => a.add(along.scale(d)) };
+};
+/** Where the lizard on hawser `s` leaves its bottom clamp, on its way down to its bottom eye. */
+const lizardFoot = (s: number) => {
+    const { on, side } = lizardLine(s);
+    return on(LIZARD.clamps[0] - 0.06).add(side);
 };
 
 /**
@@ -1548,22 +1581,71 @@ const lizardLine = () => {
  */
 const TIRFOR_RIG = (() => {
     const log = LOG_AT(0);
-    const { on } = lizardLine();
-    const ahead = on(LIZARD.clamps[0]).sub(log);
+    const ahead = lizardFoot(1).sub(log);
     const u = vec3(ahead.x, 0, ahead.z).unit();
     const start = log.add(u.scale(LOG.r + 0.45));
     const anchor = vec3(start.x, groundY(start.x + u.x * 0.26) + 0.004, start.z);
     const t = tirfor(anchor, u, UP, TIRFOR_COLORS);
     const h = hook(t.pin, u.neg(), t.pinAlong, C.steel);
-    return { tirfor: t, hook: h };
+    return { tirfor: t, hook: h, u };
 })();
 
-function lizardAndTirfor(): Piece[] {
+/** `n` points along the cubic Bézier from `a` to `b` with control points `c1` and `c2`, both ends included. */
+function bezier3(a: Vector3, c1: Vector3, c2: Vector3, b: Vector3, n: number): Vector3[] {
+    return Array.from({ length: n + 1 }, (_, i) => {
+        const t = i / n;
+        const s = 1 - t;
+        return a
+            .scale(s * s * s)
+            .add(c1.scale(3 * s * s * t))
+            .add(c2.scale(3 * s * t * t))
+            .add(b.scale(t * t * t));
+    });
+}
+
+/** How far along `path` each of its points is. */
+const arcLengths = (path: Vector3[]) => {
+    const at = [0];
+    for (let i = 1; i < path.length; i++) at.push(at[i - 1] + path[i].distanceTo(path[i - 1]));
+    return at;
+};
+
+/** The point `d` along `path`, and the way it runs there. */
+function alongPath(path: Vector3[], d: number): { at: Vector3; dir: Vector3; i: number } {
+    const at = arcLengths(path);
+    const i = Math.max(
+        1,
+        at.findIndex((x) => x >= d),
+    );
+    const k = (d - at[i - 1]) / (at[i] - at[i - 1]);
+    return { at: path[i - 1].lerp(path[i], k), dir: path[i].sub(path[i - 1]).unit(), i };
+}
+
+/**
+ * The lizard's eye at one end: a thimble with its crown's inside at `near`, pointing `d` along the wire, square to `m`,
+ * the wire's tail pressed into a ferrule. Returns its pieces and the end of the ferrule, where the wire runs on.
+ */
+function lizardEye(near: Vector3, d: Vector3, m: Vector3): { pieces: Piece[]; end: Vector3 } {
+    const th = thimble(near, d, m, LIZARD_R, C.steel);
+    const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
+    const ferrule = [tips.add(d.scale(0.015)), tips.add(d.scale(0.055))];
+    return {
+        pieces: [
+            ...th.pieces,
+            ...bar(ferrule[0], ferrule[1], LIZARD_R * 2.2, C.steel),
+            ...line([ferrule[0], ...th.wire, ferrule[0]], LIZARD_R, C.hawser, "steel"),
+        ],
+        end: ferrule[1],
+    };
+}
+
+/**
+ * A lizard on hawser `s`: its three double base clamps, and the wire from `foot` (its bottom eye's ferrule, the wire
+ * coming up `hang` to the bottom clamp) along the hawser through them and on to its free eye.
+ */
+function lizard(s: number, hang: Vector3[]): Piece[] {
+    const { along, toward, side, on } = lizardLine(s);
     const pieces: Piece[] = [];
-    const { along, on } = lizardLine();
-    // The way from the hawser to the lizard, which lie in a clamp's two throats.
-    const toward = vec3(0, -0.016, -0.012).unit();
-    const side = toward.scale(baseClampWire(HAWSER_R) + baseClampWire(LIZARD_R));
     for (const d of LIZARD.clamps)
         pieces.push(
             ...baseClamp(
@@ -1574,54 +1656,125 @@ function lizardAndTirfor(): Piece[] {
                 C.steel,
             ),
         );
-    // The Tirfor and its anchor hook, slack.
-    const { tirfor: t, hook: anchorHook } = TIRFOR_RIG;
+    // Past the top clamp the wire carries on along the hawser, then droops under its free eye's weight.
+    const past = on(LIZARD.clamps[2] + 0.05).add(side);
+    const droop = along.scale(0.45).sub(UP).unit();
+    const tip = past.add(along.scale(LIZARD.tail - 0.2)).sub(UP.scale(0.06));
+    const top = lizardEye(tip.add(droop.scale(LIZARD_EYE)), droop.neg(), along.cross(UP).unit());
+    pieces.push(...top.pieces);
+    const free = bezier3(
+        past,
+        past.add(along.scale(0.15)),
+        top.end.sub(droop.scale(0.12)),
+        top.end,
+        16,
+    );
+    pieces.push(...line([...hang, ...free], LIZARD_R, C.hawser, "steel"));
+    return pieces;
+}
+
+/**
+ * The Tirfor and lizards. Hawser A's lizard and the Tirfor's cable are slack, so together they make one long smooth
+ * curve from the Tirfor's rope guide, dipping, up into the lizard's bottom clamp; the cable's hook takes the lizard's
+ * bottom eye part way along it. Hawser B's lizard waits, its bottom eye hanging free on a smooth curve from its bottom
+ * clamp. The Tirfor's slack tail runs back from its anchor end over the top of the log and lies on the ground behind.
+ */
+function lizardAndTirfor(): Piece[] {
+    const pieces: Piece[] = [];
+    const { tirfor: t, hook: anchorHook, u } = TIRFOR_RIG;
     pieces.push(...t.pieces, ...anchorHook.pieces);
-    // The lizard's bottom eye, hanging slack part way up to the hawser, with the Tirfor's cable hooked into it.
-    const reach = on(LIZARD.clamps[0] - 0.12).add(side);
-    const eyeAt = t.ropeOut.lerp(reach, 0.4).add(vec3(0, -0.15, 0));
-    const toLizard = reach.sub(eyeAt).unit();
-    const fromTirfor = eyeAt.sub(t.ropeOut).unit();
-    const pinWay = fromTirfor.cross(UP).unit();
+
+    // Hawser A: the whole slack run, kept off the ground.
+    const A = lizardLine(1);
+    const footA = lizardFoot(1);
+    const span = footA.distanceTo(t.ropeOut);
+    const run = bezier3(
+        t.ropeOut,
+        t.ropeOut.add(u.scale(0.45 * span)),
+        footA.sub(A.along.scale(0.35 * span)),
+        footA,
+        120,
+    ).map((p) => vec3(p.x, Math.max(p.y, groundY(p.x) + TIRFOR_CABLE_R), p.z));
+    const total = arcLengths(run).at(-1)!;
+    // The cable hook's bowl, where the lizard's bottom eye sits: far enough back along the run for `hang` of wire
+    // between the eye's ferrule and the bottom clamp.
     const c = CABLE_HOOK;
+    const eyeLength = LIZARD_EYE;
+    const j = alongPath(run, total - LIZARD.hang - eyeLength - c.r);
+    const pinWay = j.dir.cross(UP).unit();
     const toEye = c.bowl + c.r + c.shank + c.eye + c.r;
-    const cableHook = hook(eyeAt.sub(fromTirfor.scale(toEye)), fromTirfor, pinWay, C.steel, c);
+    const cableHook = hook(j.at.sub(j.dir.scale(toEye)), j.dir, pinWay, C.steel, c);
     pieces.push(...cableHook.pieces);
-    // The cable from the Tirfor's rope guide, sagging, to its hook's eye; its slack tail out of the anchor end.
-    const cableEnd = eyeAt.sub(fromTirfor.scale(toEye + c.eye + c.r));
-    pieces.push(...line(hanging(t.ropeOut, cableEnd, 0.05, 16), TIRFOR_CABLE_R, C.hawser, "steel"));
+    // The cable from the rope guide to round the hook's eye.
+    const cableEnd = j.at.sub(j.dir.scale(toEye + c.eye + c.r));
+    const before = alongPath(
+        run,
+        total - LIZARD.hang - eyeLength - c.r - toEye - c.eye - c.r - 0.03,
+    );
+    pieces.push(...line([...run.slice(0, before.i), cableEnd], TIRFOR_CABLE_R, C.hawser, "steel"));
+    // The lizard's bottom eye round the hook's bar at the bottom of its bowl, its crown on the Tirfor's side.
+    const bottomA = lizardEye(cableHook.bar.sub(j.dir.scale(c.r)), j.dir, cableHook.along);
+    pieces.push(...bottomA.pieces);
+    const after = alongPath(run, total - LIZARD.hang + 0.02);
+    pieces.push(...lizard(1, [bottomA.end, ...run.slice(after.i)]));
+
+    // Hawser B: the lizard hanging free, leaving its bottom clamp down the hawser and curving to hang straight down.
+    const B = lizardLine(-1);
+    const footB = lizardFoot(-1);
+    const across = B.along.cross(UP).unit();
+    const bottomB = lizardEye(
+        footB.sub(B.along.scale(0.22)).sub(UP.scale(0.4 + eyeLength)),
+        UP,
+        across,
+    );
+    pieces.push(...bottomB.pieces);
+    pieces.push(
+        ...lizard(
+            -1,
+            bezier3(
+                bottomB.end,
+                bottomB.end.add(UP.scale(0.18)),
+                footB.sub(B.along.scale(0.2)),
+                footB,
+                24,
+            ),
+        ),
+    );
+
+    // The Tirfor's slack tail: stiff, it rises gently back from its anchor end beside the middle sling, rests on
+    // the top of the log, and comes down in a long curve to lie on the ground behind it.
+    const log = LOG_AT(0);
     const tail = t.tailOut;
-    const back = t.tailOut.sub(t.ropeOut).unit();
+    const z = -0.11;
+    const crest = vec3(log.x, log.y + LOG.r + TIRFOR_CABLE_R, z);
+    const back = vec3(crest.x - tail.x, 0, crest.z - tail.z).unit();
+    const land = onGround(log.x + 0.75, TIRFOR_CABLE_R, z - 0.05);
+    const away = vec3(1, 0, -0.25).unit();
+    const end = onGround(land.x + 1.1, TIRFOR_CABLE_R, land.z - 0.45);
     pieces.push(
         ...line(
-            smooth(
-                [
-                    tail,
-                    onGround(tail.x + back.x * 0.15, TIRFOR_CABLE_R, tail.z + back.z * 0.15),
-                    onGround(tail.x + back.x * 0.4, TIRFOR_CABLE_R, tail.z + 0.25),
-                    onGround(tail.x + back.x * 0.55, TIRFOR_CABLE_R, tail.z + 0.6),
-                ],
-                6,
-            ),
+            [
+                ...bezier3(tail, tail.add(back.scale(0.2)), crest.sub(back.scale(0.25)), crest, 16),
+                ...bezier3(
+                    crest,
+                    crest.add(back.scale(0.3)),
+                    land.sub(away.scale(0.35)),
+                    land,
+                    16,
+                ).slice(1),
+                ...bezier3(
+                    land,
+                    land.add(away.scale(0.4)),
+                    end.sub(vec3(1, 0, -0.6).unit().scale(0.4)),
+                    end,
+                    12,
+                ).slice(1),
+            ],
             TIRFOR_CABLE_R,
             C.hawser,
             "steel",
         ),
     );
-    // The lizard: an eye at each end round a thimble, its tail pressed into a ferrule. The bottom eye on the cable
-    // hook, the wire up to the hawser, along it through the clamps, and its free eye just past them.
-    const eye = (near: Vector3, d: Vector3, m: Vector3) => {
-        const th = thimble(near, d, m, LIZARD_R, C.steel);
-        const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
-        const ferrule = [tips.add(d.scale(0.015)), tips.add(d.scale(0.055))];
-        pieces.push(...th.pieces, ...bar(ferrule[0], ferrule[1], LIZARD_R * 2.2, C.steel));
-        pieces.push(...line([ferrule[0], ...th.wire, ferrule[0]], LIZARD_R, C.hawser, "steel"));
-        return ferrule[1];
-    };
-    const bottom = eye(cableHook.bar.add(toLizard.scale(c.r)), toLizard, cableHook.along);
-    const freeNear = on(LIZARD.clamps[2] + 0.24).add(side);
-    const top = eye(freeNear, along.neg(), toward);
-    pieces.push(...line([...hanging(bottom, reach, 0.08, 16), top], LIZARD_R, C.hawser, "steel"));
     return pieces;
 }
 
@@ -1976,7 +2129,7 @@ export function foxLabels(): RigLabel[] {
         {
             text: "Lizard",
             at: ANCHOR_SHACKLE(SLING_Z).add(
-                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(3.05),
+                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(LIZARD.clamps[1]),
             ),
             side: "left",
         },

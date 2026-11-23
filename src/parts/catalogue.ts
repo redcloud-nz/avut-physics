@@ -412,15 +412,15 @@ export const PARTS: Part[] = [
         slug: "fox-tirfor",
         name: "Tirfor and lizard, rigged",
         group: "Flying fox",
-        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable sagging to its hook in the lizard's bottom eye, and the lizard up to hawser A, clamped along it by three double base clamps, its free eye just past them.",
+        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable and the lizard making one slack curve up to hawser A, the cable's hook in the lizard's bottom eye, and the lizard clamped along the hawser by three double base clamps, its free eye a little way past them. Its slack tail runs back over the log. Hawser B's lizard hangs free, waiting.",
         pieces: () => {
             const a = ANCHOR_SHACKLE(0);
             const top = ANCHOR_SHACKLE(SLING_Z).add(
-                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(3.6),
+                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(6),
             );
             return within(foxPieces(), {
-                lo: vec3(Math.min(a.x, top.x) - 0.6, a.y - 0.4, -0.5),
-                hi: vec3(LOG.x + LOG.r + 0.1, top.y + 0.3, SLING_Z + 0.4),
+                lo: vec3(Math.min(a.x, top.x) - 0.3, a.y - 0.4, -2.5),
+                hi: vec3(LOG.x + 1.2, top.y + 0.3, 2.5),
             });
         },
     },
