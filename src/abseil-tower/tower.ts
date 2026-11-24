@@ -205,7 +205,8 @@ export function rod(
 
 /**
  * A sawn timber from `a` to `b` (the middles of its ends), `w` wide and `h` deep, its depth as near `up` as it can be:
- * its four long sides, and its two ends unless they're hidden (`ends` false).
+ * its four long sides, and its two ends unless they're hidden (`ends` false). With `round`, its long edges are rounded
+ * to that radius (as a steel section's are), each in a few narrow faces.
  */
 export function timber(
     a: Vector3,
@@ -215,44 +216,41 @@ export function timber(
     h: number,
     material: Material,
     withEnds = true,
+    round = 0,
 ): Face[] {
     const along = b.sub(a).unit();
-    const v = up
-        .sub(along.scale(up.dot(along)))
-        .unit()
-        .scale(h / 2);
-    const s = along
-        .cross(v)
-        .unit()
-        .scale(w / 2);
-    const corner = (p: Vector3, i: number, j: number) => p.add(s.scale(i)).add(v.scale(j));
-    const ring = [
+    const v = up.sub(along.scale(up.dot(along))).unit();
+    const s = along.cross(v).unit();
+    // Its outline, anticlockwise from the corner at -s, -v: round each corner in `steps` faces, or square.
+    const r = Math.min(round, w / 2, h / 2);
+    const steps = r > 0 ? 3 : 0;
+    const outline = [
         [-1, -1],
         [1, -1],
         [1, 1],
         [-1, 1],
-    ];
-    const sides: Face[] = ring.map(([i, j], k) => {
-        const [i2, j2] = ring[(k + 1) % 4];
-        const normal = s
-            .scale(i + i2)
-            .add(v.scale(j + j2))
-            .unit();
+    ].flatMap(([i, j], k) =>
+        Array.from({ length: steps + 1 }, (_, m) => {
+            const t = Math.PI * (1 + k / 2 + m / (2 * Math.max(steps, 1)));
+            return [i * (w / 2 - r) + r * Math.cos(t), j * (h / 2 - r) + r * Math.sin(t)];
+        }).slice(0, r > 0 ? steps + 1 : 1),
+    );
+    const at = (p: Vector3, [x, y]: number[]) => p.add(s.scale(x)).add(v.scale(y));
+    const sides: Face[] = outline.map((P, k) => {
+        const Q = outline[(k + 1) % outline.length];
         return {
             kind: "face",
-            points: [corner(a, i, j), corner(b, i, j), corner(b, i2, j2), corner(a, i2, j2)],
+            points: [at(a, P), at(b, P), at(b, Q), at(a, Q)],
             material,
-            normal,
+            normal: s
+                .scale(Q[1] - P[1])
+                .sub(v.scale(Q[0] - P[0]))
+                .unit(),
         };
     });
     const ends: Face[] = [
-        {
-            kind: "face",
-            points: ring.map(([i, j]) => corner(a, i, j)),
-            material,
-            normal: along.neg(),
-        },
-        { kind: "face", points: ring.map(([i, j]) => corner(b, i, j)), material, normal: along },
+        { kind: "face", points: outline.map((P) => at(a, P)), material, normal: along.neg() },
+        { kind: "face", points: outline.map((P) => at(b, P)), material, normal: along },
     ];
     return withEnds ? [...sides, ...ends] : sides;
 }
