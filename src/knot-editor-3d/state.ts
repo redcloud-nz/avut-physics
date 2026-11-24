@@ -1,6 +1,7 @@
+import { rad } from "@/lib/math";
 import type { Play } from "@/lib/rope-3d/operations";
 import { segmentCount, segmentMiddle } from "@/lib/rope-3d/rope";
-import type { Vector3 } from "@/lib/vector3";
+import { vec3, type Vector3 } from "@/lib/vector3";
 
 import type { Knot3dFile } from "./knot-file";
 
@@ -142,4 +143,27 @@ export function reduce(state: EditorState, action: Action): EditorState {
         case "saved":
             return { ...state, saved: true, fileName: action.fileName };
     }
+}
+
+/**
+ * Which way a W/A/S/D/R/F key moves the handle, with the view looking from compass bearing `azimuth` (degrees): W away
+ * from the eye, S towards it, A and D to its left and right, each along whichever of X and Z is nearest that way, so
+ * the move lies along an axis as the arrows' do; R up and F down.
+ */
+export function keyDirection(code: string, azimuth: number): Vector3 | null {
+    if (code === "KeyR") return vec3(0, 1, 0);
+    if (code === "KeyF") return vec3(0, -1, 0);
+    const [s, c] = [Math.sin(rad(azimuth)), Math.cos(rad(azimuth))];
+    // Level, away from the eye and to its right (the view's three.js coordinates turned back to the physics').
+    const [forward, right] = [vec3(-s, 0, -c), vec3(-c, 0, s)];
+    const way = {
+        KeyW: forward,
+        KeyS: forward.scale(-1),
+        KeyD: right,
+        KeyA: right.scale(-1),
+    }[code];
+    if (!way) return null;
+    return Math.abs(way.x) >= Math.abs(way.z)
+        ? vec3(Math.sign(way.x), 0, 0)
+        : vec3(0, 0, Math.sign(way.z));
 }

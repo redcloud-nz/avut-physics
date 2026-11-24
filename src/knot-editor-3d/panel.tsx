@@ -195,7 +195,8 @@ export function Panel(props: PanelProps) {
                     ))}
                     <p className="mt-1 text-xs text-ink-muted">
                         Drag the arrows, nudge 1 mm (5 mm with Shift), or type an offset from where
-                        the handle was chosen.
+                        the handle was chosen. Keys W and S move it away and back, A and D left and
+                        right (along the axis nearest that way in the view), R and F up and down.
                     </p>
                 </Part>
             )}

@@ -4,7 +4,7 @@ import { segmentsOf } from "@/lib/rope-3d/rope";
 import { vec3 } from "@/lib/vector3";
 
 import type { Knot3dFile } from "./knot-file";
-import { choose, initialState, reduce } from "./state";
+import { choose, initialState, keyDirection, reduce } from "./state";
 
 const points = Array.from({ length: 81 }, (_, i) => vec3(i * 0.0025, 0, 0));
 const FILE: Knot3dFile = {
@@ -65,5 +65,20 @@ describe("the editor's state", () => {
             mode: "handle",
         });
         expect(state.origin!.x).toBeCloseTo(0.03, 2);
+    });
+});
+
+describe("moving the handle by key", () => {
+    it("moves away from the eye, to its right, and up, along the nearest axis", () => {
+        // Looking from the front (bearing 0, eye out along +Z): away is -Z, and right is -X, as the view draws it.
+        expect(keyDirection("KeyW", 0)).toEqual(vec3(0, 0, -1));
+        expect(keyDirection("KeyS", 0)).toEqual(vec3(0, 0, 1));
+        expect(keyDirection("KeyD", 0)).toEqual(vec3(-1, 0, 0));
+        expect(keyDirection("KeyA", 0)).toEqual(vec3(1, 0, 0));
+        // From the three-quarter look, 145 degrees round: away is nearest +Z.
+        expect(keyDirection("KeyW", 145)).toEqual(vec3(0, 0, 1));
+        expect(keyDirection("KeyR", 145)).toEqual(vec3(0, 1, 0));
+        expect(keyDirection("KeyF", 145)).toEqual(vec3(0, -1, 0));
+        expect(keyDirection("KeyQ", 0)).toBeNull();
     });
 });

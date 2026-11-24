@@ -60,7 +60,7 @@ import { fromDrawing } from "./from-drawing";
 import { knot3dFile, setupOf, type Knot3dFile } from "./knot-file";
 import { Panel } from "./panel";
 import { RopeView, SEGMENT_COLORS } from "./rope-view";
-import { initialState, reduce, type ChooseMode } from "./state";
+import { initialState, keyDirection, reduce, type ChooseMode } from "./state";
 
 const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.SceneGL), {
     ssr: false,
@@ -69,9 +69,6 @@ const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.Sc
 
 /** The flying fox's figure 8, the editor's first file: opened as a copy until a file's opened. */
 const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
-
-/** The view's turns aren't followed here; one function for good, as a new one each render would rerun the view's setup. */
-const ignoreTurn = () => {};
 
 const DISCARD = "Discard the changes to this knot?";
 
@@ -372,6 +369,19 @@ export default function KnotEditor3D() {
     const chooseSegment = (seg: number, mode: ChooseMode) =>
         !running.current && dispatch({ type: "choose", seg, mode });
 
+    /** Moves the handle on by `by` from where it is, or from where an unfinished nudge is taking it. */
+    const nudge = (by: Vector3) => {
+        const r = running.current;
+        const base = r?.kind === "move" && !r.dragging ? r.goal : handleAt;
+        if (base) moveTowards(base.add(by), false);
+    };
+
+    // The bearing the view looks from, for the keys that move the handle.
+    const azimuth = useRef(0);
+    const onTurn = useCallback((a: number) => {
+        azimuth.current = a;
+    }, []);
+
     // Shortcuts, not while typing in a field.
     useEffect(() => {
         const listener = (e: KeyboardEvent) => {
@@ -386,6 +396,12 @@ export default function KnotEditor3D() {
             if (k === "Escape")
                 return running.current ? finish() : dispatch({ type: "choose-none" });
             if (k === "KeyC") return setChoosing((c) => !c);
+            const dir = keyDirection(k, azimuth.current);
+            if (dir && play) {
+                e.preventDefault();
+                if (!running.current || running.current.kind === "move")
+                    nudge(dir.scale((e.shiftKey ? 5 : 1) / 1000));
+            }
         };
         window.addEventListener("keydown", listener);
         return () => window.removeEventListener("keydown", listener);
@@ -482,11 +498,7 @@ export default function KnotEditor3D() {
                         choosing={choosing}
                         busy={busy}
                         onChoosing={setChoosing}
-                        onNudge={(by) => {
-                            const r = running.current;
-                            const base = r?.kind === "move" && !r.dragging ? r.goal : handleAt;
-                            if (base) moveTowards(base.add(by), false);
-                        }}
+                        onNudge={nudge}
                         onOffset={(to) => state.origin && moveTowards(state.origin.add(to), false)}
                         onTighten={() =>
                             play && run("Tightening in play", tightenInPlay(file.rope, setup, play))
@@ -514,7 +526,7 @@ export default function KnotEditor3D() {
                         pieces={bars}
                         labels={labels}
                         onReady={setGlView}
-                        onTurn={ignoreTurn}
+                        onTurn={onTurn}
                     >
                         <RopeView
                             rope={rope}
