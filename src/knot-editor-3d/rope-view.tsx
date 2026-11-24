@@ -33,7 +33,7 @@ export function segmentColor(
 ) {
     const base = colors.read(SEGMENT_COLORS[(seg - 1) % 2]).clone();
     if (!play) return base;
-    if (seg < play.from || seg > play.to) return base.lerp(background, 0.65);
+    if (seg < play.from || seg > play.to) return base.lerp(background, 0.3);
     return seg === play.handle ? base.lerp(new THREE.Color(1, 1, 1), 0.35) : base;
 }
 
@@ -164,13 +164,9 @@ function LockedMark({
         [end],
     );
     return (
-        <mesh position={T(end.at)} quaternion={quaternion} renderOrder={5}>
-            <torusGeometry args={[diameter * 0.75, diameter * 0.12, 8, 24]} />
-            <meshBasicMaterial
-                color={colors.read("var(--ink-bright)")}
-                depthTest={false}
-                transparent
-            />
+        <mesh position={T(end.at)} quaternion={quaternion} renderOrder={1}>
+            <torusGeometry args={[diameter * 0.6, diameter * 0.04, 6, 32]} />
+            <meshBasicMaterial color={colors.read("var(--ink-bright)")} transparent opacity={0.7} />
         </mesh>
     );
 }
@@ -228,7 +224,7 @@ function HandleArrows({
     onDragEnd: () => void;
 }) {
     const { camera, gl, controls } = useThree();
-    const length = diameter * 3.5;
+    const length = diameter * 2.5;
     const [hot, setHot] = useState<string | null>(null);
 
     /** How far along the axis through `origin` the point nearest the line under the pointer is. */
@@ -280,7 +276,7 @@ function HandleArrows({
     return (
         <group position={T(at)}>
             <mesh renderOrder={10}>
-                <sphereGeometry args={[diameter * 0.35, 12, 8]} />
+                <sphereGeometry args={[diameter * 0.18, 12, 8]} />
                 <meshBasicMaterial
                     color={colors.read("var(--ink-bright)")}
                     depthTest={false}
@@ -304,7 +300,7 @@ function HandleArrows({
                 >
                     <Arrow
                         length={length}
-                        r={diameter * (hot === axis.name ? 0.16 : 0.11)}
+                        r={diameter * (hot === axis.name ? 0.08 : 0.045)}
                         color={colors.read(axis.color)}
                     />
                     {/* A fatter, unseen grip along the arrow, easier to catch. */}
