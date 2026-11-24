@@ -18,6 +18,7 @@ import {
     respaceFree,
     segmentCentre,
     segmentCount,
+    segmentLength,
     segmentMiddle,
     segmentsOf,
     slideBoundary,
@@ -124,14 +125,61 @@ describe("moving the handle", () => {
         expect(moved.points.slice(-after)).toEqual(rope.points.slice(-after));
     });
 
-    it("stops against a bar rather than passing through it", () => {
+    it("keeps a bent stretch's shape, moving it only a little for a small move", () => {
+        // A stretch with a smooth bump in it, well off the curve the move would draw between its ends.
+        const bump = Array.from({ length: 41 }, (_, k) =>
+            vec3(0.1 + k * 0.0025, 0.03 * Math.sin((Math.PI * k) / 40) ** 2, 0),
+        );
+        const bent = ropeAlong([vec3(0, 0, 0), ...bump, vec3(0.3, 0, 0)]);
+        const bentPlay = { from: 5, to: 10, handle: 7 };
+        const goal = segmentMiddle(bent, 7).add(vec3(0, 0, 0.001));
+        const moved = moveHandle(bent, SETUP, bentPlay, goal);
+        // Within a millimetre: laying the stretch out again can slide the segment's middle a little along the rope.
+        expect(segmentMiddle(moved, 7).distanceTo(goal)).toBeLessThan(1e-3);
+        // How far each point is from the rope as it was (its path, not its point of the same number, as the points
+        // may slide along it a little when the stretch is laid out again).
+        const fromPath = (p: Vector3) => {
+            let least = Infinity;
+            for (let i = 1; i < bent.points.length; i++) {
+                const [a, b] = [bent.points[i - 1], bent.points[i]];
+                const ab = b.sub(a);
+                const t = Math.min(1, Math.max(0, p.sub(a).dot(ab) / ab.dot(ab)));
+                least = Math.min(least, p.distanceTo(a.add(ab.scale(t))));
+            }
+            return least;
+        };
+        expect(Math.max(...moved.points.map(fromPath))).toBeLessThan(0.002);
+    });
+
+    it("changes only the handle's segment's length, keeping the other segments in play as they were", () => {
+        const goal = segmentMiddle(rope, 8).add(vec3(0, 0.04, 0));
+        const moved = moveHandle(rope, SETUP, play, goal);
+        expect(segmentLength(moved, 8)).toBeGreaterThan(segmentLength(rope, 8) + 0.02);
+        // Within half a piece: a segment's length runs halfway to the next one's first point, and the piece between
+        // the handle's segment and the next belongs to the handle's.
+        for (const k of [6, 7, 9, 10]) {
+            expect(Math.abs(segmentLength(moved, k) - segmentLength(rope, k))).toBeLessThan(D / 8);
+            expect(countsOf(moved.seg)[k - 1]).toBe(countsOf(rope.seg)[k - 1]);
+        }
+    });
+
+    it("goes round a bar rather than through it", () => {
         const bar = { at: vec3(0.15, 0.025, 0), along: vec3(0, 0, 1), r: 0.005 };
         const setup = { ...SETUP, bars: [bar] };
         const moved = moveHandle(rope, setup, play, segmentCentre(rope, 8).add(vec3(0, 0.06, 0)));
         const want = bar.r + D / 2;
         for (const p of moved.points)
             expect(Math.hypot(p.x - bar.at.x, p.y - bar.at.y)).toBeGreaterThan(want * 0.97);
-        expect(segmentCentre(moved, 8).y).toBeLessThan(bar.at.y);
+        // The bar's still on the same side of the rope: the rope crosses the line straight down from it once, as it
+        // did. Through the bar, it would cross it no times or twice. (A bight pulled up beside the bar is fine.)
+        let crossings = 0;
+        for (let i = 1; i < moved.points.length; i++) {
+            const [a, b] = [moved.points[i - 1], moved.points[i]];
+            if (a.x < bar.at.x === b.x < bar.at.x) continue;
+            const y = a.y + ((b.y - a.y) * (bar.at.x - a.x)) / (b.x - a.x);
+            if (y < bar.at.y) crossings++;
+        }
+        expect(crossings % 2).toBe(1);
     });
 
     it("stops against fixed rope rather than passing through it", () => {

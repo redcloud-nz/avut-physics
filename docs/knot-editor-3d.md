@@ -55,11 +55,12 @@ viewer as "Figure 8, tightened (trial)".
 ### Moving
 
 - **Drag the handle** with arrows along X, Y and Z in the 3D view, or nudge it from the panel (1 mm, or 5 mm with
-  shift), or type an offset.
+  shift), or type an offset. Keys nudge it too, by the same amounts: W and S away from the eye and back, A and D to
+  its left and right (each along whichever of X and Z is nearest that way in the view), R and F up and down.
 - **The rope in play follows one smooth curve** from one locked end, through the handle, to the other, matching
   position and direction at each locked end (a cubic Hermite spline through the three, or the same idea in more
-  pieces). The segments in play get as long as the curve needs, each keeping its share of the stretch, so the
-  numbering stays even.
+  pieces). Only the handle's segment changes length: the other segments in play keep theirs, as rope worked by hand
+  feeds slack into one place and leaves the rest of the dressed knot as it was.
 - **It goes round the fixed rope, not through it.** A drag moves the handle a little each frame, and the rope in play
   settles against the fixed rope and props after each step. A move that would cut through rope stops against it.
 - **Only the rope in play is worked out** while you drag: the fixed rope's places go into a grid once, when the rope in
@@ -196,14 +197,26 @@ is to be worked out when the first one's drawn; it may need the core to say wher
   `src/flying-fox/knots/figure-8.json`, which the parts viewer's trial part now reads. The flat views are shared
   with the parts viewer (`src/parts/flat-view.tsx`), and `SceneGL` takes children, so the editor draws the live rope,
   its handle and the locked ends inside the parts viewer's 3D view.
-- **The handle** is the middle of its segment's points (`segmentMiddle`), not its middle by length: the two sides of
-  the handle keep their own shares of the points, so they're spaced differently once one side grows more than the
-  other, and the middle by points is the point the move steers.
+- **The handle** is the middle of its segment's points (`segmentMiddle`), not its middle by length: the handle's
+  segment has as many points each side of it, spaced differently once one side grows more than the other, and the
+  middle by points is the point the move steers.
 - **A move** sends the handle at most a sixth of a diameter a step towards the goal, and never more than a diameter and
-  a half ahead of where it is, so it stops against rope in its way. Each point of the rope in play goes halfway to its
-  place on the curve each step (at most a quarter of a diameter), and each side of the handle has its own rest length.
-  A move's done once neither the sent point nor the handle has moved a tenth of a millimetre a step for 15 steps.
-  The rope's stiffness is off while it moves: the curve gives it its shape.
+  a half ahead of where it is, so it stops against rope in its way. A move's done once neither the sent point nor the
+  handle has moved a tenth of a millimetre a step for 15 steps. The rope's stiffness is off while it moves: the
+  wanted shape gives it its shape.
+- **Only the handle's segment changes length.** The other segments in play keep their pieces' lengths exactly, and
+  each step move only by as much as their wanted places move (measured from the locked ends), not drawn onto them:
+  where rope's in the way, they stay where it pushed them rather than stretching to reach. Drawn onto their wanted
+  places, a move into a tight part of the figure 8 stretched them by a tenth. The handle's segment has no length of
+  its own in the simulation: its points go halfway to evenly spaced wanted places each step (at most a quarter of a
+  diameter), and it's laid out again by its length as it grows or shrinks, so its pieces stay short enough not to
+  straddle a bar or a strand. A move that would leave it less than half a point's spacing either side of the handle
+  goes no further. With its length free, a handle pulled past a bar can go round it as a bight beside it, as real
+  rope can.
+- **The rope in play keeps its shape and moves as the curve does.** Its wanted shape is its shape when the handle
+  was chosen, plus how far the curve through the handle has moved from the curve through where the handle was
+  then. Laying it straight onto the curve made a stretch snap to the curve's shape at the first nudge, losing the
+  bends it had. The two agree at the locked ends and the handle.
 - **Existing overlaps are kept, not fixed.** The trial figure 8 has strands pressed up to 2.5 mm into each other (it
   was tightened before these rules). Each simulation lets pairs already closer than a diameter stay as close as they
   are, but no closer; pushed apart at once, they kinked the rope.

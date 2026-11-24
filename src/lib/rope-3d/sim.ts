@@ -168,6 +168,9 @@ export class RopeSim {
         this.relax();
     }
 
+    /** Pieces with no length of their own (1), left out of the length passes: they're as long as the rest makes them. */
+    free: Uint8Array | null = null;
+
     /** Passes over the constraints, with the rope where it is. */
     relax(iterations = this.iterations) {
         const { n, x, y, z, rest, fixed, stiffness } = this;
@@ -223,8 +226,9 @@ export class RopeSim {
                 }
             }
             // Its length: each piece its own length, both ways along so neither end leads.
-            for (let i = 0; i < n - 1; i++) this.apart(i, i + 1, rest[i]);
-            for (let i = n - 2; i >= 0; i--) this.apart(i, i + 1, rest[i]);
+            const free = this.free;
+            for (let i = 0; i < n - 1; i++) if (!free?.[i]) this.apart(i, i + 1, rest[i]);
+            for (let i = n - 2; i >= 0; i--) if (!free?.[i]) this.apart(i, i + 1, rest[i]);
         }
     }
 }

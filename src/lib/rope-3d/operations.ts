@@ -1,12 +1,11 @@
 import type { Vector3 } from "@/lib/vector3";
 
-import { along, curveThrough, type LockedEnd } from "./curve";
+import { along, curveThrough, type LockedEnd, type Sampled } from "./curve";
 import {
     arcLengths,
     pointAt,
     pointsOf,
     respaceFree,
-    segmentSpan,
     spacingOf,
     type Rope3,
     type RopeSetup,
@@ -58,13 +57,18 @@ const atMost = (v: Vector3, length: number) => {
 };
 
 /**
- * Moving the handle. The rope in play lies along one smooth curve from one locked end, through the handle, to the other,
- * leaving and joining the fixed rope along its own direction (`curveThrough`), and gets as long as the curve. Each
- * segment in play keeps its share of the rope on its side of the handle. A step moves the curve's handle (where the
- * handle's sent) a little towards where it's wanted, moves the rope in play a little towards the curve, and lets it
- * settle against the fixed rope and the bars, so it goes round them rather than through. Where the handle's sent is
- * kept within a diameter and a half of where it is, so a move that would cut through rope stops against it.
+ * Moving the handle. Only the handle's segment changes length: the other segments in play keep theirs, as rope worked
+ * by hand feeds slack into one place and leaves the rest of the dressed knot as it was. The rope in play is wanted in
+ * its shape as the handle was chosen, moved by as much as a smooth curve from one locked end, through the handle, to the
+ * other (`curveThrough`) moves from where it was then (`wanted`). The segments either side of the handle's lie along
+ * that, measured from the locked ends, and the handle's segment takes whatever's left on each side of the handle. A step
+ * moves where the handle's sent a little towards the goal, moves the rope in play a little towards where it's wanted,
+ * and lets it settle against the fixed rope and the bars, so it goes round them rather than through. Where the handle's
+ * sent is kept within a diameter and a half of where it is, so a move that would cut through rope stops against it.
  */
+/** The point `s` along a sampled curve (clamped to its ends). */
+const on = (curve: Sampled, s: number) => along(curve, Math.min(1, Math.max(0, s / curve.length)));
+
 export class MoveOp {
     private readonly setup: RopeSetup;
     private readonly spacing: number;
@@ -73,176 +77,256 @@ export class MoveOp {
     /** The fixed rope before the stretch (up to and with its locked point) and after it (from its locked point on). */
     private readonly head: Rope3;
     private readonly tail: Rope3;
-    /** Where each segment in play starts along the stretch, as a fraction of it, in order. */
-    private readonly starts: { seg: number; u: number }[];
-    /** How far along the stretch the handle is, as a fraction. */
-    private readonly uHandle: number;
     /** The segments of the stretch's ends, the locked points. */
     private readonly endSegs: [number, number];
+    private readonly handleSeg: number;
+    /**
+     * The rope in play before the handle's segment, from the locked point to the point before the handle's segment's
+     * first: its points' segments, its pieces' lengths (kept), and how far along it each point is.
+     */
+    private readonly before: { seg: number[]; rest: number[]; arc: number[] };
+    /** The same after the handle's segment, from the point after its last to the locked point; `arc` measured from the end. */
+    private readonly after: { seg: number[]; rest: number[]; arc: number[] };
+    /** The handle segment's points' segments: its own, except for a locked point that's in it at the rope's end. */
+    private spanEnds: [number, number];
+    /** How many pieces the handle's segment has each side of the handle. */
+    private c = 1;
     private sim!: RopeSim;
     private seg!: number[];
-    /** How many pieces the stretch has, from locked point to locked point. */
-    private m = 0;
-    /** Where the handle's sent: the curve passes through it, and the rope follows. */
+    /** Where the handle's sent: the wanted shape passes through it, and the rope follows. */
     private sent: Vector3;
+    /** The stretch's shape as it was chosen, on each side of the handle. */
+    private readonly shape: Halves;
+    /** The curve through the handle where it was chosen: the rope moves as the curve moves away from this. */
+    private readonly first: Halves;
+    /** Where the other segments' points were wanted last step, and where the handle was sent then. */
+    private lastWanted: { before: Vector3[]; after: Vector3[] } | null = null;
+    private sentBefore!: Vector3;
 
     constructor(rope: Rope3, setup: RopeSetup, play: Play) {
         this.setup = setup;
         this.spacing = spacingOf(rope.points) || setup.diameter / 4;
+        this.handleSeg = play.handle;
         const { lo, hi } = stretchOf(rope, play);
         const p = rope.points;
         [this.start, this.end] = lockedEnds(rope, play);
         this.head = { points: p.slice(0, lo + 1), seg: rope.seg.slice(0, lo + 1) };
         this.tail = { points: p.slice(hi), seg: rope.seg.slice(hi) };
         this.endSegs = [rope.seg[lo], rope.seg[hi]];
-        // The segments' places along the stretch, from the rope as it is.
-        const stretch = { points: p.slice(lo, hi + 1), seg: rope.seg.slice(lo, hi + 1) };
-        const arc = arcLengths(stretch.points);
-        const total = arc.at(-1)! || 1;
-        this.starts = [];
-        for (let k = play.from; k <= play.to; k++) {
-            this.starts.push({
-                seg: k,
-                u: k === play.from ? 0 : segmentSpan(stretch, k, arc)[0] / total,
-            });
-        }
-        // The handle's the middle of its segment's points (`segmentMiddle`), as far along the stretch as it is.
+        // The handle's segment, with the points either side of it: the run that changes length.
         const [h0, h1] = pointsOf(rope, play.handle);
-        const middle = (h0 + h1) / 2 - lo;
+        const [s0, s1] = [Math.max(lo, h0 - 1), Math.min(hi, h1 + 1)];
+        this.spanEnds = [rope.seg[s0], rope.seg[s1]];
+        const run = (from: number, to: number) => {
+            const points = p.slice(from, to + 1);
+            return {
+                seg: rope.seg.slice(from, to + 1),
+                rest: points.slice(1).map((q, i) => q.distanceTo(points[i])),
+                arc: arcLengths(points),
+            };
+        };
+        this.before = run(lo, s0);
+        const after = run(s1, hi);
+        const total = after.arc.at(-1)!;
+        this.after = { ...after, arc: after.arc.map((s) => total - s) };
+        // The handle's segment laid out again evenly each side of its middle, which stays where it is.
+        const span = p.slice(s0, s1 + 1);
+        const spanArc = arcLengths(span);
+        const middle = (h0 + h1) / 2 - s0;
         const k = Math.floor(middle);
-        const sMiddle = arc[k] + (k + 1 < arc.length ? (arc[k + 1] - arc[k]) * (middle - k) : 0);
-        this.uHandle = Math.min(0.98, Math.max(0.02, sMiddle / total));
-        this.lay(
-            stretch.points,
-            Math.max(this.starts.length + 1, Math.round(arc.at(-1)! / this.spacing)),
+        const split =
+            spanArc[k] + (k + 1 < span.length ? (spanArc[k + 1] - spanArc[k]) * (middle - k) : 0);
+        this.layHandle(
+            span,
+            split,
+            Math.max(1, Math.round(spanArc.at(-1)! / (2 * this.spacing))),
+            p.slice(0, lo + 1),
+            p.slice(lo, s0 + 1),
+            p.slice(s1, hi + 1),
         );
         this.sent = this.handle();
+        this.sentBefore = this.sent;
+        const stretch = this.stretchNow();
+        const mid = this.before.rest.length + this.c;
+        this.shape = {
+            before: resample(along_(stretch.slice(0, mid + 1)), 2 * mid),
+            after: resample(along_(stretch.slice(mid)), 2 * (stretch.length - 1 - mid)),
+        };
+        this.first = curveThrough(this.start, this.sent, this.end);
     }
 
     /**
-     * The stretch laid out again as `m` pieces along `points` (its locked ends first and last): even on each side of the
-     * handle, which is `split` along them (the handle's share of the way along unless given).
+     * The rope again, with the handle's segment laid out along `span` (from the point before it to the point after it)
+     * as `c` even pieces either side of the handle, which is `split` along it. The rest of the rope is as given.
      */
-    private lay(points: readonly Vector3[], m: number, split?: number) {
-        const arc = arcLengths(points);
+    private layHandle(
+        span: readonly Vector3[],
+        split: number,
+        c: number,
+        head: readonly Vector3[],
+        before: readonly Vector3[],
+        after: readonly Vector3[],
+    ) {
+        const arc = arcLengths(span);
         const total = arc.at(-1)!;
-        const at = split ?? this.uHandle * total;
-        const free = Array.from({ length: m - 1 }, (_, k) => {
-            const u = (k + 1) / m;
-            const s =
-                u <= this.uHandle
-                    ? (at * u) / this.uHandle
-                    : at + ((total - at) * (u - this.uHandle)) / (1 - this.uHandle);
-            return pointAt(points, arc, s);
-        });
-        const freeSeg = free.map((_, k) => {
-            const u = (k + 1) / m;
-            let seg = this.starts[0].seg;
-            for (const s of this.starts) if (s.u <= u) seg = s.seg;
-            return seg;
-        });
-        this.fillEvery(freeSeg);
-        this.m = m;
-        this.seg = [...this.head.seg, ...freeSeg, ...this.tail.seg];
-        const all = [...this.head.points, ...free, ...this.tail.points];
+        const inner = Array.from({ length: 2 * c - 1 }, (_, k) =>
+            k < c
+                ? pointAt(span, arc, (split * (k + 1)) / c)
+                : pointAt(span, arc, split + ((total - split) * (k + 1 - c)) / c),
+        );
+        this.c = c;
+        const all = [
+            ...head.slice(0, -1),
+            ...before,
+            ...inner,
+            ...after,
+            ...this.tail.points.slice(1),
+        ];
+        const spanSeg = inner.map(() => this.handleSeg);
+        this.seg = [
+            ...this.head.seg.slice(0, -1),
+            ...this.before.seg.slice(0, -1),
+            this.spanEnds[0],
+            ...spanSeg,
+            this.spanEnds[1],
+            ...this.after.seg.slice(1),
+            ...this.tail.seg.slice(1),
+        ];
         const lo = this.head.points.length - 1;
+        const hi = all.length - this.tail.points.length;
         this.sim = new RopeSim(
             all,
             this.setup,
-            all.map((_, i) => i <= lo || i >= lo + m),
+            all.map((_, i) => i <= lo || i >= hi),
         );
         this.sim.refreshEvery = 1;
-        // The curve gives the rope in play its shape: stiffness would only draw its bends in, short of the handle.
+        // The wanted shape gives the rope in play its shape: stiffness would only draw its bends in.
         this.sim.stiffness = 0;
+        // The segments either side of the handle's keep their pieces' lengths. The handle's has no length of its own: it's
+        // as long as the gap between them and the handle needs.
+        const nb = this.before.rest.length;
+        this.sim.free = Uint8Array.from({ length: all.length - 1 }, (_, i) =>
+            i >= lo + nb && i < lo + nb + 2 * c ? 1 : 0,
+        );
+        this.before.rest.forEach((r, i) => (this.sim.rest[lo + i] = r));
+        this.after.rest.forEach((r, i) => (this.sim.rest[lo + nb + 2 * c + i] = r));
     }
 
-    /** Gives every segment in play at least one of the free points, shifting the boundaries along to make room. */
-    private fillEvery(freeSeg: number[]) {
-        const segs = this.starts.map((s) => s.seg);
-        for (let pass = 0; pass < segs.length; pass++)
-            for (let k = 0; k < segs.length; k++) {
-                if (freeSeg.includes(segs[k])) continue;
-                // Take the nearest point of the segment before or after it.
-                const after = freeSeg.findIndex((s) => s > segs[k]);
-                const before = freeSeg.findLastIndex((s) => s < segs[k]);
-                const i =
-                    after >= 0 && (before < 0 || after < freeSeg.length - 1 - before)
-                        ? after
-                        : before;
-                if (i >= 0) freeSeg[i] = segs[k];
-            }
+    /** Where the stretch's points are in the simulation: the locked point before it, and the one after. */
+    private bounds() {
+        const lo = this.head.points.length - 1;
+        return { lo, hi: lo + this.before.rest.length + 2 * this.c + this.after.rest.length };
     }
 
     /** The stretch, from locked point to locked point, as it is now. */
     private stretchNow(): Vector3[] {
-        const lo = this.head.points.length - 1;
-        return Array.from({ length: this.m + 1 }, (_, k) => this.sim.point(lo + k));
+        const { lo, hi } = this.bounds();
+        return Array.from({ length: hi - lo + 1 }, (_, k) => this.sim.point(lo + k));
     }
 
-    /** Where the handle (its segment's centre) is now: its share of the way along the stretch's points. */
+    /** Where the points of the segments either side of the handle's are wanted, for `wanted`, measured from the locked ends. */
+    private wantedFixed({ before, after }: Halves): { before: Vector3[]; after: Vector3[] } {
+        return {
+            before: this.before.arc.map((s) => on(before, s)),
+            after: this.after.arc.map((s) => on(after, after.length - s)),
+        };
+    }
+
+    /** Where the handle (its segment's middle) is now. */
     handle(): Vector3 {
-        return this.handleAlong(this.stretchNow()).at;
+        return this.sim.point(this.bounds().lo + this.before.rest.length + this.c);
     }
 
-    /** The handle on the stretch's points, and how far along them it is. */
-    private handleAlong(points: Vector3[]): { at: Vector3; s: number } {
-        const arc = arcLengths(points);
-        const index = this.uHandle * this.m;
-        const k = Math.min(this.m - 1, Math.floor(index));
-        const s = arc[k] + (arc[k + 1] - arc[k]) * (index - k);
-        return { at: pointAt(points, arc, s), s };
+    /**
+     * Where the stretch is wanted with the handle sent to `sent`: its shape as chosen, moved by as much as the curve
+     * through the handle moves from where it was chosen. So a small move makes a small change, rather than the stretch
+     * taking the curve's shape the moment it's touched.
+     */
+    private wanted(sent: Vector3): Halves {
+        const now = curveThrough(this.start, sent, this.end);
+        const half = (k: keyof Halves) =>
+            resample(
+                (t) => along(this.shape[k], t).add(along(now[k], t)).sub(along(this.first[k], t)),
+                this.shape[k].points.length - 1,
+            );
+        return { before: half("before"), after: half("after") };
     }
 
     /**
      * One step towards the handle being at `goal`: where it's sent moves at most a sixth of a diameter, each point of the
-     * rope in play halfway to the curve but at most a quarter of a diameter (so none can jump through rope a diameter
-     * thick), then it all settles. Says how far where it's sent still is from the goal, and whether it's settled:
-     * neither it nor the handle moved more than a tenth of a millimetre this step.
+     * rope in play halfway to where it's wanted but at most a quarter of a diameter (so none can jump through rope a
+     * diameter thick), then it all settles. Says how far where it's sent still is from the goal, and whether it's
+     * settled: neither it nor the handle moved more than a tenth of a millimetre this step.
      */
     step(goal: Vector3): { left: number; settled: boolean } {
         const d = this.setup.diameter;
         const now = this.handle();
-        let sent = this.sent.add(atMost(goal.sub(this.sent), d / 6));
+        let sent: Vector3 = this.sent.add(atMost(goal.sub(this.sent), d / 6));
         const lead = sent.sub(now);
         if (lead.len() > 1.5 * d) sent = now.add(atMost(lead, 1.5 * d));
+        // What the handle's segment has each side of the handle: what's left once the other segments have theirs. A
+        // move that would leave it less than half a point's spacing either side goes no further: the other segments
+        // can't give it rope.
+        const least = this.spacing / 2;
+        const fixedBefore = this.before.arc.at(-1)!;
+        const fixedAfter = this.after.arc[0];
+        const sidesFor = ({ before, after }: Halves) => [
+            before.length - fixedBefore,
+            after.length - fixedAfter,
+        ];
+        let wanted = this.wanted(sent);
+        if (Math.min(...sidesFor(wanted)) < least) {
+            sent = this.sent;
+            wanted = this.wanted(sent);
+        }
         const sentMoved = sent.distanceTo(this.sent);
         this.sent = sent;
-        const { before, after } = curveThrough(this.start, sent, this.end);
-        const length = before.length + after.length;
-        const want = length / this.spacing;
-        if (Math.abs(want - this.m) > 0.75) {
-            const points = this.stretchNow();
-            const { s } = this.handleAlong(points);
-            this.lay(points, Math.max(this.starts.length + 1, Math.round(want)), s);
-        }
-        const lo = this.head.points.length - 1;
-        const onCurve = (u: number) =>
-            u <= this.uHandle
-                ? along(before, u / this.uHandle)
-                : along(after, (u - this.uHandle) / (1 - this.uHandle));
-        for (let k = 1; k < this.m; k++) {
-            const i = lo + k;
-            const p = this.sim.point(i);
-            this.sim.set(
-                i,
-                p.add(
-                    atMost(
-                        onCurve(k / this.m)
-                            .sub(p)
-                            .scale(0.5),
-                        d / 4,
-                    ),
-                ),
+        const { before, after } = wanted;
+        const sides = sidesFor(wanted).map((side) => Math.max(side, least));
+        // The handle's segment laid out again when it's grown or shrunk by most of a piece, by its length as it is, as
+        // it has no length of its own to hold it: long pieces could straddle a bar or a strand.
+        const points = this.stretchNow();
+        const nb0 = this.before.rest.length;
+        const span = points.slice(nb0, nb0 + 2 * this.c + 1);
+        const spanArc = arcLengths(span);
+        const want = spanArc.at(-1)! / (2 * this.spacing);
+        if (Math.abs(want - this.c) > 0.75) {
+            const split = spanArc[this.c];
+            this.layHandle(
+                span,
+                split,
+                Math.max(1, Math.round(want)),
+                this.head.points,
+                points.slice(0, nb0 + 1),
+                points.slice(nb0 + 2 * this.c),
             );
         }
-        // Each piece as long as the curve's spacing on its side of the handle: the two sides keep their shares of the
-        // points, so they're spaced differently as one side grows more than the other.
-        const [spaceBefore, spaceAfter] = [
-            before.length / (this.uHandle * this.m),
-            after.length / ((1 - this.uHandle) * this.m),
-        ];
-        for (let k = 0; k < this.m; k++)
-            this.sim.rest[lo + k] = (k + 0.5) / this.m < this.uHandle ? spaceBefore : spaceAfter;
+        const { lo } = this.bounds();
+        const nb = this.before.rest.length;
+        const c = this.c;
+        // The other segments move as their wanted places move, without being drawn onto them: where rope's in the
+        // way, they stay where it pushed them, their own lengths, rather than stretching to reach.
+        const was = this.lastWanted ?? this.wantedFixed(this.wanted(this.sentBefore));
+        const is = this.wantedFixed(wanted);
+        this.lastWanted = is;
+        this.sentBefore = sent;
+        const shift = (i: number, by: Vector3) =>
+            this.sim.set(i, this.sim.point(i).add(atMost(by, d / 4)));
+        for (let k = 1; k <= nb; k++) shift(lo + k, is.before[k].sub(was.before[k]));
+        for (let j = 0; j < is.after.length - 1; j++)
+            shift(lo + nb + 2 * c + j, is.after[j].sub(was.after[j]));
+        // The handle's segment is drawn onto its wanted place, which it can reach, being as long as it needs.
+        for (let k = nb + 1; k < nb + 2 * c; k++) {
+            const target =
+                k <= nb + c
+                    ? on(before, fixedBefore + (sides[0] * (k - nb)) / c)
+                    : on(after, (sides[1] * (k - nb - c)) / c);
+            const p = this.sim.point(lo + k);
+            this.sim.set(lo + k, p.add(atMost(target.sub(p).scale(0.5), d / 4)));
+        }
+        // The handle's segment's pieces as long as its share each side of the handle: not held to it, only how far apart
+        // along the rope its points count as, for bends and for not passing through itself.
+        for (let k = 0; k < 2 * c; k++) this.sim.rest[lo + nb + k] = sides[k < c ? 0 : 1] / c;
         this.sim.step();
         const moved = this.handle().distanceTo(now);
         return { left: goal.distanceTo(sent), settled: sentMoved < 1e-4 && moved < 1e-4 };
@@ -261,6 +345,23 @@ export class MoveOp {
     lockedSegments(): [number, number] {
         return this.endSegs;
     }
+}
+
+/** A polyline as a curve: the point `t` (0 to 1) of the way along it. */
+const along_ = (points: readonly Vector3[]) => {
+    const arc = arcLengths(points);
+    const total = arc.at(-1)!;
+    return (t: number) => pointAt(points, arc, t * total);
+};
+
+/** A stretch of rope in two halves, before the handle and after it, each sampled finely. */
+type Halves = { before: Sampled; after: Sampled };
+
+/** A curve given by the point `at(t)` for `t` from 0 to 1, sampled finely. */
+function resample(at: (t: number) => Vector3, samples = 48): Sampled {
+    const points = Array.from({ length: samples + 1 }, (_, k) => at(k / samples));
+    const arc = arcLengths(points);
+    return { points, arc, length: arc.at(-1)! };
 }
 
 /** A stepper that runs until it's done: tightening or smoothing. */
