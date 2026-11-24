@@ -9,6 +9,8 @@ import {
 } from "@/abseil-tower/tower";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
+import { clamp } from "@/lib/math";
+import { arcLengths as ropeArcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -312,7 +314,7 @@ export const TROLLEY_COLORS = {
     steel: "var(--tower-steel)",
     bumper: "var(--rig-black)",
 };
-/** The size of the stop blocks' eyes, which the joining rope's tied round. */
+/** The size of the stop blocks' eyes, which the joining rope's tied into. */
 const STOP_BLOCK_EYE = STOP_BLOCK.eye.size;
 
 /** The stop blocks' colours: the nylon body, steel eye bolts and brass bolts. */
@@ -356,12 +358,16 @@ const bar = (a: Vector3, b: Vector3, r: number, color: string, material: Materia
 const section = (a: Vector3, b: Vector3, up: Vector3, w: number, h: number, color = C.steel) =>
     colored(timber(a, b, up, w, h, "steel"), color);
 
-/** A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. */
+/**
+ * A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. `cut`
+ * says which of its ends (`a` the first, `b` the last) are cut ends of rope, squared off and fused.
+ */
 export function line(
     points: Vector3[],
     r: number,
     color: string,
     material: Material = "rope",
+    cut: { a?: boolean; b?: boolean } = {},
 ): Strand[] {
     const piece = 12;
     const out: Strand[] = [];
@@ -375,9 +381,88 @@ export function line(
             color,
             capA: i === 0,
             capB: i + piece >= points.length - 1,
+            ...(i === 0 && cut.a && { cutA: true }),
+            ...(i + piece >= points.length - 1 && cut.b && { cutB: true }),
         });
     }
     return out;
+}
+
+/** The figure 8 on a bight, tightened in 3D round a carabiner-thick bar and edited in /knot-editor-3d. */
+const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
+
+/**
+ * The figure 8's rope as drawn: the file's, its tail (the straight run at its end, below the knot) cut to half its
+ * length.
+ */
+const FIGURE_8_ROPE = (() => {
+    const points = FIGURE_8.rope.points;
+    const n = points.length;
+    const way = points[n - 1].sub(points[n - 2]).unit();
+    // Back up the tail while it runs straight, within 10 degrees of the way it ends.
+    let k = n - 2;
+    while (
+        k > 0 &&
+        points[k]
+            .sub(points[k - 1])
+            .unit()
+            .dot(way) > Math.cos(Math.PI / 18)
+    )
+        k--;
+    const arc = ropeArcLengths(points.slice(k));
+    const half = arc.at(-1)! / 2;
+    const keep = arc.findIndex((s) => s > half);
+    return points.slice(0, k + keep);
+})();
+
+/** A figure 8 on a bight tied into something, as `figure8` draws it. */
+export type Figure8 = {
+    /** The rope from the tail's end, round through the knot, to where the standing part leaves it. */
+    rope: Vector3[];
+    /** Where the standing part leaves the knot, for the rope to go on from. */
+    end: Vector3;
+    /** How far from the bar, towards the pull, the knot reaches. */
+    reach: number;
+};
+
+/**
+ * A figure 8 on a bight tied into a bar (a carabiner's, a shackle's pin, an eye): the flying fox's figure 8, its bight
+ * round the bar at `bar` (on its middle line), which runs along `axis` and is `barR` thick, and the knot lying towards
+ * `toward`, the way its standing part pulls. It's drawn at the size of a rope `ropeR` thick, its bight opened or closed
+ * to fit round the bar (blended out over the next few centimetres of the loop).
+ */
+export function figure8(
+    bar: Vector3,
+    axis: Vector3,
+    barR: number,
+    toward: Vector3,
+    ropeR: number,
+): Figure8 {
+    const { props, diameter } = FIGURE_8;
+    const at = props[0];
+    const scale = ropeR / (diameter / 2);
+    // The knot's own axes turned onto the bar's: its bar along z, and back up its standing part along y.
+    const z = axis.unit();
+    const off = toward.sub(bar);
+    const down = off.sub(z.scale(off.dot(z))).unit();
+    const y = down.neg();
+    const x = y.cross(z);
+    // The bight's middle line round the bar, as tightened (scaled) and as it needs to be.
+    const [was, wants] = [scale * (at.r + diameter / 2), barR + ropeR];
+    const blend = was + 0.03 * scale;
+    const points = FIGURE_8_ROPE.map((p) => {
+        const q = p.sub(at.at).scale(scale);
+        const d = Math.hypot(q.x, q.y);
+        const t = clamp((blend - d) / (blend - was), 0, 1);
+        const f = d > 0 ? (d + (wants - was) * t) / d : 1;
+        return bar
+            .add(x.scale(q.x * f))
+            .add(y.scale(q.y * f))
+            .add(z.scale(q.z));
+    });
+    const reach = Math.max(...points.map((p) => p.sub(bar).dot(down)));
+    // The file runs from the standing end: the tail's end comes first reversed.
+    return { rope: points.reverse(), end: points[points.length - 1], reach };
 }
 
 /**
@@ -1102,9 +1187,14 @@ function tower(): Piece[] {
         }
     placed.push(
         ...line(
-            [...hanging(BACKSTAY_TOP, BACKSTAY_TIE.from, 0.08, 20), ...BACKSTAY_TIE.turn],
+            [
+                ...hanging(BACKSTAY_TOP, BACKSTAY_TIE.end, 0.08, 20),
+                ...BACKSTAY_TIE.rope.slice().reverse(),
+            ],
             0.0065,
             C.backstay,
+            "rope",
+            { b: true },
         ),
     );
     return [...moved(pieces, vec3(0, 0, T.z)), ...placed];
@@ -1198,12 +1288,12 @@ const BACKSTAY_SHACKLE = (() => {
     const along = BACKSTAY_TOP.sub(centre).unit();
     return { crown: centre.add(along.scale(TREE.r + 0.45)), along };
 })();
-/** Where the backstay's tied to its shackle's pin, for now with a turn round it. */
+/** The backstay's figure 8 on a bight, tied into its shackle's pin. */
 const BACKSTAY_TIE = (() => {
     const { crown, along } = BACKSTAY_SHACKLE;
     const { upright } = linkPlanes(along);
     const pin = crown.add(along.scale(SHACKLE_19.length + SHACKLE_19.pin));
-    return tiedRound(pin, upright.cross(along), SHACKLE_19.pin, BACKSTAY_TOP, 0.0065);
+    return figure8(pin, upright.cross(along), SHACKLE_19.pin, BACKSTAY_TOP, 0.0065);
 })();
 
 /**
@@ -1935,9 +2025,10 @@ function hawsers(): Piece[] {
 }
 
 /**
- * A rope from a carabiner hanging down with its gate towards `ACROSS`, tied for now round its bottom bar (whose middle
- * is `at`) and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend towards the spine. The
- * carabiner hangs straight down unless it's swung towards `down`.
+ * A rope from a carabiner hanging down with its gate towards `ACROSS`, tied into its bottom bar (whose middle is `at`)
+ * with a figure 8 on a bight and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend
+ * towards the spine. The carabiner hangs straight down unless it's swung towards `down`. Points of `rest` the knot
+ * already covers are left out.
  */
 export function tiedTo(
     at: Vector3,
@@ -1947,6 +2038,22 @@ export function tiedTo(
     spine = 0,
     down = vec3(0, -1, 0),
 ): Piece[] {
+    const { knot, bar } = carabinerKnot(at, rest[0], r, spine, down);
+    return line([...knot.rope, ...beyond(knot, bar, rest)], r, color, "rope", { a: true });
+}
+
+/**
+ * A figure 8 on a bight tied into a carabiner's bottom bar (whose middle is `at`), its rope pulling towards `toward`:
+ * in the middle of the bar, or `spine` (radians) round the bend towards the spine, as `tiedTo` ties it. Returns the knot
+ * and the point on the bar it's round.
+ */
+function carabinerKnot(
+    at: Vector3,
+    toward: Vector3,
+    r: number,
+    spine = 0,
+    down = vec3(0, -1, 0),
+): { knot: Figure8; bar: Vector3 } {
     const end = CARABINER_WIDTH / 2;
     // Round the bottom bend's middle line, from the bottom towards the spine (away from the gate).
     const bend = at.sub(down.scale(end));
@@ -1954,31 +2061,14 @@ export function tiedTo(
         .sub(ACROSS.scale(end * Math.sin(spine)))
         .add(down.scale(end * Math.cos(spine)));
     const axis = ACROSS.scale(Math.cos(spine)).add(down.scale(Math.sin(spine)));
-    const t = tiedRound(bar, axis, CARABINER_R, rest[0], r);
-    return [...line(t.turn, r, color), ...line([t.from, ...rest], r, color)];
+    return { knot: figure8(bar, axis, CARABINER_R, toward, r), bar };
 }
 
-/** The figure 8 on a bight, tightened in 3D round a carabiner-thick bar and edited in /knot-editor-3d. */
-const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
-
-/**
- * A figure 8 on a bight clipped into a carabiner: its bight round the carabiner's bottom bar (whose middle is `at`,
- * running along `ACROSS`), the knot hanging from it towards `down`. Returns the rope from the tail's end, round
- * through the knot, to where the standing part leaves it at the bottom, for the rope to go on from, and its radius.
- */
-export function figure8OnBight(at: Vector3, down = vec3(0, -1, 0)): { rope: Vector3[]; r: number } {
-    const bar = FIGURE_8.props[0];
-    // The knot's own axes turned onto the carabiner's: its bar along z, and up its standing part along y.
-    const z = ACROSS.unit();
-    const up = down.neg();
-    const y = up.sub(z.scale(up.dot(z))).unit();
-    const x = y.cross(z);
-    const rope = FIGURE_8.rope.points.map((p) => {
-        const q = p.sub(bar.at);
-        return at.add(x.scale(q.x)).add(y.scale(q.y)).add(z.scale(q.z));
-    });
-    // The file runs from the standing end, so the tail's end comes first reversed.
-    return { rope: rope.reverse(), r: FIGURE_8.diameter / 2 };
+/** The points of `route` past the reach of `knot`, tied into the bar at `bar`. */
+function beyond(knot: Figure8, bar: Vector3, route: Vector3[]): Vector3[] {
+    const pull = knot.end.sub(bar).unit();
+    const i = route.findIndex((p) => p.sub(bar).dot(pull) > knot.reach + 0.01);
+    return i < 0 ? route.slice(-1) : route.slice(i);
 }
 
 /**
@@ -2059,13 +2149,25 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         }),
     );
     // Tied into the trolley's carabiner with a figure 8 on a bight, its standing part on down to the GRIGRI.
-    const eight = figure8OnBight(hang);
-    pieces.push(...line([...eight.rope, ...g.rope, ...g.brake(0.9)], eight.r, C.dropper));
+    const eight = figure8(hang, ACROSS, CARABINER_R, hang.add(vec3(0, -1, 0)), 0.0055);
+    pieces.push(
+        ...line([...eight.rope, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper, "rope", {
+            a: true,
+            b: true,
+        }),
+    );
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
-    const safety = hanging(backUp, safetyClip, -0.05, 8);
-    pieces.push(...tiedTo(backUp, safety.slice(1, -1), 0.0055, C.dropper));
-    pieces.push(...tiedTo(safetyClip, safety.slice(1, -1).reverse(), 0.0055, C.dropper));
+    // One rope, a figure 8 at each end, each knot lying straight towards the other carabiner and the rope running
+    // straight between them, so it leaves each knot the way the knot lies.
+    const top = carabinerKnot(backUp, safetyClip, 0.0055);
+    const bottom = carabinerKnot(safetyClip, backUp, 0.0055);
+    pieces.push(
+        ...line([...top.knot.rope, ...bottom.knot.rope.reverse()], 0.0055, C.dropper, "rope", {
+            a: true,
+            b: true,
+        }),
+    );
     pieces.push(...carabiner(safetyClip, down, ACROSS.neg(), C.steel, clipLength));
     return { pieces, back };
 }
@@ -2133,9 +2235,9 @@ function dynamicBrake(): Piece[] {
         .lerp(eyes[1], 0.5)
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
     // The middle: one carabiner lying along the span (Figure 55), the brake line clipped into its uphill end, and the
-    // joining rope's middle and the stabiliser side by side in its downhill end. The real knots, for when they're
-    // drawn: the brake line and the stabiliser each end in a figure 8 on a bight, and the joining rope's middle is an
-    // alpine butterfly. Until then, each rope takes a turn round the carabiner's bar.
+    // joining rope's middle and the stabiliser side by side in its downhill end. The brake line and the stabiliser
+    // each end in a figure 8 on a bight. The joining rope's middle is really an alpine butterfly: until that's drawn,
+    // it takes a turn round the carabiner's bar.
     const ropeR = 0.004;
     const clip = 0.11;
     const ahead = vec3(1, 0, 0);
@@ -2150,25 +2252,28 @@ function dynamicBrake(): Piece[] {
         ropeR,
     );
     pieces.push(...line(knot.turn, ropeR, C.joining));
-    // The joining rope's legs, out from the knot to each block's eye, tied straight round the eye's bar: really a
-    // rethreaded figure 8 (drawn as a figure 8 on a bight).
+    // The joining rope's legs, out from the knot to each block's eye, tied into the eye's bar: really a rethreaded
+    // figure 8 (drawn as a figure 8 on a bight).
     for (const e of eyes) {
         const level = knot.from.sub(e);
         const w = vec3(level.x, 0, level.z).unit();
-        const t = tiedRound(
+        const t = figure8(
             e.add(w.scale(STOP_BLOCK_EYE.r)),
             UP.cross(w),
             STOP_BLOCK_EYE.bar,
             knot.from,
             ropeR,
         );
-        pieces.push(...line(t.turn, ropeR, C.joining));
-        pieces.push(...line(hanging(t.from, knot.from, 0.03, 8), ropeR, C.joining));
+        pieces.push(
+            ...line([...t.rope, ...hanging(t.end, knot.from, 0.03, 8)], ropeR, C.joining, "rope", {
+                a: true,
+            }),
+        );
     }
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
-    const brakeEye = tiedRound(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
-    pieces.push(...line(brakeEye.turn, 0.004, C.brakeLine));
-    const from = brakeEye.from;
+    const brakeEye = figure8(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
+    pieces.push(...line(brakeEye.rope, 0.004, C.brakeLine, "rope", { a: true }));
+    const from = brakeEye.end;
     // Sagging much as the hawsers do.
     const reach = hanging(from, BRAKE.pulley, sagLike(from, BRAKE.pulley), 50);
     // Clipped into the eye bolt under the arm, its eye turned to face the pull.
@@ -2177,7 +2282,15 @@ function dynamicBrake(): Piece[] {
     });
     pieces.push(...brake.pieces);
     pieces.push(...line(hanging(from, brake.a, sagLike(from, brake.a), 50), 0.004, C.brakeLine));
-    pieces.push(...line([...brake.round, BRAKE.chainTop], 0.004, C.brakeLine));
+    // Tied into a carabiner clipped to the chain's top link.
+    const chainClip = BRAKE.chainTop.add(vec3(0, 0.11, 0));
+    pieces.push(...carabiner(chainClip, vec3(0, -1, 0), ACROSS, C.steel, 0.11));
+    const chainKnot = figure8(chainClip, ACROSS, CARABINER_R, brake.round.at(-1)!, 0.004);
+    pieces.push(
+        ...line([...brake.round, ...chainKnot.rope.reverse()], 0.004, C.brakeLine, "rope", {
+            b: true,
+        }),
+    );
     // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
     // and down from it, tied off to the bottom spar with natural fibre rope.
     const g = groundY(SHEAR_LEG.x);
@@ -2185,9 +2298,9 @@ function dynamicBrake(): Piece[] {
     const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
     const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
     // From its eye in the carabiner's downhill end, beside the joining rope's knot.
-    const eye = tiedRound(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
-    pieces.push(...line(eye.turn, 0.005, C.shockCord));
-    const cord = eye.from;
+    const eye = figure8(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
+    pieces.push(...line(eye.rope, 0.005, C.shockCord, "rope", { a: true }));
+    const cord = eye.end;
     const stabiliser = rigPulley(centre, cord, tie, 0.005, {
         basket: {
             spar: vec3(SPAR_X, g + SHEAR_LEG.spar, 0),
@@ -2245,11 +2358,10 @@ function staticBrakes(): Piece[] {
         const across = down.cross(vec3(1, 0, 0)).unit();
         const top = at.sub(down.scale(HAWSER_R + CARABINER_R));
         pieces.push(...carabiner(top, down, across, C.steel, length));
-        const t = tiedRound(top.add(down.scale(length)), across, CARABINER_R, pk.tie, 0.0055);
+        const t = figure8(top.add(down.scale(length)), across, CARABINER_R, pk.tie, 0.0055);
         pieces.push(
             ...pk.pieces,
-            ...line(t.turn, 0.0055, C.staticBrake),
-            ...line([t.from, pk.tie], 0.0055, C.staticBrake),
+            ...line([...t.rope, pk.tie], 0.0055, C.staticBrake, "rope", { a: true }),
         );
     }
     return pieces;

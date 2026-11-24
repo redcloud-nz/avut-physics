@@ -5,7 +5,7 @@ import {
     BLOCKS_X,
     BRAKE,
     C,
-    figure8OnBight,
+    figure8,
     foxPieces,
     groundY,
     HAWSER_R,
@@ -33,6 +33,7 @@ import {
     baseClampWire,
     bolt,
     carabiner,
+    CARABINER_R,
     eyeBolt,
     grigri,
     hook,
@@ -334,17 +335,24 @@ export const PARTS: Part[] = [
                     C.hawser,
                 ),
                 ...(() => {
-                    const eight = figure8OnBight(t.hang, t.hangDown);
-                    const end = eight.rope.at(-1)!;
+                    const eight = figure8(
+                        t.hang,
+                        vec3(0, 0, 1),
+                        CARABINER_R,
+                        t.hang.add(t.hangDown),
+                        0.0055,
+                    );
                     return line(
-                        [...eight.rope, end.add(t.hangDown.scale(0.1))],
-                        eight.r,
+                        [...eight.rope, eight.end.add(t.hangDown.scale(0.1))],
+                        0.0055,
                         C.dropper,
+                        "rope",
+                        { a: true },
                     );
                 })(),
                 ...tiedTo(
                     t.backUp,
-                    [t.backUp.add(vec3(-0.03, -0.22, 0))],
+                    [t.backUp.add(t.backUpDown.scale(0.35))],
                     0.0055,
                     C.dropper,
                     -0.007,
@@ -441,7 +449,7 @@ export const PARTS: Part[] = [
         slug: "fox-static-brake",
         name: "Static brake, rigged",
         group: "Flying fox",
-        about: "A static brake as the flying fox rigs it, cut out of the whole: a carabiner clipped round the hawser, hanging towards the pull of its rope, which is tied round the carabiner's bottom bar and runs out to a picket.",
+        about: "A static brake as the flying fox rigs it, cut out of the whole: a carabiner clipped round the hawser, hanging towards the pull of its rope, which is tied into the carabiner's bottom bar with a figure 8 on a bight and runs out to a picket.",
         pieces: () => {
             const at = onHawser(STATIC_X, 1);
             return [

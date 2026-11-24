@@ -82,6 +82,12 @@ export type Strand = {
     capA: boolean;
     capB: boolean;
     /**
+     * Whether a real end is a cut end of rope, squared off and fused black as by a hot knife, rather than rounded.
+     * Only the 3D view draws the difference.
+     */
+    cutA?: boolean;
+    cutB?: boolean;
+    /**
      * Flat tape, for the views that can draw it so: `layers` of it side by side, each `width` wide (lying `across`) and
      * `thickness` thick, fanned apart where they run round what they're on and gathered together at `gather` (a
      * carabiner), over the last `ramp` metres to it.

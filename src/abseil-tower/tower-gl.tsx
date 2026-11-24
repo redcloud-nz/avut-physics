@@ -421,6 +421,49 @@ function bare(g: THREE.BufferGeometry): THREE.BufferGeometry {
     return g;
 }
 
+/**
+ * A rope's cut end at `at`, the rope arriving along `dir`: squared off and fused, as cut with a hot knife. A short band
+ * a touch fatter than the rope, where it melted, and its end face, a little ragged.
+ */
+function cutEnd(
+    at: THREE.Vector3,
+    dir: THREE.Vector3,
+    r: number,
+    sides: number,
+): THREE.BufferGeometry[] {
+    const fat = r * 1.06;
+    const band = tubeGeometry(
+        [at.clone().sub(dir.clone().multiplyScalar(Math.max(0.003, r * 0.6))), at],
+        fat,
+        sides,
+    );
+    // The face: a fan from its middle, its rim a little uneven (the same unevenness every time, so it doesn't flicker).
+    const helper = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const u = helper.clone().cross(dir).normalize();
+    const v = dir.clone().cross(u);
+    const rim = 2 * sides;
+    const position = [at.x, at.y, at.z];
+    const normal = [dir.x, dir.y, dir.z];
+    for (let k = 0; k < rim; k++) {
+        const th = (2 * Math.PI * k) / rim;
+        const rough = fat * (1 + 0.07 * Math.sin(5 * th + 1.3) * Math.cos(3 * th));
+        const p = at
+            .clone()
+            .add(u.clone().multiplyScalar(rough * Math.cos(th)))
+            .add(v.clone().multiplyScalar(rough * Math.sin(th)))
+            .add(dir.clone().multiplyScalar(0.0004 * Math.sin(7 * th)));
+        position.push(p.x, p.y, p.z);
+        normal.push(dir.x, dir.y, dir.z);
+    }
+    const index: number[] = [];
+    for (let k = 0; k < rim; k++) index.push(0, 1 + k, 1 + ((k + 1) % rim));
+    const face = new THREE.BufferGeometry();
+    face.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
+    face.setAttribute("normal", new THREE.Float32BufferAttribute(normal, 3));
+    face.setIndex(index);
+    return [band, face].filter((g): g is THREE.BufferGeometry => !!g);
+}
+
 /** How wide the gaps between boards are (metres). */
 const JOINT_GAP = 0.01;
 /** What a gap's colour key starts with, before the colour of its boards. */
@@ -474,11 +517,15 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
             const lift = new THREE.Vector3(0, r - p.r, 0);
             const points = p.points.map((q) => T(q).add(lift));
             add(color, tubeGeometry(points, r, sides));
-            for (const [cap, q] of [
-                [p.capA, points[0]],
-                [p.capB, points.at(-1)!],
+            for (const [cap, cut, q, before] of [
+                [p.capA, p.cutA, points[0], points[1]],
+                [p.capB, p.cutB, points.at(-1)!, points.at(-2)!],
             ] as const)
-                if (cap) {
+                if (cap && cut && before) {
+                    const fused = `color-mix(in srgb, ${color} 35%, var(--rig-black))`;
+                    for (const g of cutEnd(q, q.clone().sub(before).normalize(), r, sides))
+                        add(fused, g);
+                } else if (cap) {
                     const at = q;
                     add(
                         color,
