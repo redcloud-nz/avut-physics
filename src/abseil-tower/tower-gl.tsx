@@ -266,7 +266,8 @@ export function tubeGeometry(
         for (let k = 0; k < sides; k++) {
             const [a, b] = [i * sides + k, i * sides + ((k + 1) % sides)];
             const [c, d] = [a + sides, b + sides];
-            index.push(a, c, b, b, c, d);
+            // Wound anticlockwise seen from outside, so the faces' fronts are outside the tube.
+            index.push(a, b, c, b, d, c);
         }
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
