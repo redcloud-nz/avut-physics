@@ -2,12 +2,14 @@ import type { RigLabel } from "@/abseil-tower/rig";
 import { timber, type Piece } from "@/abseil-tower/tower";
 import {
     ANCHOR_SHACKLE,
+    backstayLoop,
     BLOCKS_X,
     BRAKE,
     C,
     figure8,
     foxPieces,
     groundY,
+    guyLoops,
     HAWSER_R,
     line,
     LOG,
@@ -17,6 +19,7 @@ import {
     rigTrolley,
     SADDLE,
     SHEAR_LEG,
+    shearLegGuyLoops,
     sling,
     SLING_Z,
     STATIC_X,
@@ -553,6 +556,27 @@ export const PARTS: Part[] = [
                 lo: vec3(-1.2, -0.1, -2.2),
                 hi: vec3(2, BRAKE.postTop + 0.3, 2.2),
             }),
+    },
+    {
+        slug: "fox-backstay-loop",
+        name: "Backstay loop",
+        group: "Flying fox",
+        about: "The backstay's figure 8 on a bight at the tower: its loop wrapped diagonally round the joint of the top cross bar and the brake support's post behind it, past the post above the bar on one side, across the bar's front, and back past the post below it on the other, lying flat along their faces.",
+        pieces: backstayLoop,
+    },
+    {
+        slug: "fox-guy-loops",
+        name: "Guy loops",
+        group: "Flying fox",
+        about: "The two guys' figure 8s on a bight at the top of one of the tower's uprights: each big loop dropped over the upright's top and slid down to the top cross bar, the second resting on the first where they cross, lying flat along the upright's faces.",
+        pieces: guyLoops,
+    },
+    {
+        slug: "fox-shear-leg-guys",
+        name: "Shear leg guys",
+        group: "Flying fox",
+        about: "The two guys' figure 8s on a bight at the top of one of the shear leg's uprights: each big loop dropped over the upright's top and slid down onto the top spar's square lashing, the second resting on the first where they cross.",
+        pieces: shearLegGuyLoops,
     },
 ];
 

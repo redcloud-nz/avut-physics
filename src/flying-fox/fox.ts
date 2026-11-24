@@ -9,6 +9,7 @@ import {
 } from "@/abseil-tower/tower";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
+import { convexHull } from "@/lib/hull";
 import { clamp } from "@/lib/math";
 import { arcLengths as ropeArcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
@@ -41,6 +42,8 @@ import {
     zipTrolley,
 } from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
+import FIGURE_8_BIG_LOOP_JSON from "./knots/figure-8-big-loop.json";
+import FIGURE_8_SINGLE_JSON from "./knots/figure-8-single.json";
 import FIGURE_8_JSON from "./knots/figure-8.json";
 
 /**
@@ -354,9 +357,15 @@ const onGround = (x: number, h: number, z: number) => vec3(x, groundY(x) + h, z)
 const bar = (a: Vector3, b: Vector3, r: number, color: string, material: Material = "steel") =>
     colored(rod(a, b, r, material, 2), color);
 
-/** A square or rectangular steel section from `a` to `b`, `h` deep as near `up` as it can be. */
+/**
+ * A square or rectangular steel section from `a` to `b`, `h` deep as near `up` as it can be, its long edges rounded as
+ * a hollow section's are (a plate's left square).
+ */
 const section = (a: Vector3, b: Vector3, up: Vector3, w: number, h: number, color = C.steel) =>
-    colored(timber(a, b, up, w, h, "steel"), color);
+    colored(timber(a, b, up, w, h, "steel", true, Math.min(w, h) >= 0.03 ? STEEL_ROUND : 0), color);
+
+/** How round a hollow steel section's long edges are. */
+const STEEL_ROUND = 0.005;
 
 /**
  * A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. `cut`
@@ -391,12 +400,8 @@ export function line(
 /** The figure 8 on a bight, tightened in 3D round a carabiner-thick bar and edited in /knot-editor-3d. */
 const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
 
-/**
- * The figure 8's rope as drawn: the file's, its tail (the straight run at its end, below the knot) cut to half its
- * length.
- */
-const FIGURE_8_ROPE = (() => {
-    const points = FIGURE_8.rope.points;
+/** A knot's rope as drawn: the file's, its tail (the straight run at its end, out of the knot) cut to half its length. */
+function halveTail(points: readonly Vector3[]): Vector3[] {
     const n = points.length;
     const way = points[n - 1].sub(points[n - 2]).unit();
     // Back up the tail while it runs straight, within 10 degrees of the way it ends.
@@ -413,7 +418,57 @@ const FIGURE_8_ROPE = (() => {
     const half = arc.at(-1)! / 2;
     const keep = arc.findIndex((s) => s > half);
     return points.slice(0, k + keep);
-})();
+}
+
+/** The figure 8 on a bight's rope as drawn, its tail halved. */
+const FIGURE_8_ROPE = halveTail(FIGURE_8.rope.points);
+
+/** How much of each of a big loop's legs is kept as tied (metres, at the knot file's size) before it opens out. */
+const BIG_LOOP_KEEP = 0.03;
+
+/**
+ * The figure 8 on a bight tied with a big loop, as for a guy dropped over a post: edited in /knot-editor-3d for its
+ * knot. Its loop's made again to fit each post (`bigLoop`), so only the knot matters.
+ */
+const FIGURE_8_BIG_LOOP = knot3dFile("figure-8-big-loop.json", FIGURE_8_BIG_LOOP_JSON);
+const FIGURE_8_BIG_LOOP_ROPE = halveTail(FIGURE_8_BIG_LOOP.rope.points);
+/** Where its loop leaves the knot and comes back to it. */
+const BIG_LOOP_ENDS = loopEnds(
+    FIGURE_8_BIG_LOOP_ROPE,
+    FIGURE_8_BIG_LOOP.rope.seg,
+    FIGURE_8_BIG_LOOP.knot,
+    BIG_LOOP_KEEP,
+);
+
+/** The single figure 8, a stopper in a rope's end, edited in /knot-editor-3d from the Rescue Knots drawing. */
+const FIGURE_8_SINGLE = knot3dFile("figure-8-single.json", FIGURE_8_SINGLE_JSON);
+
+/** The single figure 8's rope as drawn, from its standing end, its tail halved. */
+const FIGURE_8_SINGLE_ROPE = halveTail(FIGURE_8_SINGLE.rope.points);
+
+/**
+ * A figure 8 stopper tied in a rope's end: the rope arriving at `at` heading along `dir`, and on through the knot to
+ * the tail's end, drawn at the size of a rope `ropeR` thick.
+ */
+export function stopper(at: Vector3, dir: Vector3, ropeR: number): Vector3[] {
+    const { diameter } = FIGURE_8_SINGLE;
+    const points = FIGURE_8_SINGLE_ROPE;
+    const scale = ropeR / (diameter / 2);
+    // The knot's way in along its standing part, turned onto `dir`, its sides kept level where they can be.
+    const frame = (u: Vector3) => {
+        const side = Math.abs(u.y) < 0.9 ? UP.cross(u).unit() : ACROSS.cross(u).unit();
+        return [u, side, u.cross(side)];
+    };
+    const [u0, v0, w0] = frame(points[1].sub(points[0]).unit());
+    const [u, v, w] = frame(dir.unit());
+    return points.map((p) => {
+        const q = p.sub(points[0]).scale(scale);
+        return at
+            .add(u.scale(q.dot(u0)))
+            .add(v.scale(q.dot(v0)))
+            .add(w.scale(q.dot(w0)));
+    });
+}
 
 /** A figure 8 on a bight tied into something, as `figure8` draws it. */
 export type Figure8 = {
@@ -430,6 +485,11 @@ export type Figure8 = {
  * round the bar at `bar` (on its middle line), which runs along `axis` and is `barR` thick, and the knot lying towards
  * `toward`, the way its standing part pulls. It's drawn at the size of a rope `ropeR` thick, its bight opened or closed
  * to fit round the bar (blended out over the next few centimetres of the loop).
+ *
+ * With `loop`, the loop's a big one dropped over a post or bar: its legs run straight from the knot, `loop` from the
+ * bar's middle, out to the bar and pulled snug round its far side. Its plane holds the pull, square to `axis` as near
+ * as it can be, and the loop hugs what it's round where that plane cuts it: `around` (a square post or bar lies flat
+ * along its faces), or by default the round bar.
  */
 export function figure8(
     bar: Vector3,
@@ -437,32 +497,226 @@ export function figure8(
     barR: number,
     toward: Vector3,
     ropeR: number,
+    loop?: number,
+    around: Prism[] = [roundBar(bar, axis, barR)],
 ): Figure8 {
-    const { props, diameter } = FIGURE_8;
+    const { props, diameter } = loop === undefined ? FIGURE_8 : FIGURE_8_BIG_LOOP;
     const at = props[0];
     const scale = ropeR / (diameter / 2);
-    // The knot's own axes turned onto the bar's: its bar along z, and back up its standing part along y.
-    const z = axis.unit();
+    // The knot's own axes turned onto the bar's: its bar along z, and back up its standing part along y. A big loop
+    // lies in the plane of the pull, square to it, its bar's axis taken square to the pull.
     const off = toward.sub(bar);
-    const down = off.sub(z.scale(off.dot(z))).unit();
+    const a = axis.unit();
+    const slant = loop === undefined ? off.sub(a.scale(off.dot(a))) : off;
+    const down = slant.unit();
+    const zRaw = loop === undefined ? a : a.sub(down.scale(a.dot(down)));
+    const z = zRaw.unit();
     const y = down.neg();
     const x = y.cross(z);
-    // The bight's middle line round the bar, as tightened (scaled) and as it needs to be.
-    const [was, wants] = [scale * (at.r + diameter / 2), barR + ropeR];
-    const blend = was + 0.03 * scale;
-    const points = FIGURE_8_ROPE.map((p) => {
-        const q = p.sub(at.at).scale(scale);
-        const d = Math.hypot(q.x, q.y);
-        const t = clamp((blend - d) / (blend - was), 0, 1);
-        const f = d > 0 ? (d + (wants - was) * t) / d : 1;
-        return bar
-            .add(x.scale(q.x * f))
-            .add(y.scale(q.y * f))
-            .add(z.scale(q.z));
-    });
+    const local = (loop === undefined ? FIGURE_8_ROPE : FIGURE_8_BIG_LOOP_ROPE).map((p) =>
+        p.sub(at.at).scale(scale),
+    );
+    let shaped: Vector3[];
+    if (loop === undefined) {
+        // The bight's middle line round the bar, as tightened (scaled) and as it needs to be.
+        const [was, wants] = [scale * (at.r + diameter / 2), barR + ropeR];
+        const blend = was + 0.03 * scale;
+        shaped = local.map((q) => {
+            const d = Math.hypot(q.x, q.y);
+            const t = clamp((blend - d) / (blend - was), 0, 1);
+            const f = d > 0 ? (d + (wants - was) * t) / d : 1;
+            return vec3(q.x * f, q.y * f, q.z);
+        });
+    } else {
+        // Each long edge of what it's round, grown by the rope's radius (a hair more, to sit just clear), cut by the
+        // loop's plane, in the knot's own axes.
+        const cut = around.flatMap(({ along, corners }) =>
+            corners(ropeR * 1.02).map((c) => {
+                const p = c.add(along.scale(-c.sub(bar).dot(z) / along.dot(z))).sub(bar);
+                return new Vector2(p.dot(y.cross(z)), p.dot(y));
+            }),
+        );
+        shaped = bigLoop(local, BIG_LOOP_ENDS, cut, ropeR, loop, 0.003 * scale);
+    }
+    const points = shaped.map((q) => bar.add(x.scale(q.x)).add(y.scale(q.y)).add(z.scale(q.z)));
     const reach = Math.max(...points.map((p) => p.sub(bar).dot(down)));
     // The file runs from the standing end: the tail's end comes first reversed.
     return { rope: points.reverse(), end: points[points.length - 1], reach };
+}
+
+/**
+ * Where a knot's loop is: the points between its last knot segment before the loop's top (the highest point) and its
+ * first knot segment after, by the file's `knot` list, less `keep` (metres) of each leg as it leaves the knot. Returns
+ * the last point kept before the loop and the first after it.
+ */
+export function loopEnds(
+    points: readonly Vector3[],
+    seg: readonly number[],
+    knot: readonly number[],
+    keep = 0,
+): [number, number] {
+    let top = 0;
+    points.forEach((q, i) => q.y > points[top].y && (top = i));
+    const inKnot = new Set(knot);
+    let a = top;
+    while (a > 0 && !inKnot.has(seg[a])) a--;
+    let b = top;
+    while (b < points.length - 1 && !inKnot.has(seg[b])) b++;
+    for (let s = 0; a < top - 1 && s < keep; a++) s += points[a].distanceTo(points[a + 1]);
+    for (let s = 0; b > top + 1 && s < keep; b--) s += points[b].distanceTo(points[b - 1]);
+    return [a, b];
+}
+
+/** How tight, in rope radii, a big loop bends round a square post's or bar's corners. */
+const BIG_LOOP_BEND = 4;
+
+/**
+ * Something a big loop goes round: a straight post or bar running along `along`, its long edges through `corners`
+ * (round one, many of them), with it grown all round by `grow`.
+ */
+export type Prism = { along: Vector3; corners: (grow: number) => Vector3[] };
+
+/** A round bar `r` thick along `along` through `at`. */
+export function roundBar(at: Vector3, along: Vector3, r: number, n = 32): Prism {
+    const a = along.unit();
+    const u = (Math.abs(a.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0)).cross(a).unit();
+    const v = a.cross(u);
+    const corners = (grow: number) =>
+        Array.from({ length: n }, (_, k) => {
+            const t = (2 * Math.PI * k) / n;
+            return at.add(u.scale((r + grow) * Math.cos(t))).add(v.scale((r + grow) * Math.sin(t)));
+        });
+    return { along: a, corners };
+}
+
+/** A box section along `along` through `at`: `d` deep along `face` (square to `along`), `w` wide across. */
+export function boxBar(at: Vector3, along: Vector3, face: Vector3, d: number, w: number): Prism {
+    const a = along.unit();
+    const u = face.sub(a.scale(face.dot(a))).unit();
+    const v = a.cross(u);
+    const corners = (grow: number) =>
+        [
+            [1, 1],
+            [-1, 1],
+            [-1, -1],
+            [1, -1],
+        ].map(([i, j]) => at.add(u.scale(i * (d / 2 + grow))).add(v.scale(j * (w / 2 + grow))));
+    return { along: a, corners };
+}
+
+/**
+ * The figure 8's rope (`local`: its own axes, y up its loop towards the bar) with its loop made big, its bar's middle
+ * moved to the origin: the loop's legs, from where they leave the knot (points `ends`, kept), run straight out to what
+ * it's round (`cut`: the outline in the loop's plane, x and y about the bar's middle, that the rope's middle line keeps
+ * clear of) and round its far side, snug, its corners bent to suit a rope `ropeR` thick; the knot sits `reach` below the origin. Points about `step` apart. Says which of
+ * `local`'s points it replaced (`from` to `to`) and with how many.
+ */
+export function bigLoop(
+    local: Vector3[],
+    ends: [number, number],
+    cut: readonly Vector2[],
+    ropeR: number,
+    reach: number,
+    step: number,
+): Vector3[] & { replaced: { from: number; to: number; by: number } } {
+    const [i, j] = [ends[0] + 1, ends[1] - 1];
+    // From the last point kept on one leg, to the first kept on the other.
+    const [A, B] = [local[ends[0]], local[ends[1]]];
+    const centre = vec3((A.x + B.x) / 2, Math.max(A.y, B.y) + reach, (A.z + B.z) / 2);
+    const flat = (q: Vector3) => new Vector2(q.x - centre.x, q.y - centre.y);
+    const [a, b] = [flat(A), flat(B)];
+    // The rope's middle line round it, bent round its corners no tighter than `BIG_LOOP_BEND` rope radii: the outline
+    // taken in and then grown again by the bend. Taken in only so far that each corner's arc still goes round the
+    // corner (less where the corner's sharper), so it lies flat along long faces but stands off short ones. Then pulled
+    // tight from the legs: the hull of that and the legs' ends.
+    const bend = BIG_LOOP_BEND * ropeR;
+    const shape = convexHull(cut);
+    const around = (k: number) => [
+        shape[(k + shape.length - 1) % shape.length],
+        shape[k],
+        shape[(k + 1) % shape.length],
+    ];
+    const taken = Math.min(
+        ...shape.map((_, k) => {
+            const [o, p, q] = around(k);
+            const turn = Math.acos(clamp(o.sub(p).unit().dot(q.sub(p).unit()), -1, 1));
+            return bend * Math.sin(turn / 2);
+        }),
+    );
+    const inset = shape.map((_, k) => {
+        // Where its two faces either side, each moved in, meet.
+        const [o, p, q] = around(k);
+        const [d0, d1] = [p.sub(o).unit(), q.sub(p).unit()];
+        const inward = (d: Vector2) => new Vector2(-d.y, d.x).scale(taken);
+        const [s0, s1] = [o.add(inward(d0)), p.add(inward(d1))];
+        const t = s1.sub(s0).cross(d1) / d0.cross(d1);
+        return s0.add(d0.scale(t));
+    });
+    const round = Array.from({ length: 24 }, (_, k) => (2 * Math.PI * k) / 24);
+    const outline = inset.flatMap((c) =>
+        round.map((t) => c.add(new Vector2(bend * Math.cos(t), bend * Math.sin(t)))),
+    );
+    const hull = convexHull([a, b, ...outline]);
+    const [ia, ib] = [hull.indexOf(a), hull.indexOf(b)];
+    if (ia < 0 || ib < 0) throw new Error("A big loop's legs end inside what it goes round");
+    // The way round from a to b over the far side: the longer of the two ways round the hull.
+    const way = (dir: number) => {
+        const run = [a];
+        for (let k = ia; k !== ib; ) run.push(hull[(k = (k + dir + hull.length) % hull.length)]);
+        return run;
+    };
+    const [up, down] = [way(1), way(-1)];
+    const run = up.length > down.length ? up : down;
+    const path: Vector2[] = [];
+    // Each leg leaves the knot the way it was going, curving onto the line out to the outline (a cubic Bézier).
+    const curve = (p: Vector2, from: Vector2, q: Vector2, to: Vector2) => {
+        const l = p.distanceTo(q) / 3;
+        const [c1, c2] = [p.add(from.scale(l)), q.sub(to.scale(l))];
+        const n = Math.max(1, Math.ceil((3 * l) / step));
+        for (let k = 1; k <= n; k++) {
+            const t = k / n;
+            const u = 1 - t;
+            path.push(
+                p
+                    .scale(u * u * u)
+                    .add(c1.scale(3 * u * u * t))
+                    .add(c2.scale(3 * u * t * t))
+                    .add(q.scale(t * t * t)),
+            );
+        }
+    };
+    const [p0, p1] = [run[1], run[run.length - 2]];
+    const leaving = a.sub(flat(local[ends[0] - 1])).unit();
+    const arriving = flat(local[ends[1] + 1])
+        .sub(b)
+        .unit();
+    curve(a, leaving, p0, p0.sub(a).unit());
+    const wrapFrom = path.length;
+    // Round the outline, its flat runs cut to `step`.
+    for (let k = 2; k < run.length - 1; k++) {
+        const n = Math.max(1, Math.ceil(run[k - 1].distanceTo(run[k]) / step));
+        for (let m = 1; m <= n; m++) path.push(run[k - 1].lerp(run[k], m / n));
+    }
+    const wrapTo = path.length;
+    curve(p1, b.sub(p1).unit(), b, arriving);
+    path.pop();
+    // Each leg's depth (z) eases from its own to the loop's plane (the middle of the two) along it, so the loop lies in
+    // its plane where it's round what it's round.
+    const mid = centre.z;
+    const ease = (t: number) => t * t * (3 - 2 * t);
+    const looped = path.map((p, k) => {
+        const z =
+            k < wrapFrom
+                ? A.z + (mid - A.z) * ease((k + 1) / wrapFrom)
+                : k >= wrapTo
+                  ? mid + (B.z - mid) * ease((k - wrapTo + 1) / (path.length - wrapTo + 1))
+                  : mid;
+        return vec3(centre.x + p.x, centre.y + p.y, z);
+    });
+    const points = [...local.slice(0, i), ...looped, ...local.slice(j + 1)].map((q) =>
+        q.sub(centre),
+    );
+    return Object.assign(points, { replaced: { from: i, to: j, by: looped.length } });
 }
 
 /**
@@ -871,10 +1125,50 @@ function picket(at: Vector3, away: Vector3): { pieces: Piece[]; top: Vector3; ti
 /** A level unit vector pointing from `a` towards `b`. */
 const towards = (a: Vector3, b: Vector3) => vec3(b.x - a.x, 0, b.z - a.z).unit();
 
-/** A guy from `from` to a picket at `at`, the picket leaning away from it. */
-function guy(from: Vector3, at: Vector3, r: number, color: string): Piece[] {
+/** How far out from a post or bar the knot of a big loop over it sits (from the post's middle). */
+const BIG_LOOP = 0.3;
+
+/**
+ * A guy from `from` (the middle of what its loop goes round, `around`) to a picket at `at`, the picket leaning away
+ * from it: tied with a figure 8 on a bight, its big loop round a post dropped over it, square to `axis` as near as it
+ * can be (upright by default). Dropped onto `settle`, the loop rests where it's dropped or as little above as clears
+ * what's under it (`clear` says whether a point of the rope's middle line is clear) and the loops already on the post
+ * (`others`, which it joins).
+ */
+function guy(
+    from: Vector3,
+    at: Vector3,
+    r: number,
+    color: string,
+    around: Prism[],
+    {
+        axis = UP,
+        settle,
+    }: { axis?: Vector3; settle?: { clear: (p: Vector3) => boolean; others: Vector3[][] } } = {},
+): Piece[] {
     const p = picket(at, towards(from, at));
-    return [...p.pieces, ...line(hanging(from, p.tie, 0.05, 12), r, color)];
+    const knot = figure8(from, axis, 0, p.tie, r, BIG_LOOP, around);
+    let rope = knot.rope;
+    let end = knot.end;
+    if (settle) {
+        const near = settle.others.flat().filter((q) => q.distanceTo(from) < 0.5);
+        const mine = rope.filter((q) => q.distanceTo(from) < 0.5);
+        const fits = (lift: number) =>
+            mine.every((q) => {
+                const up = q.add(UP.scale(lift));
+                return settle.clear(up) && near.every((o) => o.distanceTo(up) >= 2 * r);
+            });
+        // Raised a quarter of the rope's thickness at a time until it fits.
+        let lift = 0;
+        while (!fits(lift) && lift < 0.3) lift += r / 4;
+        rope = rope.map((q) => q.add(UP.scale(lift)));
+        end = end.add(UP.scale(lift));
+        settle.others.push(rope);
+    }
+    return [
+        ...p.pieces,
+        ...line([...rope, ...hanging(end, p.tie, 0.05, 12)], r, color, "rope", { a: true }),
+    ];
 }
 
 /** A pulley's sheave at `at`, its axle along `axle`. */
@@ -1023,6 +1317,63 @@ const ring = (at: Vector3, r: number, n = 16) =>
  * hawsers' by `TOWER.z`; what's placed by the hawsers or elsewhere on the site (the saddles, the backstay to the tree)
  * and what's placed in the site's terms already (the brake support, the top bar's eye bolts) is added after.
  */
+/**
+ * The two guys from the tower's upright on side `s` (±1, before the tower's moved by `TOWER.z`): one out to the front
+ * and one to the back, at 45° and 1.6 times the tower's height out each way (Figure 40). Each guy's loop is dropped
+ * over the upright's top and slides down to the top cross bar, the second resting on the first where they cross.
+ */
+function towerGuys(s: number): Piece[] {
+    const T = TOWER;
+    const out = 1.6 * T.top;
+    const barTop = T.bar + T.rhs.h / 2;
+    const others: Vector3[][] = [];
+    // Not into the top cross bar, on the uprights' front faces.
+    const clear = (q: Vector3) =>
+        q.y - 0.006 >= barTop || Math.abs(q.x - BAR_X) >= T.rhs.w / 2 + 0.006;
+    const from = vec3(0, barTop + 0.006, s * T.half);
+    return [-1, 1].flatMap((f) =>
+        guy(
+            from,
+            vec3(f * out, 0, s * (T.half + out)),
+            0.006,
+            C.guy,
+            [boxBar(from, UP, vec3(1, 0, 0), T.shs, T.shs)],
+            { settle: { clear, others } },
+        ),
+    );
+}
+
+/**
+ * The guys' loops at one of the tower's uprights on their own, for a close look: the upright's top, a short stub of
+ * the top cross bar on its front face to its end just past the upright, and each guy's rope from its tail's end to a little way out from its knot.
+ */
+export function guyLoops(): Piece[] {
+    const T = TOWER;
+    const post = vec3(0, 0, T.half);
+    const near = (q: Vector3) => Math.hypot(q.x, q.z - T.half) < 0.45;
+    return [
+        ...section(
+            post.add(UP.scale(T.bar - 0.4)),
+            post.add(UP.scale(T.top)),
+            vec3(1, 0, 0),
+            T.shs,
+            T.shs,
+        ),
+        ...section(
+            vec3(BAR_X, T.bar, T.half - 0.4),
+            vec3(BAR_X, T.bar, T.barLength / 2),
+            UP,
+            T.rhs.w,
+            T.rhs.h,
+        ),
+        ...towerGuys(1).flatMap((p): Piece[] =>
+            p.kind === "strand" && p.points.some(near)
+                ? [{ ...p, points: p.points.filter(near) }]
+                : [],
+        ),
+    ];
+}
+
 function tower(): Piece[] {
     const T = TOWER;
     const pieces: Piece[] = [];
@@ -1077,7 +1428,8 @@ function tower(): Piece[] {
     const postX = T.shs / 2 - T.rhs.w / 2;
     const postTop = vec3(postX, BRAKE.postTop, T.z);
     placed.push(
-        ...section(vec3(postX, T.lower - 0.135, T.z), postTop, vec3(1, 0, 0), T.rhs.w, T.rhs.h),
+        // 50 mm front to back, so it sits just behind the bars, 75 mm across.
+        ...section(vec3(postX, T.lower - 0.135, T.z), postTop, vec3(1, 0, 0), T.rhs.h, T.rhs.w),
     );
     const armEnd = BRAKE.armEnd;
     placed.push(...section(postTop.add(vec3(0, -0.04, 0)), armEnd, UP, 0.05, 0.05));
@@ -1177,24 +1529,20 @@ function tower(): Piece[] {
                 ),
             );
         }
-    // Guys: one from each upright's top out to the front and one to the back, at 45° and 1.6 times the tower's height
-    // out each way (Figure 40), and the backstay from the top bar's middle back to the tree.
-    const out = 1.6 * T.top;
-    for (const s of [-1, 1])
-        for (const f of [-1, 1]) {
-            const from = vec3(0, T.top - 0.05, s * T.half);
-            pieces.push(...guy(from, vec3(f * out, 0, s * (T.half + out)), 0.006, C.guy));
-        }
+    // Guys from the uprights' tops, and the backstay from the joint of the top bar and the brake support's post back to
+    // the tree.
+    for (const s of [-1, 1]) pieces.push(...towerGuys(s));
     placed.push(
         ...line(
             [
-                ...hanging(BACKSTAY_TOP, BACKSTAY_TIE.end, 0.08, 20),
+                ...BACKSTAY_TOWER_TIE.rope,
+                ...hanging(BACKSTAY_TOWER_TIE.end, BACKSTAY_TIE.end, 0.08, 20),
                 ...BACKSTAY_TIE.rope.slice().reverse(),
             ],
             0.0065,
             C.backstay,
             "rope",
-            { b: true },
+            { a: true, b: true },
         ),
     );
     return [...moved(pieces, vec3(0, 0, T.z)), ...placed];
@@ -1277,8 +1625,31 @@ function tree(): Piece[] {
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
 const BACKSTAY_SLING_Y = 0.7;
-/** The backstay's top end, at the middle of the tower's top bar. */
-const BACKSTAY_TOP = vec3(BAR_X, TOWER.bar, TOWER.z);
+/** The back of the brake support's post up the tower's middle, just behind the top cross bar (`rhs.w` deep). */
+const POST_BACK = TOWER.shs / 2 - TOWER.rhs.w;
+/** The front of the top cross bar, on the uprights' front faces. */
+const BAR_FRONT = BAR_X + TOWER.rhs.w / 2;
+/**
+ * The backstay's top end: the joint of the top cross bar and the brake support's post behind it, at the middle of the
+ * two together, which its loop wraps diagonally.
+ */
+const BACKSTAY_TOP = vec3((POST_BACK + BAR_FRONT) / 2, TOWER.bar, TOWER.z);
+/**
+ * The line the backstay's loop wraps round at that joint: diagonal, so the loop goes past the post above the bar on one
+ * side, across the bar's front and back past the post below it on the other.
+ */
+const BACKSTAY_WRAP = vec3(0, 1, -1).unit();
+/** What the backstay's loop goes round: the top cross bar and the brake support's post behind it, both `rhs`. */
+const BACKSTAY_AROUND = [
+    boxBar(vec3(BAR_X, TOWER.bar, TOWER.z), ACROSS, vec3(1, 0, 0), TOWER.rhs.w, TOWER.rhs.h),
+    boxBar(
+        vec3(POST_BACK + TOWER.rhs.w / 2, TOWER.bar, TOWER.z),
+        UP,
+        vec3(1, 0, 0),
+        TOWER.rhs.w,
+        TOWER.rhs.h,
+    ),
+];
 /**
  * The bow shackle on the backstay's sling: its crown's inside out in front of the tree, straight towards the
  * backstay's top end, so the sling, the shackle and the backstay line up; and the way along it.
@@ -1288,6 +1659,40 @@ const BACKSTAY_SHACKLE = (() => {
     const along = BACKSTAY_TOP.sub(centre).unit();
     return { crown: centre.add(along.scale(TREE.r + 0.45)), along };
 })();
+/** The backstay's figure 8 on a bight at the tower, its big loop wrapped diagonally round the bar's joint. */
+const BACKSTAY_TOWER_TIE = (() => {
+    const pin = BACKSTAY_SHACKLE.crown.add(BACKSTAY_SHACKLE.along.scale(SHACKLE_19.length));
+    return figure8(BACKSTAY_TOP, BACKSTAY_WRAP, 0, pin, 0.0065, BIG_LOOP, BACKSTAY_AROUND);
+})();
+
+/**
+ * The backstay's figure 8 on a bight at the tower on its own, for a close look: a short stub of the top cross bar and
+ * of the brake support's post, and the rope from the tail's end to a little way down the backstay.
+ */
+export function backstayLoop(): Piece[] {
+    const [bar, post] = [vec3(BAR_X, TOWER.bar, TOWER.z), BACKSTAY_AROUND[1]];
+    const postAt = vec3(POST_BACK + TOWER.rhs.w / 2, TOWER.bar, TOWER.z);
+    const { rope, end } = BACKSTAY_TOWER_TIE;
+    const along = BACKSTAY_TIE.end.sub(end).unit();
+    return [
+        ...section(
+            bar.add(ACROSS.scale(-0.3)),
+            bar.add(ACROSS.scale(0.3)),
+            UP,
+            TOWER.rhs.w,
+            TOWER.rhs.h,
+        ),
+        ...section(
+            postAt.add(post.along.scale(-0.3)),
+            postAt.add(post.along.scale(0.3)),
+            vec3(1, 0, 0),
+            TOWER.rhs.h,
+            TOWER.rhs.w,
+        ),
+        ...line([...rope, end.add(along.scale(0.3))], 0.0065, C.backstay, "rope", { a: true }),
+    ];
+}
+
 /** The backstay's figure 8 on a bight, tied into its shackle's pin. */
 const BACKSTAY_TIE = (() => {
     const { crown, along } = BACKSTAY_SHACKLE;
@@ -1461,6 +1866,69 @@ export const TREE_SHACKLE = (s: number) => {
     return at.add(cradle.sub(at).unit().scale(TREE_LEG));
 };
 
+/**
+ * The two guys from the shear leg's upright on side `s` (±1): from its top, at 45° out to the front and back, 1.6 times
+ * its height each way (Figure 34). Each loop's dropped over the upright's top and slides down onto the top spar's
+ * square lashing, the second resting on the first where they cross.
+ */
+function shearLegGuys(s: number): Piece[] {
+    const L = SHEAR_LEG;
+    const g = groundY(L.x);
+    const half = L.b / 2;
+    const sparX = L.x + 2 * L.r;
+    const out = 1.6 * L.top;
+    const r = 0.006;
+    // The lashing's outermost turn round the upright, above the spar.
+    const lashingTop = g + L.spar + L.r + LASHING_R + 3 * 2 * LASHING_R + LASHING_R;
+    // Above the lashing where it's round the upright, and clear of the spar.
+    const clear = (q: Vector3) =>
+        (Math.hypot(q.x - L.x, q.z - s * half) > L.r + 0.05 || q.y - r >= lashingTop) &&
+        Math.hypot(q.x - sparX, q.y - (g + L.spar)) >= L.r + r;
+    const settle = { clear, others: [] as Vector3[][] };
+    const from = vec3(L.x, lashingTop + r, s * half);
+    return [-1, 1].flatMap((f) =>
+        guy(from, vec3(L.x + f * out, 0, s * (half + out)), r, C.guy, [roundBar(from, UP, L.r)], {
+            settle,
+        }),
+    );
+}
+
+/**
+ * The guys' loops at one of the shear leg's uprights on their own, for a close look: the upright's top, a short stub
+ * of the top spar to its end past the upright, the square lashing where they cross, and each guy's rope from its
+ * tail's end to a little way out from its knot.
+ */
+export function shearLegGuyLoops(): Piece[] {
+    const L = SHEAR_LEG;
+    const g = groundY(L.x);
+    const half = L.b / 2;
+    const sparX = L.x + 2 * L.r;
+    const near = (q: Vector3) => Math.hypot(q.x - L.x, q.z - half) < 0.45;
+    return [
+        ...bar(vec3(L.x, g + L.spar - 0.4, half), vec3(L.x, g + L.top, half), L.r, C.spar, "log"),
+        ...bar(
+            vec3(sparX, g + L.spar, half - 0.4),
+            vec3(sparX, g + L.spar, half + 0.4),
+            L.r,
+            C.spar,
+            "log",
+        ),
+        ...squareLashing(
+            vec3(L.x, g + L.spar, half),
+            L.r,
+            vec3(sparX, g + L.spar, half),
+            L.r,
+            UP,
+            ACROSS,
+        ),
+        ...shearLegGuys(1).flatMap((p): Piece[] =>
+            p.kind === "strand" && p.points.some(near)
+                ? [{ ...p, points: p.points.filter(near) }]
+                : [],
+        ),
+    ];
+}
+
 /** The H-frame shear leg at the bottom end, its lashings, bagging and guys. */
 function shearLeg(): Piece[] {
     const L = SHEAR_LEG;
@@ -1543,13 +2011,7 @@ function shearLeg(): Piece[] {
     // A star picket at each upright's heel, on the anchor side, so it can't kick out.
     for (const s of [-1, 1])
         frame.push(...picket(vec3(L.x + L.r + 0.05, 0, s * (half - 0.12)), vec3(1, 0, 0)).pieces);
-    // Guys from each upright's top, at 45° out to the front and back, 1.6 times its height each way (Figure 34).
-    const out = 1.6 * L.top;
-    for (const s of [-1, 1])
-        for (const f of [-1, 1]) {
-            const from = vec3(L.x, g + L.top - 0.1, s * half);
-            frame.push(...guy(from, vec3(L.x + f * out, 0, s * (half + out)), 0.006, C.guy));
-        }
+    for (const s of [-1, 1]) frame.push(...shearLegGuys(s));
     return frame;
 }
 
@@ -2150,11 +2612,22 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
     );
     // Tied into the trolley's carabiner with a figure 8 on a bight, its standing part on down to the GRIGRI.
     const eight = figure8(hang, ACROSS, CARABINER_R, hang.add(vec3(0, -1, 0)), 0.0055);
+    // Its brake strand's end tied off with a figure 8 stopper.
+    const brakeStrand = g.brake(0.9);
+    const [end, before] = [brakeStrand.at(-1)!, brakeStrand.at(-2)!];
     pieces.push(
-        ...line([...eight.rope, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper, "rope", {
-            a: true,
-            b: true,
-        }),
+        ...line(
+            [
+                ...eight.rope,
+                ...g.rope,
+                ...brakeStrand,
+                ...stopper(end, end.sub(before), 0.0055).slice(1),
+            ],
+            0.0055,
+            C.dropper,
+            "rope",
+            { a: true, b: true },
+        ),
     );
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
