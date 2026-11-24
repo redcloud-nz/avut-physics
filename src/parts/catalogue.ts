@@ -1,6 +1,5 @@
 import type { RigLabel } from "@/abseil-tower/rig";
 import { timber, type Piece } from "@/abseil-tower/tower";
-import TRIAL from "@/flying-fox/fig8-trial.json";
 import {
     ANCHOR_SHACKLE,
     BLOCKS_X,
@@ -47,7 +46,8 @@ import {
     zipTrolley,
 } from "@/flying-fox/hardware";
 import { axes, knotPieces, numberedRope } from "@/flying-fox/knot-3d";
-import { segmentsOf } from "@/flying-fox/knot-edit";
+import FIGURE_8_JSON from "@/flying-fox/knots/figure-8.json";
+import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -114,32 +114,31 @@ export const PARTS: Part[] = [
         slug: "figure-8-trial",
         name: "Figure 8, tightened (trial)",
         group: "Knots",
-        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar, its rope numbered in segments from the standing end, with X, Y and Z arrows.",
+        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar (src/flying-fox/knots/figure-8.json, edited in /knot-editor-3d), its rope numbered in segments from the standing end, with X, Y and Z arrows.",
         ...(() => {
-            const rope = () => {
-                const points = TRIAL.pts.map(([x, y, z]) => vec3(x, y, z));
-                const seg = (TRIAL as { seg?: number[] }).seg ?? segmentsOf(points, 0.02);
-                return numberedRope(points, 0.0055, seg, [
+            const file = knot3dFile("figure-8.json", FIGURE_8_JSON);
+            const { points, seg } = file.rope;
+            const rope = () =>
+                numberedRope(points, file.diameter / 2, seg, [
                     "var(--knot-orange)",
                     "var(--knot-purple)",
                 ]);
-            };
-            const knotLow = Math.min(...TRIAL.pts.filter(([, y]) => y > -0.15).map(([, y]) => y));
+            const knotLow = Math.min(...points.filter((p) => p.y > -0.15).map((p) => p.y));
             const arrows = () => axes(vec3(-0.06, knotLow, 0), 0.03);
             return {
                 pieces: () => [
                     ...rope().pieces,
                     ...arrows().pieces,
-                    {
+                    ...file.props.map((bar) => ({
                         kind: "rod" as const,
-                        a: vec3(TRIAL.bar.at.x, TRIAL.bar.at.y, -0.04),
-                        b: vec3(TRIAL.bar.at.x, TRIAL.bar.at.y, 0.04),
-                        r: TRIAL.bar.r,
+                        a: bar.at.sub(bar.along.scale(0.04)),
+                        b: bar.at.add(bar.along.scale(0.04)),
+                        r: bar.r,
                         material: "steel" as const,
                         color: STEEL,
                         capA: true,
                         capB: true,
-                    },
+                    })),
                 ],
                 labels: () => [...rope().labels, ...arrows().labels],
             };

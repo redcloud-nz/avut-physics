@@ -65,7 +65,7 @@ that a diagram draws correctly. The article's first load compiles for around 20 
 - `src/app/(site)/<route>/page.tsx`: thin pages. Visualisations render inside `VisualisationPage`. The `(site)`
   route group's layout adds the site's chrome (the scroll box, footer and `ScrollMemory`, in `SiteChrome`); the root
   layout holds only `<html>`, `<body>`, fonts and metadata, and `src/app/not-found.tsx` draws the chrome itself. The
-  knot editor is in `(editor)`, with a layout of its own.
+  knot editors (`/knot-editor`, and the 3D one at `/knot-editor-3d`) are in `(editor)`, with a layout of their own.
 - `src/visualisations/<name>.tsx`: the interactive client component (sliders, SVG diagram,
   readouts).
 - `src/visualisations/<name>-solver.ts`: the physics, as pure functions of a setup with no React.
@@ -100,6 +100,9 @@ that a diagram draws correctly. The article's first load compiles for around 20 
   classes (`text-slate-400`) in components; add a token instead. The exceptions are the share images
   (`src/visual/share-image.tsx` and `src/pulley-systems/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
   own overlays) and the articles' `print:` classes.
+- `src/knot-editor-3d/`: the 3D knot editor (see `docs/knot-editor-3d.md`): its page, state, file format and
+  versions. Its files are read by pages with `knot3dFile`, which fails the build on one that doesn't read; the flying
+  fox's are in `src/flying-fox/knots/`.
 - `src/knots/`: knots drawn from their centrelines (work in progress at `/rescue-knots/<slug>`; see
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
 - `src/lib/`: all the shared maths. Use it rather than writing local helpers:
@@ -114,6 +117,9 @@ that a diagram draws correctly. The article's first load compiles for around 20 
     non-negative. `minimise.ts`: Nelder–Mead, grid minima, golden-section search. `roots.ts`: bisection
     and a quadratic's roots. `differences.ts`: central differences. `held-balance.ts`: Newton's method
     on a balance with some constraints held exactly (the lowers' final solve).
+  - `rope-3d/`: a rope in 3D as points in numbered segments (`rope.ts`), settled by position-based dynamics
+    (`sim.ts`), and the 3D knot editor's edits as steppers (`operations.ts`): moving a handle along a smooth curve
+    through locked ends (`curve.ts`), tightening and smoothing.
   - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
     curves through points. `polyline.ts`: the `Polyline` type (a `readonly Vector2[]`), its arc lengths
     and its length. `svg-path.ts`: SVG path data: numbers, points and polylines written for it

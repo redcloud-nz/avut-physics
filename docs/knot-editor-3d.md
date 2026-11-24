@@ -1,5 +1,9 @@
 # 3D knot editor: design
 
+**Status (2026-11-24):** steps 1 to 6 of the order of work are built, at `/knot-editor-3d`, on branch
+`knot-editor-3d`. Step 7 (fixing the figure 8's last twist and drawing it on the trolley) is next, and needs a person
+at the editor. What changed from the design below as it was built is under Built.
+
 An editor for shaping knots in 3D by hand, a few segments at a time, and tightening them, saved to files. It's for
 the flying fox's figure 8s first: their 3D shape comes from tightening the Rescue Knots drawing, which leaves strands
 twisted in places, and fixing a twist means moving rope about half way round the knot while watching what happens.
@@ -184,3 +188,32 @@ is to be worked out when the first one's drawn; it may need the core to say wher
   against the photos in `~/AVUT/parts/figure-8_*.jpg`.
 - **Should the editor show the photos** beside the 3D view, from matching angles, to compare against?
 - **Route and naming:** `/knot-editor-3d`, or a 3D mode in the existing editor?
+
+## Built
+
+- **Where things are:** the engine is `src/lib/rope-3d/` (`rope.ts`, `sim.ts`, `curve.ts`, `operations.ts`), replacing
+  `knot-tighten.ts` and `knot-edit.ts`; the editor is `src/knot-editor-3d/`; the trial figure 8 is
+  `src/flying-fox/knots/figure-8.json`, which the parts viewer's trial part now reads. The flat views are shared
+  with the parts viewer (`src/parts/flat-view.tsx`), and `SceneGL` takes children, so the editor draws the live rope,
+  its handle and the locked ends inside the parts viewer's 3D view.
+- **The handle** is the middle of its segment's points (`segmentMiddle`), not its middle by length: the two sides of
+  the handle keep their own shares of the points, so they're spaced differently once one side grows more than the
+  other, and the middle by points is the point the move steers.
+- **A move** sends the handle at most a sixth of a diameter a step towards the goal, and never more than a diameter and
+  a half ahead of where it is, so it stops against rope in its way. Each point of the rope in play goes halfway to its
+  place on the curve each step (at most a quarter of a diameter), and each side of the handle has its own rest length.
+  A move's done once neither the sent point nor the handle has moved a tenth of a millimetre a step for 15 steps.
+  The rope's stiffness is off while it moves: the curve gives it its shape.
+- **Existing overlaps are kept, not fixed.** The trial figure 8 has strands pressed up to 2.5 mm into each other (it
+  was tightened before these rules). Each simulation lets pairs already closer than a diameter stay as close as they
+  are, but no closer; pushed apart at once, they kinked the rope.
+- **The rope's end** in play is locked like any other end: a stretch running to the rope's end holds that end where it
+  is.
+- **Least bend** is saved per file in metres. The trial figure 8 was tightened at half a diameter, so its file says
+  5.5 mm; one diameter (the start suggested above) would loosen it wherever it's edited. That's still open.
+- **Stiffness** now straightens once a step, not on every pass over the constraints, so a rope settling keeps its
+  length.
+- **Held and knot segments** for the trial figure 8: held 1, 27–28 (the loop's top over the bar) and 54; knot 7–23 and
+  34–50. Both are set in the panel.
+- **Not built:** dragging a segment boundary's marker (boundaries slide from the panel), the photos beside the view,
+  and knots of two ropes (New from a knot drawing takes a drawing's first rope and its bars only).

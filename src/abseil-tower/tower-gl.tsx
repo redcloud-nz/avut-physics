@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentRef, type RefObject } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentRef,
+    type ReactNode,
+    type RefObject,
+} from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -27,7 +37,7 @@ import {
  * what's behind it however they cross. Scene points are compass (x east, y up, z north); three.js wants a right-handed
  * frame, so z is turned round to point south as they go in.
  */
-const T = (p: Vector3) => new THREE.Vector3(p.x, p.y, -p.z);
+export const T = (p: Vector3) => new THREE.Vector3(p.x, p.y, -p.z);
 
 const COLOR: Record<Material, string> = {
     log: "var(--tower-log)",
@@ -158,7 +168,16 @@ function colorReader(box: HTMLElement) {
     const font = getComputedStyle(box).getPropertyValue("--font-geist-mono") || "monospace";
     return { read, font, dispose: () => probe.remove() };
 }
-type Colors = ReturnType<typeof colorReader>;
+export type Colors = ReturnType<typeof colorReader>;
+
+const ColorsContext = createContext<Colors | null>(null);
+
+/** The scene's colour reader, for what's drawn inside a `SceneGL` as its children. */
+export function useSceneColors(): Colors {
+    const colors = useContext(ColorsContext);
+    if (!colors) throw new Error("useSceneColors is only for a SceneGL's children");
+    return colors;
+}
 
 /** How many sides a rope's or rod's tube has, unless a scene asks for more or fewer. */
 const SIDES = 10;
@@ -201,7 +220,7 @@ function rodGeometry(
 }
 
 /** A tube of radius `r` along a polyline, its rings kept square to the line as it bends. */
-function tubeGeometry(
+export function tubeGeometry(
     points: THREE.Vector3[],
     r: number,
     sides = SIDES,
@@ -530,7 +549,7 @@ function buildHairlines(pieces: Piece[]) {
 }
 
 /** A label's text drawn on a canvas, for a texture: `fill` letters, with an outline in `stroke` if given. */
-function textTexture(text: string, font: string, fill: string, stroke?: string) {
+export function textTexture(text: string, font: string, fill: string, stroke?: string) {
     const size = 64;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
@@ -567,16 +586,18 @@ function KnotLabel({ label, colors }: { label: RigLabel; colors: Colors }) {
     const mesh = useRef<THREE.Mesh>(null);
     const { camera, size } = useThree();
     const on = label.on!;
+    // Drawn again only when its text changes, not as it moves (as the 3D knot editor's numbers do while dragged).
+    const { text, light } = label;
     const card = useMemo(() => {
-        const ink = colors.read(label.light ? "var(--ink-bright)" : "var(--rig-on-rope)");
-        const edge = label.light ? colors.read("var(--rig-on-rope)") : undefined;
+        const ink = colors.read(light ? "var(--ink-bright)" : "var(--rig-on-rope)");
+        const edge = light ? colors.read("var(--rig-on-rope)") : undefined;
         return textTexture(
-            label.text,
+            text,
             colors.font,
             `#${ink.getHexString()}`,
             edge && `#${edge.getHexString()}`,
         );
-    }, [label, colors]);
+    }, [text, light, colors]);
     useEffect(() => () => card.texture.dispose(), [card]);
     const centre = useMemo(() => T(label.at), [label]);
     const axis = useMemo(() => T(on.along).normalize(), [on]);
@@ -941,12 +962,15 @@ export function SceneGL({
     onTurn,
     detail,
     onFrameRate,
+    children,
 }: ViewProps & {
     scene: SceneConfig;
     /** How finely to draw it (as fine as the screen allows, up to 2 pixels a CSS pixel, unless given). */
     detail?: GLDetail;
     /** Told when the frame rate stays short of smooth, or has room to spare, for a choice of detail to follow. */
     onFrameRate?: (rate: FrameRate) => void;
+    /** More to draw in the scene, which may read its colours with `useSceneColors`. */
+    children?: ReactNode;
 }) {
     const box = useRef<HTMLDivElement>(null);
     const [colors, setColors] = useState<Colors | null>(null);
@@ -1027,6 +1051,7 @@ export function SceneGL({
                     />
                     <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />
                     {scene.pivotToPointer && <PivotToPointer controls={controls} limits={limits} />}
+                    <ColorsContext value={colors}>{children}</ColorsContext>
                     <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>
             )}
