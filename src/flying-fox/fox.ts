@@ -1,20 +1,47 @@
-import type { RigLabel } from "@/abseil-tower/rig";
-import { rod, timber, type Material, type Piece, type Strand } from "@/abseil-tower/tower";
+import { TAPE, type RigLabel } from "@/abseil-tower/rig";
+import {
+    rod,
+    tapeLayers,
+    timber,
+    type Material,
+    type Piece,
+    type Strand,
+} from "@/abseil-tower/tower";
+import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
+import { clamp } from "@/lib/math";
+import { arcLengths as ropeArcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import {
+    ANCHOR_HOOK,
+    baseClamp,
+    baseClampWire,
+    CABLE_HOOK,
     carabiner,
+    CARABINER_R,
+    CARABINER_WIDTH,
     EYE_BOLT,
     eyeBolt,
     eyeFrame,
     grigri,
+    hook,
     pulley,
+    shackle,
+    SHACKLE_19,
+    STOP_BLOCK,
+    stopBlock,
+    thimble,
+    THIMBLE_11,
+    tiedRound,
+    tirfor,
+    turnbuckle,
     wrap,
     zipTrolley,
 } from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
+import FIGURE_8_JSON from "./knots/figure-8.json";
 
 /**
  * A dual-hawser flying fox braked by a chain weight, set up to Scouts NSW's "Flying Fox - Operations and Construction"
@@ -199,16 +226,11 @@ const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.25, 0);
 /** The tree the hawsers are slung round, at least 2.15 times the tower's height behind it (Figure 26). */
 export const TREE = { x: -23, r: 0.36, height: 9 };
 /**
- * The log and picket anchor, on the level ground past the shear leg: 2.15 times the shear leg's height past it brings the
- * hawsers down to it at 25°, so it's set back as far as keeps them at 25° down to their shackles, 0.75 m in front of the
- * log, with a little to spare.
+ * The log and picket anchor, on the level ground past the shear leg: the book's minimum is 2.15 times the height from
+ * the shear leg's base to its saddle (which brings the hawsers down at just under 25°); it's set well back from that,
+ * 3 times the height, for flatter hawsers.
  */
-export const LOG = (() => {
-    const tan = Math.tan((25 * Math.PI) / 180);
-    const high = SHEAR_LEG.spar + BAGGING_R - 0.12;
-    const out = high / tan + 0.3;
-    return { x: SHEAR_LEG.x + 2 * SHEAR_LEG.r + out + 0.75, r: 0.075, length: 2.4 };
-})();
+export const LOG = { x: SHEAR_LEG.x + 3 * (SHEAR_LEG.spar + BAGGING_R), r: 0.075, length: 2.4 };
 
 /** The dynamic brake's blocks, this far up the span from the shear leg, and the static brakes. */
 export const BLOCKS_X = SPAN - 10;
@@ -264,15 +286,26 @@ export const C = {
     picket: "var(--fox-picket)",
     cap: "var(--knot-yellow)",
     steel: "var(--tower-steel)",
+    brass: "var(--fox-brass)",
+    /** Shackles' painted screw pins. */
+    pin: "var(--fox-shackle-pin)",
     trolley: "var(--knot-red)",
     nylon: "var(--fox-nylon)",
-    sling: "var(--fox-sling)",
-    tirfor: "var(--rig-black)",
+    tirfor: "var(--fox-tirfor)",
+    oval: "var(--fox-carabiner-oval)",
     tree: "var(--tower-log)",
     spar: "var(--fox-spar)",
     grate: "var(--fox-grate)",
     pulley: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
+};
+/** The Tirfor's colours: its alloy body, steel pin and handle, yellow release lever, black grips and labels. */
+export const TIRFOR_COLORS = {
+    body: "var(--fox-tirfor)",
+    steel: "var(--tower-steel)",
+    lever: "var(--fox-tirfor-lever)",
+    grip: "var(--rig-black)",
+    label: "var(--rig-black)",
 };
 /** The trolleys' and pulleys' colours. */
 export const TROLLEY_COLORS = {
@@ -281,10 +314,21 @@ export const TROLLEY_COLORS = {
     steel: "var(--tower-steel)",
     bumper: "var(--rig-black)",
 };
+/** The size of the stop blocks' eyes, which the joining rope's tied into. */
+const STOP_BLOCK_EYE = STOP_BLOCK.eye.size;
+
+/** The stop blocks' colours: the nylon body, steel eye bolts and brass bolts. */
+export const STOP_BLOCK_COLORS = {
+    body: "var(--fox-nylon)",
+    steel: "var(--tower-steel)",
+    brass: "var(--fox-brass)",
+};
+
 export const PULLEY_COLORS = {
     plates: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",
     steel: "var(--tower-steel)",
+    carabiner: "var(--fox-carabiner-oval)",
 };
 
 const UP = vec3(0, 1, 0);
@@ -314,12 +358,16 @@ const bar = (a: Vector3, b: Vector3, r: number, color: string, material: Materia
 const section = (a: Vector3, b: Vector3, up: Vector3, w: number, h: number, color = C.steel) =>
     colored(timber(a, b, up, w, h, "steel"), color);
 
-/** A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. */
+/**
+ * A run of rope or wire through `points`. Long runs are cut into strands of about `piece` points, for the sort. `cut`
+ * says which of its ends (`a` the first, `b` the last) are cut ends of rope, squared off and fused.
+ */
 export function line(
     points: Vector3[],
     r: number,
     color: string,
     material: Material = "rope",
+    cut: { a?: boolean; b?: boolean } = {},
 ): Strand[] {
     const piece = 12;
     const out: Strand[] = [];
@@ -333,9 +381,413 @@ export function line(
             color,
             capA: i === 0,
             capB: i + piece >= points.length - 1,
+            ...(i === 0 && cut.a && { cutA: true }),
+            ...(i + piece >= points.length - 1 && cut.b && { cutB: true }),
         });
     }
     return out;
+}
+
+/** The figure 8 on a bight, tightened in 3D round a carabiner-thick bar and edited in /knot-editor-3d. */
+const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
+
+/**
+ * The figure 8's rope as drawn: the file's, its tail (the straight run at its end, below the knot) cut to half its
+ * length.
+ */
+const FIGURE_8_ROPE = (() => {
+    const points = FIGURE_8.rope.points;
+    const n = points.length;
+    const way = points[n - 1].sub(points[n - 2]).unit();
+    // Back up the tail while it runs straight, within 10 degrees of the way it ends.
+    let k = n - 2;
+    while (
+        k > 0 &&
+        points[k]
+            .sub(points[k - 1])
+            .unit()
+            .dot(way) > Math.cos(Math.PI / 18)
+    )
+        k--;
+    const arc = ropeArcLengths(points.slice(k));
+    const half = arc.at(-1)! / 2;
+    const keep = arc.findIndex((s) => s > half);
+    return points.slice(0, k + keep);
+})();
+
+/** A figure 8 on a bight tied into something, as `figure8` draws it. */
+export type Figure8 = {
+    /** The rope from the tail's end, round through the knot, to where the standing part leaves it. */
+    rope: Vector3[];
+    /** Where the standing part leaves the knot, for the rope to go on from. */
+    end: Vector3;
+    /** How far from the bar, towards the pull, the knot reaches. */
+    reach: number;
+};
+
+/**
+ * A figure 8 on a bight tied into a bar (a carabiner's, a shackle's pin, an eye): the flying fox's figure 8, its bight
+ * round the bar at `bar` (on its middle line), which runs along `axis` and is `barR` thick, and the knot lying towards
+ * `toward`, the way its standing part pulls. It's drawn at the size of a rope `ropeR` thick, its bight opened or closed
+ * to fit round the bar (blended out over the next few centimetres of the loop).
+ */
+export function figure8(
+    bar: Vector3,
+    axis: Vector3,
+    barR: number,
+    toward: Vector3,
+    ropeR: number,
+): Figure8 {
+    const { props, diameter } = FIGURE_8;
+    const at = props[0];
+    const scale = ropeR / (diameter / 2);
+    // The knot's own axes turned onto the bar's: its bar along z, and back up its standing part along y.
+    const z = axis.unit();
+    const off = toward.sub(bar);
+    const down = off.sub(z.scale(off.dot(z))).unit();
+    const y = down.neg();
+    const x = y.cross(z);
+    // The bight's middle line round the bar, as tightened (scaled) and as it needs to be.
+    const [was, wants] = [scale * (at.r + diameter / 2), barR + ropeR];
+    const blend = was + 0.03 * scale;
+    const points = FIGURE_8_ROPE.map((p) => {
+        const q = p.sub(at.at).scale(scale);
+        const d = Math.hypot(q.x, q.y);
+        const t = clamp((blend - d) / (blend - was), 0, 1);
+        const f = d > 0 ? (d + (wants - was) * t) / d : 1;
+        return bar
+            .add(x.scale(q.x * f))
+            .add(y.scale(q.y * f))
+            .add(z.scale(q.z));
+    });
+    const reach = Math.max(...points.map((p) => p.sub(bar).dot(down)));
+    // The file runs from the standing end: the tail's end comes first reversed.
+    return { rope: points.reverse(), end: points[points.length - 1], reach };
+}
+
+/**
+ * A sling's webbing: a round sling (an endless loop of yarn in a woven sleeve, the anchors' 4 t ones) or a climbing
+ * sling (sewn flat tape as on the tower, here the common 25 mm). Neither is round in section: a round sling's sleeve
+ * squashes semi-flat, about 50 mm wide and 14 mm thick. `r` is how thick the flat views draw it.
+ */
+export const SLINGS = {
+    round: {
+        width: 0.05,
+        thickness: 0.014,
+        r: 0.016,
+        color: "var(--fox-round-sling)",
+        bunched: { width: 0.038, thickness: 0.02, over: 0.15 },
+    },
+    climbing: {
+        width: 0.025,
+        thickness: TAPE.thickness,
+        r: 0.0125,
+        color: "var(--fox-sling)",
+        // Climbing tape is flat already, and a carabiner's bar is wide enough for it not to bunch.
+        bunched: { width: 0.025, thickness: TAPE.thickness, over: 0.06 },
+    },
+};
+
+/**
+ * A sling through `points`, doubled (an endless or tied loop goes round anything with its two parts side by side):
+ * its two layers lie `across`, fanned apart where it wraps and gathered at `gather` (its shackle or carabiner) over the
+ * last `ramp` metres.
+ */
+export function sling(
+    kind: keyof typeof SLINGS,
+    points: Vector3[],
+    across: Vector3,
+    gather: Vector3,
+    ramp: number,
+    layers = 2,
+): Strand[] {
+    const { width, thickness, r, color } = SLINGS[kind];
+    const tape = { width, thickness, across, layers, gather, ramp };
+    const strands = line(points, r, color, "sling").map((p) => ({ ...p, tape }));
+    if (kind !== "round")
+        return [
+            ...strands,
+            ...strands
+                .flatMap((p) =>
+                    tapeLayers(p).map((layer) => ({ layer, size: { width, thickness } })),
+                )
+                .flatMap(({ layer, size }) =>
+                    stitching(
+                        layer,
+                        layer.map(() => size),
+                        across,
+                    ),
+                ),
+        ];
+    // A round sling's stripes, along each layer.
+    return [
+        ...strands,
+        ...strands.flatMap((p) =>
+            tapeLayers(p).flatMap((layer) =>
+                stripes(
+                    layer,
+                    layer.map(() => ({ width, thickness })),
+                    across,
+                ),
+            ),
+        ),
+    ];
+}
+
+/** A round sling's stripes: two dark lines along it either side of its middle, on both faces. */
+const STRIPE = { at: 0.3, width: 0.003, color: "var(--fox-round-sling-stripe)" };
+
+/** A tape's width and thickness at a point, and (if it twists) the way its width lies there. */
+type TapeSize = { width: number; thickness: number; across?: Vector3 };
+
+/** The stripes along a round sling's layer through `points`, `profile` its size at each. */
+function stripes(points: Vector3[], profile: TapeSize[], across: Vector3): Strand[] {
+    const a = across.unit();
+    return [-1, 1].flatMap((s) =>
+        tapeRun(
+            points.map((q, i) =>
+                q.add((profile[i].across ?? a).unit().scale(s * STRIPE.at * profile[i].width)),
+            ),
+            profile.map((p) => ({
+                width: STRIPE.width,
+                thickness: p.thickness + 0.001,
+                across: p.across,
+            })),
+            a,
+            STRIPE.color,
+            0.0015,
+        ).map((p) => ({ ...p, fine: STRIPE.width })),
+    );
+}
+
+/**
+ * A climbing sling's stitching, the pattern woven along its tape: two rows of short light dashes, on both faces.
+ */
+const STITCH = {
+    rows: [-0.22, 0.22],
+    dash: 0.008,
+    gap: 0.008,
+    width: 0.0012,
+    color: "var(--fox-sling-stitch)",
+};
+
+/** The stitching along a climbing sling's layer through `points`, `profile` its size at each. */
+function stitching(points: Vector3[], profile: TapeSize[], across: Vector3): Strand[] {
+    const a = across.unit();
+    const at = [0];
+    for (let i = 1; i < points.length; i++)
+        at.push(at[i - 1] + points[i].distanceTo(points[i - 1]));
+    // The point and size `d` along the tape, `off` (of its width) out from its middle.
+    const sample = (d: number, off: number): { q: Vector3; size: TapeSize } => {
+        const i = Math.min(
+            points.length - 1,
+            Math.max(
+                1,
+                at.findIndex((x) => x >= d),
+            ),
+        );
+        const k = Math.min(1, Math.max(0, (d - at[i - 1]) / (at[i] - at[i - 1] || 1)));
+        const p = profile[i];
+        const w = (p.across ?? a).unit();
+        return { q: points[i - 1].lerp(points[i], k).add(w.scale(off * p.width)), size: p };
+    };
+    const out: Strand[] = [];
+    const step = STITCH.dash + STITCH.gap;
+    // Fine detail, which the flat views leave out when it's too small to see.
+    const fine = { fine: STITCH.width };
+    for (const off of STITCH.rows)
+        for (let d = 0; d + STITCH.dash < at.at(-1)!; d += step) {
+            const ends = [sample(d, off), sample(d + STITCH.dash, off)];
+            out.push({
+                ...fine,
+                kind: "strand",
+                points: ends.map((e) => e.q),
+                r: 0.0008,
+                material: "sling",
+                color: STITCH.color,
+                capA: true,
+                capB: true,
+                tape: {
+                    width: STITCH.width,
+                    thickness: ends[0].size.thickness + 0.0008,
+                    across: a,
+                    layers: 1,
+                    gather: ends[0].q,
+                    ramp: 1,
+                    profile: ends.map((e) => ({
+                        width: STITCH.width,
+                        thickness: e.size.thickness + 0.0008,
+                        across: e.size.across,
+                    })),
+                },
+            });
+        }
+    return out;
+}
+
+/**
+ * One layer of tape through `points`, `profile` its size at each, lying `across` (where the profile doesn't say), in
+ * short strands so it sorts where it is; `r` is how thick the flat views draw it.
+ */
+function tapeRun(
+    points: Vector3[],
+    profile: TapeSize[],
+    across: Vector3,
+    color: string,
+    r: number,
+): Strand[] {
+    const piece = 12;
+    const out: Strand[] = [];
+    for (let i = 0; i < points.length - 1; i += piece) {
+        const end = Math.min(points.length, i + piece + 1);
+        const part = profile.slice(i, end);
+        out.push({
+            kind: "strand",
+            points: points.slice(i, end),
+            r,
+            material: "sling",
+            color,
+            capA: i === 0,
+            capB: i + piece >= points.length - 1,
+            tape: {
+                width: part[0].width,
+                thickness: part[0].thickness,
+                across,
+                layers: 1,
+                gather: points[i],
+                ramp: 1,
+                profile: part,
+            },
+        });
+    }
+    return out;
+}
+
+/**
+ * A sling basketed round a log (or spar) and up into a shackle's bow (or a carabiner), both its ends on it: the loop
+ * lies doubled, its two strands flat side by side round the log, and each leg ends in a bight round the shackle's crown
+ * (or the carabiner's bar), one strand in over it and the other under it, the two bights one atop the other. Over the
+ * last of its legs it bunches up, narrower and thicker. `log` is the log's middle (its axis `along`, `logR` its
+ * radius), `bar` the middle of the crown bar (its radius `barR`), and `up` a way square to the line between them and
+ * to `along`, which the top leg is on. The loop crosses itself round the crown, where it changes layer.
+ */
+export function basketedSling(
+    kind: keyof typeof SLINGS,
+    log: Vector3,
+    logR: number,
+    bar: Vector3,
+    barR: number,
+    up: Vector3,
+    along: Vector3,
+): Strand[] {
+    const { width, thickness, r, color, bunched } = SLINGS[kind];
+    // Worked out square to the log, then sheared along it as far as the bar rises along it, so the loop hugs the log
+    // on a slant.
+    const axis = along.unit();
+    const toBar = bar.sub(log);
+    const rise = toBar.dot(axis);
+    const flat = toBar.sub(axis.scale(rise));
+    const D = flat.len();
+    const a = flat.unit();
+    const b = up
+        .sub(a.scale(up.dot(a)))
+        .sub(axis.scale(up.dot(axis)))
+        .unit();
+    const p = (x: number, y: number) =>
+        log
+            .add(a.scale(x))
+            .add(b.scale(y))
+            .add(axis.scale((x / D) * rise));
+    // Round the log the two strands of the doubled loop lie flat side by side, strand `k` (0 or 1) `side(k)` along
+    // the log from the middle. Each leg ends in a bight through the bow round the crown: one strand comes in over the
+    // crown and the other under it, joined round its far side. The two bights lie partly one atop the other, swapping
+    // over round the far side, so each strand leaves the crown on the side away from the strands it crosses.
+    // A climbing sling's thin flat tape comes together in the carabiner, one bight on the other; its legs close
+    // from side by side round the rail to one on the other there.
+    const stacked = kind === "climbing";
+    const side = (k: number) => (k - 0.5) * (width + 0.004);
+    const z = axis;
+    const r1 = logR + thickness / 2;
+    const rb = (layer: number) => barR + bunched.thickness * (layer + 0.5);
+    type Flat2 = [number, number];
+    // The straight line from the log (on its top or bottom, `s1` ±1) to the crown (on its top or bottom, `s2`), the
+    // crown `layer` out: where it leaves each.
+    const tangent = (s1: number, s2: number, layer: number): { log: number; bar: number } => {
+        const r2 = rb(layer);
+        if (s1 === s2) {
+            const t = Math.acos((r1 - r2) / D);
+            return { log: s1 * t, bar: s1 * t };
+        }
+        const t = Math.acos((r1 + r2) / D);
+        return { log: s1 * t, bar: Math.PI + s1 * t };
+    };
+    const onLog = (angle: number): Flat2 => [r1 * Math.cos(angle), r1 * Math.sin(angle)];
+    const onBar = (angle: number, layer: number): Flat2 => [
+        D + rb(layer) * Math.cos(angle),
+        rb(layer) * Math.sin(angle),
+    ];
+    const ease = (t: number) => t * t * (3 - 2 * t);
+    // In the bow each bight is pushed to one side, the top leg's towards +z; each strand runs straight from there to
+    // its place round the log, so the one whose place is on the far side angles across more.
+    const lap = stacked ? 0 : 0.3 * bunched.width;
+    const inBow = (bight: number) => (bight === 0 ? lap : -lap);
+    const pts: Vector3[] = [];
+    // A leg of strand `k` between the crown (in `bight`) and the log.
+    const leg = (from: Flat2, to: Flat2, k: number, bight: number, toLog: boolean) => {
+        const [z0, z1] = toLog ? [inBow(bight), side(k)] : [side(k), inBow(bight)];
+        for (let i = 0; i < 10; i++) {
+            const s = i / 10;
+            const [x, y] = [from[0] + (to[0] - from[0]) * s, from[1] + (to[1] - from[1]) * s];
+            pts.push(p(x, y).add(z.scale(z0 + (z1 - z0) * s)));
+        }
+    };
+    const arc = (from: number, to: number, k: number) => {
+        for (let i = 0; i < 16; i++) {
+            const [x, y] = onLog(from + ((to - from) * i) / 16);
+            pts.push(p(x, y).add(z.scale(side(k))));
+        }
+    };
+    // A bight round the crown's far side, stepping a layer out (or in) as it goes, where it passes the other bight.
+    const wrap = (from: number, to: number, bight: number, l0: number, l1: number) => {
+        for (let i = 0; i < 16; i++) {
+            const u = i / 16;
+            const [x, y] = onBar(from + (to - from) * u, l0 + (l1 - l0) * ease(u));
+            pts.push(p(x, y).add(z.scale(inBow(bight))));
+        }
+    };
+    // Strand 0: out of the top bight over the crown (the outer layer there), along the top leg, round the back of the
+    // log, along the bottom leg and in over the crown (the inner layer) into the bottom bight.
+    const topOut = tangent(1, 1, 1);
+    const bottomIn = tangent(-1, 1, 0);
+    leg(onBar(topOut.bar, 1), onLog(topOut.log), 0, 0, true);
+    arc(topOut.log, 2 * Math.PI + bottomIn.log, 0);
+    leg(onLog(bottomIn.log), onBar(bottomIn.bar, 0), 0, 1, false);
+    // The bottom bight, round the crown's far side from its top to its bottom, stepping out a layer.
+    const bottomOut = tangent(-1, -1, 1);
+    wrap(bottomIn.bar, bottomOut.bar, 1, 0, 1);
+    // Strand 1: out of the bottom bight under the crown (the outer layer there), back along the bottom leg, round the
+    // log, along the top leg and in under the crown (the inner layer) into the top bight.
+    const topIn = tangent(1, -1, 0);
+    leg(onBar(bottomOut.bar, 1), onLog(bottomOut.log), 1, 1, true);
+    arc(2 * Math.PI + bottomOut.log, topIn.log, 1);
+    leg(onLog(topIn.log), onBar(topIn.bar, 0), 1, 0, false);
+    // The top bight, round the crown's far side from its bottom to its top, stepping out a layer, back to the start.
+    wrap(topIn.bar - 2 * Math.PI, topOut.bar, 0, 0, 1);
+    const points = [...pts, pts[0]];
+    // Bunched up near the bar, easing out to its full width over the last of each leg.
+    const profile = points.map((q) => {
+        const f = Math.min(1, Math.max(0, (q.distanceTo(bar) - 0.2 * bunched.over) / bunched.over));
+        const e = f * f * (3 - 2 * f);
+        return {
+            width: bunched.width + (width - bunched.width) * e,
+            thickness: bunched.thickness + (thickness - bunched.thickness) * e,
+        };
+    });
+    const tape = tapeRun(points, profile, z, color, r);
+    return [
+        ...tape,
+        ...(kind === "round" ? stripes(points, profile, z) : stitching(points, profile, z)),
+    ];
 }
 
 /** Points along a hanging line from `a` to `b`, `sag` below the straight line between them at its middle. */
@@ -429,9 +881,6 @@ function guy(from: Vector3, at: Vector3, r: number, color: string): Piece[] {
 /** The bar of a pulley's carabiner (its radius). */
 const CARABINER_BAR = 0.0045;
 
-/** A round sling's thickness (its radius), as it lies over a spar. */
-const SLING_R = 0.01;
-
 /**
  * A rescue pulley, its rope running off towards points `a` and `b`, and the rope round it from `a`'s side to `b`'s.
  * Clipped into an eye bolt screwed into a post or arm at `base`, standing out towards `out`, it's moved from `near`
@@ -453,7 +902,7 @@ export function rigPulley(
     let p = build(centre);
     const extra: Piece[] = [];
     if ("basket" in hung) {
-        // A round sling basketed over a spar (its middle `spar`, running along `along`), its two legs down to the
+        // A climbing sling basketed over a spar (its middle `spar`, running along `along`), its two legs down to the
         // carabiner `drop` below the spar's middle. The pulley swings until the sling lines up with the pull of its
         // rope, as with an eye, moving half way each time so it settles.
         const { spar, along, r, drop } = hung.basket;
@@ -468,18 +917,12 @@ export function rigPulley(
             p = build(centre);
             if (moved < 1e-5) break;
         }
-        // Over the spar from where each leg leaves it, round the far side from the carabiner.
-        const R = r + SLING_R;
-        const out = square(p.hook.sub(spar));
-        const d = out.len();
-        const e = out.unit();
-        const f = axis.cross(e);
-        const a = Math.acos(Math.min(1, R / d));
-        const round = Array.from({ length: 17 }, (_, i) => {
-            const t = a + ((2 * Math.PI - 2 * a) * i) / 16;
-            return spar.add(e.scale(R * Math.cos(t))).add(f.scale(R * Math.sin(t)));
-        });
-        extra.push(...line([p.hook, ...round, p.hook], SLING_R, C.sling, "sling"));
+        // The sling doubled round the spar, each leg's bight through the carabiner round its top bar.
+        const level = spar.add(axis.scale(axis.dot(p.hook.sub(spar))));
+        const e = square(p.hook.sub(spar)).unit();
+        extra.push(
+            ...basketedSling("climbing", level, r, p.hook, CARABINER_BAR, axis.cross(e), axis),
+        );
     } else {
         const { base, out, toward } = hung.eyeBolt;
         const mount = base.add(out.unit().scale(EYE_BOLT.centre));
@@ -568,9 +1011,6 @@ function squareLashing(
 }
 
 /** A double base clamp on a wire at `at`, the wire running along `along`. */
-const clamp = (at: Vector3, along: Vector3) =>
-    section(at.sub(along.unit().scale(0.025)), at.add(along.unit().scale(0.025)), UP, 0.05, 0.06);
-
 /** A ring of chain or rope `r` round at `at`, level, as points. */
 const ring = (at: Vector3, r: number, n = 16) =>
     Array.from({ length: n + 1 }, (_, i) => {
@@ -746,7 +1186,16 @@ function tower(): Piece[] {
             pieces.push(...guy(from, vec3(f * out, 0, s * (T.half + out)), 0.006, C.guy));
         }
     placed.push(
-        ...line(hanging(vec3(BAR_X, T.bar, T.z), BACKSTAY_TIE, 0.08, 20), 0.0065, C.backstay),
+        ...line(
+            [
+                ...hanging(BACKSTAY_TOP, BACKSTAY_TIE.end, 0.08, 20),
+                ...BACKSTAY_TIE.rope.slice().reverse(),
+            ],
+            0.0065,
+            C.backstay,
+            "rope",
+            { b: true },
+        ),
     );
     return [...moved(pieces, vec3(0, 0, T.z)), ...placed];
 }
@@ -803,48 +1252,213 @@ function tree(): Piece[] {
                 "log",
             ),
         );
-    // A round sling choked round the trunk for each hawser, the choke drawn round to the hawser's own side of the
-    // tree, so the two lead off either side of it.
+    // A round sling choked round the trunk for each hawser, the choke where its hawser's line touches the trunk, on
+    // the hawser's own side of the tree, so the two lead off either side of it.
     for (const s of [-1, 1]) {
-        const y = TREE_SLING_Y(s);
         // Built on level ground, and put on the ground at the tree at the end.
         const shackle = TREE_SHACKLE(s).add(vec3(0, -groundY(TREE.x), 0));
-        const choke = s * CHOKE;
-        const rr = TREE.r + 0.02;
-        const around = Array.from({ length: 25 }, (_, i) => {
-            const a = choke + s * 2 * Math.PI * (i / 24);
-            return vec3(TREE.x + rr * Math.cos(a), y, rr * Math.sin(a));
-        });
-        // Round the trunk from the choke and back to it, then out through itself to the shackle.
-        pieces.push(...line([...around, shackle], 0.016, C.sling, "sling"));
-        pieces.push(...bar(shackle, shackle.add(vec3(0.07, 0, 0)), 0.014, C.steel));
+        const { angle, turn, at } = TREE_CHOKE(s);
+        const y = at.y - groundY(TREE.x);
+        pieces.push(...chokedSling(angle, turn, y, TREE_WRAP_R(s), shackle));
     }
-    // The backstay's own sling, basketed round the trunk just above the others, to a carabiner in front.
-    const tie = BACKSTAY_TIE.add(vec3(0, -groundY(TREE.x), 0));
-    const rr = TREE.r + 0.02;
-    const basket = Array.from({ length: 13 }, (_, i) => {
-        const a = Math.PI / 4 + ((3 * Math.PI) / 2) * (i / 12);
-        return vec3(TREE.x + rr * Math.cos(a), BACKSTAY_SLING_Y, rr * Math.sin(a));
-    });
-    pieces.push(...line([tie, ...basket, tie], 0.016, C.sling, "sling"));
-    pieces.push(...bar(tie.add(vec3(-0.03, 0, 0)), tie.add(vec3(0.05, 0, 0)), 0.012, C.steel));
+    // The backstay's own sling, basketed round the trunk above the others, up into a bow shackle in line with the
+    // backstay, which is tied to the shackle's pin.
+    const g = vec3(0, -groundY(TREE.x), 0);
+    const { crown, along: toTower } = BACKSTAY_SHACKLE;
+    // Standing on edge, its crown bar upright, so the sling's strands, on edge round the trunk, lie flat round it.
+    const { upright } = linkPlanes(toTower);
+    const bow = shackle("bow", crown.add(g), toTower, upright, C.steel, C.pin);
+    pieces.push(...bow.pieces);
+    const centre = vec3(TREE.x, BACKSTAY_SLING_Y, 0);
+    const crownBar = crown.add(g).sub(toTower.scale(SHACKLE_19.body));
+    pieces.push(...basketedSling("round", centre, TREE.r, crownBar, SHACKLE_19.body, ACROSS, UP));
     return shift(pieces, groundY(TREE.x));
 }
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
 const BACKSTAY_SLING_Y = 0.7;
-/** Where the backstay's tied to its sling: a carabiner out in front of the tree, on the centre line. */
-const BACKSTAY_TIE = vec3(TREE.x + TREE.r + 0.4, groundY(TREE.x) + BACKSTAY_SLING_Y, 0);
+/** The backstay's top end, at the middle of the tower's top bar. */
+const BACKSTAY_TOP = vec3(BAR_X, TOWER.bar, TOWER.z);
+/**
+ * The bow shackle on the backstay's sling: its crown's inside out in front of the tree, straight towards the
+ * backstay's top end, so the sling, the shackle and the backstay line up; and the way along it.
+ */
+const BACKSTAY_SHACKLE = (() => {
+    const centre = vec3(TREE.x, groundY(TREE.x) + BACKSTAY_SLING_Y, 0);
+    const along = BACKSTAY_TOP.sub(centre).unit();
+    return { crown: centre.add(along.scale(TREE.r + 0.45)), along };
+})();
+/** The backstay's figure 8 on a bight, tied into its shackle's pin. */
+const BACKSTAY_TIE = (() => {
+    const { crown, along } = BACKSTAY_SHACKLE;
+    const { upright } = linkPlanes(along);
+    const pin = crown.add(along.scale(SHACKLE_19.length + SHACKLE_19.pin));
+    return figure8(pin, upright.cross(along), SHACKLE_19.pin, BACKSTAY_TOP, 0.0065);
+})();
 
-/** How far round the trunk each sling's choke is drawn from the front (radians), towards its hawser's side. */
-const CHOKE = (70 * Math.PI) / 180;
-/** How high on the trunk each sling is choked. */
-const TREE_SLING_Y = (s: number) => (s > 0 ? 0.5 : 0.35);
-/** Where hawser `s`'s eye is shackled to its sling round the tree: out from the choke on its own side. */
+/**
+ * A round sling choked round the trunk, the hawser's line touching the trunk at `angle` round it (the sling arriving
+ * there heading out going `turn` round) at height `y`, out to the bow shackle whose crown's inside is at `crown` (the
+ * shackle lying flat, its crown bar level and square to the leg). The loop goes round the trunk from the far side of
+ * its choke, out along the leg towards the shackle, and through its own bight, the choke, `TREE_CHOKE_AT` of the way
+ * out, which squeezes the leg's two strands together. Followed round: from the crown along the leg's top strand to the
+ * trunk, the long way round the tree, out from its far side to the choke, round the leg in a flat bight and back, round
+ * the tree again the other way, and out along the leg's bottom strand to the crown, round its far side and back. Round
+ * the trunk the strands lie on edge one above the other; the leg twists a quarter turn to lie flat through the bow,
+ * bunching up into it, and the choke's bight twists to lie flat round the leg.
+ */
+function chokedSling(angle: number, turn: number, y: number, R: number, crown: Vector3): Strand[] {
+    const { width, thickness, r, color, bunched } = SLINGS.round;
+    const ease = (t: number) => t * t * (3 - 2 * t);
+    const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
+    const onTrunk = (a: number, h: number) => vec3(TREE.x + R * Math.cos(a), h, R * Math.sin(a));
+    const apart = (width + 0.004) / 2;
+    const touch = onTrunk(angle, y);
+    const d = crown.sub(touch).unit();
+    const { flat: up } = linkPlanes(d);
+    const w = up.cross(d);
+    const barR = SHACKLE_19.body;
+    const bar = crown.sub(d.scale(barR));
+    const rb = barR + bunched.thickness / 2;
+    const legLength = touch.distanceTo(bar);
+    // The choke, out along the leg, where the leg's strands are squeezed together.
+    const sA = TREE_CHOKE_AT;
+    const choke = touch.lerp(bar, sA);
+    const squeezed = { width: 0.036, thickness: 0.018, apart: 0.012 };
+    // Seen from above, the other line from the choke that just touches the trunk: where the loop leaves the trunk.
+    const plan = Math.hypot(choke.x - TREE.x, choke.z);
+    const wedge = 2 * Math.acos(R / plan);
+    const far = angle - turn * (2 * Math.PI - wedge);
+    const leaves = onTrunk(far, y);
+    // Out from the trunk at the choke, away from the trunk, square to the leg.
+    const outward = w.scale(Math.sign(w.dot(choke.sub(vec3(TREE.x, choke.y, 0)))));
+    const pts: Vector3[] = [];
+    const sizes: TapeSize[] = [];
+    const push = (q: Vector3, across: Vector3, size = { width, thickness }) => {
+        pts.push(q);
+        sizes.push({ ...size, across });
+    };
+    // A leg strand at `s` of the way from the trunk to the crown, above the middle (`k` 1) or below.
+    const legPoint = (k: number, s: number) => {
+        const off =
+            s < sA
+                ? apart + (squeezed.apart - apart) * ease(s / sA)
+                : squeezed.apart + (rb - squeezed.apart) * ease((s - sA) / (1 - sA));
+        const side = UP.lerp(up, ease(s)).unit();
+        const twist = (Math.PI / 2) * ease(s);
+        // Squeezed round the choke, bunched into the crown.
+        const g = ease(clamp01((Math.abs(s - sA) * legLength) / 0.08));
+        const c = ease(
+            clamp01((bar.distanceTo(touch.lerp(bar, s)) - 0.2 * bunched.over) / bunched.over),
+        );
+        const [tw, tt] = [
+            Math.min(
+                squeezed.width + (width - squeezed.width) * g,
+                bunched.width + (width - bunched.width) * c,
+            ),
+            Math.max(
+                squeezed.thickness + (thickness - squeezed.thickness) * g,
+                bunched.thickness + (thickness - bunched.thickness) * c,
+            ),
+        ];
+        push(
+            touch.lerp(bar, s).add(side.scale(k * off)),
+            UP.scale(Math.cos(twist)).add(w.scale(Math.sin(twist))),
+            { width: tw, thickness: tt },
+        );
+    };
+    const leg = (k: number, out: boolean) => {
+        for (let i = 0; i <= 24; i++) legPoint(k, out ? i / 24 : 1 - i / 24);
+    };
+    // Round the trunk from angle `a0` to `a1`, `h` above or below the middle. The loop round the trunk lies in the plane
+    // of the leg and the other line to the choke, which both pull towards the choke: tilted, so it meets both without
+    // a corner and is lowest round the back.
+    const tilt = choke.sub(touch).cross(choke.sub(leaves));
+    const planeY = (x: number, z: number) =>
+        choke.y - (tilt.x * (x - choke.x) + tilt.z * (z - choke.z)) / tilt.y;
+    const round = (a0: number, a1: number, h: number) => {
+        for (let i = 1; i < 30; i++) {
+            const q = onTrunk(a0 + ((a1 - a0) * i) / 30, 0);
+            push(vec3(q.x, planeY(q.x, q.z) + h, q.z), UP);
+        }
+    };
+    // The choke's bight round the squeezed leg: a smooth curve, open towards the trunk, lying flat along the leg.
+    const high = squeezed.apart + squeezed.width / 2 + thickness / 2 + 0.003;
+    const reach = squeezed.width / 2 + thickness / 2 + 0.003;
+    const bightPoint = (phi: number) =>
+        choke
+            .add(up.scale(high * Math.cos(phi)))
+            .add(outward.scale(reach * (1.65 * Math.sin(phi) - 0.5)));
+    // Between the trunk and the choke, along the other line, twisting a quarter turn smoothly all the way from where
+    // it leaves the trunk to the bight.
+    const across = (from: Vector3, to: Vector3, toChoke: boolean) => {
+        for (let i = 1; i < 20; i++) {
+            const t = i / 20;
+            const twist = ease(toChoke ? t : 1 - t);
+            push(from.lerp(to, t), UP.lerp(d, twist).unit());
+        }
+    };
+    // From the crown along the leg's top strand to the trunk, the long way round to the far side.
+    leg(1, false);
+    round(angle, far, apart);
+    push(leaves.add(UP.scale(apart)), UP);
+    // Out to the choke, round the leg and back.
+    across(leaves.add(UP.scale(apart)), bightPoint(0), true);
+    for (let i = 0; i <= 16; i++) push(bightPoint((Math.PI * i) / 16), d);
+    across(bightPoint(Math.PI), leaves.sub(UP.scale(apart)), false);
+    push(leaves.sub(UP.scale(apart)), UP);
+    // Round the trunk again the other way, and out along the leg's bottom strand to the crown.
+    round(far, angle, -apart);
+    leg(-1, true);
+    // Round the crown's far side, from its bottom to its top, back to the start.
+    for (let i = 1; i < 12; i++) {
+        const t = -Math.PI / 2 + (Math.PI * i) / 12;
+        push(bar.add(d.scale(rb * Math.cos(t))).add(up.scale(rb * Math.sin(t))), w, bunched);
+    }
+    push(pts[0], sizes[0].across!, sizes[0]);
+    return [...tapeRun(pts, sizes, w, color, r), ...stripes(pts, sizes, w)];
+}
+
+/** How far out along a tree sling's leg, from the trunk towards the shackle, its choke sits. */
+const TREE_CHOKE_AT = 0.5;
+
+/** How high on the trunk both slings are choked, level with each other so the hawsers lie alike. */
+const TREE_SLING_Y = 0.42;
+/**
+ * The radius hawser `s`'s sling round the trunk lies at: the trunk's, out to the middle of the sling's thickness. The
+ * two cross round the back, hawser A's over hawser B's, so it lies a layer further out.
+ */
+const TREE_WRAP_R = (s: number) => TREE.r + SLINGS.round.thickness * (s > 0 ? 1.5 : 0.5);
+/** How far each tree sling's choke is from its shackle (the inside of the bow's crown). */
+const TREE_LEG = 0.7;
+/**
+ * Where hawser `s`'s sling is choked round the trunk: seen from above, where the line from its cradle on the tower
+ * just touches the sling round the trunk, on the hawser's own side, so the sling leaves the trunk in line with the
+ * hawser. Its angle round the trunk (anticlockwise from +x, seen with +z towards that angle's sine), which way round
+ * the sling runs to arrive there heading out (`turn`, ±1), and the point, at the sling's height.
+ */
+const TREE_CHOKE = (s: number) => {
+    const [cx, cz] = [BAR_X - TREE.x, s * HAWSER_Z];
+    const d = Math.hypot(cx, cz);
+    const R = TREE_WRAP_R(s);
+    const angle = Math.atan2(cz, cx) + s * Math.acos(R / d);
+    const at = vec3(
+        TREE.x + R * Math.cos(angle),
+        groundY(TREE.x) + TREE_SLING_Y,
+        R * Math.sin(angle),
+    );
+    // Heading round the trunk anticlockwise at the choke is (-sin, cos); the sling arrives heading towards the cradle.
+    const heading = -Math.sin(angle) * (cx + TREE.x - at.x) + Math.cos(angle) * (cz - at.z);
+    return { angle, turn: Math.sign(heading), at };
+};
+/**
+ * Where hawser `s`'s eye is shackled to its sling round the tree: out from the choke along the line to the hawser's
+ * cradle on the tower, so the sling's leg, the shackle and the hawser line up.
+ */
 export const TREE_SHACKLE = (s: number) => {
-    const rr = TREE.r + 0.02;
-    const choke = vec3(TREE.x + rr * Math.cos(CHOKE), 0, s * rr * Math.sin(CHOKE));
-    return choke.add(vec3(0.45, groundY(TREE.x) + TREE_SLING_Y(s), s * 0.1));
+    const { at } = TREE_CHOKE(s);
+    const cradle = vec3(BAR_X, CRADLE_Y, s * HAWSER_Z);
+    return at.add(cradle.sub(at).unit().scale(TREE_LEG));
 };
 
 /** The H-frame shear leg at the bottom end, its lashings, bagging and guys. */
@@ -941,14 +1555,36 @@ function shearLeg(): Piece[] {
 
 /** Where a hawser comes down from the shear leg to the anchor: from the saddle to the bow shackle on its sling. */
 export const SADDLE = (s: number) => vec3(SPAR_X, SADDLE_Y, s * HAWSER_Z);
-/** Where each sling round the log is shackled, out in front of it towards the shear leg. */
-export const SLING_Z = 0.8;
-export const ANCHOR_SHACKLE = (z: number) => onGround(LOG.x - 0.75, 0.12, z);
+/**
+ * Where each sling round the log is, in the gaps between its six pickets (Figure 29, dual hawser and tension setup):
+ * the hawsers' in the second and fourth gaps, the Tirfor's in the middle one.
+ */
+export const SLING_Z = 0.4;
+/** The log's middle at `z`, the log resting on the slings under it. */
+const LOG_AT = (z: number) => vec3(LOG.x, groundY(LOG.x) + LOG.r + 2 * SLINGS.round.thickness, z);
+/** How far out in front of the log's middle each sling's shackle is (the inside of its crown). */
+const SLING_REACH = 0.8;
+/**
+ * Where the sling round the log at `z` is shackled (the inside of the bow shackle's crown): out from the log straight
+ * towards the saddle its hawser comes from, so the log, the sling, the hardware and the hawser all line up. The Tirfor's
+ * points midway between the two.
+ */
+export const ANCHOR_SHACKLE = (z: number) => {
+    const log = LOG_AT(z);
+    const saddle = vec3(SADDLE(1).x, SADDLE(1).y, (z / SLING_Z) * HAWSER_Z);
+    return log.add(saddle.sub(log).unit().scale(SLING_REACH));
+};
+
+/**
+ * How far in front of the log's middle the front pickets are driven: leaning back 25°, they bite a little into the log
+ * at its middle's height.
+ */
+const FRONT_PICKET = 0.14;
 
 /** The log and picket anchor: the log, two rows of six pickets with banjo lashings, and three slings round it. */
 function logAnchor(): Piece[] {
     const pieces: Piece[] = [];
-    const y = groundY(LOG.x) + LOG.r * 0.6;
+    const y = LOG_AT(0).y;
     pieces.push(
         ...bar(
             vec3(LOG.x, y, -LOG.length / 2),
@@ -961,7 +1597,7 @@ function logAnchor(): Piece[] {
     const back = vec3(1, 0, 0);
     for (const z of [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0]) {
         // The front row just on the pull's side of the log, the back row 0.45 m behind it.
-        const front = picket(vec3(LOG.x - LOG.r - 0.02, 0, z), back);
+        const front = picket(vec3(LOG.x - FRONT_PICKET, 0, z), back);
         const rear = picket(vec3(LOG.x + 0.45, 0, z), back);
         pieces.push(...front.pieces, ...rear.pieces);
         // A banjo lashing from the front picket, just above the log, to the back one's foot.
@@ -977,96 +1613,363 @@ function logAnchor(): Piece[] {
                 ),
             );
     }
-    // Round slings basketed round the log between the pickets: one for each hawser and one for the Tirfor.
-    for (const z of [-SLING_Z, 0, SLING_Z]) {
-        const shackle = ANCHOR_SHACKLE(z);
-        const wrap = Array.from({ length: 9 }, (_, i) => {
-            const a = Math.PI / 2 - Math.PI * (i / 8);
-            return vec3(LOG.x + (LOG.r + 0.02) * Math.cos(a), y + (LOG.r + 0.02) * Math.sin(a), z);
-        });
-        for (const dz of [-0.06, 0.06])
-            pieces.push(
-                ...line(
-                    [
-                        shackle,
-                        ...wrap.map((q) => q.add(vec3(0, 0, dz))),
-                        shackle.add(vec3(0, -0.02, 0)),
-                    ],
-                    0.018,
-                    C.sling,
-                    "sling",
-                ),
-            );
+    // Round slings basketed round the log between the pickets, up into the bow shackles: one for each hawser and one
+    // for the Tirfor.
+    for (const z of [-SLING_Z, SLING_Z]) {
+        const crown = ANCHOR_SHACKLE(z);
+        const log = LOG_AT(z);
+        const bar = crown.sub(crown.sub(log).unit().scale(SHACKLE_19.body));
+        pieces.push(...basketedSling("round", log, LOG.r, bar, SHACKLE_19.body, UP, vec3(0, 0, 1)));
     }
+    // The Tirfor's, in the bowl of its anchor hook.
+    const { hook: h } = TIRFOR_RIG;
+    pieces.push(
+        ...basketedSling("round", LOG_AT(0), LOG.r, h.bar, ANCHOR_HOOK.r, UP, vec3(0, 0, 1)),
+    );
+    return pieces;
+}
+
+/** Where a made-off eye's three double base clamps are, from the thimble's point along the hawser (Figure 66). */
+const EYE_CLAMPS = [0.1, 0.25, 0.4];
+
+/**
+ * A level frame for a line of hardware along `along`: `flat` square to the links that lie flat, `upright` square to
+ * the ones that stand on edge between them.
+ */
+function linkPlanes(along: Vector3): { flat: Vector3; upright: Vector3 } {
+    const d = along.unit();
+    const flat = UP.sub(d.scale(UP.dot(d))).unit();
+    return { flat, upright: d.cross(flat) };
+}
+
+/**
+ * A hawser's end made off round a thimble: the thimble's crown hooked on at `near`, its point along `along`, lying
+ * square to `m`; the hawser's eye round it, its live part on to `live`, and its dead end back beside the live part
+ * through three double base clamps and on through `tail` (given the dead end's last point and the way across from the
+ * live part to the dead).
+ */
+function madeOff(
+    near: Vector3,
+    along: Vector3,
+    m: Vector3,
+    live: Vector3,
+    tail: (end: Vector3, side: Vector3) => Vector3[],
+): Piece[] {
+    const d = along.unit();
+    const th = thimble(near, d, m, HAWSER_R, C.steel, baseClampWire(HAWSER_R));
+    const [first, last] = [th.wire[0], th.wire.at(-1)!];
+    const tip = first.lerp(last, 0.5);
+    const pieces: Piece[] = [...th.pieces];
+    for (const k of EYE_CLAMPS)
+        pieces.push(...baseClamp(tip.add(d.scale(k)), d, th.side, HAWSER_R, C.steel));
+    const deadEnd = last.add(d.scale(EYE_CLAMPS.at(-1)! + 0.1));
+    const path = [
+        ...tail(deadEnd, th.side).reverse(),
+        deadEnd,
+        last,
+        ...th.wire.slice(1, -1).reverse(),
+        first,
+        live,
+    ];
+    pieces.push(...line(path, HAWSER_R, C.hawser, "steel"));
     return pieces;
 }
 
 /**
- * The in-line hardware from a sling's bow shackle up the hawser, by distance along it (Figure 66): the bow shackle, the
- * turnbuckle, three D shackles, then the hawser's in-line eye round its thimble, held by three double base clamps,
- * its tail running on past them and lying on the ground.
+ * A hawser's bottom end: from the saddle down to the anchor through its in-line hardware (Figure 66), from the sling a
+ * 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye made off round its thimble,
+ * its tail lying on the ground. Each link lies a quarter turn from the last.
  */
-const HARDWARE = {
-    shackle: 0.1,
-    turnbuckle: 0.65,
-    dShackles: 0.92,
-    eye: 1.02,
-    clamps: [1.12, 1.3, 1.48],
-};
-
-/** A hawser's bottom end: from the saddle down to its hardware at the anchor, with its tail. */
 function hawserFoot(s: number): Piece[] {
     const pieces: Piece[] = [];
     const a = ANCHOR_SHACKLE(s * SLING_Z);
     const saddle = SADDLE(s);
     const along = saddle.sub(a).unit();
-    const at = (d: number) => a.add(along.scale(d));
-    const H = HARDWARE;
-    pieces.push(...bar(at(0), at(H.shackle), 0.016, C.steel));
-    pieces.push(...bar(at(H.shackle), at(H.turnbuckle), 0.022, C.steel));
-    pieces.push(...bar(at(H.turnbuckle), at(H.dShackles), 0.013, C.steel));
-    pieces.push(...bar(at(H.dShackles), at(H.eye), 0.02, C.steel));
-    // The live hawser from the eye up to the saddle, and the dead end beside it through the clamps, then its tail.
-    const side = ACROSS.scale(0.016 * s);
-    pieces.push(...line([at(H.eye), saddle], HAWSER_R, C.hawser, "steel"));
-    for (const d of H.clamps) pieces.push(...clamp(at(d).add(side.scale(0.5)), along));
-    const tailStart = at(H.clamps[2] + 0.12).add(side);
-    const tail = [
-        at(H.eye).add(side),
-        tailStart,
-        tailStart.add(along.scale(0.4)).add(vec3(0, -0.3, s * 0.15)),
-        onGround(tailStart.x - 0.2, 0.02, s * 1.6),
-        onGround(LOG.x - 0.6, 0.02, s * 2.2),
-        onGround(LOG.x + 0.2, 0.02, s * 1.7),
-        onGround(LOG.x - 0.4, 0.02, s * 1.3),
-    ];
-    pieces.push(...line(smooth(tail, 6), HAWSER_R, C.hawser, "steel"));
+    const { flat, upright } = linkPlanes(along);
+    const bow = shackle("bow", a, along, flat, C.steel, C.pin);
+    const tb = turnbuckle(bow.far, along, upright, C.steel);
+    const d1 = shackle("d", tb.far, along, flat, C.steel, C.pin);
+    const d2 = shackle("d", d1.far, along, upright, C.steel, C.pin);
+    const d3 = shackle("d", d2.far, along, flat, C.steel, C.pin);
+    pieces.push(...bow.pieces, ...tb.pieces, ...d1.pieces, ...d2.pieces, ...d3.pieces);
+    pieces.push(
+        ...madeOff(d3.far, along, upright, saddle, (end) => {
+            // The stiff wire carries on up the hawser's line, bends over in one long curve to the ground, and lies
+            // there curving gently out to the hawser's own side.
+            const out = vec3(-1, 0, s * 0.2).unit();
+            const land = onGround(end.x - 2.0, HAWSER_R, end.z + s * 0.25);
+            const rest = onGround(land.x - 1.0, HAWSER_R, land.z + s * 0.35);
+            const drop = bezier3(
+                end,
+                end.add(along.scale(0.4)),
+                land.sub(out.scale(0.9)),
+                land,
+                24,
+            );
+            const lie = bezier3(
+                land,
+                land.add(out.scale(0.4)),
+                rest.sub(vec3(-0.35, 0, s * 0.2)),
+                rest,
+                16,
+            );
+            return [...drop.slice(1), ...lie.slice(1)];
+        }),
+    );
     return pieces;
 }
 
-/** The lizard on hawser A, left slack in line to the Tirfor as a back-up once the hardware takes the load. */
-export const LIZARD = { clamps: [2.9, 3.05, 3.2] };
+/** Where the turnbuckle is on hawser `s`'s in-line hardware, for its label: a little out from the anchor. */
+export const TURNBUCKLE_AT = (s: number) => {
+    const a = ANCHOR_SHACKLE(s * SLING_Z);
+    return a.add(SADDLE(s).sub(a).unit().scale(0.35));
+};
+
+/**
+ * The lizards, one clamped on each hawser well up from the anchor (`clamps`, metres up the hawser from its bow shackle),
+ * the wire running on `tail` past the top clamp to its free eye, and `hang` of it between the bottom clamp and the
+ * bottom eye. Hawser A's is left slack in line to the Tirfor as a back-up once the hardware takes the load.
+ */
+export const LIZARD = { clamps: [5.0, 5.15, 5.3], tail: 0.5, hang: 0.5 };
+/** The lizard's wire's radius. */
+const LIZARD_R = 0.004;
+/** About how far a lizard's eye reaches, from its thimble's crown to the end of its ferrule. */
+const LIZARD_EYE = THIMBLE_11.length + 0.065;
+/** The Tirfor's 11.5 mm cable's radius. */
+const TIRFOR_CABLE_R = 0.00575;
+/**
+ * Hawser `s`'s anchor end, and the way up it to the saddle: where its lizard's clamped on. The lizard lies `side` off
+ * the hawser's middle, in the clamps' other throats, which face `toward` (down and in).
+ */
+const lizardLine = (s: number) => {
+    const a = ANCHOR_SHACKLE(s * SLING_Z);
+    const along = SADDLE(s).sub(a).unit();
+    const toward = vec3(0, -0.016, -s * 0.012).unit();
+    const side = toward.scale(baseClampWire(HAWSER_R) + baseClampWire(LIZARD_R));
+    return { along, toward, side, on: (d: number) => a.add(along.scale(d)) };
+};
+/** Where the lizard on hawser `s` leaves its bottom clamp, on its way down to its bottom eye. */
+const lizardFoot = (s: number) => {
+    const { on, side } = lizardLine(s);
+    return on(LIZARD.clamps[0] - 0.06).add(side);
+};
+
+/**
+ * The Tirfor, lying on the ground in front of the log's middle sling, pointing (seen from above) up hawser A towards
+ * the lizard; its anchor hook, lying flat, takes the sling's bights.
+ */
+const TIRFOR_RIG = (() => {
+    const log = LOG_AT(0);
+    const ahead = lizardFoot(1).sub(log);
+    const u = vec3(ahead.x, 0, ahead.z).unit();
+    const start = log.add(u.scale(LOG.r + 0.45));
+    const anchor = vec3(start.x, groundY(start.x + u.x * 0.26) + 0.004, start.z);
+    const t = tirfor(anchor, u, UP, TIRFOR_COLORS);
+    const h = hook(t.pin, u.neg(), t.pinAlong, C.steel);
+    return { tirfor: t, hook: h, u };
+})();
+
+/** `n` points along the cubic Bézier from `a` to `b` with control points `c1` and `c2`, both ends included. */
+function bezier3(a: Vector3, c1: Vector3, c2: Vector3, b: Vector3, n: number): Vector3[] {
+    return Array.from({ length: n + 1 }, (_, i) => {
+        const t = i / n;
+        const s = 1 - t;
+        return a
+            .scale(s * s * s)
+            .add(c1.scale(3 * s * s * t))
+            .add(c2.scale(3 * s * t * t))
+            .add(b.scale(t * t * t));
+    });
+}
+
+/** How far along `path` each of its points is. */
+const arcLengths = (path: Vector3[]) => {
+    const at = [0];
+    for (let i = 1; i < path.length; i++) at.push(at[i - 1] + path[i].distanceTo(path[i - 1]));
+    return at;
+};
+
+/** The point `d` along `path`, and the way it runs there. */
+function alongPath(path: Vector3[], d: number): { at: Vector3; dir: Vector3; i: number } {
+    const at = arcLengths(path);
+    const i = Math.max(
+        1,
+        at.findIndex((x) => x >= d),
+    );
+    const k = (d - at[i - 1]) / (at[i] - at[i - 1]);
+    return { at: path[i - 1].lerp(path[i], k), dir: path[i].sub(path[i - 1]).unit(), i };
+}
+
+/**
+ * A swaged eye in a wire of radius `wireR` (a lizard's ends, the Tirfor cable's hook end): a thimble with its crown's
+ * inside at `near`, pointing `d` along the wire, square to `m`, the wire's tail pressed into a ferrule ten times the
+ * wire's radius long. Returns its pieces and the end of the ferrule, where the wire runs on.
+ */
+function swagedEye(
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    wireR = LIZARD_R,
+): { pieces: Piece[]; end: Vector3 } {
+    const th = thimble(near, d, m, wireR, C.steel);
+    const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
+    const ferrule = [tips.add(d.scale(3.75 * wireR)), tips.add(d.scale(13.75 * wireR))];
+    return {
+        pieces: [
+            ...th.pieces,
+            ...bar(ferrule[0], ferrule[1], wireR * 2.2, C.steel),
+            ...line([ferrule[0], ...th.wire, ferrule[0]], wireR, C.hawser, "steel"),
+        ],
+        end: ferrule[1],
+    };
+}
+
+/**
+ * A lizard on hawser `s`: its three double base clamps, and the wire from `foot` (its bottom eye's ferrule, the wire
+ * coming up `hang` to the bottom clamp) along the hawser through them and on to its free eye.
+ */
+function lizard(s: number, hang: Vector3[]): Piece[] {
+    const { along, toward, side, on } = lizardLine(s);
+    const pieces: Piece[] = [];
+    for (const d of LIZARD.clamps)
+        pieces.push(
+            ...baseClamp(
+                on(d).add(toward.scale(baseClampWire(HAWSER_R))),
+                along,
+                toward,
+                HAWSER_R,
+                C.steel,
+            ),
+        );
+    // Past the top clamp the wire carries on along the hawser, then droops under its free eye's weight.
+    const past = on(LIZARD.clamps[2] + 0.05).add(side);
+    const droop = along.scale(0.45).sub(UP).unit();
+    const tip = past.add(along.scale(LIZARD.tail - 0.2)).sub(UP.scale(0.06));
+    const top = swagedEye(tip.add(droop.scale(LIZARD_EYE)), droop.neg(), along.cross(UP).unit());
+    pieces.push(...top.pieces);
+    const free = bezier3(
+        past,
+        past.add(along.scale(0.15)),
+        top.end.sub(droop.scale(0.12)),
+        top.end,
+        16,
+    );
+    pieces.push(...line([...hang, ...free], LIZARD_R, C.hawser, "steel"));
+    return pieces;
+}
+
+/**
+ * The Tirfor and lizards. Hawser A's lizard and the Tirfor's cable are slack, so together they make one long smooth
+ * curve from the Tirfor's rope guide, dipping, up into the lizard's bottom clamp; the cable's hook takes the lizard's
+ * bottom eye part way along it. Hawser B's lizard waits, its bottom eye hanging free on a smooth curve from its bottom
+ * clamp. The Tirfor's slack tail runs back from its anchor end over the top of the log and lies on the ground behind.
+ */
 function lizardAndTirfor(): Piece[] {
     const pieces: Piece[] = [];
-    const a = ANCHOR_SHACKLE(SLING_Z);
-    const along = SADDLE(1).sub(a).unit();
-    const on = (d: number) => a.add(along.scale(d));
-    const side = vec3(0, -0.016, -0.012);
-    for (const d of LIZARD.clamps) pieces.push(...clamp(on(d).add(side.scale(0.5)), along));
-    // The Tirfor, hooked to the middle sling, its cable out to the lizard.
-    const hook = ANCHOR_SHACKLE(0);
-    const dir = on(LIZARD.clamps[0]).sub(hook).unit();
-    const body = [hook.add(dir.scale(0.15)), hook.add(dir.scale(0.75))];
-    pieces.push(...bar(hook, body[0], 0.012, C.steel));
-    pieces.push(...section(body[0], body[1], UP, 0.12, 0.26, C.tirfor));
-    // The handle, standing up from it.
-    const mid = body[0].lerp(body[1], 0.5);
-    pieces.push(...bar(mid.add(vec3(0, 0.13, 0)), mid.add(vec3(-0.15, 0.6, 0.05)), 0.014, C.steel));
-    // The lizard: a length of wire from the Tirfor to the clamps, slack, then along the hawser through them.
-    const start = body[1].add(dir.scale(0.05));
-    const reach = on(LIZARD.clamps[0] - 0.12).add(side);
-    pieces.push(...line(hanging(start, reach, 0.12, 16), 0.004, C.hawser, "steel"));
-    pieces.push(...line([reach, on(LIZARD.clamps[2] + 0.12).add(side)], 0.004, C.hawser, "steel"));
+    const { tirfor: t, hook: anchorHook, u } = TIRFOR_RIG;
+    pieces.push(...t.pieces, ...anchorHook.pieces);
+
+    // Hawser A: the whole slack run, kept off the ground.
+    const A = lizardLine(1);
+    const footA = lizardFoot(1);
+    const span = footA.distanceTo(t.ropeOut);
+    const run = bezier3(
+        t.ropeOut,
+        t.ropeOut.add(u.scale(0.45 * span)),
+        footA.sub(A.along.scale(0.35 * span)),
+        footA,
+        120,
+    ).map((p) => vec3(p.x, Math.max(p.y, groundY(p.x) + TIRFOR_CABLE_R), p.z));
+    const total = arcLengths(run).at(-1)!;
+    // The cable hook's bowl, where the lizard's bottom eye sits: far enough back along the run for `hang` of wire
+    // between the eye's ferrule and the bottom clamp.
+    const c = CABLE_HOOK;
+    const eyeLength = LIZARD_EYE;
+    const j = alongPath(run, total - LIZARD.hang - eyeLength - c.r);
+    const pinWay = j.dir.cross(UP).unit();
+    const toEye = c.bowl + c.r + c.shank + c.eye + c.r;
+    const cableHook = hook(j.at.sub(j.dir.scale(toEye)), j.dir, pinWay, C.steel, c);
+    pieces.push(...cableHook.pieces);
+    // The cable from the rope guide to its swaged eye, its thimble through the hook's eye (its crown bearing on the
+    // far side of the eye's bar from the Tirfor).
+    const hookEye = j.at.sub(j.dir.scale(toEye));
+    const cableEye = swagedEye(
+        hookEye.sub(j.dir.scale(c.eye)),
+        j.dir.neg(),
+        cableHook.along,
+        TIRFOR_CABLE_R,
+    );
+    pieces.push(...cableEye.pieces);
+    const before = alongPath(
+        run,
+        total - LIZARD.hang - eyeLength - c.r - toEye - hookEye.distanceTo(cableEye.end) - 0.03,
+    );
+    pieces.push(
+        ...line([...run.slice(0, before.i), cableEye.end], TIRFOR_CABLE_R, C.hawser, "steel"),
+    );
+    // The lizard's bottom eye round the hook's bar at the bottom of its bowl, its crown on the Tirfor's side.
+    const bottomA = swagedEye(cableHook.bar.sub(j.dir.scale(c.r)), j.dir, cableHook.along);
+    pieces.push(...bottomA.pieces);
+    const after = alongPath(run, total - LIZARD.hang + 0.02);
+    pieces.push(...lizard(1, [bottomA.end, ...run.slice(after.i)]));
+
+    // Hawser B: the lizard hanging free, leaving its bottom clamp down the hawser and curving to hang straight down.
+    const B = lizardLine(-1);
+    const footB = lizardFoot(-1);
+    const across = B.along.cross(UP).unit();
+    const bottomB = swagedEye(
+        footB.sub(B.along.scale(0.22)).sub(UP.scale(0.4 + eyeLength)),
+        UP,
+        across,
+    );
+    pieces.push(...bottomB.pieces);
+    pieces.push(
+        ...lizard(
+            -1,
+            bezier3(
+                bottomB.end,
+                bottomB.end.add(UP.scale(0.18)),
+                footB.sub(B.along.scale(0.2)),
+                footB,
+                24,
+            ),
+        ),
+    );
+
+    // The Tirfor's slack tail: stiff, it rises gently back from its anchor end beside the middle sling, rests on
+    // the top of the log, and comes down in a long curve to lie on the ground behind it.
+    const log = LOG_AT(0);
+    const tail = t.tailOut;
+    const z = -0.11;
+    const crest = vec3(log.x, log.y + LOG.r + TIRFOR_CABLE_R, z);
+    const back = vec3(crest.x - tail.x, 0, crest.z - tail.z).unit();
+    const land = onGround(log.x + 0.75, TIRFOR_CABLE_R, z - 0.05);
+    const away = vec3(1, 0, -0.25).unit();
+    const end = onGround(land.x + 1.1, TIRFOR_CABLE_R, land.z - 0.45);
+    pieces.push(
+        ...line(
+            [
+                ...bezier3(tail, tail.add(back.scale(0.2)), crest.sub(back.scale(0.25)), crest, 16),
+                ...bezier3(
+                    crest,
+                    crest.add(back.scale(0.3)),
+                    land.sub(away.scale(0.35)),
+                    land,
+                    16,
+                ).slice(1),
+                ...bezier3(
+                    land,
+                    land.add(away.scale(0.4)),
+                    end.sub(vec3(1, 0, -0.6).unit().scale(0.4)),
+                    end,
+                    12,
+                ).slice(1),
+            ],
+            TIRFOR_CABLE_R,
+            C.hawser,
+            "steel",
+        ),
+    );
     return pieces;
 }
 
@@ -1101,24 +2004,17 @@ function smooth(pts: Vector3[], n: number): Vector3[] {
 function hawsers(): Piece[] {
     const pieces: Piece[] = [];
     for (const s of [-1, 1]) {
-        const shackle = TREE_SHACKLE(s);
+        const shackleAt = TREE_SHACKLE(s);
         const cradle = vec3(BAR_X, CRADLE_Y, s * HAWSER_Z);
-        // The eye at the tree: round its thimble, the dead end beside it through three clamps.
-        const back = cradle.sub(shackle).unit();
-        const eye = shackle.add(back.scale(0.12));
-        const side = ACROSS.scale(0.016);
-        pieces.push(...line([eye, cradle], HAWSER_R, C.hawser, "steel"));
+        // The eye at the tree: a bow shackle on the sling, the hawser's eye round its thimble on the pin, the dead end
+        // back beside it through three clamps.
+        const back = cradle.sub(shackleAt).unit();
+        const { flat, upright } = linkPlanes(back);
+        const bow = shackle("bow", shackleAt, back, flat, C.steel, C.pin);
+        pieces.push(...bow.pieces);
         pieces.push(
-            ...line(
-                [eye.add(side), eye.add(side).add(back.scale(0.65))],
-                HAWSER_R,
-                C.hawser,
-                "steel",
-            ),
+            ...madeOff(bow.far, back, upright, cradle, (end) => [end.add(back.scale(0.12))]),
         );
-        for (const d of [0.2, 0.38, 0.56])
-            pieces.push(...clamp(eye.add(back.scale(d)).add(side.scale(0.5)), back));
-        pieces.push(...bar(shackle.add(vec3(0.07, 0, 0)), eye, 0.018, C.steel));
         const span = Array.from({ length: 61 }, (_, i) =>
             onHawser(BAR_X + ((SPAR_X - BAR_X) * i) / 60, s),
         );
@@ -1129,23 +2025,96 @@ function hawsers(): Piece[] {
 }
 
 /**
+ * A rope from a carabiner hanging down with its gate towards `ACROSS`, tied into its bottom bar (whose middle is `at`)
+ * with a figure 8 on a bight and on through `rest`: in the middle of the bar, or `spine` (radians) round the bend
+ * towards the spine. The carabiner hangs straight down unless it's swung towards `down`. Points of `rest` the knot
+ * already covers are left out.
+ */
+export function tiedTo(
+    at: Vector3,
+    rest: Vector3[],
+    r: number,
+    color: string,
+    spine = 0,
+    down = vec3(0, -1, 0),
+): Piece[] {
+    const { knot, bar } = carabinerKnot(at, rest[0], r, spine, down);
+    return line([...knot.rope, ...beyond(knot, bar, rest)], r, color, "rope", { a: true });
+}
+
+/**
+ * A figure 8 on a bight tied into a carabiner's bottom bar (whose middle is `at`), its rope pulling towards `toward`:
+ * in the middle of the bar, or `spine` (radians) round the bend towards the spine, as `tiedTo` ties it. Returns the knot
+ * and the point on the bar it's round.
+ */
+function carabinerKnot(
+    at: Vector3,
+    toward: Vector3,
+    r: number,
+    spine = 0,
+    down = vec3(0, -1, 0),
+): { knot: Figure8; bar: Vector3 } {
+    const end = CARABINER_WIDTH / 2;
+    // Round the bottom bend's middle line, from the bottom towards the spine (away from the gate).
+    const bend = at.sub(down.scale(end));
+    const bar = bend
+        .sub(ACROSS.scale(end * Math.sin(spine)))
+        .add(down.scale(end * Math.cos(spine)));
+    const axis = ACROSS.scale(Math.cos(spine)).add(down.scale(Math.sin(spine)));
+    return { knot: figure8(bar, axis, CARABINER_R, toward, r), bar };
+}
+
+/** The points of `route` past the reach of `knot`, tied into the bar at `bar`. */
+function beyond(knot: Figure8, bar: Vector3, route: Vector3[]): Vector3[] {
+    const pull = knot.end.sub(bar).unit();
+    const i = route.findIndex((p) => p.sub(bar).dot(pull) > knot.reach + 0.01);
+    return i < 0 ? route.slice(-1) : route.slice(i);
+}
+
+/**
+ * How far below the top of its hole each of the trolley's carabiners hangs, past just touching it: the rider's, in the
+ * middle hole, and the back one's.
+ */
+const TROLLEY_CLIP_DROP = { hang: 0.022, backUp: 0.003 };
+
+/**
  * A trolley on the wire at `at`, its bumper towards `ahead` (downhill, where it meets the brake blocks), with its two
- * carabiners hanging straight down from the holes below: the rider's dropper on the middle one, and the back-up line
- * and the return line together on the one behind it, uphill. Returns where each carabiner's bottom is.
+ * carabiners hanging from the holes below: the rider's dropper on the middle one, and the back-up line and the return
+ * line together on the one behind it, uphill. Each carabiner pivots where it passes through its hole: `swing` turns its
+ * bottom that far (radians) towards `ahead`, as when the trolley's stopped by the brake blocks and the rider swings on,
+ * or back when the return line pulls. Returns where each carabiner's bottom is, and which way it hangs.
  */
 export function rigTrolley(
     at: Vector3,
     ahead: Vector3,
-): { pieces: Piece[]; hang: Vector3; backUp: Vector3 } {
+    swing: { hang?: number; backUp?: number } = {},
+): {
+    pieces: Piece[];
+    hang: Vector3;
+    backUp: Vector3;
+    hangDown: Vector3;
+    backUpDown: Vector3;
+} {
     const t = zipTrolley(at, ahead, ACROSS, HAWSER_R, TROLLEY_COLORS);
     const pieces: Piece[] = [...t.pieces];
-    const down = vec3(0, -1, 0);
-    const clip = (top: Vector3, length: number) => {
-        const bar = top.add(vec3(0, -0.005, 0));
-        pieces.push(...carabiner(bar, down, ACROSS, C.steel, length));
-        return bar.add(down.scale(length));
+    const level = vec3(ahead.x, 0, ahead.z).unit();
+    const clip = (top: Vector3, length: number, drop: number, angle = 0) => {
+        const down = vec3(0, -Math.cos(angle), 0).add(level.scale(Math.sin(angle)));
+        const bar = top.add(vec3(0, -0.005 - drop, 0));
+        pieces.push(
+            ...carabiner(bar, down, ACROSS, C.oval, length, { shape: "oval", through: t.gap }),
+        );
+        return { bottom: bar.add(down.scale(length)), down };
     };
-    return { pieces, hang: clip(t.main, 0.11), backUp: clip(t.towSide, 0.1) };
+    const hang = clip(t.main, 0.11, TROLLEY_CLIP_DROP.hang, swing.hang);
+    const backUp = clip(t.towSide, 0.1, TROLLEY_CLIP_DROP.backUp, swing.backUp);
+    return {
+        pieces,
+        hang: hang.bottom,
+        backUp: backUp.bottom,
+        hangDown: hang.down,
+        backUpDown: backUp.down,
+    };
 }
 
 /** A trolley on hawser `s` at `x`, with its dropper: where its tow points are, back (uphill) and front. */
@@ -1155,7 +2124,8 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         .sub(onHawser(x - 0.1, s))
         .unit();
     const { pieces, hang, backUp } = rigTrolley(at, ahead);
-    const back = backUp.add(vec3(0, 0.01, 0));
+    // The return line's tied on beside the back-up line, round the bend on the carabiner's spine side.
+    const back = backUp;
     // The dropper: the rider's rope down through the descender, a GRIGRI+ clipped to the harness's tie-in (the
     // rider's drop below the hawser) and reaching up to about `DESCENDER` below it, the rope's brake strand hanging on
     // below; and the back-up line, down to the harness too.
@@ -1170,16 +2140,40 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         steel: C.steel,
     });
     pieces.push(...g.pieces);
-    // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in.
+    // Its carabiner through the hole, hanging from the hole's bottom edge to the tie-in, turned over (its gate the
+    // other way from the trolley's).
     const holeBottom = tieIn.add(vec3(0, clipLength - g.holeR + 0.005, 0));
-    pieces.push(...carabiner(holeBottom, down, ACROSS, C.steel, clipLength - g.holeR + 0.005));
-    pieces.push(...line([hang, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
+    pieces.push(
+        ...carabiner(holeBottom, down, ACROSS.neg(), C.steel, clipLength - g.holeR + 0.005, {
+            through: g.width,
+        }),
+    );
+    // Tied into the trolley's carabiner with a figure 8 on a bight, its standing part on down to the GRIGRI.
+    const eight = figure8(hang, ACROSS, CARABINER_R, hang.add(vec3(0, -1, 0)), 0.0055);
+    pieces.push(
+        ...line([...eight.rope, ...g.rope, ...g.brake(0.9)], 0.0055, C.dropper, "rope", {
+            a: true,
+            b: true,
+        }),
+    );
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
-    pieces.push(...line(hanging(backUp, safetyClip, -0.05, 8), 0.0055, C.dropper));
-    pieces.push(...carabiner(safetyClip, down, ACROSS, C.steel, clipLength));
+    // One rope, a figure 8 at each end, each knot lying straight towards the other carabiner and the rope running
+    // straight between them, so it leaves each knot the way the knot lies.
+    const top = carabinerKnot(backUp, safetyClip, 0.0055);
+    const bottom = carabinerKnot(safetyClip, backUp, 0.0055);
+    pieces.push(
+        ...line([...top.knot.rope, ...bottom.knot.rope.reverse()], 0.0055, C.dropper, "rope", {
+            a: true,
+            b: true,
+        }),
+    );
+    pieces.push(...carabiner(safetyClip, down, ACROSS.neg(), C.steel, clipLength));
     return { pieces, back };
 }
+
+/** How far round its carabiner's bottom bend towards the spine the return line's tied (radians). */
+const RETURN_SPINE = 1.1;
 
 /** Where the trolleys sit: A at the launch, just out from the platform, and B at the bottom against its brake block. */
 export const TROLLEY_X = { a: 1.4, b: BLOCKS_X - 0.15 };
@@ -1204,9 +2198,15 @@ function trolleysAndReturn(): Piece[] {
         ...b.pieces,
         ...pa.pieces,
         ...pb.pieces,
-        ...line([a.back, ...pa.round, ...pb.round], 0.004, C.returnLine),
+        ...tiedTo(a.back, [...pa.round, ...pb.round], 0.004, C.returnLine, RETURN_SPINE),
         // Out to trolley B, sagging under its own weight below hawser B.
-        ...line(hanging(pb.b, b.back, slack(pb.b, b.back), 60), 0.004, C.returnLine),
+        ...tiedTo(
+            b.back,
+            hanging(pb.b, b.back, slack(pb.b, b.back), 60).reverse().slice(1),
+            0.004,
+            C.returnLine,
+            RETURN_SPINE,
+        ),
     ];
 }
 
@@ -1223,15 +2223,10 @@ function dynamicBrake(): Piece[] {
         const along = onHawser(BLOCKS_X + 0.1, s)
             .sub(onHawser(BLOCKS_X - 0.1, s))
             .unit();
-        pieces.push(
-            ...section(at.sub(along.scale(0.05)), at.add(along.scale(0.05)), UP, 0.1, 0.1, C.nylon),
-        );
-        // Eye bolts either side, below the hawser.
-        for (const t of [-1, 1]) {
-            const eye = at.add(vec3(0, -0.03, t * 0.08));
-            pieces.push(...bar(eye, eye.add(vec3(0, 0, t * 0.03)), 0.012, C.steel));
-            if (t === -s) eyes.push(eye.add(vec3(0, 0, t * 0.03)));
-        }
+        // The joining rope's tied to the eye on the inside, towards the other hawser.
+        const block = stopBlock(at, along, UP, vec3(0, 0, -s), HAWSER_R, STOP_BLOCK_COLORS);
+        pieces.push(...block.pieces);
+        eyes.push(block.inner);
     }
     // The joining rope: 2.5 m with its knots tied, its middle drawn up the span by the brake line.
     const half = 1.25;
@@ -1239,10 +2234,46 @@ function dynamicBrake(): Piece[] {
     const apex = eyes[0]
         .lerp(eyes[1], 0.5)
         .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
-    for (const e of eyes) pieces.push(...line(hanging(e, apex, 0.03, 8), 0.004, C.joining));
-    pieces.push(...bar(apex.add(vec3(-0.04, 0, 0)), apex.add(vec3(0.04, 0, 0)), 0.012, C.steel));
+    // The middle: one carabiner lying along the span (Figure 55), the brake line clipped into its uphill end, and the
+    // joining rope's middle and the stabiliser side by side in its downhill end. The brake line and the stabiliser
+    // each end in a figure 8 on a bight. The joining rope's middle is really an alpine butterfly: until that's drawn,
+    // it takes a turn round the carabiner's bar.
+    const ropeR = 0.004;
+    const clip = 0.11;
+    const ahead = vec3(1, 0, 0);
+    const downhill = apex.sub(ahead.scale(CARABINER_R + ropeR));
+    const uphill = downhill.sub(ahead.scale(clip));
+    pieces.push(...carabiner(uphill, ahead, ACROSS, C.oval, clip, { shape: "oval" }));
+    const knot = tiedRound(
+        downhill.add(ACROSS.scale(0.008)),
+        ACROSS,
+        CARABINER_R,
+        apex.add(ahead),
+        ropeR,
+    );
+    pieces.push(...line(knot.turn, ropeR, C.joining));
+    // The joining rope's legs, out from the knot to each block's eye, tied into the eye's bar: really a rethreaded
+    // figure 8 (drawn as a figure 8 on a bight).
+    for (const e of eyes) {
+        const level = knot.from.sub(e);
+        const w = vec3(level.x, 0, level.z).unit();
+        const t = figure8(
+            e.add(w.scale(STOP_BLOCK_EYE.r)),
+            UP.cross(w),
+            STOP_BLOCK_EYE.bar,
+            knot.from,
+            ropeR,
+        );
+        pieces.push(
+            ...line([...t.rope, ...hanging(t.end, knot.from, 0.03, 8)], ropeR, C.joining, "rope", {
+                a: true,
+            }),
+        );
+    }
     // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
-    const from = apex.add(vec3(-0.04, 0, 0));
+    const brakeEye = figure8(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
+    pieces.push(...line(brakeEye.rope, 0.004, C.brakeLine, "rope", { a: true }));
+    const from = brakeEye.end;
     // Sagging much as the hawsers do.
     const reach = hanging(from, BRAKE.pulley, sagLike(from, BRAKE.pulley), 50);
     // Clipped into the eye bolt under the arm, its eye turned to face the pull.
@@ -1251,14 +2282,25 @@ function dynamicBrake(): Piece[] {
     });
     pieces.push(...brake.pieces);
     pieces.push(...line(hanging(from, brake.a, sagLike(from, brake.a), 50), 0.004, C.brakeLine));
-    pieces.push(...line([...brake.round, BRAKE.chainTop], 0.004, C.brakeLine));
+    // Tied into a carabiner clipped to the chain's top link.
+    const chainClip = BRAKE.chainTop.add(vec3(0, 0.11, 0));
+    pieces.push(...carabiner(chainClip, vec3(0, -1, 0), ACROSS, C.steel, 0.11));
+    const chainKnot = figure8(chainClip, ACROSS, CARABINER_R, brake.round.at(-1)!, 0.004);
+    pieces.push(
+        ...line([...brake.round, ...chainKnot.rope.reverse()], 0.004, C.brakeLine, "rope", {
+            b: true,
+        }),
+    );
     // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
     // and down from it, tied off to the bottom spar with natural fibre rope.
     const g = groundY(SHEAR_LEG.x);
     const centre = STABILISER_PULLEY.add(vec3(0, g, 0));
     const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
     const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
-    const cord = apex.add(vec3(0.04, 0, 0));
+    // From its eye in the carabiner's downhill end, beside the joining rope's knot.
+    const eye = figure8(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
+    pieces.push(...line(eye.rope, 0.005, C.shockCord, "rope", { a: true }));
+    const cord = eye.end;
     const stabiliser = rigPulley(centre, cord, tie, 0.005, {
         basket: {
             spar: vec3(SPAR_X, g + SHEAR_LEG.spar, 0),
@@ -1299,16 +2341,28 @@ function chainWeight(): Piece[] {
     return pieces;
 }
 
-/** The static brakes: a shackle on each hawser, with a rope out to a picket 2.5 m to its side (Figure 55). */
+/**
+ * The static brakes: a carabiner clipped round each hawser, hanging towards the pull of a rope tied to it and out to a
+ * picket 2.5 m to its side (Figure 55).
+ */
 function staticBrakes(): Piece[] {
     const pieces: Piece[] = [];
+    const length = 0.11;
     for (const s of [-1, 1]) {
         const at = onHawser(STATIC_X, s);
-        const shackle = at.add(vec3(0, -0.05, 0));
-        pieces.push(...bar(at.add(vec3(0, 0.02, 0)), shackle, 0.012, C.steel));
         const base = vec3(STATIC_X, 0, s * (HAWSER_Z + 2.5));
-        const pk = picket(base, towards(shackle, base));
-        pieces.push(...pk.pieces, ...line([shackle, pk.tie], 0.0055, C.staticBrake));
+        const pk = picket(base, towards(at, base));
+        // Square to the hawser, swung to the rope's pull, the wire in its top bend.
+        const pull = pk.tie.sub(at);
+        const down = vec3(0, pull.y, pull.z).unit();
+        const across = down.cross(vec3(1, 0, 0)).unit();
+        const top = at.sub(down.scale(HAWSER_R + CARABINER_R));
+        pieces.push(...carabiner(top, down, across, C.steel, length));
+        const t = figure8(top.add(down.scale(length)), across, CARABINER_R, pk.tie, 0.0055);
+        pieces.push(
+            ...pk.pieces,
+            ...line([...t.rope, pk.tie], 0.0055, C.staticBrake, "rope", { a: true }),
+        );
     }
     return pieces;
 }
@@ -1351,15 +2405,15 @@ export function foxLabels(): RigLabel[] {
         { text: "Brake blocks", at: onHawser(BLOCKS_X, -1), side: "right" },
         { text: "Static brakes", at: onHawser(STATIC_X, -1).add(vec3(0, -0.05, 0)), side: "right" },
         { text: "H-frame shear leg", at: onGround(SHEAR_LEG.x, SHEAR_LEG.top, 0), side: "right" },
-        { text: "Turnbuckle", at: ANCHOR_SHACKLE(-SLING_Z).lerp(SADDLE(-1), 0.04), side: "right" },
+        { text: "Turnbuckle", at: TURNBUCKLE_AT(-1), side: "right" },
         {
             text: "Lizard",
             at: ANCHOR_SHACKLE(SLING_Z).add(
-                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(3.05),
+                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(LIZARD.clamps[1]),
             ),
             side: "left",
         },
-        { text: "Tirfor", at: ANCHOR_SHACKLE(0).add(vec3(-0.4, 0.15, 0)), side: "left" },
+        { text: "Tirfor", at: TIRFOR_RIG.tirfor.ropeOut.add(vec3(0, 0.25, 0)), side: "left" },
         { text: "Log and picket anchor", at: onGround(LOG.x + 0.3, 0.3, 0), side: "right" },
     ];
 }
@@ -1377,7 +2431,8 @@ export function foxLegend(): { name: string; color: string; look: "tape" | "rope
         { name: "Guys", color: C.guy, look: "rope" },
         { name: "Tower backstay", color: C.backstay, look: "rope" },
         { name: "Lashings and ties (natural fibre)", color: C.fibre, look: "rope" },
-        { name: "Round slings", color: C.sling, look: "tape" },
+        { name: "Round slings (4 t)", color: SLINGS.round.color, look: "tape" },
+        { name: "Climbing slings", color: SLINGS.climbing.color, look: "tape" },
     ];
 }
 

@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentRef, type RefObject } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentRef,
+    type ReactNode,
+    type RefObject,
+} from "react";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
@@ -27,7 +37,7 @@ import {
  * what's behind it however they cross. Scene points are compass (x east, y up, z north); three.js wants a right-handed
  * frame, so z is turned round to point south as they go in.
  */
-const T = (p: Vector3) => new THREE.Vector3(p.x, p.y, -p.z);
+export const T = (p: Vector3) => new THREE.Vector3(p.x, p.y, -p.z);
 
 const COLOR: Record<Material, string> = {
     log: "var(--tower-log)",
@@ -158,7 +168,16 @@ function colorReader(box: HTMLElement) {
     const font = getComputedStyle(box).getPropertyValue("--font-geist-mono") || "monospace";
     return { read, font, dispose: () => probe.remove() };
 }
-type Colors = ReturnType<typeof colorReader>;
+export type Colors = ReturnType<typeof colorReader>;
+
+const ColorsContext = createContext<Colors | null>(null);
+
+/** The scene's colour reader, for what's drawn inside a `SceneGL` as its children. */
+export function useSceneColors(): Colors {
+    const colors = useContext(ColorsContext);
+    if (!colors) throw new Error("useSceneColors is only for a SceneGL's children");
+    return colors;
+}
 
 /** How many sides a rope's or rod's tube has, unless a scene asks for more or fewer. */
 const SIDES = 10;
@@ -201,7 +220,7 @@ function rodGeometry(
 }
 
 /** A tube of radius `r` along a polyline, its rings kept square to the line as it bends. */
-function tubeGeometry(
+export function tubeGeometry(
     points: THREE.Vector3[],
     r: number,
     sides = SIDES,
@@ -247,7 +266,8 @@ function tubeGeometry(
         for (let k = 0; k < sides; k++) {
             const [a, b] = [i * sides + k, i * sides + ((k + 1) % sides)];
             const [c, d] = [a + sides, b + sides];
-            index.push(a, c, b, b, c, d);
+            // Wound anticlockwise seen from outside, so the faces' fronts are outside the tube.
+            index.push(a, b, c, b, d, c);
         }
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
@@ -265,8 +285,13 @@ function ribbonGeometry(
     across: THREE.Vector3,
     width: number,
     thickness: number,
+    profile?: { width: number; thickness: number; across?: THREE.Vector3 }[],
 ): THREE.BufferGeometry | null {
-    const pts = points.filter((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
+    const keep = points.map((p, i) => i === 0 || p.distanceTo(points[i - 1]) > 1e-6);
+    const pts = points.filter((_, i) => keep[i]);
+    const sizes: { width: number; thickness: number; across?: THREE.Vector3 }[] = (
+        profile ?? points.map(() => ({ width, thickness }))
+    ).filter((_, i) => keep[i]);
     if (pts.length < 2) return null;
     const tangent = (i: number) =>
         pts[Math.min(i + 1, pts.length - 1)]
@@ -276,12 +301,15 @@ function ribbonGeometry(
     // Each point's half-width and half-thickness directions.
     const frames = pts.map((_, i) => {
         const t = tangent(i);
-        const w = across
+        const w = (sizes[i].across ?? across)
             .clone()
             .sub(t.clone().multiplyScalar(across.dot(t)))
             .normalize();
         const n = t.clone().cross(w);
-        return { w: w.multiplyScalar(width / 2), n: n.multiplyScalar(thickness / 2) };
+        return {
+            w: w.multiplyScalar(sizes[i].width / 2),
+            n: n.multiplyScalar(sizes[i].thickness / 2),
+        };
     });
     const position: number[] = [];
     const normal: number[] = [];
@@ -393,6 +421,49 @@ function bare(g: THREE.BufferGeometry): THREE.BufferGeometry {
     return g;
 }
 
+/**
+ * A rope's cut end at `at`, the rope arriving along `dir`: squared off and fused, as cut with a hot knife. A short band
+ * a touch fatter than the rope, where it melted, and its end face, a little ragged.
+ */
+function cutEnd(
+    at: THREE.Vector3,
+    dir: THREE.Vector3,
+    r: number,
+    sides: number,
+): THREE.BufferGeometry[] {
+    const fat = r * 1.06;
+    const band = tubeGeometry(
+        [at.clone().sub(dir.clone().multiplyScalar(Math.max(0.003, r * 0.6))), at],
+        fat,
+        sides,
+    );
+    // The face: a fan from its middle, its rim a little uneven (the same unevenness every time, so it doesn't flicker).
+    const helper = Math.abs(dir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const u = helper.clone().cross(dir).normalize();
+    const v = dir.clone().cross(u);
+    const rim = 2 * sides;
+    const position = [at.x, at.y, at.z];
+    const normal = [dir.x, dir.y, dir.z];
+    for (let k = 0; k < rim; k++) {
+        const th = (2 * Math.PI * k) / rim;
+        const rough = fat * (1 + 0.07 * Math.sin(5 * th + 1.3) * Math.cos(3 * th));
+        const p = at
+            .clone()
+            .add(u.clone().multiplyScalar(rough * Math.cos(th)))
+            .add(v.clone().multiplyScalar(rough * Math.sin(th)))
+            .add(dir.clone().multiplyScalar(0.0004 * Math.sin(7 * th)));
+        position.push(p.x, p.y, p.z);
+        normal.push(dir.x, dir.y, dir.z);
+    }
+    const index: number[] = [];
+    for (let k = 0; k < rim; k++) index.push(0, 1 + k, 1 + ((k + 1) % rim));
+    const face = new THREE.BufferGeometry();
+    face.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
+    face.setAttribute("normal", new THREE.Float32BufferAttribute(normal, 3));
+    face.setIndex(index);
+    return [band, face].filter((g): g is THREE.BufferGeometry => !!g);
+}
+
 /** How wide the gaps between boards are (metres). */
 const JOINT_GAP = 0.01;
 /** What a gap's colour key starts with, before the colour of its boards. */
@@ -428,17 +499,33 @@ function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
             // Flat tape: its layers side by side, fanned apart round the beam and gathered at the carabiner.
             const across = T(p.tape.across).normalize();
             for (const layer of tapeLayers(p))
-                add(color, ribbonGeometry(layer.map(T), across, p.tape.width, p.tape.thickness));
+                add(
+                    color,
+                    ribbonGeometry(
+                        layer.map(T),
+                        across,
+                        p.tape.width,
+                        p.tape.thickness,
+                        p.tape.profile?.map((q) => ({
+                            ...q,
+                            across: q.across && T(q.across).normalize(),
+                        })),
+                    ),
+                );
         } else if (p.kind === "strand") {
             // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
             const lift = new THREE.Vector3(0, r - p.r, 0);
             const points = p.points.map((q) => T(q).add(lift));
             add(color, tubeGeometry(points, r, sides));
-            for (const [cap, q] of [
-                [p.capA, points[0]],
-                [p.capB, points.at(-1)!],
+            for (const [cap, cut, q, before] of [
+                [p.capA, p.cutA, points[0], points[1]],
+                [p.capB, p.cutB, points.at(-1)!, points.at(-2)!],
             ] as const)
-                if (cap) {
+                if (cap && cut && before) {
+                    const fused = `color-mix(in srgb, ${color} 35%, var(--rig-black))`;
+                    for (const g of cutEnd(q, q.clone().sub(before).normalize(), r, sides))
+                        add(fused, g);
+                } else if (cap) {
                     const at = q;
                     add(
                         color,
@@ -510,7 +597,7 @@ function buildHairlines(pieces: Piece[]) {
 }
 
 /** A label's text drawn on a canvas, for a texture: `fill` letters, with an outline in `stroke` if given. */
-function textTexture(text: string, font: string, fill: string, stroke?: string) {
+export function textTexture(text: string, font: string, fill: string, stroke?: string) {
     const size = 64;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
@@ -547,22 +634,26 @@ function KnotLabel({ label, colors }: { label: RigLabel; colors: Colors }) {
     const mesh = useRef<THREE.Mesh>(null);
     const { camera, size } = useThree();
     const on = label.on!;
+    // Drawn again only when its text changes, not as it moves (as the 3D knot editor's numbers do while dragged).
+    const { text, light } = label;
     const card = useMemo(() => {
-        const ink = colors.read(label.light ? "var(--ink-bright)" : "var(--rig-on-rope)");
-        const edge = label.light ? colors.read("var(--rig-on-rope)") : undefined;
+        const ink = colors.read(light ? "var(--ink-bright)" : "var(--rig-on-rope)");
+        const edge = light ? colors.read("var(--rig-on-rope)") : undefined;
         return textTexture(
-            label.text,
+            text,
             colors.font,
             `#${ink.getHexString()}`,
             edge && `#${edge.getHexString()}`,
         );
-    }, [label, colors]);
+    }, [text, light, colors]);
     useEffect(() => () => card.texture.dispose(), [card]);
     const centre = useMemo(() => T(label.at), [label]);
     const axis = useMemo(() => T(on.along).normalize(), [on]);
     // The letters' height that fits on the cylinder (as in the SVG views: 70% of its thickness, the text 72% of its
     // length).
-    const font = Math.min(0.7 * 2 * on.r, (0.72 * on.length) / (label.text.length * 0.6));
+    const font =
+        (label.size ?? 1) *
+        Math.min(0.7 * 2 * on.r, (0.72 * on.length) / (label.text.length * 0.6));
     useFrame(() => {
         const m = mesh.current;
         if (!m) return;
@@ -919,12 +1010,15 @@ export function SceneGL({
     onTurn,
     detail,
     onFrameRate,
+    children,
 }: ViewProps & {
     scene: SceneConfig;
     /** How finely to draw it (as fine as the screen allows, up to 2 pixels a CSS pixel, unless given). */
     detail?: GLDetail;
     /** Told when the frame rate stays short of smooth, or has room to spare, for a choice of detail to follow. */
     onFrameRate?: (rate: FrameRate) => void;
+    /** More to draw in the scene, which may read its colours with `useSceneColors`. */
+    children?: ReactNode;
 }) {
     const box = useRef<HTMLDivElement>(null);
     const [colors, setColors] = useState<Colors | null>(null);
@@ -1005,6 +1099,7 @@ export function SceneGL({
                     />
                     <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />
                     {scene.pivotToPointer && <PivotToPointer controls={controls} limits={limits} />}
+                    <ColorsContext value={colors}>{children}</ColorsContext>
                     <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>
             )}

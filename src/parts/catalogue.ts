@@ -1,29 +1,56 @@
+import type { RigLabel } from "@/abseil-tower/rig";
 import { timber, type Piece } from "@/abseil-tower/tower";
 import {
+    ANCHOR_SHACKLE,
+    BLOCKS_X,
     BRAKE,
     C,
+    figure8,
     foxPieces,
     groundY,
     HAWSER_R,
     line,
+    LOG,
     onHawser,
     PULLEY_COLORS,
     rigPulley,
     rigTrolley,
+    SADDLE,
     SHEAR_LEG,
+    sling,
+    SLING_Z,
+    STATIC_X,
+    STOP_BLOCK_COLORS,
+    tiedTo,
+    TIRFOR_COLORS,
+    TREE,
+    TREE_SHACKLE,
     TROLLEY_COLORS,
     TROLLEY_X,
 } from "@/flying-fox/fox";
 import {
+    baseClamp,
+    baseClampWire,
     bolt,
     carabiner,
+    CARABINER_R,
     eyeBolt,
     grigri,
+    hook,
     pulley,
+    shackle,
     sheave,
+    stopBlock,
+    thimble,
+    tirfor,
+    turnbuckle,
     wrap,
     zipTrolley,
 } from "@/flying-fox/hardware";
+import { axes, knotPieces, numberedRope } from "@/flying-fox/knot-3d";
+import FIGURE_8_JSON from "@/flying-fox/knots/figure-8.json";
+import { knot3dFile } from "@/knot-editor-3d/knot-file";
+import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
@@ -37,6 +64,8 @@ export type Part = {
     group: string;
     about: string;
     pieces: () => Piece[];
+    /** What's written on it, if anything. */
+    labels?: () => RigLabel[];
 };
 
 const ORIGIN = vec3(0, 0, 0);
@@ -55,13 +84,77 @@ function reeved(p: { a: Vector3; b: Vector3 }, centre: Vector3, a: Vector3, b: V
     return line([a, ...wrap(centre, p.a, p.b), b], r, C.returnLine);
 }
 
+/** A sling laid out flat on edge as an oval: its two parts `long` apart end to end, round ends `r` across. */
+function slingLoop(kind: "round" | "climbing", long: number, r: number): Piece[] {
+    const pts = Array.from({ length: 41 }, (_, i) => {
+        const t = (2 * Math.PI * i) / 40;
+        const end = Math.cos(t) >= 0 ? long / 2 - r : -(long / 2 - r);
+        return vec3(end + r * Math.cos(t), 0, r * Math.sin(t));
+    });
+    return sling(kind, pts, UP, ORIGIN, 1, 1);
+}
+
 export const PARTS: Part[] = [
     {
         slug: "carabiner",
         name: "Carabiner",
         group: "Hardware",
-        about: "A screwgate carabiner, 110 mm long and 60 mm wide, its sleeve on the gate side.",
+        about: "A D-shape triple-lock carabiner (the CT one), traced from a photo: 110 mm from its top bend to its bottom one and 60 mm wide, the narrow top bend and the wide bottom one beside its straight spine, the gate opposite behind its red knurled locking sleeve.",
         pieces: () => carabiner(vec3(0, 0.055, 0), DOWN, ALONG, STEEL),
+    },
+    {
+        slug: "figure-8-rethreaded",
+        name: "Figure 8, rethreaded",
+        group: "Knots",
+        about: "The rethreaded figure 8 from Rescue Knots, lifted into 3D from its drawing: each strand rises where it's on top at a crossing and sinks where it's underneath, round the drawing's bar seen end on.",
+        pieces: () => {
+            const knot = KNOTS.find((k) => k.slug === "figure-8-rethreaded")!;
+            return knotPieces(knot.file.knot, { steel: STEEL });
+        },
+    },
+    {
+        slug: "figure-8-trial",
+        name: "Figure 8, tightened (trial)",
+        group: "Knots",
+        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar (src/flying-fox/knots/figure-8.json, edited in /knot-editor-3d), its rope numbered in segments from the standing end, with X, Y and Z arrows.",
+        ...(() => {
+            const file = knot3dFile("figure-8.json", FIGURE_8_JSON);
+            const { points, seg } = file.rope;
+            const rope = () =>
+                numberedRope(points, file.diameter / 2, seg, [
+                    "var(--knot-orange)",
+                    "var(--knot-purple)",
+                ]);
+            const knotLow = Math.min(...points.filter((p) => p.y > -0.15).map((p) => p.y));
+            const arrows = () => axes(vec3(-0.06, knotLow, 0), 0.03);
+            return {
+                pieces: () => [
+                    ...rope().pieces,
+                    ...arrows().pieces,
+                    ...file.props.map((bar) => ({
+                        kind: "rod" as const,
+                        a: bar.at.sub(bar.along.scale(0.04)),
+                        b: bar.at.add(bar.along.scale(0.04)),
+                        r: bar.r,
+                        material: "steel" as const,
+                        color: STEEL,
+                        capA: true,
+                        capB: true,
+                    })),
+                ],
+                labels: () => [...rope().labels, ...arrows().labels],
+            };
+        })(),
+    },
+    {
+        slug: "carabiner-oval",
+        name: "Carabiner (oval)",
+        group: "Hardware",
+        about: "An oval triple-lock carabiner (the CT one), traced from a photo, on the pulleys and the dynamic brake: dark grey, the same round both ends, 110 mm from the middle of one end to the other and about 49 mm wide, its straight gate behind its red knurled locking sleeve.",
+        pieces: () =>
+            carabiner(vec3(0, 0.055, 0), DOWN, ALONG, PULLEY_COLORS.carabiner, 0.11, {
+                shape: "oval",
+            }),
     },
     {
         slug: "eye-bolt",
@@ -133,10 +226,104 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "stop-block",
+        name: "Stop block",
+        group: "Hardware",
+        about: "The team's stop block, from their drawing and a photo: two nylon halves split along 11 mm wire, 100 mm each way, held by four 10 mm brass bolts sunk flush top and bottom, with two eye bolts across it, one high with its eye on the +z side at the −x end, the other low on the far side at the far end.",
+        pieces: () => [
+            ...stopBlock(ORIGIN, ALONG, UP, ACROSS, HAWSER_R, STOP_BLOCK_COLORS).pieces,
+            ...wire(ORIGIN, 0.25),
+        ],
+    },
+    {
+        slug: "bow-shackle",
+        name: "Bow shackle (19 mm)",
+        group: "Hardware",
+        about: "A 19 mm bow shackle with a yellow screw pin, after Crosby's G-209: 32 mm between its ears, 73 mm inside from the crown to the pin, its bow 52 mm across inside. Its crown at the origin, its pin towards +x.",
+        pieces: () => shackle("bow", ORIGIN, ALONG, UP, STEEL, C.pin).pieces,
+    },
+    {
+        slug: "d-shackle",
+        name: "D shackle (19 mm)",
+        group: "Hardware",
+        about: "A 19 mm D (chain) shackle with a yellow screw pin, after Crosby's G-210: 32 mm between its ears, 73 mm inside from the crown to the pin. Its crown at the origin, its pin towards +x.",
+        pieces: () => shackle("d", ORIGIN, ALONG, UP, STEEL, C.pin).pieces,
+    },
+    {
+        slug: "turnbuckle",
+        name: "Turnbuckle (24 mm)",
+        group: "Hardware",
+        about: "A 24 mm turnbuckle, eye to eye, its rods partly wound out: a forged frame 360 mm long between its hexagon bosses with a window through it, an eye at each end 78 mm long inside.",
+        pieces: () => turnbuckle(ORIGIN, ALONG, UP, STEEL).pieces,
+    },
+    {
+        slug: "thimble",
+        name: "Thimble and eye",
+        group: "Hardware",
+        about: "A wire rope thimble for 11 mm wire, 72 mm long and 34 mm wide inside, with the wire's eye round it and its two parts running on side by side.",
+        pieces: () => {
+            const t = thimble(ORIGIN, ALONG, UP, HAWSER_R, STEEL);
+            const [first, last] = [t.wire[0], t.wire.at(-1)!];
+            return [
+                ...t.pieces,
+                ...line(
+                    [
+                        last.add(ALONG.scale(0.15)),
+                        last,
+                        ...t.wire.slice(1, -1).reverse(),
+                        first,
+                        first.add(ALONG.scale(0.15)),
+                    ],
+                    HAWSER_R,
+                    C.hawser,
+                ),
+            ];
+        },
+    },
+    {
+        slug: "base-clamp",
+        name: "Double base clamp",
+        group: "Hardware",
+        about: "A double base (double throat) wire rope grip for 11 mm wire: a forged body with a wire in the throat either side, and two U-bolts staggered along the wires, each hooked over one wire and nutted on the far side.",
+        pieces: () => {
+            const side = vec3(0, 0, 1);
+            const off = side.scale(baseClampWire(HAWSER_R));
+            return [
+                ...baseClamp(ORIGIN, ALONG, side, HAWSER_R, STEEL),
+                ...wire(off, 0.1),
+                ...wire(off.neg(), 0.1),
+            ];
+        },
+    },
+    {
+        slug: "round-sling",
+        name: "Round sling (4 t)",
+        group: "Hardware",
+        about: "A round sling, as the book calls the anchors' 4 t slings, here 1 m long: an endless loop of yarn in a woven sleeve. It isn't round: the sleeve squashes semi-flat, about 50 mm wide and 14 mm thick. Laid out on edge, its two parts either side.",
+        pieces: () => slingLoop("round", 1, 0.04),
+    },
+    {
+        slug: "climbing-sling",
+        name: "Climbing sling",
+        group: "Hardware",
+        about: "A climbing sling, 1.2 m long, as on the abseil tower and on the flying fox's bottom shear legs: tape sewn into a loop, flat, 25 mm wide and 3 mm thick. Laid out on edge.",
+        pieces: () => slingLoop("climbing", 1.2, 0.03),
+    },
+    {
+        slug: "tirfor",
+        name: "Tirfor T-516D",
+        group: "Hardware",
+        about: "A Tirfor T-516D wire rope winch, 1.6 t, lying on its side: its alloy body 523 mm long and 127 mm thick, the forward lever's telescopic handle closed (650 mm), the reverse lever, the yellow release lever, the rope guide at the load end, and its anchor hook with its latch on the pin at the other.",
+        pieces: () => {
+            const t = tirfor(ORIGIN, ALONG, UP, TIRFOR_COLORS);
+            return [...t.pieces, ...hook(t.pin, ALONG.neg(), t.pinAlong, STEEL).pieces];
+        },
+    },
+    {
         slug: "fox-trolley",
         name: "Trolley, rigged",
         group: "Flying fox",
-        about: "A trolley as the flying fox rigs it: the rider's dropper on the middle carabiner, the back-up and return lines on the one behind, the bumper downhill.",
+        about: "A trolley as the flying fox rigs it: the rider's dropper tied into the middle carabiner with a figure 8 on a bight, the back-up and return lines on the one behind, the bumper downhill.",
         pieces: () => {
             const ahead = vec3(1, -0.05, 0).unit();
             const t = rigTrolley(ORIGIN, ahead);
@@ -147,9 +334,38 @@ export const PARTS: Part[] = [
                     HAWSER_R,
                     C.hawser,
                 ),
-                ...line([t.hang, t.hang.add(vec3(0, -0.25, 0))], 0.0055, C.dropper),
-                ...line([t.backUp, t.backUp.add(vec3(-0.03, -0.22, 0))], 0.0055, C.dropper),
-                ...line([t.backUp, t.backUp.add(vec3(-0.2, 0.03, 0))], 0.004, C.returnLine),
+                ...(() => {
+                    const eight = figure8(
+                        t.hang,
+                        vec3(0, 0, 1),
+                        CARABINER_R,
+                        t.hang.add(t.hangDown),
+                        0.0055,
+                    );
+                    return line(
+                        [...eight.rope, eight.end.add(t.hangDown.scale(0.1))],
+                        0.0055,
+                        C.dropper,
+                        "rope",
+                        { a: true },
+                    );
+                })(),
+                ...tiedTo(
+                    t.backUp,
+                    [t.backUp.add(t.backUpDown.scale(0.35))],
+                    0.0055,
+                    C.dropper,
+                    -0.007,
+                    t.backUpDown,
+                ),
+                ...tiedTo(
+                    t.backUp,
+                    [t.backUp.add(vec3(-0.2, 0.03, 0))],
+                    0.004,
+                    C.returnLine,
+                    0.007,
+                    t.backUpDown,
+                ),
             ];
         },
     },
@@ -215,10 +431,110 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "fox-brake-blocks",
+        name: "Brake blocks, rigged",
+        group: "Flying fox",
+        about: "The dynamic brake's stop blocks as the flying fox rigs them, cut out of the whole: one on each hawser, the joining rope tied between their inner eyes and drawn up the span by the brake line, trolley B against its block.",
+        pieces: () => {
+            const at = onHawser(BLOCKS_X, 1);
+            return [
+                ...within(foxPieces(), {
+                    lo: vec3(at.x - 1.6, at.y - 0.6, -1),
+                    hi: vec3(at.x + 0.3, at.y + 0.3, 1),
+                }),
+            ];
+        },
+    },
+    {
+        slug: "fox-static-brake",
+        name: "Static brake, rigged",
+        group: "Flying fox",
+        about: "A static brake as the flying fox rigs it, cut out of the whole: a carabiner clipped round the hawser, hanging towards the pull of its rope, which is tied into the carabiner's bottom bar with a figure 8 on a bight and runs out to a picket.",
+        pieces: () => {
+            const at = onHawser(STATIC_X, 1);
+            return [
+                ...within(foxPieces(), {
+                    lo: at.add(vec3(-0.3, -0.5, -0.3)),
+                    hi: at.add(vec3(0.3, 0.1, 0.3)),
+                }),
+            ];
+        },
+    },
+    {
+        slug: "fox-in-line",
+        name: "In-line hardware, rigged",
+        group: "Flying fox",
+        about: "Hawser A's in-line hardware at the log anchor, cut out of the whole (Figure 66): from the round sling, a 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye round its thimble, its dead end held beside the live part by three double base clamps.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(SLING_Z);
+            const along = SADDLE(1).sub(a).unit();
+            const far = a.add(along.scale(1.7));
+            return within(foxPieces(), {
+                lo: vec3(Math.min(a.x, far.x) - 0.2, Math.min(a.y, far.y) - 0.2, a.z - 0.25),
+                hi: vec3(Math.max(a.x, far.x) + 0.15, Math.max(a.y, far.y) + 0.2, a.z + 0.25),
+            });
+        },
+    },
+    {
+        slug: "fox-log-anchor",
+        name: "Log anchor, rigged",
+        group: "Flying fox",
+        about: "The log and picket anchor at the bottom end, cut out of the whole: the log behind two rows of pickets, and the three 4 t round slings basketed round it, one shackled to each hawser and the middle one to the Tirfor.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(0);
+            return within(foxPieces(), {
+                lo: vec3(a.x - 0.3, a.y - 0.4, -LOG.length / 2 - 0.1),
+                hi: vec3(LOG.x + 0.5, a.y + 0.6, LOG.length / 2 + 0.1),
+            });
+        },
+    },
+    {
+        slug: "fox-tirfor",
+        name: "Tirfor and lizard, rigged",
+        group: "Flying fox",
+        about: "The Tirfor, cut out of the whole, left slack in line as a back-up: lying on the ground, its anchor hook in the log's middle round sling, its 11.5 mm cable and the lizard making one slack curve up to hawser A, the cable's hook on a swaged eye, in the lizard's bottom eye, and the lizard clamped along the hawser by three double base clamps, its free eye a little way past them. Its slack tail runs back over the log. Hawser B's lizard hangs free, waiting.",
+        pieces: () => {
+            const a = ANCHOR_SHACKLE(0);
+            const top = ANCHOR_SHACKLE(SLING_Z).add(
+                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(6),
+            );
+            return within(foxPieces(), {
+                lo: vec3(Math.min(a.x, top.x) - 0.3, a.y - 0.4, -2.5),
+                hi: vec3(LOG.x + 1.2, top.y + 0.3, 2.5),
+            });
+        },
+    },
+    {
+        slug: "fox-tree-anchors",
+        name: "Tree anchors, rigged",
+        group: "Flying fox",
+        about: "The tree at the top end, cut out of the whole: the 4 t round sling choked round the trunk for each hawser, its bow shackle and the hawser's eye, and the backstay's own sling basketed round the trunk above them.",
+        pieces: () => {
+            const g = groundY(TREE.x);
+            return within(foxPieces(), {
+                lo: vec3(TREE.x - TREE.r - 0.3, g - 0.1, -TREE.r - 0.7),
+                hi: vec3(TREE.x + TREE.r + 1.1, g + 1.1, TREE.r + 0.7),
+            });
+        },
+    },
+    {
+        slug: "fox-tree-eye",
+        name: "Hawser eye at the tree, rigged",
+        group: "Flying fox",
+        about: "Hawser A's end at the tree, cut out of the whole: a 19 mm bow shackle on the round sling choked round the trunk, the hawser's eye round its thimble on the pin, its dead end held beside the live part by three double base clamps.",
+        pieces: () => {
+            const a = TREE_SHACKLE(1);
+            return within(foxPieces(), {
+                lo: a.add(vec3(-0.75, -0.35, -0.6)),
+                hi: a.add(vec3(0.85, 0.35, 0.4)),
+            });
+        },
+    },
+    {
         slug: "fox-stabiliser",
         name: "Stabiliser pulley on the shear leg",
         group: "Flying fox",
-        about: "The stabiliser's pulley as the flying fox hangs it, cut out of the whole: from a round sling basketed over the shear leg's top spar, swung to line up with the pull of the shock cord through it.",
+        about: "The stabiliser's pulley as the flying fox hangs it, cut out of the whole: from a climbing sling basketed over the shear leg's top spar, each leg's bight round the carabiner's bar, swung to line up with the pull of the shock cord through it.",
         pieces: () => {
             const spar = vec3(SHEAR_LEG.x, groundY(SHEAR_LEG.x) + SHEAR_LEG.spar, 0);
             return within(foxPieces(), {
@@ -240,15 +556,52 @@ export const PARTS: Part[] = [
     },
 ];
 
-/** The pieces whose middles are inside the box from `lo` to `hi`, to look at one place in a whole rig. */
+/**
+ * The pieces inside the box from `lo` to `hi`, to look at one place in a whole rig: rods and faces whose middles are
+ * in it, and the stretches of ropes and wires that run through it.
+ */
 function within(pieces: Piece[], { lo, hi }: { lo: Vector3; hi: Vector3 }): Piece[] {
-    return pieces.filter((p) => {
+    const inside = (c: Vector3) =>
+        c.x >= lo.x && c.x <= hi.x && c.y >= lo.y && c.y <= hi.y && c.z >= lo.z && c.z <= hi.z;
+    return pieces.flatMap((p): Piece[] => {
+        if (p.kind === "strand") {
+            // Each stretch inside, as a strand of its own: every segment cut where it crosses the box's walls.
+            const runs: Vector3[][] = [];
+            let open = false;
+            for (let i = 1; i < p.points.length; i++) {
+                const cut = clip(p.points[i - 1], p.points[i], lo, hi);
+                if (!cut) {
+                    open = false;
+                    continue;
+                }
+                if (!open) runs.push([cut[0]]);
+                runs[runs.length - 1].push(cut[1]);
+                open = cut[1] === p.points[i];
+            }
+            return runs.map((points) => ({ ...p, points }));
+        }
         const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
-        const c = pts.reduce((sum, q) => sum.add(q), vec3(0, 0, 0)).scale(1 / pts.length);
-        return (
-            c.x >= lo.x && c.x <= hi.x && c.y >= lo.y && c.y <= hi.y && c.z >= lo.z && c.z <= hi.z
-        );
+        return inside(pts.reduce((sum, q) => sum.add(q), vec3(0, 0, 0)).scale(1 / pts.length))
+            ? [p]
+            : [];
     });
+}
+
+/** The part of the segment from `a` to `b` inside the box (Liang–Barsky), its ends kept as they are when inside. */
+function clip(a: Vector3, b: Vector3, lo: Vector3, hi: Vector3): [Vector3, Vector3] | null {
+    const d = b.sub(a);
+    let [t0, t1] = [0, 1];
+    for (const k of ["x", "y", "z"] as const) {
+        if (Math.abs(d[k]) < 1e-12) {
+            if (a[k] < lo[k] || a[k] > hi[k]) return null;
+            continue;
+        }
+        const [ta, tb] = [(lo[k] - a[k]) / d[k], (hi[k] - a[k]) / d[k]];
+        t0 = Math.max(t0, Math.min(ta, tb));
+        t1 = Math.min(t1, Math.max(ta, tb));
+        if (t0 > t1) return null;
+    }
+    return [t0 === 0 ? a : a.add(d.scale(t0)), t1 === 1 ? b : a.add(d.scale(t1))];
 }
 
 export const GROUPS = [...new Set(PARTS.map((p) => p.group))];

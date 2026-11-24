@@ -82,6 +82,12 @@ export type Strand = {
     capA: boolean;
     capB: boolean;
     /**
+     * Whether a real end is a cut end of rope, squared off and fused black as by a hot knife, rather than rounded.
+     * Only the 3D view draws the difference.
+     */
+    cutA?: boolean;
+    cutB?: boolean;
+    /**
      * Flat tape, for the views that can draw it so: `layers` of it side by side, each `width` wide (lying `across`) and
      * `thickness` thick, fanned apart where they run round what they're on and gathered together at `gather` (a
      * carabiner), over the last `ramp` metres to it.
@@ -93,6 +99,11 @@ export type Strand = {
         layers: number;
         gather: Vector3;
         ramp: number;
+        /**
+         * Its width and thickness at each point, in place of `width` and `thickness` (as where it bunches up), and the
+         * way its width lies there, in place of `across` (as where it twists).
+         */
+        profile?: { width: number; thickness: number; across?: Vector3 }[];
     };
 };
 

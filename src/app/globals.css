@@ -334,6 +334,12 @@ html {
   --fox-hessian: #a68a5b;
   --fox-picket: #3a3a42;
   --fox-nylon: #f1e7c8;
+  --fox-brass: #c9a64a;
+  --fox-tirfor: #c5cad1;
+  --fox-tirfor-lever: #e6c21c;
+  --fox-carabiner-sleeve: #c8302a;
+  --fox-carabiner-oval: #868c96;
+  --fox-shackle-pin: #e3c11f;
   --fox-spar: #c9a36b;
   --fox-grate: #8e9aab;
   --fox-pulley: #4a78b8;
@@ -341,7 +347,10 @@ html {
   /* The GRIGRI+'s coloured side plate (Petzl's yellow-green). */
   --fox-grigri: #c3cc1e;
   /* The round slings (pastel purple). */
-  --fox-sling: #b9a3e3;
+  --fox-sling: #2552c9;
+  --fox-sling-stitch: #8db4f2;
+  --fox-round-sling: #12876b;
+  --fox-round-sling-stripe: #1d2b25;
   --fox-grigri-handle: #4b4f56;
   /* The flying fox's ground: grass, and the dry, bare ground it shades into in patches. */
   --fox-ground: #2f5238;

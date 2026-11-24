@@ -561,8 +561,8 @@ const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "d
 
 /** Tape and rope, as round as they're drawn. */
 const SLING_R = 0.0125;
-/** The beam slings' flat tape. */
-const TAPE = { width: 0.035, thickness: 0.003 };
+/** The beam slings' flat tape (climbing slings, sewn from tubular tape). */
+export const TAPE = { width: 0.035, thickness: 0.003 };
 const ROPE_R = 0.0055;
 /** How far from an abseil rope a belay beside it crosses the rail. */
 const BESIDE_GAP = 0.12;
@@ -696,6 +696,8 @@ export type RigLabel = {
     on?: { along: Vector3; length: number; r: number };
     /** Written light on a dark cylinder, not dark on a light one. */
     light?: boolean;
+    /** How big it's written in 3D, as a fraction of the most that fits on what it's on (all of it unless given). */
+    size?: number;
     /** Where it is in the tower's shell, as what it's written on is, so it sorts with it. */
     shell?: Piece["shell"];
     /** Which side of it an elevation writes it, if not the side of the drawing it's on. */
