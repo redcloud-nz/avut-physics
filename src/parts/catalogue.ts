@@ -5,6 +5,7 @@ import {
     BLOCKS_X,
     BRAKE,
     C,
+    figure8OnBight,
     foxPieces,
     groundY,
     HAWSER_R,
@@ -321,7 +322,7 @@ export const PARTS: Part[] = [
         slug: "fox-trolley",
         name: "Trolley, rigged",
         group: "Flying fox",
-        about: "A trolley as the flying fox rigs it: the rider's dropper on the middle carabiner, the back-up and return lines on the one behind, the bumper downhill.",
+        about: "A trolley as the flying fox rigs it: the rider's dropper tied into the middle carabiner with a figure 8 on a bight, the back-up and return lines on the one behind, the bumper downhill.",
         pieces: () => {
             const ahead = vec3(1, -0.05, 0).unit();
             const t = rigTrolley(ORIGIN, ahead);
@@ -332,14 +333,15 @@ export const PARTS: Part[] = [
                     HAWSER_R,
                     C.hawser,
                 ),
-                ...tiedTo(
-                    t.hang,
-                    [t.hang.add(t.hangDown.scale(0.25))],
-                    0.0055,
-                    C.dropper,
-                    0,
-                    t.hangDown,
-                ),
+                ...(() => {
+                    const eight = figure8OnBight(t.hang, t.hangDown);
+                    const end = eight.rope.at(-1)!;
+                    return line(
+                        [...eight.rope, end.add(t.hangDown.scale(0.1))],
+                        eight.r,
+                        C.dropper,
+                    );
+                })(),
                 ...tiedTo(
                     t.backUp,
                     [t.backUp.add(vec3(-0.03, -0.22, 0))],

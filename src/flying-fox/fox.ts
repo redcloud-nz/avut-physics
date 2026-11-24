@@ -7,6 +7,7 @@ import {
     type Piece,
     type Strand,
 } from "@/abseil-tower/tower";
+import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
@@ -38,6 +39,7 @@ import {
     zipTrolley,
 } from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
+import FIGURE_8_JSON from "./knots/figure-8.json";
 
 /**
  * A dual-hawser flying fox braked by a chain weight, set up to Scouts NSW's "Flying Fox - Operations and Construction"
@@ -1956,6 +1958,29 @@ export function tiedTo(
     return [...line(t.turn, r, color), ...line([t.from, ...rest], r, color)];
 }
 
+/** The figure 8 on a bight, tightened in 3D round a carabiner-thick bar and edited in /knot-editor-3d. */
+const FIGURE_8 = knot3dFile("figure-8.json", FIGURE_8_JSON);
+
+/**
+ * A figure 8 on a bight clipped into a carabiner: its bight round the carabiner's bottom bar (whose middle is `at`,
+ * running along `ACROSS`), the knot hanging from it towards `down`. Returns the rope from the tail's end, round
+ * through the knot, to where the standing part leaves it at the bottom, for the rope to go on from, and its radius.
+ */
+export function figure8OnBight(at: Vector3, down = vec3(0, -1, 0)): { rope: Vector3[]; r: number } {
+    const bar = FIGURE_8.props[0];
+    // The knot's own axes turned onto the carabiner's: its bar along z, and up its standing part along y.
+    const z = ACROSS.unit();
+    const up = down.neg();
+    const y = up.sub(z.scale(up.dot(z))).unit();
+    const x = y.cross(z);
+    const rope = FIGURE_8.rope.points.map((p) => {
+        const q = p.sub(bar.at);
+        return at.add(x.scale(q.x)).add(y.scale(q.y)).add(z.scale(q.z));
+    });
+    // The file runs from the standing end, so the tail's end comes first reversed.
+    return { rope: rope.reverse(), r: FIGURE_8.diameter / 2 };
+}
+
 /**
  * How far below the top of its hole each of the trolley's carabiners hangs, past just touching it: the rider's, in the
  * middle hole, and the back one's.
@@ -2033,7 +2058,9 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
             through: g.width,
         }),
     );
-    pieces.push(...tiedTo(hang, [...g.rope, ...g.brake(0.9)], 0.0055, C.dropper));
+    // Tied into the trolley's carabiner with a figure 8 on a bight, its standing part on down to the GRIGRI.
+    const eight = figure8OnBight(hang);
+    pieces.push(...line([...eight.rope, ...g.rope, ...g.brake(0.9)], eight.r, C.dropper));
     // The safety (back-up) line, down beside it to a carabiner of its own on the harness.
     const safetyClip = tieIn.add(vec3(-0.05, clipLength, 0));
     const safety = hanging(backUp, safetyClip, -0.05, 8);

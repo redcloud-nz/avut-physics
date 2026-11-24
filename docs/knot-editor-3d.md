@@ -1,8 +1,8 @@
 # 3D knot editor: design
 
-**Status (2026-11-24):** steps 1 to 6 of the order of work are built, at `/knot-editor-3d`, on branch
-`knot-editor-3d`. Step 7 (fixing the figure 8's last twist and drawing it on the trolley) is next, and needs a person
-at the editor. What changed from the design below as it was built is under Built.
+**Status (2026-11-25):** built, at `/knot-editor-3d`, on branch `knot-editor-3d`. The figure 8's twist is fixed
+(`src/flying-fox/knots/figure-8.json`), and it's drawn on the flying fox's trolleys, tying the dropper into the rider's
+carabiner. Its other uses (the rethreaded 8s, the joining rope's) still stand in as turns round a bar. What changed from the design below as it was built is under Built.
 
 An editor for shaping knots in 3D by hand, a few segments at a time, and tightening them, saved to files. It's for
 the flying fox's figure 8s first: their 3D shape comes from tightening the Rescue Knots drawing, which leaves strands

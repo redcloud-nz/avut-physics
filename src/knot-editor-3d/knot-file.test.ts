@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import FIGURE_8 from "@/flying-fox/knots/figure-8.json";
 
-import { knot3dFile, parseKnot3d, writeKnot3d } from "./knot-file";
+import { knot3dFile, parseKnot3d } from "./knot-file";
 import { CURRENT_VERSION } from "./versions";
+import { writeKnot3d } from "./write-knot-file";
 
 const SAMPLES = join(import.meta.dirname, "samples");
 const sample = (name: string) => readFileSync(join(SAMPLES, name), "utf8");

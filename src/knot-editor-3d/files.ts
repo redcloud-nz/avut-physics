@@ -4,7 +4,8 @@
  * nothing happening, not an error.
  */
 
-import { parseKnot3d, writeKnot3d, type Knot3dFile } from "./knot-file";
+import { parseKnot3d, type Knot3dFile } from "./knot-file";
+import { writeKnot3d } from "./write-knot-file";
 
 export { canUseFiles } from "@/knot-editor/files";
 
