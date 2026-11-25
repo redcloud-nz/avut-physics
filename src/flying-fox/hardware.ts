@@ -1,4 +1,5 @@
 import { rod, type Face, type Piece } from "@/abseil-tower/tower";
+import { bisect } from "@/lib/numeric/roots";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 /**
@@ -1144,6 +1145,14 @@ function steelStrand(points: Vector3[], r: number, color: string): Piece {
  * ears and its inside length from the crown to the pin; a bow shackle's bow widens to `bow` inside.
  */
 export const SHACKLE_19 = { body: 0.0095, pin: 0.0112, width: 0.032, length: 0.073, bow: 0.052 };
+/** A 3/8 in (10 mm) shackle, after Crosby's G-209: its pin 11.2 mm across, 16.8 mm between its ears, 36.6 mm inside. */
+export const SHACKLE_10: typeof SHACKLE_19 = {
+    body: 0.00475,
+    pin: 0.0056,
+    width: 0.0168,
+    length: 0.0366,
+    bow: 0.0269,
+};
 
 /**
  * A shackle, `kind` bow or D, its crown's inside at `near` and its pin across the far end, the pin's axis `m` × `d`
@@ -1201,7 +1210,7 @@ export function shackle(
     pieces.push(...part(p(pinAt, -face - 0.002), p(pinAt, face), pin, pinColor));
     pieces.push(...part(p(pinAt, face), p(pinAt, face + 0.003), pin * 1.4, pinColor, 0.003));
     const tab = { o: p(pinAt, face + 0.003), u: f.w, v: f.d, n: f.m };
-    const long = 0.026;
+    const long = 0.026 * (pin / SHACKLE_19.pin);
     const half = pin * 1.05;
     const outline: Flat[] = [
         [0, -pin],
@@ -1672,4 +1681,114 @@ export function tirfor(
         ropeOut: p(L + 0.03, rope),
         tailOut: p(-0.005, 0.3 * H),
     };
+}
+
+/**
+ * A short link chain (metres): its wire's radius, and each link's inside length and width. 6 mm galvanised short link,
+ * typical of hardware-store chain: 18.5 mm inside, 9 mm across inside (21 mm outside).
+ */
+export const CHAIN_6 = { r: 0.003, length: 0.0185, width: 0.009 };
+/** 10 mm short link: 28 mm long and 14 mm across inside (34 mm outside), wide enough for a 3/8 in shackle's pin. */
+export const CHAIN_10: ChainSize = { r: 0.005, length: 0.028, width: 0.014 };
+export type ChainSize = typeof CHAIN_6;
+
+/**
+ * One chain link, its inside running from `near` along `d` for its inside length, lying in the plane of `d` and `m`:
+ * two straight sides joined by a half round at each end. Returns its pieces and its far end's inside.
+ */
+export function chainLink(
+    near: Vector3,
+    d: Vector3,
+    m: Vector3,
+    color: string,
+    size: ChainSize = CHAIN_6,
+): { pieces: Piece[]; far: Vector3 } {
+    const f = linkFrame(d, m);
+    const { r, length, width } = size;
+    const p = (u: number, v: number) => near.add(f.d.scale(u)).add(f.m.scale(v));
+    // Its middle line: round each end on a half circle through the middle of the wire, straight along the sides.
+    const round = width / 2 + r;
+    const [a, b] = [width / 2, length - width / 2];
+    const n = 10;
+    const pts: Vector3[] = [];
+    for (let i = 0; i <= n; i++) {
+        const t = -Math.PI / 2 + (Math.PI * i) / n;
+        pts.push(p(b + round * Math.cos(t), round * Math.sin(t)));
+    }
+    for (let i = 0; i <= n; i++) {
+        const t = Math.PI / 2 + (Math.PI * i) / n;
+        pts.push(p(a + round * Math.cos(t), round * Math.sin(t)));
+    }
+    pts.push(pts[0]);
+    return { pieces: [steelStrand(pts, r, color)], far: p(length, 0) };
+}
+
+/**
+ * The points along `path` (a polyline) each a straight `step` on from the last, from its start for as far as it goes.
+ */
+export function stepsAlong(path: Vector3[], step: number): Vector3[] {
+    const out = [path[0]];
+    let here = path[0];
+    let i = 1;
+    while (i < path.length) {
+        // The first point past `here` that's at least a step away (give or take rounding, so a path a whole number of
+        // steps long ends on a step): the next point is on the segment leading to it.
+        while (i < path.length && path[i].distanceTo(here) < step * (1 - 1e-9)) i++;
+        if (i === path.length) break;
+        const [a, b] = [path[i - 1], path[i]];
+        const ab = b.sub(a);
+        const ah = a.sub(here);
+        // |a + t ab - here|² = step², for the t in [0, 1] past `a`.
+        const [qa, qb, qc] = [ab.dot(ab), 2 * ab.dot(ah), ah.dot(ah) - step * step];
+        const t = (-qb + Math.sqrt(Math.max(0, qb * qb - 4 * qa * qc))) / (2 * qa);
+        here = a.add(ab.scale(t));
+        out.push(here);
+    }
+    return out;
+}
+
+/**
+ * Chain laid along `path`, from its start: each link's inside runs from one point a link's inside length along to the
+ * next, where the next link's inside starts, so each link's end sits in the next one's. The links lie alternately in
+ * the plane of the path and `face`, and square to it. Returns its pieces, the inside of its last link's far end (short
+ * of the path's end by less than a link), and how many links.
+ */
+export function chain(
+    path: Vector3[],
+    face: Vector3,
+    color: string,
+    size: ChainSize = CHAIN_6,
+): { pieces: Piece[]; end: Vector3; links: number } {
+    const joints = stepsAlong(path, size.length);
+    const pieces: Piece[] = [];
+    for (let k = 0; k + 1 < joints.length; k++) {
+        const d = joints[k + 1].sub(joints[k]);
+        const f = linkFrame(d, face);
+        pieces.push(...chainLink(joints[k], d, k % 2 ? f.w : f.m, color, size).pieces);
+    }
+    return { pieces, end: joints[joints.length - 1], links: joints.length - 1 };
+}
+
+/**
+ * How a chain or rope `length` long hangs between `a` and `b` (a catenary: no stretch, weight evenly along it), as
+ * `n` + 1 points from `a` to `b`. The ends mustn't be one above the other.
+ */
+export function hangingPath(a: Vector3, b: Vector3, length: number, n = 400): Vector3[] {
+    const ab = b.sub(a);
+    const v = ab.y;
+    const across = vec3(ab.x, 0, ab.z);
+    const h = across.len();
+    const along = across.scale(1 / h);
+    // Its parameter c from √(L² − v²) = 2c sinh(h / 2c), which falls as c grows; taut if it's no longer than the chord.
+    const span = Math.sqrt(Math.max(0, length * length - v * v));
+    if (span <= h * (1 + 1e-9)) return [a, b];
+    const [lo, hi] = bisect((c) => 2 * c * Math.sinh(h / (2 * c)) > span, 1e-4 * h, 1e4 * h, 200);
+    const c = (lo + hi) / 2;
+    // Where it's lowest, along from `a`, from v = 2c sinh(h / 2c) sinh((h / 2 − x0) / c).
+    const x0 = h / 2 - c * Math.asinh(v / (2 * c * Math.sinh(h / (2 * c))));
+    const y = (x: number) => c * (Math.cosh((x - x0) / c) - Math.cosh(x0 / c));
+    return Array.from({ length: n + 1 }, (_, i) => {
+        const x = (h * i) / n;
+        return a.add(along.scale(x)).add(vec3(0, y(x), 0));
+    });
 }

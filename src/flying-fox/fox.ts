@@ -23,6 +23,8 @@ import {
     carabiner,
     CARABINER_R,
     CARABINER_WIDTH,
+    chain,
+    CHAIN_10,
     EYE_BOLT,
     eyeBolt,
     eyeFrame,
@@ -30,6 +32,7 @@ import {
     hook,
     pulley,
     shackle,
+    SHACKLE_10,
     SHACKLE_19,
     STOP_BLOCK,
     stopBlock,
@@ -1449,25 +1452,32 @@ function tower(): Piece[] {
     );
     // The platform: an aluminium frame on the bottom bar, its floor a grate, its front corners chained up to the top
     // bar's outer eye bolts from eye bolts of their own.
-    const floor = T.lower + T.rhs.h / 2 + 0.05;
-    const [back, front] = [TOWER.shs / 2, TOWER.shs / 2 + T.platform.depth];
-    const w = T.platform.width / 2;
-    // Its two ends, across the tower.
+    // The frame's 50 mm box section, its top flush with the floor; its back against the uprights' front faces, the
+    // platform's depth and width to the frame's outsides.
+    const box = 0.05;
+    const floor = T.lower + T.rhs.h / 2 + box;
+    const [back, front] = [TOWER.shs / 2 + box / 2, TOWER.shs / 2 + T.platform.depth - box / 2];
+    const w = T.platform.width / 2 - box / 2;
+    // Its two ends' middles, across the tower.
     const [lo, hi] = [-w + T.platform.shift, w + T.platform.shift];
+    const y = floor - box / 2;
+    // Front and back run the full width, the ends between them.
     for (const [a, b] of [
-        [vec3(back, floor - 0.025, lo), vec3(back, floor - 0.025, hi)],
-        [vec3(front, floor - 0.025, lo), vec3(front, floor - 0.025, hi)],
-        [vec3(back, floor - 0.025, lo), vec3(front, floor - 0.025, lo)],
-        [vec3(back, floor - 0.025, hi), vec3(front, floor - 0.025, hi)],
+        [vec3(back, y, lo - box / 2), vec3(back, y, hi + box / 2)],
+        [vec3(front, y, lo - box / 2), vec3(front, y, hi + box / 2)],
+        [vec3(back + box / 2, y, lo), vec3(front - box / 2, y, lo)],
+        [vec3(back + box / 2, y, hi), vec3(front - box / 2, y, hi)],
     ])
-        pieces.push(...section(a, b, UP, 0.05, 0.05));
+        pieces.push(...section(a, b, UP, box, box));
+    // The grate, filling the frame's opening.
+    const [gx0, gx1, gz0, gz1] = [back + box / 2, front - box / 2, lo + box / 2, hi - box / 2];
     pieces.push({
         kind: "face",
         points: [
-            vec3(back, floor, lo),
-            vec3(front, floor, lo),
-            vec3(front, floor, hi),
-            vec3(back, floor, hi),
+            vec3(gx0, floor, gz0),
+            vec3(gx1, floor, gz0),
+            vec3(gx1, floor, gz1),
+            vec3(gx0, floor, gz1),
         ],
         material: "steel",
         color: C.grate,
@@ -1475,38 +1485,24 @@ function tower(): Piece[] {
         joints: ACROSS,
     });
     // The stays: each from the eye bolt in the frame's front corner, its eye turned to the stay, up to the top bar's
-    // outer eye bolt on its side, held at the edge of each eye it pulls to.
-    const grip = (eye: Vector3, out: Vector3, toward: Vector3, to: Vector3) => {
-        const { m } = eyeFrame(out, toward);
-        const d = to.sub(eye);
-        return eye.add(
-            d
-                .sub(m.scale(d.dot(m)))
-                .unit()
-                .scale(EYE_BOLT.r),
-        );
-    };
-    for (const [i, z] of [lo + 0.06, hi - 0.06].entries()) {
+    // outer eye bolt on its side.
+    // Each in a front corner, on top where the front's box section meets the end's.
+    for (const [i, z] of [lo, hi].entries()) {
         const base = vec3(front, floor, z + T.z);
         const top = outerEyes[i];
         const toTop = top.eye.sub(base);
         const corner = eyeBolt(base, UP, toTop, C.steel);
         placed.push(...corner.pieces);
         placed.push(
-            ...line(
-                [
-                    grip(corner.eye, UP, toTop, top.eye),
-                    grip(top.eye, vec3(1, 0, 0), UP, corner.eye),
-                ],
-                0.006,
-                C.steel,
-                "steel",
+            ...chainStay(
+                { eye: top.eye, m: eyeFrame(vec3(1, 0, 0), UP).m },
+                { eye: corner.eye, m: eyeFrame(UP, toTop).m },
             ),
         );
     }
     // A ladder up from the front, as in the photos: resting against the bottom bar's free end, between the platform and
     // the upright on hawser B's side, its rails running on past the bar to hold onto as you step across.
-    const ladderZ = (lo - T.half) / 2;
+    const ladderZ = (lo - box / 2 - T.half) / 2;
     // At the ideal 4 to 1: its foot out a quarter of the height it rests at.
     const rest = vec3(BAR_X + T.rhs.w / 2 + 0.025, T.lower + T.rhs.h / 2, ladderZ);
     const ladderFoot = onGround(rest.x + rest.y / 4, 0, ladderZ);
@@ -1637,6 +1633,38 @@ function tree(): Piece[] {
 const NOT_OVERHEAD = new WeakSet<Piece>();
 /** Whether `piece` (one of `foxPieces`) is drawn in the overhead view. */
 export const drawnOverhead = (piece: Piece) => !NOT_OVERHEAD.has(piece);
+
+/**
+ * A taut stay of chain between two eye bolts' eyes (`m` the way through each eye's hole): a bow shackle at each, its
+ * pin through the eye's ring and its crown through the chain's end link. The chain has an odd number of links, so its
+ * end links lie the same way and both shackles stand square to their rings; it's stretched or shortened a hair to fit.
+ */
+function chainStay(a: { eye: Vector3; m: Vector3 }, b: { eye: Vector3; m: Vector3 }): Piece[] {
+    const [size, shackleSize] = [CHAIN_10, SHACKLE_10];
+    // Where each shackle's pin is: through the eye's hole, bearing on the inside of the ring on the side towards the
+    // other end.
+    const pinAt = (e: typeof a, to: Vector3) => {
+        const dir = to.sub(e.eye);
+        const inRing = dir.sub(e.m.scale(dir.dot(e.m))).unit();
+        return e.eye.add(inRing.scale(EYE_BOLT.r - EYE_BOLT.bar - shackleSize.pin));
+    };
+    const [pinA, pinB] = [pinAt(a, b.eye), pinAt(b, a.eye)];
+    const u = pinB.sub(pinA).unit();
+    // Each shackle's crown towards the chain, the inside of the end link's end resting on the inside of the crown.
+    const reach = shackleSize.length + shackleSize.pin;
+    const [startA, startB] = [pinA.add(u.scale(reach)), pinB.sub(u.scale(reach))];
+    const span = startA.distanceTo(startB);
+    const links = 2 * Math.round((span / size.length - 1) / 2) + 1;
+    // The links lie alternately square to the top ring and in line with it: the end links square to the shackles'
+    // pins, which run through the rings.
+    const face = u.cross(a.m);
+    const ends = [
+        shackle("bow", startA, u.neg(), face.neg(), C.steel, C.pin, shackleSize),
+        shackle("bow", startB, u, face, C.steel, C.pin, shackleSize),
+    ];
+    const laid = chain([startA, startB], face, C.steel, { ...size, length: span / links });
+    return [...ends.flatMap((e) => e.pieces), ...laid.pieces];
+}
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
 const BACKSTAY_SLING_Y = 0.7;

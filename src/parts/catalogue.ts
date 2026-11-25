@@ -26,6 +26,7 @@ import {
     STOP_BLOCK_COLORS,
     tiedTo,
     TIRFOR_COLORS,
+    TOWER,
     TREE,
     TREE_SHACKLE,
     TROLLEY_COLORS,
@@ -37,8 +38,12 @@ import {
     bolt,
     carabiner,
     CARABINER_R,
+    chain,
+    CHAIN_10,
+    chainLink,
     eyeBolt,
     grigri,
+    hangingPath,
     hook,
     pulley,
     shackle,
@@ -251,6 +256,22 @@ export const PARTS: Part[] = [
         group: "Hardware",
         about: "A 19 mm D (chain) shackle with a yellow screw pin, after Crosby's G-210: 32 mm between its ears, 73 mm inside from the crown to the pin. Its crown at the origin, its pin towards +x.",
         pieces: () => shackle("d", ORIGIN, ALONG, UP, STEEL, C.pin).pieces,
+    },
+    {
+        slug: "chain-link",
+        name: "Chain link (10 mm)",
+        group: "Hardware",
+        about: "One link of 10 mm galvanised short link chain, as in the flying fox's platform stays: 28 mm long and 14 mm across inside, 34 mm across outside. Its inside starts at the origin and runs towards +x, lying in the x–y plane.",
+        pieces: () => chainLink(ORIGIN, ALONG, UP, STEEL, CHAIN_10).pieces,
+    },
+    {
+        slug: "chain",
+        name: "Chain (10 mm)",
+        group: "Hardware",
+        about: `A metre of 10 mm short link chain hung between two points 0.8 m apart, the right one 0.2 m higher: a catenary, each link's end sitting in the next, the links turned a quarter turn to each other. ${Math.round(1 / CHAIN_10.length)} links to the metre.`,
+        pieces: () =>
+            chain(hangingPath(vec3(-0.4, 0, 0), vec3(0.4, 0.2, 0), 1), ACROSS, STEEL, CHAIN_10)
+                .pieces,
     },
     {
         slug: "turnbuckle",
@@ -555,6 +576,32 @@ export const PARTS: Part[] = [
             within(foxPieces(), {
                 lo: vec3(-1.2, -0.1, -2.2),
                 hi: vec3(2, BRAKE.postTop + 0.3, 2.2),
+            }),
+    },
+    {
+        slug: "fox-platform-stay-top",
+        name: "Platform stay, top",
+        group: "Flying fox",
+        about: "The top of one of the platform's stays: 10 mm chain from the top cross bar's outer eye bolt down to the platform's front corner, taut and so straight, on a 3/8 in bow shackle at each end: its pin through the eye bolt's ring, its crown through the chain's end link.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(0, TOWER.bar - 0.2, TOWER.z + 1.25),
+                hi: vec3(0.3, TOWER.bar + 0.1, TOWER.z + 1.45),
+            }),
+    },
+    {
+        slug: "fox-platform-stay-foot",
+        name: "Platform stay, foot",
+        group: "Flying fox",
+        about: "The foot of the same stay: the chain down to its bow shackle on the eye bolt in the platform's front corner.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(TOWER.shs / 2 + TOWER.platform.depth - 0.25, TOWER.lower, TOWER.z + 1.2),
+                hi: vec3(
+                    TOWER.shs / 2 + TOWER.platform.depth + 0.15,
+                    TOWER.lower + 0.45,
+                    TOWER.z + 1.6,
+                ),
             }),
     },
     {
