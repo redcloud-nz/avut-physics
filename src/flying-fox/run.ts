@@ -350,7 +350,7 @@ export function sampleAt(run: Run, t: number): RunSample {
 export const runLength = (run: Run) => (run.samples.length - 1) / run.rate;
 
 /** The timeline: trolley A's rider launches, is brought to rest and unclips; then trolley B's does the same (s). */
-export const TIMELINE = { launchA: 5, unloadA: 50, launchB: 60, unloadB: 105, end: 108 };
+export const TIMELINE = { launchA: 5, unloadA: 30, launchB: 35, unloadB: 60, end: 63 };
 
 /** A trolley at one moment: where it is, how much of its rider's weight is on it, their swing, its block's push. */
 export type TrolleyAt = {
