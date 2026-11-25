@@ -1,8 +1,9 @@
 # Scene code: improvements to pick up
 
 From a review of the flying fox's code (November 2026), for the 3D scenes built from pieces: the flying fox, the
-Cracroft abseil tower, the parts viewer and the 3D knot editor. The duplicate helpers it found are moved into
-`src/lib` on the `shared-helpers` branch; the rest is here, roughly in the order worth doing.
+Cracroft abseil tower, the parts viewer and the 3D knot editor. Done so far: the duplicate helpers it found are in
+`src/lib`, and both flat views share `useFlatView` (`src/scene/use-flat-view.ts`, the start of the shared scene
+module below). The rest is here, roughly in the order worth doing.
 
 ## Where things are now
 
@@ -31,12 +32,9 @@ from it, so the physics depends on the whole drawing.
   big loops, `swagedEye`, `rigPulley`, `squareLashing`, `chokedSling`.
 - **Split `fox.ts`**: `site.ts` (ground and sizes, which both physics and drawing read), a file for each part of the
   rig (tower, tree anchor, shear leg, log anchor, hawsers and Tirfor, trolleys, brake), `labels.ts`, `targets.ts`.
-- **A `useFlatView` hook** for the flat views' camera and gestures, used by both the fox and the tower:
-  `drawingSize`, `startOf`, `reframe`, `inFit`, `targetFit`, `leastZoom`, wheel zoom, pan, pinch, the two-finger swipe,
-  telling a click from a drag. Both views have their own copy now.
 - **`fox-view.tsx` down to the flying fox's own parts**: its scene settings, its fits and the run. The rest is
-  generic (address state, gestures, detail, target boxes, about 270 lines of controls).
-- Three types are called `Frame` (hardware's frame, and the fox and tower views' zoom and centre). Rename the views'.
+  generic (address state, the two-finger swipe to the next target, detail, target boxes, about 270 lines of
+  controls). Its flat view's camera and gestures are in `useFlatView` already.
 - Keep the assembly editor in mind (`docs/knot-editor-3d.md`, "The assembly editor"): builders that return named
   frames, and placements kept apart from the pieces drawn.
 
@@ -71,9 +69,6 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 
 ## Smaller fixes
 
-- In the flat views the zoom buttons' `reframe` leaves out `focus?.pan`, so they keep a locked view within different
-  limits from the wheel and pinch.
-- `new OrbitCamera(rad(flat.azimuth), rad(flat.elevation))` is built three times in `FoxView`.
 - The frame-rate limits (45 and 58 a second) and Auto's four changes of direction are in both `detail.ts` and
   `tower-gl.tsx`'s `PerformanceMonitor`.
 - `detail.ts` is generic but lives in `flying-fox/`, with the key `flying-fox:detail`; the parts viewer imports it.

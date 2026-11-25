@@ -29,13 +29,7 @@ import {
     type GLHandle,
     type SceneConfig,
 } from "@/abseil-tower/tower-gl";
-import {
-    Callouts,
-    nearness,
-    PieceDrawing,
-    StrandSwatch,
-    toDrawing,
-} from "@/abseil-tower/tower-view";
+import { Callouts, nearness, PieceDrawing, StrandSwatch } from "@/abseil-tower/tower-view";
 import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
     DropdownMenu,
@@ -52,6 +46,7 @@ import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
 
 import {
     AUTO_START,
@@ -96,11 +91,11 @@ const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.Sc
 const RunGL = dynamic(() => import("./run-gl"), { ssr: false });
 
 /** The least room (SVG units) the drawing needs unzoomed; it widens or deepens past it to fill its box. */
-const W = 1000;
-const H = 600;
+const LEAST = vec2(1000, 600);
 /** SVG units per metre unzoomed. */
 const PPM = 8;
-const MAX_ZOOM = 60;
+/** How far in the flat views zoom, and the least zoom they start at. */
+const ZOOM = { most: 60, leastStart: 0.2 };
 
 /** The ground, as strips following its fall and dip. */
 const GROUND_FACES = groundFaces();
@@ -158,10 +153,6 @@ const TARGETS = foxTargets();
 /** Where the 3D view can stand and look round from. */
 const STANCES = foxStances();
 
-/** How close a flat view is, and the point it's centred on. */
-type Frame = { zoom: number; target: Vector3 };
-type Fit = { centre: Vector3; width: number; height: number };
-
 type Mode = "3d" | "side" | "overhead";
 const MODES: Record<
     Mode,
@@ -197,43 +188,6 @@ const MODE_ICONS: Record<Mode, React.ReactNode> = {
 const modeOf = (param: string | null): Mode =>
     param === "side" || param === "overhead" ? param : "3d";
 
-/** The drawing's size (SVG units) for a box `width` by `height` (pixels): at least `W` by `H`, in the box's shape. */
-function drawingSize(width: number, height: number): Vector2 {
-    if (width <= 0 || height <= 0) return vec2(W, H);
-    return width / height > W / H ? vec2((H * width) / height, H) : vec2(W, (W * height) / width);
-}
-const originOf = (size: Vector2) => vec2(size.x / 2, size.y / 2);
-
-/** Where a flat view starts in a drawing `size`: as close as fits its box. */
-function startOf(fit: Fit, size: Vector2): Frame {
-    const zoom = clamp(Math.min(size.x / fit.width, size.y / fit.height) / PPM, 0.2, MAX_ZOOM);
-    return { zoom, target: fit.centre };
-}
-
-/**
- * The frame that keeps the scene point that was under `from` (in `start`) under `to`, at `zoom`: zooming about a point,
- * panning, or both at once as in a pinch.
- */
-function reframe(
-    cam: OrbitCamera,
-    origin: Vector2,
-    start: Frame,
-    from: Vector2,
-    to: Vector2,
-    zoom: number,
-    least: number,
-    fit: Fit,
-    pan?: { lo: Vector3; hi: Vector3 },
-): Frame {
-    const z = clamp(zoom, least, MAX_ZOOM);
-    const inView = (s: Vector2, ppm: number) =>
-        vec2((s.x - origin.x) / ppm, (origin.y - s.y) / ppm);
-    const [u, v] = [inView(from, PPM * start.zoom), inView(to, PPM * z)];
-    const shift = cam.right.scale(u.x - v.x).add(cam.up.scale(u.y - v.y));
-    const moved = start.target.add(shift);
-    return { zoom: z, target: pan ? inBox(pan, moved) : inFit(cam, fit, moved) };
-}
-
 /** `p` kept inside the box from `lo` to `hi`: where a target's view may be panned. */
 const inBox = ({ lo, hi }: { lo: Vector3; hi: Vector3 }, p: Vector3) =>
     vec3(clamp(p.x, lo.x, hi.x), clamp(p.y, lo.y, hi.y), clamp(p.z, lo.z, hi.z));
@@ -264,15 +218,15 @@ function targetFit(target: FoxTarget, cam: OrbitCamera): Fit {
  * `FOCUS_OUT` times as far out as it starts on it.
  */
 function leastZoom(fit: Fit, siteFit: Fit, size: Vector2, locked: boolean): number {
-    const site = startOf(siteFit, size).zoom;
-    return locked ? Math.max(site, startOf(fit, size).zoom / FOCUS_OUT) : site;
+    const site = zoomToFit(siteFit, size, PPM, ZOOM.leastStart, ZOOM.most);
+    return locked
+        ? Math.max(site, zoomToFit(fit, size, PPM, ZOOM.leastStart, ZOOM.most) / FOCUS_OUT)
+        : site;
 }
 
 /** The targets' names over their boxes: how wide each letter is and how far apart lines are (SVG units). */
 const NAME = { width: 6.7, line: 13 };
 
-/** How far a pointer may move (SVG units) and still count as a click rather than a drag. */
-const CLICK = 6;
 /** How far two fingers, or a trackpad's swipe, go sideways (pixels) to move on to the next target. */
 const SWIPE = 60;
 
@@ -291,8 +245,6 @@ function inFit(cam: OrbitCamera, fit: Fit, target: Vector3): Vector3 {
 export default function FoxView() {
     const params = useSearchParams();
     const mode = modeOf(params.get("view"));
-    // How a flat view's been zoomed and moved, from where it starts.
-    const [moved, setMoved] = useState<Frame | null>(null);
     const setParams = (values: Record<string, string | null>) => {
         const url = new URL(window.location.href);
         for (const [name, value] of Object.entries(values)) {
@@ -302,19 +254,13 @@ export default function FoxView() {
         window.history.replaceState(null, "", url);
     };
     const setParam = (name: string, value: string | null) => setParams({ [name]: value });
-    const setMode = (m: Mode) => {
-        setParam("view", m);
-        setMoved(null);
-    };
+    const setMode = (m: Mode) => setParam("view", m);
     // What every view's locked onto (`?target=trolley-a`), kept from view to view, or nothing to move freely.
     const target = TARGETS.find((t) => t.slug === params.get("target")) ?? null;
     // Where the 3D view stands, if anywhere (`?eye=loader`): only in 3D, and instead of a target.
     const stance =
         mode === "3d" ? (STANCES.find((e) => e.slug === params.get("eye")) ?? null) : null;
-    const lockOn = (t: FoxTarget | null) => {
-        setParams({ target: t?.slug ?? null, eye: null });
-        setMoved(null);
-    };
+    const lockOn = (t: FoxTarget | null) => setParams({ target: t?.slug ?? null, eye: null });
     const standAs = (slug: string) => setParams({ eye: slug, target: null });
     // Through the targets in turn, round from the last to the first.
     const step = (by: number) => {
@@ -399,81 +345,32 @@ export default function FoxView() {
         };
         requestAnimationFrame(tick);
     }, [onFrameRate]);
-    const svgRef = useRef<SVGSVGElement>(null);
-    const boxRef = useRef<HTMLDivElement>(null);
-    const [size, setSize] = useState(vec2(W, H));
-    const origin = originOf(size);
-    const pointers = useRef(new Map<number, Vector2>());
-    const gesture = useRef<
-        | { kind: "pan"; at: Vector2; frame: Frame }
-        | { kind: "pinch"; mid: Vector2; spread: number; frame: Frame }
-        | null
-    >(null);
-
     const flat = MODES[mode].camera ?? MODES.side.camera!;
     const siteFit = MODES[mode].fit ?? MODES.side.fit!;
-    const cam = new OrbitCamera(rad(flat.azimuth), rad(flat.elevation));
-    // Locked onto a target, the view starts round it, and zooms about its middle.
-    const fit = useMemo(
-        () =>
-            focus
-                ? targetFit(focus, new OrbitCamera(rad(flat.azimuth), rad(flat.elevation)))
-                : siteFit,
-        [focus, flat.azimuth, flat.elevation, siteFit],
+    const cam = useMemo(
+        () => new OrbitCamera(rad(flat.azimuth), rad(flat.elevation)),
+        [flat.azimuth, flat.elevation],
     );
-    const start = startOf(fit, size);
-    const least = leastZoom(fit, siteFit, size, focus !== null);
-    const frame = moved ?? start;
-    const ppm = PPM * frame.zoom;
-    const toSvg = (p: Vector3): Vector2 => {
-        const v = cam.project(p.sub(frame.target));
-        return vec2(origin.x + v.x * ppm, origin.y - v.y * ppm);
-    };
-
-    useEffect(() => {
-        const box = boxRef.current;
-        if (!box) return;
-        const observer = new ResizeObserver(([entry]) => {
-            const { width, height } = entry.contentRect;
-            setSize(drawingSize(width, height));
-        });
-        observer.observe(box);
-        return () => observer.disconnect();
-    }, []);
-
-    // Scrolling over the drawing zooms about the pointer, as does a trackpad pinch (a scroll with Ctrl).
-    useEffect(() => {
-        const svg = svgRef.current;
-        if (!svg) return;
-        const onWheel = (e: WheelEvent) => {
-            e.preventDefault();
-            // About the pointer, or about the middle when locked onto a target.
-            const at = focus ? originOf(size) : toDrawing(svg, e.clientX, e.clientY);
-            const delta = e.deltaY * (e.deltaMode === 1 ? 33 : 1);
-            const rate = e.ctrlKey ? 0.01 : 0.0025;
-            setMoved((moved) => {
-                const first = startOf(fit, size);
-                const f = moved ?? first;
-                return reframe(
-                    new OrbitCamera(rad(flat.azimuth), rad(flat.elevation)),
-                    originOf(size),
-                    f,
-                    at,
-                    at,
-                    f.zoom * Math.exp(-delta * rate),
-                    leastZoom(fit, siteFit, size, focus !== null),
-                    fit,
-                    focus?.pan,
-                );
-            });
-        };
-        const watched = (e: WheelEvent) => {
-            poke();
-            onWheel(e);
-        };
-        svg.addEventListener("wheel", watched, { passive: false });
-        return () => svg.removeEventListener("wheel", watched);
-    }, [flat.azimuth, flat.elevation, fit, siteFit, size, mode, poke, focus]);
+    // Locked onto a target, the view starts round it, zooms about its middle, and is panned only if it may be.
+    const fit = useMemo(() => (focus ? targetFit(focus, cam) : siteFit), [focus, cam, siteFit]);
+    const view = useFlatView({
+        camera: cam,
+        least: LEAST,
+        ppm: PPM,
+        zoom: ZOOM,
+        fit,
+        leastZoom: (size) => leastZoom(fit, siteFit, size, focus !== null),
+        keepIn: (t) => (focus?.pan ? inBox(focus.pan, t) : inFit(cam, fit, t)),
+        locked: focus ? { pan: !!focus.pan } : undefined,
+        resetKey: `${mode}|${target?.slug ?? ""}`,
+        onMove: poke,
+        // A click (not a drag) on a target's box in the free view locks onto it.
+        onClick: (at) => {
+            const t = focus ? undefined : targetAt(at);
+            if (t) lockOn(t);
+        },
+    });
+    const { boxRef, svgRef, size, ppm, toSvg } = view;
 
     // Swiping sideways with two fingers moves on to the next target (or back): on a trackpad, a sideways scroll, in
     // any view; on a touch screen, two fingers moving together, only when locked onto a target (otherwise they move
@@ -539,7 +436,7 @@ export default function FoxView() {
             box.removeEventListener("pointerup", onUp, opts);
             box.removeEventListener("pointercancel", onUp, opts);
         };
-    }, []);
+    }, [boxRef]);
 
     // Back to front by each piece's middle; a section's sides facing away are left out, and what the overhead view
     // leaves out (the tree's branches).
@@ -551,9 +448,6 @@ export default function FoxView() {
         .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
         .sort((a, b) => a.key - b.key);
 
-    const drag = (at: Vector2): NonNullable<typeof gesture.current> => ({ kind: "pan", at, frame });
-    // Where a single pointer went down, to tell a click on a target's box from a drag.
-    const pressed = useRef<Vector2 | null>(null);
     // Each target's box in the drawing, as its corner and size (SVG units).
     const boxOf = (t: FoxTarget) => {
         const f = targetFit(t, cam);
@@ -580,58 +474,6 @@ export default function FoxView() {
         TARGETS.map((t) => ({ t, b: boxOf(t) }))
             .filter(({ b }) => at.x >= b.x && at.x <= b.x + b.w && at.y >= b.y && at.y <= b.y + b.h)
             .sort((p, q) => p.b.w * p.b.h - q.b.w * q.b.h)[0]?.t;
-    const startPinch = () => {
-        const [a, b] = [...pointers.current.values()];
-        gesture.current = { kind: "pinch", mid: a.mid(b), spread: a.distanceTo(b), frame };
-    };
-    const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
-        pointers.current.set(e.pointerId, at);
-        pressed.current = pointers.current.size === 1 ? at : null;
-        if (pointers.current.size === 2) startPinch();
-        else if (pointers.current.size > 2) return;
-        else gesture.current = drag(at);
-    };
-    const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-        if (gesture.current) poke();
-        if (!pointers.current.has(e.pointerId)) return;
-        const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
-        pointers.current.set(e.pointerId, at);
-        const d = gesture.current;
-        if (!d) return;
-        if (d.kind === "pinch") {
-            if (pointers.current.size !== 2) return;
-            const [a, b] = [...pointers.current.values()];
-            const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
-            // Locked onto a target, it zooms about the middle and doesn't move.
-            const [from, to] = focus ? [origin, origin] : [d.mid, a.mid(b)];
-            setMoved(reframe(cam, origin, d.frame, from, to, zoom, least, fit, focus?.pan));
-            return;
-        }
-        // Locked onto a target, only one that may be panned moves, and only within its box.
-        if (focus && !focus.pan) return;
-        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom, least, fit, focus?.pan));
-    };
-    const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
-        // A click (not a drag) on a target's box in the free view locks onto it.
-        const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
-        const click =
-            e.type === "pointerup" &&
-            pressed.current !== null &&
-            pressed.current.distanceTo(at) < CLICK;
-        if (!focus && click) {
-            const t = targetAt(at);
-            if (t) lockOn(t);
-        }
-        pressed.current = null;
-        pointers.current.delete(e.pointerId);
-        const [rest] = [...pointers.current.entries()];
-        gesture.current = null;
-        if (pointers.current.size === 2) startPinch();
-        else if (rest && e.pointerType === "touch") gesture.current = drag(rest[1]);
-    };
-
     const diagram = (
         <svg
             ref={svgRef}
@@ -639,11 +481,7 @@ export default function FoxView() {
             className="absolute inset-0 block h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
             aria-label={`The flying fox: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onContextMenu={(e) => e.preventDefault()}
+            {...view.handlers}
         >
             {mode === "overhead" && (
                 <g>
@@ -740,11 +578,7 @@ export default function FoxView() {
     );
 
     const zoomBy = (factor: number) =>
-        mode === "3d"
-            ? glView?.zoomBy(factor)
-            : setMoved(
-                  reframe(cam, origin, frame, origin, origin, frame.zoom * factor, least, fit),
-              );
+        mode === "3d" ? glView?.zoomBy(factor) : view.zoomBy(factor);
 
     return (
         <div
@@ -972,13 +806,13 @@ export default function FoxView() {
                         label: "Zoom in",
                         icon: <Plus />,
                         onClick: () => zoomBy(1.4),
-                        off: mode !== "3d" && frame.zoom >= MAX_ZOOM,
+                        off: mode !== "3d" && view.nearest,
                     },
                     {
                         label: "Zoom out",
                         icon: <Minus />,
                         onClick: () => zoomBy(1 / 1.4),
-                        off: mode !== "3d" && frame.zoom <= least,
+                        off: mode !== "3d" && view.furthest,
                     },
                     {
                         label:
@@ -988,7 +822,7 @@ export default function FoxView() {
                         icon: <RotateCcw />,
                         onClick: () => {
                             if (mode === "3d") return glView?.reset();
-                            setMoved(null);
+                            view.reset();
                         },
                         off: false,
                     },

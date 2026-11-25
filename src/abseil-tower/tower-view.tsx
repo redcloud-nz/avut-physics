@@ -3,7 +3,7 @@
 import { Info, Minus, Plus, RotateCcw, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { Toggle } from "@/components/diagram/controls";
 import { Label } from "@/components/diagram/svg";
@@ -13,6 +13,7 @@ import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { useFlatView, type Fit } from "@/scene/use-flat-view";
 
 import { placeLabel, type Box, type ObstacleGrid } from "./callout-layout";
 import Loading3D from "./loading-3d";
@@ -39,44 +40,13 @@ import type { GLHandle } from "./tower-gl";
 const TowerGL = dynamic(() => import("./tower-gl"), { ssr: false, loading: () => <Loading3D /> });
 
 /** The least room (SVG units) the whole tower needs unzoomed. The drawing widens or deepens past it to fill its box. */
-const W = 800;
-const H = 1000;
+const LEAST = vec2(800, 1000);
 /** SVG units per metre unzoomed: the same in every view, so the tower doesn't grow and shrink as it turns. */
 const PPM = 60;
-/** The point the camera turns about to start with. It sits in the middle of the drawing. */
-const CENTRE = vec3(SIDE / 2, 5.4, SIDE / 2);
-
-/** The drawing's size (SVG units) for a box `width` by `height` (pixels): at least `W` by `H`, in the box's shape. */
-function drawingSize(width: number, height: number): Vector2 {
-    if (width <= 0 || height <= 0) return vec2(W, H);
-    return width / height > W / H ? vec2((H * width) / height, H) : vec2(W, (W * height) / width);
-}
-const originOf = (size: Vector2) => vec2(size.x / 2, size.y / 2 + 10);
-const MAX_ZOOM = 8;
-
-/** How close the view is, and the point it's centred on (which it turns about). */
-type Frame = { zoom: number; target: Vector3 };
-const WHOLE: Frame = { zoom: 1, target: CENTRE };
-
-/**
- * The frame that keeps the scene point that was under `from` (in `start`) under `to`, at `zoom`: zooming about a point,
- * panning, or both at once as in a pinch.
- */
-function reframe(
-    cam: OrbitCamera,
-    origin: Vector2,
-    start: Frame,
-    from: Vector2,
-    to: Vector2,
-    zoom: number,
-): Frame {
-    const z = clamp(zoom, 1, MAX_ZOOM);
-    const inView = (s: Vector2, ppm: number) =>
-        vec2((s.x - origin.x) / ppm, (origin.y - s.y) / ppm);
-    const [u, v] = [inView(from, PPM * start.zoom), inView(to, PPM * z)];
-    const shift = cam.right.scale(u.x - v.x).add(cam.up.scale(u.y - v.y));
-    return { zoom: z, target: start.target.add(shift) };
-}
+/** How far the flat views zoom in, and the least zoom they start at (and may zoom out to). */
+const ZOOM = { most: 8, leastStart: 1 };
+/** How far below the drawing's middle the view's middle is (SVG units). */
+const DROP = 10;
 
 /** The narrowest some things are drawn (SVG units), however thin they are, so a rope never vanishes. */
 const MIN_WIDTH: Partial<Record<Material, number>> = { sling: 4.5, rope: 3.5, steel: 1.6 };
@@ -101,7 +71,6 @@ const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: numbe
  * reset button goes back to: a fixed one, or the closest that fits a box round a point.
  */
 type Mode = "plan" | "west" | "east" | "3d";
-type Start = Frame | { fit: { centre: Vector3; width: number; height: number } };
 /** The elevations' box: levels 3 and 4 and the beam over them, the outrigger and the ropes just past the sides. */
 const UPPER = (() => {
     const [bottom, top] = [LEVELS[3] - 0.8, OVERHEAD.upperY + OVERHEAD.r + 0.4];
@@ -122,28 +91,28 @@ const MODES: Record<
     {
         label: string;
         camera?: { azimuth: number; elevation: number };
-        start: Start;
+        fit?: Fit;
         side?: "east" | "west";
     }
 > = {
     plan: {
         label: "Overhead",
         camera: { azimuth: 180, elevation: 90 },
-        start: { fit: TOP_DECK },
+        fit: TOP_DECK,
     },
     west: {
         label: "West elevation",
         camera: { azimuth: 270, elevation: 0 },
-        start: { fit: UPPER },
+        fit: UPPER,
         side: "west",
     },
     east: {
         label: "East elevation",
         camera: { azimuth: 90, elevation: 0 },
-        start: { fit: UPPER },
+        fit: UPPER,
         side: "east",
     },
-    "3d": { label: "3D", start: WHOLE },
+    "3d": { label: "3D" },
 };
 
 /** Each view's name in the page's address (`?view=`), so a view can be linked to. */
@@ -155,14 +124,6 @@ const VIEW_PARAM: Record<Mode, string> = {
 };
 const modeOf = (param: string | null): Mode =>
     (Object.keys(VIEW_PARAM) as Mode[]).find((m) => VIEW_PARAM[m] === param) ?? "3d";
-
-/** Where a view starts, in a drawing `size` (SVG units). */
-function startOf(start: Start, size: Vector2): Frame {
-    if (!("fit" in start)) return start;
-    const { centre, width, height } = start.fit;
-    const zoom = clamp(Math.min(size.x / width, size.y / height) / PPM, 1, MAX_ZOOM);
-    return { zoom, target: centre };
-}
 
 /**
  * A person's disc or rope coiled on a deck, put in the group of the deck rectangles it lies on and over them, so it's
@@ -236,8 +197,6 @@ export default function TowerView({ slug }: { slug: string }) {
         const rigging = laid.pieces.filter((p) => showPeople || p.material !== "person");
         return [...tower, ...rigging.map((p) => onDeck(p, tower))];
     }, [laid, showPeople]);
-    // Where the view's been moved to, or where it starts until it's moved.
-    const [moved, setMoved] = useState<Frame | null>(null);
     // The WebGL view keeps its own camera: the page reaches it through this, and it says which way it's looking.
     const [glView, setGlView] = useState<GLHandle | null>(null);
     const [glTurned, setGlTurned] = useState({ azimuth: 0, elevation: 0 });
@@ -250,67 +209,18 @@ export default function TowerView({ slug }: { slug: string }) {
     const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
     // The drawing's last digits can differ between the server and the browser, so it's drawn only in the browser.
     const inBrowser = useInBrowser();
-    const svgRef = useRef<SVGSVGElement>(null);
-    /** The box the drawing fills, which it matches in shape. */
-    const boxRef = useRef<HTMLDivElement>(null);
-    const [size, setSize] = useState(vec2(W, H));
-    const origin = originOf(size);
-    /** The pointers down on the drawing, where each is now (SVG units). */
-    const pointers = useRef(new Map<number, Vector2>());
-    /** What a drag or pinch started from: panning, or a pinch (two touches). */
-    const gesture = useRef<
-        | { kind: "pan"; at: Vector2; frame: Frame }
-        | { kind: "pinch"; mid: Vector2; spread: number; frame: Frame }
-        | null
-    >(null);
-
-    const cam = new OrbitCamera(rad(azimuth), rad(elevation));
-    const start = startOf(MODES[mode].start, size);
-    const frame = moved ?? start;
-    const ppm = PPM * frame.zoom;
-    const toSvg = (p: Vector3): Vector2 => {
-        const v = cam.project(p.sub(frame.target));
-        return vec2(origin.x + v.x * ppm, origin.y - v.y * ppm);
-    };
-
-    // The drawing takes the shape of its box, so the tower stays the same size as the window changes shape.
-    useEffect(() => {
-        const box = boxRef.current;
-        if (!box) return;
-        const observer = new ResizeObserver(([entry]) => {
-            const { width, height } = entry.contentRect;
-            setSize(drawingSize(width, height));
-        });
-        observer.observe(box);
-        return () => observer.disconnect();
-    }, []);
-
-    // Scrolling over the drawing zooms about the pointer, as does a trackpad pinch (which comes as a scroll with Ctrl).
-    // The page itself never scrolls.
-    useEffect(() => {
-        const svg = svgRef.current;
-        if (!svg) return;
-        const onWheel = (e: WheelEvent) => {
-            e.preventDefault();
-            const at = toDrawing(svg, e.clientX, e.clientY);
-            // A mouse wheel's notch is around 100 pixels (or 3 lines); a pinch's steps are much smaller.
-            const delta = e.deltaY * (e.deltaMode === 1 ? 33 : 1);
-            const rate = e.ctrlKey ? 0.01 : 0.0025;
-            setMoved((moved) => {
-                const f = moved ?? startOf(MODES[mode].start, size);
-                return reframe(
-                    new OrbitCamera(rad(azimuth), rad(elevation)),
-                    originOf(size),
-                    f,
-                    at,
-                    at,
-                    f.zoom * Math.exp(-delta * rate),
-                );
-            });
-        };
-        svg.addEventListener("wheel", onWheel, { passive: false });
-        return () => svg.removeEventListener("wheel", onWheel);
-    }, [azimuth, elevation, size, mode]);
+    const cam = useMemo(() => new OrbitCamera(rad(azimuth), rad(elevation)), [azimuth, elevation]);
+    // A flat view, moved like a map; changing view starts it afresh.
+    const flatView = useFlatView({
+        camera: cam,
+        least: LEAST,
+        ppm: PPM,
+        zoom: ZOOM,
+        fit: MODES[mode].fit ?? TOP_DECK,
+        drop: DROP,
+        resetKey: mode,
+    });
+    const { boxRef, svgRef, size, ppm, toSvg } = flatView;
 
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). Looking straight
@@ -351,44 +261,6 @@ export default function TowerView({ slug }: { slug: string }) {
         (k) => VIEWS[k].azimuth === glTurned.azimuth && VIEWS[k].elevation === glTurned.elevation,
     );
 
-    // A drag moves the view, as on a map.
-    const drag = (at: Vector2): NonNullable<typeof gesture.current> => ({ kind: "pan", at, frame });
-    const startPinch = () => {
-        const [a, b] = [...pointers.current.values()];
-        gesture.current = { kind: "pinch", mid: a.mid(b), spread: a.distanceTo(b), frame };
-    };
-    const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
-        pointers.current.set(e.pointerId, at);
-        if (pointers.current.size === 2) startPinch();
-        else if (pointers.current.size > 2) return;
-        else gesture.current = drag(at);
-    };
-    const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-        if (!pointers.current.has(e.pointerId)) return;
-        const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
-        pointers.current.set(e.pointerId, at);
-        const d = gesture.current;
-        if (!d) return;
-        if (d.kind === "pinch") {
-            if (pointers.current.size !== 2) return;
-            const [a, b] = [...pointers.current.values()];
-            const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
-            setMoved(reframe(cam, origin, d.frame, d.mid, a.mid(b), zoom));
-            return;
-        }
-        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom));
-    };
-    const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
-        pointers.current.delete(e.pointerId);
-        // Lifting one finger of a pinch carries on as a drag with the other, from where it is.
-        const [rest] = [...pointers.current.entries()];
-        gesture.current = null;
-        if (pointers.current.size === 2) startPinch();
-        else if (rest && e.pointerType === "touch") gesture.current = drag(rest[1]);
-    };
-
     const compass: [string, Vector3][] = [
         ["N", vec3(SIDE / 2, groundAt(SIDE / 2), SIDE + 1.8)],
         ["S", vec3(SIDE / 2, groundAt(SIDE / 2), -1.8)],
@@ -403,11 +275,7 @@ export default function TowerView({ slug }: { slug: string }) {
             className="absolute inset-0 block h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
             aria-label={`The Cracroft abseil tower: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onContextMenu={(e) => e.preventDefault()}
+            {...flatView.handlers}
         >
             <polygon points={svgPoints(groundCorners().map(toSvg))} fill="var(--tower-ground)" />
             {compass
@@ -447,9 +315,7 @@ export default function TowerView({ slug }: { slug: string }) {
     );
 
     const zoomBy = (factor: number) =>
-        mode === "3d"
-            ? glView?.zoomBy(factor)
-            : setMoved(reframe(cam, origin, frame, origin, origin, frame.zoom * factor));
+        mode === "3d" ? glView?.zoomBy(factor) : flatView.zoomBy(factor);
     const key = legend(rig);
 
     // Laid out like a map: the drawing fills the box, with the legend over its top right, the views bottom left and
@@ -559,10 +425,7 @@ export default function TowerView({ slug }: { slug: string }) {
                             key={m}
                             type="button"
                             aria-pressed={mode === m}
-                            onClick={() => {
-                                setMode(m);
-                                setMoved(null);
-                            }}
+                            onClick={() => setMode(m)}
                             className={`px-3 py-1.5 text-left text-xs transition-colors ${
                                 mode === m
                                     ? "bg-action text-primary-foreground"
@@ -603,20 +466,20 @@ export default function TowerView({ slug }: { slug: string }) {
                         label: "Zoom in",
                         icon: <Plus />,
                         onClick: () => zoomBy(1.4),
-                        off: mode !== "3d" && frame.zoom >= MAX_ZOOM,
+                        off: mode !== "3d" && flatView.nearest,
                     },
                     {
                         label: "Zoom out",
                         icon: <Minus />,
                         onClick: () => zoomBy(1 / 1.4),
-                        off: mode !== "3d" && frame.zoom <= 1,
+                        off: mode !== "3d" && flatView.furthest,
                     },
                     {
                         label: "Show the whole view again",
                         icon: <RotateCcw />,
                         onClick: () => {
                             if (mode === "3d") return glView?.reset();
-                            setMoved(null);
+                            flatView.reset();
                         },
                         off: false,
                     },
@@ -945,12 +808,6 @@ export function Callouts({
 }
 
 /** Where a point on the screen is in the drawing's SVG units. */
-export function toDrawing(svg: SVGSVGElement, clientX: number, clientY: number): Vector2 {
-    const m = svg.getScreenCTM();
-    if (!m) return vec2(clientX, clientY);
-    const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
-    return vec2(p.x, p.y);
-}
 
 export function PieceDrawing({
     piece,

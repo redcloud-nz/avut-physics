@@ -94,6 +94,9 @@ they've looked.
   folder in `pages/`: `page.tsx` (server) holds its name, headline, text and any details, and
   `figure.tsx` (client) its figure. `pages/index.ts` sets the order. Pieces several pages share
   are in `common/`, and `card.tsx` and `frame.tsx` are the chrome around every page and figure.
+- `src/scene/`: what the 3D scenes built from pieces (the flying fox, the abseil tower, the parts viewer) share, as
+  it moves out of `src/abseil-tower/` and `src/flying-fox/` (see `docs/scene-code.md`). `use-flat-view.ts`: a flat
+  view's camera, fit, pan, zoom and pinch.
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`, and
   `worldToSvg` for placing physics points), slider controls, `Notice` and `NONE`. Drawing only, no
   maths. `src/components/notes.tsx` has the notes card (`NotesCard`, `Part`), and `use-in-browser.ts`
