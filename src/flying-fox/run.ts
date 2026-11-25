@@ -1,9 +1,21 @@
 import { G } from "@/lib/constants";
+import { vec3 } from "@/lib/vector3";
 
-import { BLOCKS_X, loaded, RIDER, STATIC_X, TROLLEY_X } from "./fox";
+import {
+    BLOCKS_X,
+    DISMOUNT,
+    HAWSER_Z,
+    hawserY,
+    loaded,
+    RETURN_PULLEY,
+    RIDER,
+    SHEAR_LEG,
+    STATIC_X,
+    TROLLEY_X,
+} from "./fox";
 
 /**
- * A rider's run down hawser A: the trolley rolling along the hawser as it sags under them, the rider swinging on the
+ * A rider's run down a hawser: the trolley rolling along the hawser as it sags under them, the rider swinging on the
  * dropper below it, the trolley meeting the dynamic brake's block and dragging it down the span (lifting the chain
  * weight), and the chain pulling it back until the rider rolls to rest. Worked out ahead of time, step by step, so it
  * can be played and scrubbed.
@@ -35,6 +47,11 @@ export type RunSetup = {
     /** The block, joining rope and brake line, dragged along with the trolley once it meets the block (kg). */
     brake: number;
     /**
+     * How quickly ground staff bring a rider to rest once they've caught them, back in the dismount zone after the
+     * brake and slower than walking pace (s).
+     */
+    catchTime: number;
+    /**
      * Friction where the dropper hangs from the trolley, against the rider swinging relative to it: torque per turning
      * speed (N m s). It barely slows the rider's own swing, but stops the light trolley shuddering to and fro under them.
      */
@@ -56,17 +73,17 @@ export const RUN: RunSetup = {
     chain: { hanging: 6, perMetre: 6, growth: CHAIN_GROWTH },
     brake: 6,
     swingDamping: 100,
+    catchTime: 0.7,
 };
+
+/** How slow a rider has to be going for ground staff to catch them (m/s): a jog. */
+const CATCH_SPEED = 3;
 
 /** Air's density (kg/m³). */
 const AIR = 1.2;
 
-/** When the rider steps off the platform (s), and how long their weight takes to come onto the hawser. */
-export const STEP_OFF = 2;
+/** How long a rider's weight takes to come onto the hawser as they step off the platform, or off it as they unclip. */
 export const LOAD_ON = 0.5;
-
-/** Where the trolley starts, at the launch. */
-export const TROLLEY_START = TROLLEY_X.a;
 
 /** Where the trolley's bumper meets block A, the trolley's middle this far along the span. */
 export const HIT_X = TROLLEY_X.b;
@@ -101,6 +118,8 @@ export type Run = {
     top: { speed: number; x: number };
     /** Furthest the block was pushed (m). */
     pushed: number;
+    /** When ground staff caught the rider (s), if they did. */
+    caught: number | null;
     /** How far short of the static brakes the trolley got, at its furthest (m). */
     shortOfStatic: number;
     /** Whether the trolley reached the static brakes (it shouldn't). */
@@ -135,8 +154,10 @@ export function loadedPath(mass: number, from = 0.6, to = STATIC_X + 0.5, step =
 }
 
 /**
- * The run for `setup`, from rest at the launch until the rider's come to rest (or `limit` seconds), worked out in
- * steps of `dt` and sampled `rate` times a second.
+ * The run for `setup`, from the moment the rider's let go at the launch (their weight already on) until they've come
+ * to rest (or `limit` seconds), worked out in steps of `dt` and sampled `rate` times a second. Once the brake's let go
+ * of the trolley and the rider's back in the dismount zone below walking pace, ground staff catch them and bring them
+ * to rest.
  */
 export function simulateRun(
     setup: RunSetup = RUN,
@@ -150,7 +171,14 @@ export function simulateRun(
      * The accelerations of the trolley's place along the span `x` and the rider's swing `a`, from Lagrange's
      * equations for the trolley (a point on the path) and the rider (a point `L` below it).
      */
-    const accelerate = (x: number, a: number, vx: number, va: number, onBlock: boolean) => {
+    const accelerate = (
+        x: number,
+        a: number,
+        vx: number,
+        va: number,
+        onBlock: boolean,
+        held: number | null = null,
+    ) => {
         const { y, slope: yp, bend: ypp } = path.at(x);
         const [sa, ca] = [Math.sin(a), Math.cos(a)];
         const pushed = onBlock ? Math.max(x - HIT_X, 0) : 0;
@@ -180,10 +208,19 @@ export function simulateRun(
         // Each point's force less its mass times the curves' part, onto the coordinates (Jᵀ).
         const gt = { x: ft.x - mt * th.x, y: ft.y - mt * th.y };
         const gr = { x: fr.x - m * rh.x, y: fr.y - m * rh.y };
-        const Q1 = gt.x + yp * gt.y + gr.x + yp * gr.y;
+        // Caught by the staff on the ground: held where they were caught, and their swing stopped, over about
+        // `catchTime` (critically damped).
+        const w = 2 / setup.catchTime;
+        const hold =
+            held === null ? 0 : (m + mt) * (w * w * (x - held) + 2 * w * vx) * (1 + yp * yp);
+        const Q1 = gt.x + yp * gt.y + gr.x + yp * gr.y - hold;
         // Friction at the pivot, against the swing relative to the trolley (which turns as the wire's slope does).
         const turning = va - (ypp * vx) / (1 + yp * yp);
-        const Q2 = L * ca * gr.x + L * sa * gr.y - setup.swingDamping * turning;
+        const Q2 =
+            L * ca * gr.x +
+            L * sa * gr.y -
+            setup.swingDamping * turning -
+            (held === null ? 0 : m * L * L * (w * w * a + 2 * w * va));
         const det = M11 * M22 - M12 * M12;
         return {
             ax: (Q1 * M22 - Q2 * M12) / det,
@@ -196,18 +233,10 @@ export function simulateRun(
 
     let [x, a, vx, va] = [TROLLEY_X.a, 0, 0, 0];
     let onBlock = false;
-    // On the platform, clipped in, then stepping off: the rider's weight comes onto the hawser while the trolley's held
-    // at the launch, and once it's all on, it's let go.
+    let braked = false;
+    let caught: number | null = null;
+    let caughtAt: number | null = null;
     const samples: RunSample[] = [];
-    const start = x;
-    for (let i = 0; i < (STEP_OFF + LOAD_ON) * rate; i++) {
-        const t = i / rate;
-        const u = Math.min(Math.max((t - STEP_OFF) / LOAD_ON, 0), 1);
-        const load = u * u * (3 - 2 * u);
-        const y = loaded(start, setup.trolley + m * load, 2).load!.y;
-        samples.push({ t, load, x: start, y, swing: 0, pushed: 0, speed: 0 });
-    }
-    const held = samples.length / rate;
     let t = 0;
     let pushedMost = 0;
     let reachedStatic = false;
@@ -215,10 +244,12 @@ export function simulateRun(
     const every = Math.round(1 / rate / dt);
     let still = 0;
     for (let k = 0; t <= limit; k++, t += dt) {
-        const now = accelerate(x, a, vx, va, onBlock);
+        // Once caught, held where they were caught.
+        const held = caughtAt;
+        const now = accelerate(x, a, vx, va, onBlock, held);
         if (k % every === 0)
             samples.push({
-                t: held + t,
+                t,
                 load: 1,
                 x,
                 y: now.y,
@@ -233,7 +264,7 @@ export function simulateRun(
 
         // A step (RK4).
         const f = (s: number[]) => {
-            const r = accelerate(s[0], s[1], s[2], s[3], onBlock);
+            const r = accelerate(s[0], s[1], s[2], s[3], onBlock, held);
             return [s[2], s[3], r.ax, r.aa];
         };
         const s0 = [x, a, vx, va];
@@ -259,6 +290,19 @@ export function simulateRun(
         } else if (onBlock && x < HIT_X) {
             // Back where the block started: the stabiliser holds it there and the trolley rolls on without it.
             onBlock = false;
+            braked = true;
+        }
+        // Thrown back up the span by the brake, caught on the way back down, in the dismount zone.
+        if (
+            caught === null &&
+            braked &&
+            vx > 0 &&
+            x > DISMOUNT.from &&
+            x < DISMOUNT.to &&
+            now.speed < CATCH_SPEED
+        ) {
+            caught = t;
+            caughtAt = x;
         }
         pushedMost = Math.max(pushedMost, onBlock ? x - HIT_X : 0);
         if (x >= staticX) {
@@ -270,6 +314,7 @@ export function simulateRun(
         samples,
         rate,
         top,
+        caught,
         pushed: pushedMost,
         shortOfStatic: staticX - (HIT_X + pushedMost),
         reachedStatic,
@@ -299,3 +344,181 @@ export function sampleAt(run: Run, t: number): RunSample {
 
 /** How long a run lasts (s). */
 export const runLength = (run: Run) => (run.samples.length - 1) / run.rate;
+
+/** The timeline: trolley A's rider launches, is brought to rest and unclips; then trolley B's does the same (s). */
+export const TIMELINE = { launchA: 5, unloadA: 50, launchB: 60, unloadB: 105, end: 108 };
+
+/** A trolley at one moment: where it is, how much of its rider's weight is on it, their swing, its block's push. */
+export type TrolleyAt = {
+    x: number;
+    y: number;
+    load: number;
+    swing: number;
+    pushed: number;
+    speed: number;
+};
+
+/** One moment of the timeline: both trolleys, and how much slack is in the return line between them (m). */
+export type SessionSample = { t: number; a: TrolleyAt; b: TrolleyAt; slack: number };
+
+export type Session = {
+    samples: SessionSample[];
+    rate: number;
+    run: Run;
+    /** How long the timeline is (s). */
+    length: number;
+    /** The return line's length, less the bit over the pulleys (m). */
+    line: number;
+};
+
+/** The return line's pulleys, one above each hawser at the tower. */
+const pulleyFor = (side: number) => RETURN_PULLEY(side);
+
+/** How far from its pulley the return line reaches to a trolley on hawser `side` at `x`, height `y`. */
+const reach = (side: number, x: number, y: number) =>
+    pulleyFor(side).distanceTo(vec3(x, y, side * HAWSER_Z));
+
+/**
+ * The return line's length, less the bit over the pulleys: as short as it can be, so with the heaviest rider (120 kg)
+ * at their furthest into the brake, the other trolley's just reached the platform.
+ */
+export function returnLength(setup: RunSetup = RUN) {
+    const heaviest = simulateRun({ ...setup, mass: RIDER.mass });
+    const far = HIT_X + heaviest.pushed;
+    const y = loaded(far, RIDER.mass + setup.trolley, 2).load!.y;
+    return reach(1, far, y) + reach(-1, TROLLEY_X.a, hawserY(TROLLEY_X.a));
+}
+
+/** How fast an empty trolley's rolling resistance and the hauled trolley's catch work (share of its weight). */
+const EMPTY_ROLLING = 0.03;
+
+/**
+ * Both trolleys through the timeline. The riding trolley follows `run`; the return line, which doesn't stretch and
+ * doesn't slow it, takes up its slack as it goes, then hauls the other (empty) trolley up its hawser. When the rider
+ * meets the brake the other carries on on its own momentum, the line going slack behind it, until it's caught at the
+ * platform (or rolls back until the line's tight again).
+ */
+export function simulateSession(setup: RunSetup = RUN, { rate = 60 } = {}): Session {
+    const run = simulateRun(setup, { rate });
+    const m = setup.mass;
+    const ease = (u: number) => {
+        const v = Math.min(Math.max(u, 0), 1);
+        return v * v * (3 - 2 * v);
+    };
+    /** The riding trolley, `tau` seconds after its launch (stepping off), until it's unloaded `unload` after. */
+    const rider = (tau: number, unload: number): TrolleyAt => {
+        const last = run.samples[run.samples.length - 1];
+        if (tau < LOAD_ON) {
+            const load = ease(tau / LOAD_ON);
+            const x = TROLLEY_X.a;
+            return {
+                x,
+                y: loaded(x, setup.trolley + m * load, 2).load!.y,
+                load,
+                swing: 0,
+                pushed: 0,
+                speed: 0,
+            };
+        }
+        if (tau < unload) {
+            const s = sampleAt(run, tau - LOAD_ON);
+            return { x: s.x, y: s.y, load: 1, swing: s.swing, pushed: s.pushed, speed: s.speed };
+        }
+        const load = 1 - ease((tau - unload) / LOAD_ON);
+        const x = last.x;
+        const y = load < 1e-6 ? hawserY(x) : loaded(x, setup.trolley + m * load, 2).load!.y;
+        return { x, y, load, swing: last.swing * load, pushed: 0, speed: 0 };
+    };
+    // Where on its hawser an empty trolley is, this far from its pulley (the hawser's unloaded).
+    const xAt = (side: number, d: number) => {
+        let [lo, hi] = [TROLLEY_X.a, SHEAR_LEG.x - 0.15];
+        if (reach(side, lo, hawserY(lo)) >= d) return lo;
+        for (let i = 0; i < 40; i++) {
+            const mid = (lo + hi) / 2;
+            if (reach(side, mid, hawserY(mid)) < d) lo = mid;
+            else hi = mid;
+        }
+        return (lo + hi) / 2;
+    };
+    const empty = (x: number, speed = 0): TrolleyAt => ({
+        x,
+        y: hawserY(x),
+        load: 0,
+        swing: 0,
+        pushed: 0,
+        speed,
+    });
+
+    const length = returnLength(setup);
+    const samples: SessionSample[] = [];
+    const steps = 10;
+    const dt = 1 / rate / steps;
+    // The empty trolley: where, how fast, and whether it's been caught at the platform.
+    // The other trolley parked where the last rider was caught.
+    let other = { x: run.rest, v: 0, caught: false };
+    let riding = 1;
+    for (let i = 0; i <= TIMELINE.end * rate; i++) {
+        const t = i / rate;
+        // Trolley A's turn until B launches, then B's; the other one waits at the platform once it's caught there.
+        if (t >= TIMELINE.launchB && riding === 1) {
+            riding = -1;
+            other = { x: run.samples[run.samples.length - 1].x, v: 0, caught: false };
+        }
+        const launch = riding > 0 ? TIMELINE.launchA : TIMELINE.launchB;
+        const unload = (riding > 0 ? TIMELINE.unloadA : TIMELINE.unloadB) - launch;
+        const r = t < launch ? empty(TROLLEY_X.a) : rider(t - launch, unload);
+        // On the line's other side: what's left of it, once the rider's side is taken.
+        const left = (q: TrolleyAt) => length - reach(riding, q.x, q.y);
+        if (i > 0 && !other.caught) {
+            const before = samples[samples.length - 1];
+            const rBefore = riding > 0 ? before.a : before.b;
+            for (let k = 1; k <= steps; k++) {
+                const f = k / steps;
+                const limit = left(rBefore) + (left(r) - left(rBefore)) * f;
+                // Rolling free: back down the slope, slowed by rolling resistance (uphill is towards the tower).
+                const h = 0.05;
+                const yp = (hawserY(other.x + h) - hawserY(other.x - h)) / (2 * h);
+                const ax =
+                    (-9.81 * (yp + EMPTY_ROLLING * Math.tanh(other.v / 0.05))) / (1 + yp * yp);
+                let v = other.v + ax * dt;
+                let x = other.x + v * dt;
+                // The line won't let it further from its pulley than what's left: hauled, at the line's speed.
+                if (reach(-riding, x, hawserY(x)) > limit) {
+                    const pulled = xAt(-riding, limit);
+                    v = (pulled - other.x) / dt;
+                    x = pulled;
+                }
+                // At the platform, staff catch it.
+                if (x <= TROLLEY_X.a && v <= 0) {
+                    other = { x: TROLLEY_X.a, v: 0, caught: true };
+                    break;
+                }
+                other = { x, v, caught: false };
+            }
+        }
+        const o = empty(other.x, Math.abs(other.v));
+        const [a, b] = riding > 0 ? [r, o] : [o, r];
+        const slack = Math.max(length - reach(1, a.x, a.y) - reach(-1, b.x, b.y), 0);
+        samples.push({ t, a, b, slack });
+    }
+    return { samples, rate, run, length: TIMELINE.end, line: length };
+}
+
+/** The timeline's state at `t` seconds, between its samples. */
+export function sessionAt(session: Session, t: number): SessionSample {
+    const { samples } = session;
+    const u = Math.min(Math.max(t * session.rate, 0), samples.length - 1);
+    const i = Math.min(Math.floor(u), samples.length - 2);
+    const f = u - i;
+    const [p, q] = [samples[i], samples[i + 1]];
+    const mix = (a: number, b: number) => a + (b - a) * f;
+    const trolley = (a: TrolleyAt, b: TrolleyAt): TrolleyAt => ({
+        x: mix(a.x, b.x),
+        y: mix(a.y, b.y),
+        load: mix(a.load, b.load),
+        swing: mix(a.swing, b.swing),
+        pushed: mix(a.pushed, b.pushed),
+        speed: mix(a.speed, b.speed),
+    });
+    return { t, a: trolley(p.a, q.a), b: trolley(p.b, q.b), slack: mix(p.slack, q.slack) };
+}

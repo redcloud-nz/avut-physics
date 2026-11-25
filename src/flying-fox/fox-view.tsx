@@ -86,7 +86,7 @@ import {
     type FlatView,
     type FoxTarget,
 } from "./fox";
-import { RUN, runLength, sampleAt, simulateRun } from "./run";
+import { RUN, sessionAt, simulateSession } from "./run";
 import { RunClock } from "./run-clock";
 import RunControls from "./run-controls";
 
@@ -96,7 +96,7 @@ const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.Sc
     loading: () => <Loading3D />,
 });
 
-/** What moves in a run, in 3D, loaded with the WebGL view. */
+/** What moves through the timeline, in 3D, loaded with the WebGL view. */
 const RunGL = dynamic(() => import("./run-gl"), { ssr: false });
 
 /** The least room (SVG units) the drawing needs unzoomed; it widens or deepens past it to fill its box. */
@@ -332,22 +332,25 @@ export default function FoxView() {
         lockedRef.current = target !== null;
         standingRef.current = stance !== null;
     });
-    // In 3D, what moves in a run is drawn apart from the rest (hawser A, trolley A and the dynamic brake).
+    // In 3D, what moves through the timeline is drawn apart from the rest (the hawsers, the trolleys, the return line
+    // and the dynamic brake).
     const is3d = mode === "3d";
     const pieces = useMemo(() => foxPieces({ run: is3d }), [is3d]);
-    // A rider's run, worked out once, and its clock.
-    const run = useMemo(() => simulateRun(RUN), []);
-    const clock = useMemo(() => new RunClock(runLength(run)), [run]);
-    // In 3D, trolley A's target follows the trolley as it runs.
+    // Both riders' runs, worked out once, and the clock they're played by.
+    const session = useMemo(() => simulateSession(RUN), []);
+    const clock = useMemo(() => new RunClock(session.length), [session]);
+    // In 3D, each trolley's target follows the trolley.
     const focus = useMemo(() => {
-        if (!target || !is3d || target.slug !== "trolley-a") return target;
-        const start = onHawser(TROLLEY_X.a, 1);
+        const side = target?.slug === "trolley-a" ? 1 : target?.slug === "trolley-b" ? -1 : 0;
+        if (!target || !is3d || !side) return target;
+        const start = onHawser(side > 0 ? TROLLEY_X.a : TROLLEY_X.b, side);
         const moving = () => {
-            const s = sampleAt(run, clock.t);
-            return vec3(s.x - start.x, s.y - start.y, 0);
+            const s = sessionAt(session, clock.t);
+            const q = side > 0 ? s.a : s.b;
+            return vec3(q.x - start.x, q.y - start.y, 0);
         };
         return { ...target, moving };
-    }, [target, is3d, run, clock]);
+    }, [target, is3d, session, clock]);
     const labels = useMemo(() => foxLabels(), []);
     const legend = foxLegend();
     const [glView, setGlView] = useState<GLHandle | null>(null);
@@ -759,14 +762,19 @@ export default function FoxView() {
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
                     onFrameRate={choice === "auto" ? onFrameRate : undefined}
                 >
-                    <RunGL run={run} setup={RUN} clock={clock} sides={DETAILS[detail].sides} />
+                    <RunGL
+                        session={session}
+                        setup={RUN}
+                        clock={clock}
+                        sides={DETAILS[detail].sides}
+                    />
                 </SceneGL>
             ) : (
                 diagram
             )}
             {mode === "3d" && (
                 <RunControls
-                    run={run}
+                    session={session}
                     clock={clock}
                     className="absolute top-2 left-2 flex w-80 max-w-[calc(100%-4rem)] items-center gap-2 rounded-xl border border-border bg-surface/90 pr-3 shadow-lg backdrop-blur"
                 />

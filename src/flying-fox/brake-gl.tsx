@@ -10,11 +10,11 @@ import { buildHairlines, buildScene, Solids, T, type Colors } from "@/abseil-tow
 
 import { brakeRig, loaded, type Pose } from "./fox";
 import { heightAt } from "./hawser";
-import { sampleAt, type Run, type RunSetup } from "./run";
+import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";
 
 /** A pose for three.js: its axis flipped with the scene (which turns the turn the other way). */
-function place(group: THREE.Group, { at, axis, angle }: Pose) {
+export function place(group: THREE.Group, { at, axis, angle }: Pose) {
     group.position.copy(T(at));
     group.quaternion.setFromAxisAngle(T(axis).normalize(), -angle);
 }
@@ -24,13 +24,13 @@ function place(group: THREE.Group, { at, axis, angle }: Pose) {
  * carabiner and chain top moved (and turned) whole each frame, and the ropes between them drawn again.
  */
 export default function BrakeGL({
-    run,
+    session,
     setup,
     clock,
     sides,
     colors,
 }: {
-    run: Run;
+    session: Session;
     setup: RunSetup;
     clock: RunClock;
     sides: number;
@@ -51,10 +51,15 @@ export default function BrakeGL({
     }, []);
 
     useFrame(() => {
-        const s = sampleAt(run, clock.t);
-        // Hawser A as it hangs now, the rider's weight on it once they've stepped off.
-        const shape = loaded(s.x, setup.trolley + setup.mass * s.load, 160);
-        const { poses, ropes } = rig.pose({ pushed: s.pushed, heightA: (x) => heightAt(shape, x) });
+        const s = sessionAt(session, clock.t);
+        // The hawsers as they hang now, each with its rider's weight on it once they've stepped off.
+        const [a, b] = [s.a, s.b].map((q) => loaded(q.x, setup.trolley + setup.mass * q.load, 160));
+        const { poses, ropes } = rig.pose({
+            pushed: s.a.pushed,
+            pushedB: s.b.pushed,
+            heightA: (x) => heightAt(a, x),
+            heightB: (x) => heightAt(b, x),
+        });
         for (const [name, group] of groups.current) {
             const pose = poses.get(name);
             if (pose) place(group, pose);
