@@ -77,19 +77,27 @@ import {
     groundShade,
     groundY,
     LOG,
+    onHawser,
     RIDER,
     SPAN,
     TEST_LOAD,
     TREE,
+    TROLLEY_X,
     type FlatView,
     type FoxTarget,
 } from "./fox";
+import { RUN, runLength, sampleAt, simulateRun } from "./run";
+import { RunClock } from "./run-clock";
+import RunControls from "./run-controls";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
 const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.SceneGL), {
     ssr: false,
     loading: () => <Loading3D />,
 });
+
+/** What moves in a run, in 3D, loaded with the WebGL view. */
+const RunGL = dynamic(() => import("./run-gl"), { ssr: false });
 
 /** The least room (SVG units) the drawing needs unzoomed; it widens or deepens past it to fill its box. */
 const W = 1000;
@@ -301,7 +309,7 @@ export default function FoxView() {
         setMoved(null);
     };
     // What every view's locked onto (`?target=trolley-a`), kept from view to view, or nothing to move freely.
-    const focus = TARGETS.find((t) => t.slug === params.get("target")) ?? null;
+    const target = TARGETS.find((t) => t.slug === params.get("target")) ?? null;
     // Where the 3D view stands, if anywhere (`?eye=loader`): only in 3D, and instead of a target.
     const stance =
         mode === "3d" ? (STANCES.find((e) => e.slug === params.get("eye")) ?? null) : null;
@@ -312,7 +320,7 @@ export default function FoxView() {
     const standAs = (slug: string) => setParams({ eye: slug, target: null });
     // Through the targets in turn, round from the last to the first.
     const step = (by: number) => {
-        const i = focus ? TARGETS.indexOf(focus) : by > 0 ? -1 : TARGETS.length;
+        const i = target ? TARGETS.indexOf(target) : by > 0 ? -1 : TARGETS.length;
         lockOn(TARGETS[(i + by + TARGETS.length) % TARGETS.length]);
     };
     // For the swipes, which are watched from outside React's events.
@@ -321,10 +329,25 @@ export default function FoxView() {
     const standingRef = useRef(false);
     useEffect(() => {
         stepRef.current = step;
-        lockedRef.current = focus !== null;
+        lockedRef.current = target !== null;
         standingRef.current = stance !== null;
     });
-    const pieces = useMemo(() => foxPieces(), []);
+    // In 3D, what moves in a run is drawn apart from the rest (hawser A, trolley A and the dynamic brake).
+    const is3d = mode === "3d";
+    const pieces = useMemo(() => foxPieces({ run: is3d }), [is3d]);
+    // A rider's run, worked out once, and its clock.
+    const run = useMemo(() => simulateRun(RUN), []);
+    const clock = useMemo(() => new RunClock(runLength(run)), [run]);
+    // In 3D, trolley A's target follows the trolley as it runs.
+    const focus = useMemo(() => {
+        if (!target || !is3d || target.slug !== "trolley-a") return target;
+        const start = onHawser(TROLLEY_X.a, 1);
+        const moving = () => {
+            const s = sampleAt(run, clock.t);
+            return vec3(s.x - start.x, s.y - start.y, 0);
+        };
+        return { ...target, moving };
+    }, [target, is3d, run, clock]);
     const labels = useMemo(() => foxLabels(), []);
     const legend = foxLegend();
     const [glView, setGlView] = useState<GLHandle | null>(null);
@@ -735,9 +758,18 @@ export default function FoxView() {
                     stance={stance}
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
                     onFrameRate={choice === "auto" ? onFrameRate : undefined}
-                />
+                >
+                    <RunGL run={run} setup={RUN} clock={clock} sides={DETAILS[detail].sides} />
+                </SceneGL>
             ) : (
                 diagram
+            )}
+            {mode === "3d" && (
+                <RunControls
+                    run={run}
+                    clock={clock}
+                    className="absolute top-2 left-2 flex w-80 max-w-[calc(100%-4rem)] items-center gap-2 rounded-xl border border-border bg-surface/90 pr-3 shadow-lg backdrop-blur"
+                />
             )}
             {/* Back to the target before, or on to the next, round from the last to the first: only on a target. */}
             {focus !== null &&

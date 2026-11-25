@@ -1081,7 +1081,7 @@ export function hawserY(x: number): number {
 }
 
 /** `pieces` moved by `d`. */
-function moved(pieces: Piece[], d: Vector3): Piece[] {
+export function moved(pieces: Piece[], d: Vector3): Piece[] {
     return pieces.map((p) =>
         p.kind === "rod"
             ? { ...p, a: p.a.add(d), b: p.b.add(d) }
@@ -2483,7 +2483,7 @@ function smooth(pts: Vector3[], n: number): Vector3[] {
 }
 
 /** Each hawser from its tree shackle over the tower's cradle and down the span to the shear leg's saddle. */
-function hawsers(): Piece[] {
+function hawsers(run = false): Piece[] {
     const pieces: Piece[] = [];
     for (const s of [-1, 1]) {
         const shackleAt = TREE_SHACKLE(s);
@@ -2500,7 +2500,7 @@ function hawsers(): Piece[] {
         const span = Array.from({ length: 61 }, (_, i) =>
             onHawser(BAR_X + ((SPAR_X - BAR_X) * i) / 60, s),
         );
-        pieces.push(...line(span, HAWSER_R, C.hawser, "steel"));
+        if (!(run && s > 0)) pieces.push(...line(span, HAWSER_R, C.hawser, "steel"));
         pieces.push(...hawserFoot(s));
     }
     return pieces;
@@ -2572,13 +2572,18 @@ export function rigTrolley(
     swing: { hang?: number; backUp?: number } = {},
 ): {
     pieces: Piece[];
+    /** The trolley alone, and its carabiners alone. */
+    body: Piece[];
+    clips: Piece[];
+    /** Where the rider's carabiner passes through its hole, which it pivots about. */
+    pivot: Vector3;
     hang: Vector3;
     backUp: Vector3;
     hangDown: Vector3;
     backUpDown: Vector3;
 } {
     const t = zipTrolley(at, ahead, ACROSS, HAWSER_R, TROLLEY_COLORS);
-    const pieces: Piece[] = [...t.pieces];
+    const pieces: Piece[] = [];
     const level = vec3(ahead.x, 0, ahead.z).unit();
     const clip = (top: Vector3, length: number, drop: number, angle = 0) => {
         const down = vec3(0, -Math.cos(angle), 0).add(level.scale(Math.sin(angle)));
@@ -2586,12 +2591,15 @@ export function rigTrolley(
         pieces.push(
             ...carabiner(bar, down, ACROSS, C.oval, length, { shape: "oval", through: t.gap }),
         );
-        return { bottom: bar.add(down.scale(length)), down };
+        return { bottom: bar.add(down.scale(length)), down, bar };
     };
     const hang = clip(t.main, 0.11, TROLLEY_CLIP_DROP.hang, swing.hang);
     const backUp = clip(t.towSide, 0.1, TROLLEY_CLIP_DROP.backUp, swing.backUp);
     return {
-        pieces,
+        pieces: [...t.pieces, ...pieces],
+        body: t.pieces,
+        clips: pieces,
+        pivot: hang.bar,
         hang: hang.bottom,
         backUp: backUp.bottom,
         hangDown: hang.down,
@@ -2599,13 +2607,22 @@ export function rigTrolley(
     };
 }
 
-/** A trolley on hawser `s` at `x`, with its dropper: where its tow points are, back (uphill) and front. */
-function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
+/**
+ * A trolley on hawser `s` at `x`, with its dropper: the trolley's pieces and the dropper's apart (the dropper, with
+ * the carabiners it hangs from, swings about `hang`, where the rider's carabiner passes through the trolley), where it
+ * sits on the wire, and where its back (uphill) tow point is.
+ */
+function trolley(
+    x: number,
+    s: number,
+): { pieces: Piece[]; dropper: Piece[]; at: Vector3; hang: Vector3; back: Vector3 } {
     const at = onHawser(x, s);
     const ahead = onHawser(x + 0.1, s)
         .sub(onHawser(x - 0.1, s))
         .unit();
-    const { pieces, hang, backUp } = rigTrolley(at, ahead);
+    const rig = rigTrolley(at, ahead);
+    const { hang, backUp } = rig;
+    const pieces: Piece[] = [];
     // The return line's tied on beside the back-up line, round the bend on the carabiner's spine side.
     const back = backUp;
     // The dropper: the rider's rope down through the descender, a GRIGRI+ clipped to the harness's tie-in (the
@@ -2662,7 +2679,7 @@ function trolley(x: number, s: number): { pieces: Piece[]; back: Vector3 } {
         }),
     );
     pieces.push(...carabiner(safetyClip, down, ACROSS.neg(), C.steel, clipLength));
-    return { pieces, back };
+    return { pieces: rig.body, dropper: [...rig.clips, ...pieces], at, hang: rig.pivot, back };
 }
 
 /** How far round its carabiner's bottom bend towards the spine the return line's tied (radians). */
@@ -2671,8 +2688,11 @@ const RETURN_SPINE = 1.1;
 /** Where the trolleys sit: A at the launch, just out from the platform, and B at the bottom against its brake block. */
 export const TROLLEY_X = { a: 1.4, b: BLOCKS_X - 0.15 };
 
-/** The trolleys and the return line joining them over the tower's pulleys. */
-function trolleysAndReturn(): Piece[] {
+/**
+ * The trolleys and the return line joining them over the tower's pulleys; for a run, only trolley B and the pulleys,
+ * trolley A riding the hawser by itself with no return line on it.
+ */
+function trolleysAndReturn(run = false): Piece[] {
     const a = trolley(TROLLEY_X.a, 1);
     const b = trolley(TROLLEY_X.b, -1);
     const [ca, cb] = [RETURN_PULLEY(1), RETURN_PULLEY(-1)];
@@ -2686,9 +2706,12 @@ function trolleysAndReturn(): Piece[] {
     });
     const pa = rigPulley(ca, a.back, cb, 0.004, bolt(1));
     const pb = rigPulley(cb, pa.centre, out[1], 0.004, bolt(-1));
+    if (run) return [...b.pieces, ...b.dropper, ...pa.pieces, ...pb.pieces];
     return [
         ...a.pieces,
+        ...a.dropper,
         ...b.pieces,
+        ...b.dropper,
         ...pa.pieces,
         ...pb.pieces,
         ...tiedTo(a.back, [...pa.round, ...pb.round], 0.004, C.returnLine, RETURN_SPINE),
@@ -2703,40 +2726,129 @@ function trolleysAndReturn(): Piece[] {
     ];
 }
 
+/** Where the chain weight's picket is driven: back from the pile, between it and hawser A, clear of the hawser. */
+const CHAIN_PICKET = vec3(BRAKE.chainTop.x - 0.9, 0, BRAKE.chainTop.z + 0.35);
+
+/** Where a rigid part of a moving rig is: turned by `angle` about `axis` (through its own origin), then moved to `at`. */
+export type Pose = { at: Vector3; axis: Vector3; angle: number };
+
+/** `v` turned by `angle` about the unit `axis` (Rodrigues). */
+function turned(v: Vector3, axis: Vector3, angle: number): Vector3 {
+    const [c, s] = [Math.cos(angle), Math.sin(angle)];
+    return v
+        .scale(c)
+        .add(axis.cross(v).scale(s))
+        .add(axis.scale(axis.dot(v) * (1 - c)));
+}
+
+/** The turn that takes direction `from` to direction `to`, about the line square to both. */
+function turnBetween(from: Vector3, to: Vector3): { axis: Vector3; angle: number } {
+    const [a, b] = [from.unit(), to.unit()];
+    const axis = a.cross(b);
+    const sin = axis.len();
+    if (sin < 1e-9) return { axis: vec3(0, 0, 1), angle: 0 };
+    return { axis: axis.scale(1 / sin), angle: Math.atan2(sin, a.dot(b)) };
+}
+
+/** `pieces`, built about the origin, put in `pose`. */
+export function posed(pieces: Piece[], { at, axis, angle }: Pose): Piece[] {
+    const point = (q: Vector3) => turned(q, axis, angle).add(at);
+    const dir = (q: Vector3) => turned(q, axis, angle);
+    return pieces.map((p) => {
+        if (p.kind === "rod") return { ...p, a: point(p.a), b: point(p.b) };
+        if (p.kind === "face")
+            return {
+                ...p,
+                points: p.points.map(point),
+                ...(p.holes && { holes: p.holes.map((h) => h.map(point)) }),
+            };
+        return {
+            ...p,
+            points: p.points.map(point),
+            ...(p.tape && {
+                tape: {
+                    ...p.tape,
+                    across: dir(p.tape.across),
+                    ...(p.tape.profile && {
+                        profile: p.tape.profile.map((q) => ({
+                            ...q,
+                            ...(q.across && { across: dir(q.across) }),
+                        })),
+                    }),
+                },
+            }),
+        };
+    });
+}
+
+/** How far the trolley's pushed block A down the span, and how hawser A hangs (its height at each `x`). */
+export type BrakeState = { pushed?: number; heightA?: (x: number) => number };
+
+/**
+ * The dynamic brake, built to move: what stays put, the rigid parts (built about their own origins, so they can be
+ * moved and turned whole), and for any state, where each rigid part goes and the ropes between them.
+ */
+export type BrakeRig = {
+    fixed: Piece[];
+    parts: { name: string; pieces: Piece[] }[];
+    pose: (state?: BrakeState) => { poses: Map<string, Pose>; ropes: Piece[] };
+};
+
 /**
  * The dynamic brake: a nylon block on each hawser, joined by a rope with its middle tied to the brake line, which runs
  * back up the span to the tower's pulley and down to the chain; and the stabiliser, a shock cord from the same middle
- * back to the shear leg's bottom spar, holding the chain's first links just off the ground.
+ * back to the shear leg's bottom spar, holding the chain's first links just off the ground. Then the chain weight,
+ * hanging from the brake line's end and piled on the ground, its end tied off to a picket.
+ *
+ * As the trolley pushes block A down the span, the blocks, the knots, the middle carabiner and the chain's top move
+ * whole (the knots turning to follow their ropes), and the ropes between them, which don't stretch, are drawn again
+ * between their ends. The pulleys stay as they're rigged at rest.
  */
-function dynamicBrake(): Piece[] {
-    const pieces: Piece[] = [];
-    const eyes: Vector3[] = [];
-    for (const s of [-1, 1]) {
-        const at = onHawser(BLOCKS_X, s);
-        const along = onHawser(BLOCKS_X + 0.1, s)
-            .sub(onHawser(BLOCKS_X - 0.1, s))
-            .unit();
-        // The joining rope's tied to the eye on the inside, towards the other hawser.
-        const block = stopBlock(at, along, UP, vec3(0, 0, -s), HAWSER_R, STOP_BLOCK_COLORS);
-        pieces.push(...block.pieces);
-        eyes.push(block.inner);
-    }
+export function brakeRig(): BrakeRig {
+    const ropeR = 0.004;
+    const clip = 0.11;
+    const ahead = vec3(1, 0, 0);
+    const Z = vec3(0, 0, 1);
     // The joining rope: 2.5 m with its knots tied, its middle drawn up the span by the brake line.
     const half = 1.25;
-    const across = eyes[0].distanceTo(eyes[1]) / 2;
-    const apex = eyes[0]
-        .lerp(eyes[1], 0.5)
-        .add(vec3(-Math.sqrt(half * half - across * across), -0.05, 0));
+    /** Where a block sits on hawser `s` at `x` (hawser A hanging as `height` has it), and the wire's slope there. */
+    const seat = (x: number, s: number, height: (x: number) => number) => {
+        const on = (x: number) => vec3(x, height(x), s * HAWSER_Z);
+        const along = on(x + 0.1)
+            .sub(on(x - 0.1))
+            .unit();
+        return { at: on(x), along, slope: Math.atan2(along.y, along.x) };
+    };
+    /** The joining rope's middle, where both legs reach, as far up the span as they let the brake line draw it. */
+    const middleOf = (eyeB: Vector3, eyeA: Vector3) => {
+        const between = eyeA.sub(eyeB);
+        const across = between.len() / 2;
+        const e = between.unit();
+        const up = ahead.neg();
+        const w = up.sub(e.scale(up.dot(e))).unit();
+        return eyeB
+            .lerp(eyeA, 0.5)
+            .add(w.scale(Math.sqrt(Math.max(half * half - across * across, 0))))
+            .add(vec3(0, -0.05, 0));
+    };
+
+    // At rest: the blocks where they're set, on the hawsers hanging unloaded.
+    const blocks = [1, -1].map((s) => {
+        const at = seat(BLOCKS_X, s, hawserY);
+        // The joining rope's tied to the eye on the inside, towards the other hawser.
+        const block = stopBlock(at.at, at.along, UP, vec3(0, 0, -s), HAWSER_R, STOP_BLOCK_COLORS);
+        return { s, ...at, pieces: block.pieces, eye: block.inner };
+    });
+    const [blockA, blockB] = blocks;
+    const apex = middleOf(blockB.eye, blockA.eye);
+
     // The middle: one carabiner lying along the span (Figure 55), the brake line clipped into its uphill end, and the
     // joining rope's middle and the stabiliser side by side in its downhill end. The brake line and the stabiliser
     // each end in a figure 8 on a bight. The joining rope's middle is really an alpine butterfly: until that's drawn,
     // it takes a turn round the carabiner's bar.
-    const ropeR = 0.004;
-    const clip = 0.11;
-    const ahead = vec3(1, 0, 0);
     const downhill = apex.sub(ahead.scale(CARABINER_R + ropeR));
     const uphill = downhill.sub(ahead.scale(clip));
-    pieces.push(...carabiner(uphill, ahead, ACROSS, C.oval, clip, { shape: "oval" }));
+    const middle: Piece[] = [...carabiner(uphill, ahead, ACROSS, C.oval, clip, { shape: "oval" })];
     const knot = tiedRound(
         downhill.add(ACROSS.scale(0.008)),
         ACROSS,
@@ -2744,57 +2856,57 @@ function dynamicBrake(): Piece[] {
         apex.add(ahead),
         ropeR,
     );
-    pieces.push(...line(knot.turn, ropeR, C.joining));
+    middle.push(...line(knot.turn, ropeR, C.joining));
+    const brakeEye = figure8(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
+    middle.push(...line(brakeEye.rope, 0.004, C.brakeLine, "rope", { a: true }));
+    // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
+    // and down from it, tied off to the bottom spar with natural fibre rope. Its eye's in the carabiner's downhill end,
+    // beside the joining rope's knot.
+    const g = groundY(SHEAR_LEG.x);
+    const centre = STABILISER_PULLEY.add(vec3(0, g, 0));
+    const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
+    const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
+    const cordEye = figure8(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
+    middle.push(...line(cordEye.rope, 0.005, C.shockCord, "rope", { a: true }));
+
     // The joining rope's legs, out from the knot to each block's eye, tied into the eye's bar: really a rethreaded
-    // figure 8 (drawn as a figure 8 on a bight).
-    for (const e of eyes) {
-        const level = knot.from.sub(e);
+    // figure 8 (drawn as a figure 8 on a bight). Each knot's built about the eye, and turns with its leg.
+    const eyeKnots = blocks.map((b) => {
+        const level = knot.from.sub(b.eye);
         const w = vec3(level.x, 0, level.z).unit();
         const t = figure8(
-            e.add(w.scale(STOP_BLOCK_EYE.r)),
+            b.eye.add(w.scale(STOP_BLOCK_EYE.r)),
             UP.cross(w),
             STOP_BLOCK_EYE.bar,
             knot.from,
             ropeR,
         );
-        pieces.push(
-            ...line([...t.rope, ...hanging(t.end, knot.from, 0.03, 8)], ropeR, C.joining, "rope", {
-                a: true,
-            }),
-        );
-    }
-    // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain.
-    const brakeEye = figure8(uphill, ACROSS, CARABINER_R, uphill.sub(ahead), 0.004);
-    pieces.push(...line(brakeEye.rope, 0.004, C.brakeLine, "rope", { a: true }));
-    const from = brakeEye.end;
-    // Sagging much as the hawsers do.
-    const reach = hanging(from, BRAKE.pulley, sagLike(from, BRAKE.pulley), 50);
-    // Clipped into the eye bolt under the arm, its eye turned to face the pull.
+        return {
+            pieces: moved(line(t.rope, ropeR, C.joining, "rope", { a: true }), b.eye.neg()),
+            end: t.end.sub(b.eye),
+            toward: knot.from.sub(b.eye),
+        };
+    });
+
+    // The brake line, back up the span to the pulley on the brake support's arm and straight down to the chain,
+    // clipped into the eye bolt under the arm, its eye turned to face the pull.
+    const reach = hanging(brakeEye.end, BRAKE.pulley, sagLike(brakeEye.end, BRAKE.pulley), 50);
     const brake = rigPulley(BRAKE.pulley, reach[reach.length - 3], BRAKE.chainTop, 0.004, {
         eyeBolt: { base: BRAKE.eye, out: vec3(0, -1, 0) },
     });
-    pieces.push(...brake.pieces);
-    pieces.push(...line(hanging(from, brake.a, sagLike(from, brake.a), 50), 0.004, C.brakeLine));
-    // Tied into a carabiner clipped to the chain's top link.
-    const chainClip = BRAKE.chainTop.add(vec3(0, 0.11, 0));
-    pieces.push(...carabiner(chainClip, vec3(0, -1, 0), ACROSS, C.steel, 0.11));
+    // Tied into a carabiner clipped to the chain's top link: the chain's top, built about where it is at rest.
+    const top = BRAKE.chainTop;
+    const chainClip = top.add(vec3(0, 0.11, 0));
     const chainKnot = figure8(chainClip, ACROSS, CARABINER_R, brake.round.at(-1)!, 0.004);
-    pieces.push(
-        ...line([...brake.round, ...chainKnot.rope.reverse()], 0.004, C.brakeLine, "rope", {
-            b: true,
-        }),
+    const chainTop = moved(
+        [
+            ...carabiner(chainClip, vec3(0, -1, 0), ACROSS, C.steel, 0.11),
+            ...line(chainKnot.rope, 0.004, C.brakeLine, "rope", { a: true }),
+            ...bar(top.add(vec3(0, 0.03, 0)), top.add(vec3(0, -0.03, 0)), 0.014, C.steel),
+        ],
+        top.neg(),
     );
-    // The stabiliser: shock cord, stretched, from the joining rope's middle to the pulley under the shear leg's top spar
-    // and down from it, tied off to the bottom spar with natural fibre rope.
-    const g = groundY(SHEAR_LEG.x);
-    const centre = STABILISER_PULLEY.add(vec3(0, g, 0));
-    const tie = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r + 0.35, 0);
-    const spar = vec3(SPAR_X, g + SHEAR_LEG.lower + SHEAR_LEG.r, 0);
-    // From its eye in the carabiner's downhill end, beside the joining rope's knot.
-    const eye = figure8(downhill.sub(ACROSS.scale(0.008)), ACROSS, CARABINER_R, centre, 0.005);
-    pieces.push(...line(eye.rope, 0.005, C.shockCord, "rope", { a: true }));
-    const cord = eye.end;
-    const stabiliser = rigPulley(centre, cord, tie, 0.005, {
+    const stabiliser = rigPulley(centre, cordEye.end, tie, 0.005, {
         basket: {
             spar: vec3(SPAR_X, g + SHEAR_LEG.spar, 0),
             along: ACROSS,
@@ -2802,22 +2914,17 @@ function dynamicBrake(): Piece[] {
             drop: SHEAR_LEG.r + 0.25,
         },
     });
-    pieces.push(...stabiliser.pieces);
-    pieces.push(...line([cord, ...stabiliser.round, tie], 0.005, C.shockCord));
-    pieces.push(...line([tie, spar], 0.006, C.fibre, "rail"));
-    return pieces;
-}
 
-/** The chain weight: hanging from the brake line's end, then piled on the ground, its end tied off to a picket. */
-/** Where the chain weight's picket is driven: back from the pile, between it and hawser A, clear of the hawser. */
-const CHAIN_PICKET = vec3(BRAKE.chainTop.x - 0.9, 0, BRAKE.chainTop.z + 0.35);
-
-function chainWeight(): Piece[] {
-    const pieces: Piece[] = [];
-    const top = BRAKE.chainTop;
+    // What stays put: the pulleys and the brake line round its pulley, the stabiliser's tie, and the chain's pile and
+    // its picket.
     const foot = onGround(top.x, 0.2, top.z);
-    pieces.push(...bar(top.add(vec3(0, 0.03, 0)), top.add(vec3(0, -0.03, 0)), 0.014, C.steel));
-    pieces.push(...line([top, foot], 0.012, C.steel, "steel"));
+    const fixed: Piece[] = [
+        ...brake.pieces,
+        ...line(brake.round, 0.004, C.brakeLine),
+        ...stabiliser.pieces,
+        ...line([...stabiliser.round, tie], 0.005, C.shockCord),
+        ...line([tie, spar], 0.006, C.fibre, "rail"),
+    ];
     // The pile: rings of chain, smaller towards the top.
     for (const [y, r] of [
         [0.03, 0.32],
@@ -2825,13 +2932,93 @@ function chainWeight(): Piece[] {
         [0.13, 0.2],
         [0.18, 0.12],
     ])
-        pieces.push(...line(ring(onGround(top.x, y, top.z), r, 18), 0.014, C.steel, "steel"));
+        fixed.push(...line(ring(onGround(top.x, y, top.z), r, 18), 0.014, C.steel, "steel"));
     const pk = picket(CHAIN_PICKET, towards(foot, CHAIN_PICKET));
-    pieces.push(
+    fixed.push(
         ...pk.pieces,
         ...line([onGround(top.x - 0.25, 0.03, top.z + 0.15), pk.tie], 0.012, C.steel, "steel"),
     );
-    return pieces;
+
+    const parts = [
+        { name: "block-a", pieces: moved(blockA.pieces, blockA.at.neg()) },
+        { name: "block-b", pieces: moved(blockB.pieces, blockB.at.neg()) },
+        { name: "knot-a", pieces: eyeKnots[0].pieces },
+        { name: "knot-b", pieces: eyeKnots[1].pieces },
+        { name: "middle", pieces: moved(middle, apex.neg()) },
+        { name: "chain-top", pieces: chainTop },
+    ];
+
+    const pose = ({ pushed = 0, heightA = hawserY }: BrakeState = {}) => {
+        // Each block on its hawser, turned with the wire's slope, and its eye with it.
+        const place = (b: (typeof blocks)[number], x: number, height: (x: number) => number) => {
+            const at = seat(x, b.s, height);
+            const angle = at.slope - b.slope;
+            return {
+                pose: { at: at.at, axis: Z, angle },
+                eye: at.at.add(turned(b.eye.sub(b.at), Z, angle)),
+            };
+        };
+        const a = place(blockA, BLOCKS_X + pushed, heightA);
+        let b = place(blockB, BLOCKS_X, hawserY);
+        // Block A pushed far enough that the joining rope's legs can't both reach its middle, it drags block B along.
+        const legs = 2 * half * 0.995;
+        const gap = a.eye.sub(b.eye);
+        const level = legs * legs - gap.y * gap.y - gap.z * gap.z;
+        if (gap.len() > legs && level > 0)
+            b = place(blockB, BLOCKS_X + gap.x - Math.sqrt(level), hawserY);
+        const mid = middleOf(b.eye, a.eye);
+        const by = mid.sub(apex);
+        const from = knot.from.add(by);
+        const poses = new Map<string, Pose>([
+            ["block-a", a.pose],
+            ["block-b", b.pose],
+            ["middle", { at: mid, axis: Z, angle: 0 }],
+            ["chain-top", { at: top.add(vec3(0, pushed, 0)), axis: Z, angle: 0 }],
+        ]);
+        const ropes: Piece[] = [];
+        [a, b].forEach((block, i) => {
+            const k = eyeKnots[i];
+            const turn = turnBetween(k.toward, from.sub(block.eye));
+            poses.set(i === 0 ? "knot-a" : "knot-b", { at: block.eye, ...turn });
+            // Its leg, sagging a touch out to the middle.
+            const end = block.eye.add(turned(k.end, turn.axis, turn.angle));
+            ropes.push(...line(hanging(end, from, 0.03, 8), ropeR, C.joining));
+        });
+        // The brake line up the span to the pulley, sagging much as the hawsers do, and from the pulley straight down
+        // to the chain's top as it's lifted.
+        const brakeFrom = brakeEye.end.add(by);
+        ropes.push(
+            ...line(
+                hanging(brakeFrom, brake.a, sagLike(brakeFrom, brake.a), 50),
+                0.004,
+                C.brakeLine,
+            ),
+        );
+        const lifted = top.add(vec3(0, pushed, 0));
+        ropes.push(
+            ...line(
+                [brake.round.at(-1)!, chainKnot.end.add(vec3(0, pushed, 0))],
+                0.004,
+                C.brakeLine,
+            ),
+        );
+        // The chain hanging from its top to the pile.
+        ropes.push(...line([lifted, foot], 0.012, C.steel, "steel"));
+        // The stabiliser from its eye back to its pulley.
+        ropes.push(...line([cordEye.end.add(by), stabiliser.round[0]], 0.005, C.shockCord));
+        return { poses, ropes };
+    };
+    return { fixed, parts, pose };
+}
+
+/** The dynamic brake and its chain weight, with block A pushed `pushed` down the span (as one set of pieces). */
+export function brakePieces(state: BrakeState = {}, rig = brakeRig()): Piece[] {
+    const { poses, ropes } = rig.pose(state);
+    return [
+        ...rig.fixed,
+        ...rig.parts.flatMap((p) => posed(p.pieces, poses.get(p.name)!)),
+        ...ropes,
+    ];
 }
 
 /**
@@ -2860,15 +3047,23 @@ function staticBrakes(): Piece[] {
     return pieces;
 }
 
-/** The whole flying fox, as pieces to draw. */
-export function foxPieces(): Piece[] {
+/**
+ * Trolley A at the launch, for a run: its pieces and its dropper's apart, where it sits on the wire, and where the
+ * dropper hangs from.
+ */
+export const runTrolley = () => trolley(TROLLEY_X.a, 1);
+
+/**
+ * The whole flying fox, as pieces to draw. For a run, what moves is left out (hawser A's span, trolley A and the
+ * dynamic brake: `runTrolley` and `brakeRig`), and the return line too.
+ */
+export function foxPieces({ run = false }: { run?: boolean } = {}): Piece[] {
     return [
         ...tree(),
         ...tower(),
-        ...hawsers(),
-        ...trolleysAndReturn(),
-        ...dynamicBrake(),
-        ...chainWeight(),
+        ...hawsers(run),
+        ...trolleysAndReturn(run),
+        ...(run ? [] : brakePieces()),
         ...staticBrakes(),
         ...shearLeg(),
         ...logAnchor(),

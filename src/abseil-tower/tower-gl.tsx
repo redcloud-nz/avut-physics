@@ -66,7 +66,16 @@ export type GLHandle = {
  * there, keeping the way it's looking, to `distance` (metres) out from it, and zooms out no further than `FOCUS_OUT`
  * times that.
  */
-export type Focus = { centre: Vector3; distance: number };
+export type Focus = {
+    centre: Vector3;
+    distance: number;
+    /** For something that moves: how far it's moved from `centre` now, read each frame so the view follows it. */
+    moving?: () => Vector3;
+};
+
+/** Where a focus is now, moved on from its centre if it moves. */
+const focusPoint = (focus: Focus) =>
+    T(focus.moving ? focus.centre.add(focus.moving()) : focus.centre);
 /** How many times its starting distance out a view locked onto a focus may zoom. */
 export const FOCUS_OUT = 2;
 
@@ -497,7 +506,7 @@ const JOINT = "joint:";
  * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
  * of the boards they're between.
  */
-function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
+export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     // Faces shaded corner to corner, gathered into one mesh, with their corners' colours in order.
     const shadedParts: THREE.BufferGeometry[] = [];
@@ -606,7 +615,7 @@ const HAIRLINE_R = 0.03;
  * Every thin rod's and strand's centreline, as line segments merged per colour: drawn a pixel wide however far off,
  * so wire and rope still show when they're thinner than a pixel. Up close they're inside their solids, so hidden.
  */
-function buildHairlines(pieces: Piece[]) {
+export function buildHairlines(pieces: Piece[]) {
     const byColor = new Map<string, [number, number, number][]>();
     for (const p of pieces) {
         if (p.kind === "face" || p.r > HAIRLINE_R || p.toScale) continue;
@@ -777,7 +786,7 @@ function CompassLetter({
 }
 
 /** The solids and lines, built once for each set of pieces. */
-function Solids({
+export function Solids({
     pieces,
     colors,
     minR,
@@ -974,8 +983,13 @@ function Handle({
                     ? standing.current.reset()
                     : focus
                       ? move(
-                            eyeAt(T(focus.centre), focus.distance, scene.azimuth, scene.elevation),
-                            T(focus.centre),
+                            eyeAt(
+                                focusPoint(focus),
+                                focus.distance,
+                                scene.azimuth,
+                                scene.elevation,
+                            ),
+                            focusPoint(focus),
                         )
                       : move(
                             eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
@@ -1058,6 +1072,8 @@ function FocusOn({
         out: [number, number];
         start: number;
     } | null>(null);
+    // Where a moving focus was last frame, once the view's eased onto it, so the view moves on with it.
+    const followed = useRef<THREE.Vector3 | null>(null);
     useEffect(() => {
         // Read from the store, as it's changed here rather than drawn from.
         const lens = get().camera;
@@ -1074,7 +1090,7 @@ function FocusOn({
         const out = camera.position.clone().sub(c.target);
         ease.current = {
             from: c.target.clone(),
-            to: T(focus.centre),
+            to: focusPoint(focus),
             dir: out.clone().normalize(),
             out: [out.length(), focus.distance],
             start: performance.now(),
@@ -1085,15 +1101,32 @@ function FocusOn({
             zoomOutTo(limit);
         };
         c.addEventListener("start", stop);
+        followed.current = null;
         return () => {
             c.removeEventListener("start", stop);
             ease.current = null;
+            followed.current = null;
         };
     }, [focus, controls, camera, near, far, get, zoomOutTo]);
     useFrame(() => {
         const e = ease.current;
         const c = controls.current;
-        if (!e || !c) return;
+        if (!c || !focus) return;
+        if (!e) {
+            // Eased in (or stopped by a turn or zoom): carried along with a moving focus, looking the same way.
+            if (!focus.moving) return;
+            const now = focusPoint(focus);
+            const before = followed.current;
+            followed.current = now;
+            if (!before || before.equals(now)) return;
+            const by = now.clone().sub(before);
+            c.target.add(by);
+            camera.position.add(by);
+            c.update();
+            return;
+        }
+        // A moving focus is eased onto where it is now.
+        if (focus.moving) e.to.copy(focusPoint(focus));
         const t = Math.min((performance.now() - e.start) / FOCUS_EASE, 1);
         const k = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
         // In and out by the same fraction each step, so a long way in doesn't rush the close end.
@@ -1106,6 +1139,7 @@ function FocusOn({
         c.update();
         if (t >= 1) {
             ease.current = null;
+            followed.current = c.target.clone();
             zoomOutTo(limit);
         }
     });
