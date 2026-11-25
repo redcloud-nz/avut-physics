@@ -15,6 +15,7 @@ import { arcLengths as ropeArcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
+import { CHAIN_WEIGHT, chainWeight, chainWeightPieces, type ChainWeight } from "./chain-weight";
 import {
     ANCHOR_HOOK,
     baseClamp,
@@ -24,25 +25,31 @@ import {
     CARABINER_R,
     CARABINER_WIDTH,
     chain,
-    CHAIN_10,
+    CHAIN_G80_6,
     EYE_BOLT,
+    EYE_BOLT_M16,
     eyeBolt,
     eyeFrame,
     grigri,
     hook,
+    M12,
+    M16,
+    plate,
     pulley,
     shackle,
-    SHACKLE_10,
+    SHACKLE_6,
     SHACKLE_19,
     STOP_BLOCK,
     stopBlock,
     thimble,
     THIMBLE_11,
+    throughBolt,
     tiedRound,
     tirfor,
     turnbuckle,
     wrap,
     zipTrolley,
+    type Frame,
 } from "./hardware";
 import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
 import FIGURE_8_BIG_LOOP_JSON from "./knots/figure-8-big-loop.json";
@@ -65,12 +72,11 @@ import FIGURE_8_JSON from "./knots/figure-8.json";
  */
 
 /**
- * How far the ground falls between the tower and the shear leg, as a grade over the span: 5%, the gentle end of a 5–10%
- * grade. The unloaded hawsers leave the tower at about 17°: steeper than section 4.7's "conventional" 15° for the
- * unloaded rope, which is advisory and doesn't say where it's measured, but well inside the 45° and 65° maximums
- * (Figures 18 and 19).
+ * How far the ground falls between the tower and the shear leg, as a grade over the span: 2°, a gentle site, so riders
+ * reach the brake slowly enough for a chain weight within the book's limits to stop them. The unloaded hawsers leave the
+ * tower inside section 4.7's "conventional" 15°, and well inside the 45° and 65° maximums (Figures 18 and 19).
  */
-export const GRADE = 0.05;
+export const GRADE = Math.tan((2 * Math.PI) / 180);
 
 /**
  * The lie of the land without the hollow: level round the tower and back to the tree, level round the shear leg and
@@ -188,7 +194,7 @@ export const TOWER = {
 /** The top cross bar's middle: on the uprights' front (span) faces. */
 const BAR_X = TOWER.shs / 2 + TOWER.rhs.w / 2;
 /** Where a hawser rests in its cradle on the top cross bar. */
-export const CRADLE_Y = TOWER.bar + TOWER.rhs.h / 2 + 0.01 + HAWSER_R;
+export const CRADLE_Y = TOWER.bar + TOWER.rhs.h / 2 + 0.008 + HAWSER_R;
 
 /** The H-frame shear leg at the bottom end (Figure 32): `b` between the uprights, the top spar 2B up. */
 export const SHEAR_LEG = {
@@ -263,8 +269,12 @@ export const REST_X = (() => {
     }
     return best.x;
 })();
-/** The dismount zone: from a little short of where riders come to rest to the static brakes. */
-export const DISMOUNT = { from: REST_X - 4, to: STATIC_X };
+/**
+ * The dismount zone: from a little up the span from where the heaviest riders slow to a walk, thrown back up from the
+ * brake (about 49 m along; lighter riders slow further down), to the static brakes. Staff catch riders there and lower
+ * them where they're caught.
+ */
+export const DISMOUNT = { from: 47, to: STATIC_X };
 /**
  * How far the heaviest rider's feet are off the ground standing up: well clear along the ride, but only just in the
  * dismount zone, so they can't quite stand up by themselves, and a staff member on the ground can reach their descender
@@ -1312,14 +1322,6 @@ function squareLashing(
     return pieces;
 }
 
-/** A double base clamp on a wire at `at`, the wire running along `along`. */
-/** A ring of chain or rope `r` round at `at`, level, as points. */
-const ring = (at: Vector3, r: number, n = 16) =>
-    Array.from({ length: n + 1 }, (_, i) => {
-        const a = (2 * Math.PI * i) / n;
-        return at.add(vec3(r * Math.cos(a), 0, r * Math.sin(a)));
-    });
-
 /**
  * The steel tower, with its platform, ladder, brake support and guys. It's built about its own middle and moved off the
  * hawsers' by `TOWER.z`; what's placed by the hawsers or elsewhere on the site (the saddles, the backstay to the tree)
@@ -1382,6 +1384,224 @@ export function guyLoops(): Piece[] {
     ];
 }
 
+/** Where brace `b` crosses height `y`, across the tower. */
+const braceZ = (b: { foot: Vector3; top: Vector3 }, y: number) =>
+    b.foot.z + ((b.top.z - b.foot.z) * (y - b.foot.y)) / (b.top.y - b.foot.y);
+
+/** A steel plate `thick` thick cut to `outline` in frame `f` (u and v in its plane). */
+const plateFaces = (
+    f: Frame,
+    outline: [number, number][],
+    thick: number,
+    color = C.steel,
+): Piece[] => plate(f, outline, [], thick, color);
+
+/** The braces' middles front to back: 50 deep, flush with the uprights' front faces. */
+const BRACE_X = TOWER.shs / 2 - TOWER.rhs.w / 2;
+/** How far in from the upright's middle each brace's foot ends, its middle, beside the upright between its plates. */
+const BRACE_FOOT_IN = 0.11;
+
+/**
+ * A hawser guide on the top cross bar (Appendix E), its middle `z` across: 3 mm steel, a strap 50 mm wide over the bar,
+ * its legs down the bar's front and back and clamped together under it by a 110 mm M16 bolt; on its top two cheeks 32 mm
+ * apart and 100 mm long, the hawser sitting between them on a PTFE liner, a bolt across above it to keep it in.
+ */
+function hawserGuide(z: number): Piece[] {
+    const T = TOWER;
+    const sheet = 0.003;
+    const barTop = T.bar + T.rhs.h / 2;
+    const pieces: Piece[] = [];
+    // The strap: over the top, and its legs 147 mm down the faces.
+    pieces.push(
+        ...section(
+            vec3(BAR_X, barTop + sheet / 2, z - 0.025),
+            vec3(BAR_X, barTop + sheet / 2, z + 0.025),
+            UP,
+            T.rhs.w + 0.005 + 2 * sheet,
+            sheet,
+        ),
+    );
+    for (const t of [-1, 1]) {
+        const x = BAR_X + t * ((T.rhs.w + 0.005) / 2 + sheet / 2);
+        pieces.push(
+            ...section(
+                vec3(x, barTop, z),
+                vec3(x, barTop + sheet - 0.15, z),
+                vec3(1, 0, 0),
+                0.05,
+                sheet,
+            ),
+        );
+    }
+    // The clamp bolt, 12 mm up from the legs' feet.
+    pieces.push(
+        ...throughBolt(
+            vec3(BAR_X + (T.rhs.w + 0.005) / 2 + sheet, barTop + sheet - 0.15 + 0.012, z),
+            vec3(-1, 0, 0),
+            T.rhs.w + 0.005 + 2 * sheet,
+            0.11,
+            C.steel,
+        ),
+    );
+    // The cheeks, rounded over the top and notched 55 mm wide and 40 mm deep underneath to sit over the bar and the
+    // strap's legs: a flat-topped piece and a tab either side of the notch (each kept convex).
+    const seat = barTop + sheet;
+    const round = 0.012;
+    const high = 0.045 - sheet;
+    const corner = (cx: number, from: number): [number, number][] =>
+        Array.from({ length: 5 }, (_, i) => {
+            const a = from + (Math.PI / 2) * (i / 4);
+            return [cx + round * Math.cos(a), high - round + round * Math.sin(a)];
+        });
+    const notch = 0.0275 + sheet;
+    const shapes: [number, number][][] = [
+        [[-0.05, 0], [0.05, 0], ...corner(0.05 - round, 0), ...corner(-0.05 + round, Math.PI / 2)],
+        ...[-1, 1].map((t): [number, number][] => [
+            [t * notch, -0.04],
+            [t * 0.05, -0.04],
+            [t * 0.05, 0],
+            [t * notch, 0],
+        ]),
+    ];
+    for (const t of [-1, 1])
+        for (const shape of shapes)
+            pieces.push(
+                ...plateFaces(
+                    {
+                        o: vec3(BAR_X, seat, z + t * (0.016 + sheet / 2)),
+                        u: vec3(1, 0, 0),
+                        v: UP,
+                        n: vec3(0, 0, t),
+                    },
+                    shape,
+                    sheet,
+                ),
+            );
+    // The liner: a PTFE sheet bent over the bar to a 50 mm radius, its crest just above the strap, so the hawser
+    // bends smoothly over the guide; its ends drop past the bar's front and back.
+    const arc = 0.05;
+    const crest = CRADLE_Y - HAWSER_R;
+    const centre = vec3(BAR_X, crest - arc, z);
+    const reach = Math.asin(0.045 / arc);
+    const along = Array.from({ length: 13 }, (_, i) => {
+        const a = -reach + (2 * reach * i) / 12;
+        return centre.add(vec3(Math.sin(a), Math.cos(a), 0).scale(arc - sheet / 2));
+    });
+    for (let i = 1; i < along.length; i++) {
+        const mid = along[i - 1].lerp(along[i], 0.5);
+        pieces.push(
+            ...section(along[i - 1], along[i], mid.sub(centre).unit(), 0.032, sheet, C.nylon),
+        );
+    }
+    // The bolt across above the hawser, towards the span.
+    pieces.push(
+        ...throughBolt(
+            vec3(BAR_X + 0.025, crest + 0.022, z + 0.016 + sheet),
+            vec3(0, 0, -1),
+            0.032 + 2 * sheet,
+            0.06,
+            C.steel,
+            M12,
+        ),
+    );
+    return pieces;
+}
+
+/**
+ * The tower's bolts (Appendix E's layout), M16 with a washer each side and a lock nut, in the tower's own frame: the
+ * cross bars to the uprights (175 mm), the braces and the brake support's post to the cross bars (150 mm), the braces'
+ * feet to the uprights through the brackets on their ends (150 mm), the extensions' joint plates (125 mm, four each side)
+ * and the feet (125 mm, two each side). The top bar's bolts into the uprights carry the platform's stays' eyes and are
+ * drawn with them.
+ */
+function towerBolts(braces: { s: number; foot: Vector3; top: Vector3 }[]): Piece[] {
+    const T = TOWER;
+    const pieces: Piece[] = [];
+    const back = vec3(-1, 0, 0);
+    const barFront = BAR_X + T.rhs.w / 2;
+    // From the bar's front: through it and the upright or brace behind it (both 75 deep), or the post (50 deep).
+    const throughBar = (y: number, z: number, grip: number, length: number) =>
+        pieces.push(...throughBolt(vec3(barFront, y, z), back, grip, length, C.steel));
+    for (const s of [-1, 1]) throughBar(T.lower, s * T.half, T.rhs.w + T.shs, 0.175);
+    for (const y of [T.bar, T.lower]) {
+        for (const b of braces) throughBar(y, braceZ(b, y), 2 * T.rhs.w, 0.15);
+        throughBar(y, 0, 2 * T.rhs.w, 0.15);
+    }
+    for (const b of braces) {
+        // The bracket on the brace's foot (Appendix E's "Diagonal Brace End"): a 10 mm plate either side of the upright,
+        // 76 mm apart, 100 mm high, reaching from the bolt hole 38 mm in from their outer end along to the brace's end,
+        // their inner end cut parallel to the brace; the brace welded in between them, a 25 mm spacer behind it.
+        const plate = 0.01;
+        const hole = vec3(0, T.braceFoot, b.s * T.half);
+        const inward = vec3(0, 0, -b.s);
+        const along = b.top.sub(b.foot).unit();
+        const slant = (along.z * -b.s) / along.y;
+        const outline: [number, number][] = [
+            [-0.038, -0.05],
+            [-0.038 + 0.195 - 0.05 * slant, -0.05],
+            [-0.038 + 0.195 + 0.05 * slant, 0.05],
+            [-0.038, 0.05],
+        ];
+        for (const t of [-1, 1])
+            pieces.push(
+                ...plateFaces(
+                    {
+                        o: hole.add(vec3(t * (0.038 + plate / 2), 0, 0)),
+                        u: inward,
+                        v: UP,
+                        n: vec3(t, 0, 0),
+                    },
+                    outline,
+                    plate,
+                ),
+            );
+        // The spacer: RHS 75 × 25 behind the brace's end.
+        pieces.push(
+            ...section(
+                b.foot.add(vec3(-T.rhs.w / 2 - 0.0125, 0, 0)),
+                b.foot.add(along.scale(0.12)).add(vec3(-T.rhs.w / 2 - 0.0125, 0, 0)),
+                vec3(1, 0, 0),
+                T.rhs.h,
+                0.025,
+            ),
+        );
+        pieces.push(
+            ...throughBolt(
+                vec3(0.038 + plate, T.braceFoot, b.s * T.half),
+                back,
+                T.shs + 2 * plate + 0.001,
+                0.15,
+                C.steel,
+            ),
+        );
+    }
+    // The eye bolts 350 mm below the top bar's bolts, in the front of each brace (100 mm bolts) and of the brake
+    // support's post (75 mm), for safety and belay lines; their nuts behind.
+    const eyeY = T.bar - 0.35;
+    for (const [z, length] of [...braces.map((b) => [braceZ(b, eyeY), 0.1]), [0, 0.075]]) {
+        const base = vec3(T.shs / 2, eyeY, z);
+        pieces.push(...eyeBolt(base, vec3(1, 0, 0), UP, C.steel, EYE_BOLT_M16).pieces);
+        pieces.push(...throughBolt(base, back, T.rhs.w, length, C.steel, M16, false));
+    }
+    // Across the uprights: through the joint plates either side of the extension's joint, and through the feet.
+    for (const s of [-1, 1]) {
+        const across = (y: number, outside: number, grip: number) =>
+            pieces.push(
+                ...throughBolt(
+                    vec3(0, y, s * T.half + outside),
+                    vec3(0, 0, -1),
+                    grip,
+                    0.125,
+                    C.steel,
+                ),
+            );
+        for (const dy of [-0.25, -0.05, 0.05, 0.25])
+            across(T.joint + dy, T.shs / 2 + 0.008, T.shs + 0.016);
+        for (const y of [T.feet + 0.04, T.feet + 0.09]) across(y, T.shs / 2, T.shs);
+    }
+    return pieces;
+}
+
 function tower(): Piece[] {
     const T = TOWER;
     const pieces: Piece[] = [];
@@ -1405,12 +1625,6 @@ function tower(): Piece[] {
                 ),
             );
     }
-    // The outer eye bolts in the top bar, their eyes upright, for the platform's stays; the inner ones are drawn with
-    // the pulleys hung on them.
-    const outerEyes = [-1, 1].map((s) =>
-        eyeBolt(topEye(s * TOP_EYES.outer), vec3(1, 0, 0), UP, C.steel),
-    );
-    for (const e of outerEyes) placed.push(...e.pieces);
     // The top and bottom cross bars, on the uprights' front faces.
     for (const y of [T.bar, T.lower])
         pieces.push(
@@ -1424,13 +1638,17 @@ function tower(): Piece[] {
         );
     // The diagonal braces, in the uprights' plane, from the uprights up to either side of the top bar's middle, their
     // tops standing a little above it.
-    for (const s of [-1, 1]) {
-        const foot = vec3(0, T.braceFoot, s * (T.half - T.shs / 2 - 0.03));
-        const head = vec3(0, T.bar - 0.05, s * 0.15);
+    // RHS 75 × 50 laid 50 deep, flush with the uprights' fronts; each foot ends between its bracket's plates, beside
+    // the upright.
+    const braces = [-1, 1].map((s) => {
+        const foot = vec3(BRACE_X, T.braceFoot, s * (T.half - BRACE_FOOT_IN));
+        const head = vec3(BRACE_X, T.bar - 0.05, s * 0.15);
         const rise = T.bar + T.rhs.h / 2 + 0.06 - foot.y;
         const top = foot.lerp(head, rise / (head.y - foot.y));
-        pieces.push(...section(top, foot, vec3(1, 0, 0), T.rhs.w, T.rhs.h));
-    }
+        pieces.push(...section(top, foot, vec3(1, 0, 0), T.rhs.h, T.rhs.w));
+        return { s, foot, top };
+    });
+    pieces.push(...towerBolts(braces));
     // The brake support: up the middle behind the bars (away from the platform), past the top bar, with an arm out at
     // its top carrying the brake line's pulley, back and to one side.
     const postX = T.shs / 2 - T.rhs.w / 2;
@@ -1439,17 +1657,10 @@ function tower(): Piece[] {
         // 50 mm front to back, so it sits just behind the bars, 75 mm across.
         ...section(vec3(postX, T.lower - 0.135, T.z), postTop, vec3(1, 0, 0), T.rhs.h, T.rhs.w),
     );
-    const armEnd = BRAKE.armEnd;
-    placed.push(...section(postTop.add(vec3(0, -0.04, 0)), armEnd, UP, 0.05, 0.05));
-    placed.push(
-        ...section(
-            postTop.add(vec3(0, -0.35, 0)),
-            postTop.lerp(armEnd, 0.5).add(vec3(0, -0.04, 0)),
-            UP,
-            0.04,
-            0.04,
-        ),
-    );
+    placed.push(...section(BRAKE.armStart, BRAKE.armEnd, UP, 0.05, 0.05));
+    placed.push(...section(BRAKE.strut.from, BRAKE.strut.to, UP, 0.04, 0.04));
+    // The brake pulley's eye bolt through the arm, nutted on top.
+    placed.push(...throughBolt(BRAKE.eye, UP, 0.05, 0.075, C.steel, M12, false));
     // The platform: an aluminium frame on the bottom bar, its floor a grate, its front corners chained up to the top
     // bar's outer eye bolts from eye bolts of their own.
     // The frame's 50 mm box section, its top flush with the floor; its back against the uprights' front faces, the
@@ -1484,18 +1695,25 @@ function tower(): Piece[] {
         planks: 0.15,
         joints: ACROSS,
     });
-    // The stays: each from the eye bolt in the frame's front corner, its eye turned to the stay, up to the top bar's
-    // outer eye bolt on its side.
-    // Each in a front corner, on top where the front's box section meets the end's.
-    for (const [i, z] of [lo, hi].entries()) {
+    // The stays (Appendix E): 6 mm chain from an M16 eye bolt in each of the frame's front corners up to another on
+    // the bolt through the top bar and its upright on that side, each eye turned to the stay.
+    for (const [s, z] of [
+        [-1, lo],
+        [1, hi],
+    ]) {
         const base = vec3(front, floor, z + T.z);
-        const top = outerEyes[i];
+        const topBase = topEye(s * T.half);
+        const top = eyeBolt(topBase, vec3(1, 0, 0), base.sub(topBase), C.steel, EYE_BOLT_M16);
         const toTop = top.eye.sub(base);
-        const corner = eyeBolt(base, UP, toTop, C.steel);
-        placed.push(...corner.pieces);
+        const corner = eyeBolt(base, UP, toTop, C.steel, EYE_BOLT_M16);
+        placed.push(...top.pieces, ...corner.pieces);
+        // The eye bolt's the bolt through the bar and the upright: its nut on the upright's back.
+        placed.push(
+            ...throughBolt(topBase, vec3(-1, 0, 0), T.rhs.w + T.shs, 0.175, C.steel, M16, false),
+        );
         placed.push(
             ...chainStay(
-                { eye: top.eye, m: eyeFrame(vec3(1, 0, 0), UP).m },
+                { eye: top.eye, m: eyeFrame(vec3(1, 0, 0), base.sub(topBase)).m },
                 { eye: corner.eye, m: eyeFrame(UP, toTop).m },
             ),
         );
@@ -1516,20 +1734,20 @@ function tower(): Piece[] {
         const c = ladderFoot.lerp(ladderTop, i / rungs);
         pieces.push(...bar(c.add(ACROSS.scale(-0.2)), c.add(ACROSS.scale(0.2)), 0.014, C.steel));
     }
-    // The hawsers' cradles on the top bar: a channel either side of each hawser.
+    // The return line's pulleys' eye bolts through the top bar, nutted behind it.
     for (const s of [-1, 1])
-        for (const t of [-1, 1]) {
-            const z = s * HAWSER_Z + t * 0.035;
-            placed.push(
-                ...section(
-                    vec3(BAR_X, TOWER.bar + TOWER.rhs.h / 2, z),
-                    vec3(BAR_X, TOWER.bar + TOWER.rhs.h / 2 + 0.08, z),
-                    ACROSS,
-                    0.1,
-                    0.006,
-                ),
-            );
-        }
+        placed.push(
+            ...throughBolt(
+                topEye(s * RETURN_EYE_Z),
+                vec3(-1, 0, 0),
+                T.rhs.w,
+                0.075,
+                C.steel,
+                M12,
+                false,
+            ),
+        );
+    for (const s of [-1, 1]) placed.push(...hawserGuide(s * HAWSER_Z));
     // Guys from the uprights' tops, and the backstay from the joint of the top bar and the brake support's post back to
     // the tree.
     for (const s of [-1, 1]) pieces.push(...towerGuys(s));
@@ -1550,34 +1768,42 @@ function tower(): Piece[] {
 }
 
 /** The return line's pulley on side `s` (+1 for hawser A's side), under the top bar. */
-export const RETURN_PULLEY = (s: number) =>
-    vec3(0.15, TOWER.bar - 0.2, TOWER.z + s * TOP_EYES.inner);
+export const RETURN_PULLEY = (s: number) => vec3(0.15, TOWER.bar - 0.2, TOWER.z + s * RETURN_EYE_Z);
 
 /**
- * The eye bolts in the top cross bar's platform side, two towards each end: the outer ones' eyes stand upright (their
- * holes level), the inner ones' lie flat (their holes upright), and the return line's pulleys hang from the inner ones.
- * How far each is from the tower's middle.
+ * How far the return line's pulleys' eye bolts are from the tower's middle, in the top cross bar's platform side, their
+ * eyes lying flat (their holes upright). The platform's stays hang from the bolts through the bar into the uprights.
  */
-const TOP_EYES = { outer: 1.35, inner: 1.2 };
+const RETURN_EYE_Z = 1.35;
 /** Where an eye bolt in the top bar's platform side screws in, `z` from the tower's middle. */
 const topEye = (z: number) => vec3(BAR_X + TOWER.rhs.w / 2, TOWER.bar, TOWER.z + z);
 
 /** The chain brake: the brake support's top and arm, its pulley, and the chain weight hanging below it. */
 export const BRAKE = (() => {
+    // Appendix E's brake support: the post's top 615 mm above the top bar's bolt, an arm out level from it (its top
+    // flush with the post's), diagonally back and to one side, 450 mm each way, braced by a strut from 300 mm down the
+    // post to 350 mm (of the 450) out along the arm.
     const postTop = TOWER.bar + 0.615;
     const postX = TOWER.shs / 2 - TOWER.rhs.w / 2;
-    const out = vec3(-1, 0, 1).unit().scale(0.6);
-    const armEnd = vec3(postX, postTop - 0.02, TOWER.z).add(out);
-    // The eye bolt in the arm's underside, 100 mm in from its end.
-    const eye = armEnd.sub(out.unit().scale(0.1)).add(vec3(0, -0.025, 0));
+    const along = vec3(-1, 0, 1).unit();
+    const length = 0.45 * Math.SQRT2;
+    const armStart = vec3(postX, postTop - 0.025, TOWER.z);
+    const armEnd = armStart.add(along.scale(length));
+    // The eye bolt through the hole at the arm's end, in its underside.
+    const eye = armEnd.sub(along.scale(0.025)).add(vec3(0, -0.025, 0));
     const pulley = eye.add(vec3(0, -0.215, 0));
     return {
         postTop,
+        armStart,
         armEnd,
+        strut: {
+            from: vec3(postX, postTop - 0.3, TOWER.z),
+            to: armStart.add(along.scale((length * 0.35) / 0.45)).add(vec3(0, -0.025, 0)),
+        },
         eye,
         pulley,
-        /** Where the brake line ends and the chain starts, the first of it just off the ground. */
-        chainTop: onGround(pulley.x - 0.05, 1.1, pulley.z),
+        /** Where the brake line ends, tied into the chain weight's shackle, its ring just clear of the heap. */
+        chainTop: onGround(pulley.x - 0.05, 0.5, pulley.z),
     };
 })();
 
@@ -1635,18 +1861,19 @@ const NOT_OVERHEAD = new WeakSet<Piece>();
 export const drawnOverhead = (piece: Piece) => !NOT_OVERHEAD.has(piece);
 
 /**
- * A taut stay of chain between two eye bolts' eyes (`m` the way through each eye's hole): a bow shackle at each, its
- * pin through the eye's ring and its crown through the chain's end link. The chain has an odd number of links, so its
+ * A taut stay of chain between two M16 eye bolts' eyes (`m` the way through each eye's hole): a 6 mm D shackle at each,
+ * its pin through the eye's ring and its crown through the chain's end link (Appendix E). The book's 6 mm shackle is a
+ * little narrow between its ears for the M16 eye's 14 mm ring, so they overlap by a millimetre either side. The chain has an odd number of links, so its
  * end links lie the same way and both shackles stand square to their rings; it's stretched or shortened a hair to fit.
  */
 function chainStay(a: { eye: Vector3; m: Vector3 }, b: { eye: Vector3; m: Vector3 }): Piece[] {
-    const [size, shackleSize] = [CHAIN_10, SHACKLE_10];
+    const [size, shackleSize, eyeSize] = [CHAIN_G80_6, SHACKLE_6, EYE_BOLT_M16];
     // Where each shackle's pin is: through the eye's hole, bearing on the inside of the ring on the side towards the
     // other end.
     const pinAt = (e: typeof a, to: Vector3) => {
         const dir = to.sub(e.eye);
         const inRing = dir.sub(e.m.scale(dir.dot(e.m))).unit();
-        return e.eye.add(inRing.scale(EYE_BOLT.r - EYE_BOLT.bar - shackleSize.pin));
+        return e.eye.add(inRing.scale(eyeSize.r - eyeSize.bar - shackleSize.pin));
     };
     const [pinA, pinB] = [pinAt(a, b.eye), pinAt(b, a.eye)];
     const u = pinB.sub(pinA).unit();
@@ -1659,8 +1886,8 @@ function chainStay(a: { eye: Vector3; m: Vector3 }, b: { eye: Vector3; m: Vector
     // pins, which run through the rings.
     const face = u.cross(a.m);
     const ends = [
-        shackle("bow", startA, u.neg(), face.neg(), C.steel, C.pin, shackleSize),
-        shackle("bow", startB, u, face, C.steel, C.pin, shackleSize),
+        shackle("d", startA, u.neg(), face.neg(), C.steel, C.pin, shackleSize),
+        shackle("d", startB, u, face, C.steel, C.pin, shackleSize),
     ];
     const laid = chain([startA, startB], face, C.steel, { ...size, length: span / links });
     return [...ends.flatMap((e) => e.pieces), ...laid.pieces];
@@ -2756,7 +2983,7 @@ function trolleysAndReturn(run = false): Piece[] {
     const slack = (a: Vector3, z: Vector3) => sagLike(a, z, 2);
     const out = hanging(cb, b.back, slack(cb, b.back), 60);
     const bolt = (s: number) => ({
-        eyeBolt: { base: topEye(s * TOP_EYES.inner), out: vec3(1, 0, 0), toward: ACROSS },
+        eyeBolt: { base: topEye(s * RETURN_EYE_Z), out: vec3(1, 0, 0), toward: ACROSS },
     });
     const pa = rigPulley(ca, a.back, cb, 0.004, bolt(1));
     const pb = rigPulley(cb, pa.centre, out[1], 0.004, bolt(-1));
@@ -2788,9 +3015,6 @@ function trolleysAndReturn(run = false): Piece[] {
         ),
     ];
 }
-
-/** Where the chain weight's picket is driven: back from the pile, between it and hawser A, clear of the hawser. */
-const CHAIN_PICKET = vec3(BRAKE.chainTop.x - 0.9, 0, BRAKE.chainTop.z + 0.35);
 
 /** Where a rigid part of a moving rig is: turned by `angle` about `axis` (through its own origin), then moved to `at`. */
 export type Pose = { at: Vector3; axis: Vector3; angle: number };
@@ -2859,7 +3083,7 @@ export type BrakeState = {
 export type BrakeRig = {
     fixed: Piece[];
     parts: { name: string; pieces: Piece[] }[];
-    pose: (state?: BrakeState) => { poses: Map<string, Pose>; ropes: Piece[] };
+    pose: (state?: BrakeState) => { poses: Map<string, Pose>; ropes: Piece[]; weight: ChainWeight };
 };
 
 /**
@@ -2962,15 +3186,17 @@ export function brakeRig(): BrakeRig {
     const brake = rigPulley(BRAKE.pulley, reach[reach.length - 3], BRAKE.chainTop, 0.004, {
         eyeBolt: { base: BRAKE.eye, out: vec3(0, -1, 0) },
     });
-    // Tied into a carabiner clipped to the chain's top link: the chain's top, built about where it is at rest.
+    // Tied round the crown of the shackle the chain weight's ring hangs on: the chain's top, built about where it is at
+    // rest. The shackle's pin runs through the ring, square to it.
     const top = BRAKE.chainTop;
-    const chainClip = top.add(vec3(0, 0.11, 0));
-    const chainKnot = figure8(chainClip, ACROSS, CARABINER_R, brake.round.at(-1)!, 0.004);
+    const ringFace = ACROSS.cross(UP);
+    const sh = CHAIN_WEIGHT.shackle;
+    const crownBar = top.add(UP.scale(sh.body));
+    const chainKnot = figure8(crownBar, ringFace, sh.body, brake.round.at(-1)!, 0.004);
     const chainTop = moved(
         [
-            ...carabiner(chainClip, vec3(0, -1, 0), ACROSS, C.steel, 0.11),
+            ...shackle("bow", top, UP.neg(), UP.neg().cross(ringFace), C.steel, C.pin, sh).pieces,
             ...line(chainKnot.rope, 0.004, C.brakeLine, "rope", { a: true }),
-            ...bar(top.add(vec3(0, 0.03, 0)), top.add(vec3(0, -0.03, 0)), 0.014, C.steel),
         ],
         top.neg(),
     );
@@ -2983,29 +3209,18 @@ export function brakeRig(): BrakeRig {
         },
     });
 
-    // What stays put: the pulleys and the brake line round its pulley, the stabiliser's tie, and the chain's pile and
-    // its picket.
-    const foot = onGround(top.x, 0.2, top.z);
+    // What stays put: the pulleys and the brake line round its pulley, the stabiliser's tie, and the static brakes'
+    // pickets (the chain weight is drawn as it's lifted).
+    const statics = staticBrakes();
     const fixed: Piece[] = [
         ...brake.pieces,
         ...line(brake.round, 0.004, C.brakeLine),
         ...stabiliser.pieces,
         ...line([...stabiliser.round, tie], 0.005, C.shockCord),
         ...line([tie, spar], 0.006, C.fibre, "rail"),
+        ...statics.fixed,
     ];
-    // The pile: rings of chain, smaller towards the top.
-    for (const [y, r] of [
-        [0.03, 0.32],
-        [0.08, 0.27],
-        [0.13, 0.2],
-        [0.18, 0.12],
-    ])
-        fixed.push(...line(ring(onGround(top.x, y, top.z), r, 18), 0.014, C.steel, "steel"));
-    const pk = picket(CHAIN_PICKET, towards(foot, CHAIN_PICKET));
-    fixed.push(
-        ...pk.pieces,
-        ...line([onGround(top.x - 0.25, 0.03, top.z + 0.15), pk.tie], 0.012, C.steel, "steel"),
-    );
+    const under = onGround(top.x, 0, top.z);
 
     const parts = [
         { name: "block-a", pieces: moved(blockA.pieces, blockA.at.neg()) },
@@ -3014,6 +3229,7 @@ export function brakeRig(): BrakeRig {
         { name: "knot-b", pieces: eyeKnots[1].pieces },
         { name: "middle", pieces: moved(middle, apex.neg()) },
         { name: "chain-top", pieces: chainTop },
+        ...statics.parts,
     ];
 
     const pose = ({
@@ -3075,22 +3291,27 @@ export function brakeRig(): BrakeRig {
         ropes.push(
             ...line([brake.round.at(-1)!, chainKnot.end.add(vec3(0, lift, 0))], 0.004, C.brakeLine),
         );
-        // The chain hanging from its top to the pile.
-        ropes.push(...line([lifted, foot], 0.012, C.steel, "steel"));
+        // The chain weight, hanging from its top as it's lifted.
+        const weight = chainWeight(under, lifted.y - under.y, ACROSS);
+        // The static brakes, on the hawsers as they hang now.
+        const held = statics.pose([heightA, heightB]);
+        for (const [name, p] of held.poses) poses.set(name, p);
+        ropes.push(...held.ropes);
         // The stabiliser from its eye back to its pulley.
         ropes.push(...line([cordEye.end.add(by), stabiliser.round[0]], 0.005, C.shockCord));
-        return { poses, ropes };
+        return { poses, ropes, weight };
     };
     return { fixed, parts, pose };
 }
 
 /** The dynamic brake and its chain weight, with block A pushed `pushed` down the span (as one set of pieces). */
 export function brakePieces(state: BrakeState = {}, rig = brakeRig()): Piece[] {
-    const { poses, ropes } = rig.pose(state);
+    const { poses, ropes, weight } = rig.pose(state);
     return [
         ...rig.fixed,
         ...rig.parts.flatMap((p) => posed(p.pieces, poses.get(p.name)!)),
         ...ropes,
+        ...chainWeightPieces(weight, C.steel),
     ];
 }
 
@@ -3098,10 +3319,11 @@ export function brakePieces(state: BrakeState = {}, rig = brakeRig()): Piece[] {
  * The static brakes: a carabiner clipped round each hawser, hanging towards the pull of a rope tied to it and out to a
  * picket 2.5 m to its side (Figure 55).
  */
-function staticBrakes(): Piece[] {
-    const pieces: Piece[] = [];
+function staticBrakes() {
     const length = 0.11;
-    for (const s of [-1, 1]) {
+    const fixed: Piece[] = [];
+    const parts: { name: string; pieces: Piece[] }[] = [];
+    const sides = [1, -1].map((s) => {
         const at = onHawser(STATIC_X, s);
         const base = vec3(STATIC_X, 0, s * (HAWSER_Z + 2.5));
         const pk = picket(base, towards(at, base));
@@ -3110,14 +3332,38 @@ function staticBrakes(): Piece[] {
         const down = vec3(0, pull.y, pull.z).unit();
         const across = down.cross(vec3(1, 0, 0)).unit();
         const top = at.sub(down.scale(HAWSER_R + CARABINER_R));
-        pieces.push(...carabiner(top, down, across, C.steel, length));
         const t = figure8(top.add(down.scale(length)), across, CARABINER_R, pk.tie, 0.0055);
-        pieces.push(
-            ...pk.pieces,
-            ...line([...t.rope, pk.tie], 0.0055, C.staticBrake, "rope", { a: true }),
-        );
-    }
-    return pieces;
+        fixed.push(...pk.pieces);
+        parts.push({
+            name: s > 0 ? "static-a" : "static-b",
+            pieces: moved(
+                [
+                    ...carabiner(top, down, across, C.steel, length),
+                    ...line(t.rope, 0.0055, C.staticBrake, "rope", { a: true }),
+                ],
+                at.neg(),
+            ),
+        });
+        return { s, at, end: t.end, tie: pk.tie, rope: t.end.distanceTo(pk.tie) };
+    });
+    /**
+     * Each carabiner where its hawser is now at the static brakes (`heights`, hawser A's then B's), and its rope out
+     * to its picket: as long as it was rigged, so it sags when the hawser's lower and pulls straight when it's higher.
+     */
+    const pose = (heights: [(x: number) => number, (x: number) => number]) => {
+        const poses = new Map<string, Pose>();
+        const ropes: Piece[] = [];
+        for (const [i, b] of sides.entries()) {
+            const at = vec3(STATIC_X, heights[i](STATIC_X), b.at.z);
+            poses.set(b.s > 0 ? "static-a" : "static-b", { at, axis: vec3(0, 0, 1), angle: 0 });
+            const end = b.end.add(at.sub(b.at));
+            const chord = end.distanceTo(b.tie);
+            const sag = b.rope > chord ? Math.sqrt((3 * chord * (b.rope - chord)) / 8) : 0;
+            ropes.push(...line(hanging(end, b.tie, sag, 20), 0.0055, C.staticBrake));
+        }
+        return { poses, ropes };
+    };
+    return { fixed, parts, pose };
 }
 
 /**
@@ -3145,7 +3391,7 @@ export function runTrolley(side: number) {
 export function returnRig() {
     const [ca, cb] = [RETURN_PULLEY(1), RETURN_PULLEY(-1)];
     const bolt = (s: number) => ({
-        eyeBolt: { base: topEye(s * TOP_EYES.inner), out: vec3(1, 0, 0), toward: ACROSS },
+        eyeBolt: { base: topEye(s * RETURN_EYE_Z), out: vec3(1, 0, 0), toward: ACROSS },
     });
     // Built with the line running out to a trolley a little way along each hawser.
     const pa = rigPulley(ca, onHawser(20, 1), cb, 0.004, bolt(1));
@@ -3204,7 +3450,6 @@ export function foxPieces({ run = false }: { run?: boolean } = {}): Piece[] {
         ...hawsers(run),
         ...trolleysAndReturn(run),
         ...(run ? [] : brakePieces()),
-        ...staticBrakes(),
         ...shearLeg(),
         ...logAnchor(),
         ...lizardAndTirfor(),
@@ -3291,13 +3536,6 @@ export function foxLabels(): FoxLabel[] {
             target: "top-tower",
             text: "Chain weight",
             at: onGround(BRAKE.chainTop.x, 0.3, BRAKE.chainTop.z),
-            side: "left",
-        },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Chain weight picket",
-            at: onGround(CHAIN_PICKET.x, 0, CHAIN_PICKET.z),
             side: "left",
         },
         {
@@ -3507,6 +3745,8 @@ export type FoxTarget = {
     hi: Vector3;
     centre: Vector3;
     distance: number;
+    /** Where its view's middle may be panned to while locked onto it (see `Focus.pan`); none, it stays put. */
+    pan?: { lo: Vector3; hi: Vector3 };
 };
 
 /** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
@@ -3529,6 +3769,12 @@ function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
         distance: Math.max(4.2 * r, 1.5),
     };
 }
+
+/** `target`, its view's middle free to be panned within the box `box` gives round its centre. */
+const panned = (target: FoxTarget, box: (centre: Vector3) => [Vector3, Vector3]): FoxTarget => {
+    const [lo, hi] = box(target.centre);
+    return { ...target, pan: { lo, hi } };
+};
 
 export function foxTargets(): FoxTarget[] {
     const sides = [-1, 1];
@@ -3567,10 +3813,14 @@ export function foxTargets(): FoxTarget[] {
             ...sides.map(treeEye),
         ]),
         // The tower from its backstay's tie to the foot of its ladder, up to the top of the brake support.
-        framing("top-tower", "Top tower", [
-            onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
-            onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
-        ]),
+        // Panned up and down, to look at the tower's feet, platform or top from close up.
+        panned(
+            framing("top-tower", "Top tower", [
+                onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
+                onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
+            ]),
+            (c) => [vec3(c.x, 0.5, c.z), vec3(c.x, BRAKE.postTop, c.z)],
+        ),
         framing("trolley-a", "Trolley A", trolleyAt(TROLLEY_X.a, 1)),
         framing("trolley-b", "Trolley B", trolleyAt(TROLLEY_X.b, -1)),
         // The two blocks and the joining rope sagging between them.
@@ -3588,11 +3838,18 @@ export function foxTargets(): FoxTarget[] {
             onGround(SHEAR_LEG.x - 0.4, 0, -SHEAR_LEG.b / 2 - 0.3),
             onGround(SHEAR_LEG.x + 0.5, SHEAR_LEG.top + 0.1, SHEAR_LEG.b / 2 + 0.3),
         ]),
-        framing("bottom-anchor", "Bottom anchor", [
-            onGround(LOG.x + 0.5, 0, -LOG.length / 2),
-            onGround(LOG.x - 0.2, 1, LOG.length / 2),
-            ...sides.map(lizardEnd),
-        ]),
+        // Panned level, back to the shear leg along the lizards and out along the log.
+        panned(
+            framing("bottom-anchor", "Bottom anchor", [
+                onGround(LOG.x + 0.5, 0, -LOG.length / 2),
+                onGround(LOG.x - 0.2, 1, LOG.length / 2),
+                ...sides.map(lizardEnd),
+            ]),
+            (c) => [
+                vec3(SHEAR_LEG.x, c.y, -LOG.length / 2),
+                vec3(LOG.x + 0.5, c.y, LOG.length / 2),
+            ],
+        ),
     ];
 }
 

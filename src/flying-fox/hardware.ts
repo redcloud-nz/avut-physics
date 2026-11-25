@@ -393,6 +393,18 @@ export const EYE_BOLT_M10: EyeBoltSize = {
 };
 
 /**
+ * An M16 eye bolt to DIN 580, as Appendix E's platform stays hang from: 63 mm outside its eye and 35 mm inside, 62 mm
+ * to the eye's top, a 35 mm collar.
+ */
+export const EYE_BOLT_M16: EyeBoltSize = {
+    r: 0.0245,
+    bar: 0.007,
+    centre: 0.0305,
+    collar: { r: 0.0175, h: 0.012 },
+    thread: { r: 0.008, length: 0.027 },
+};
+
+/**
  * The eye of a bolt standing out towards `out`, turned into the plane of `out` and `toward`: those two directions in it,
  * square to each other (`o` out, `w` across), and the way through its hole (`m`).
  */
@@ -1145,6 +1157,17 @@ function steelStrand(points: Vector3[], r: number, color: string): Piece {
  * ears and its inside length from the crown to the pin; a bow shackle's bow widens to `bow` inside.
  */
 export const SHACKLE_19 = { body: 0.0095, pin: 0.0112, width: 0.032, length: 0.073, bow: 0.052 };
+/**
+ * A 6 mm D shackle (500 kg WLL), as on Appendix E's platform stays: its body 6.5 mm and pin 8 mm across, 12 mm between
+ * its ears, 24 mm inside from the crown to the pin.
+ */
+export const SHACKLE_6: typeof SHACKLE_19 = {
+    body: 0.00325,
+    pin: 0.004,
+    width: 0.012,
+    length: 0.024,
+    bow: 0.019,
+};
 /** A 3/8 in (10 mm) shackle, after Crosby's G-209: its pin 11.2 mm across, 16.8 mm between its ears, 36.6 mm inside. */
 export const SHACKLE_10: typeof SHACKLE_19 = {
     body: 0.00475,
@@ -1688,6 +1711,8 @@ export function tirfor(
  * typical of hardware-store chain: 18.5 mm inside, 9 mm across inside (21 mm outside).
  */
 export const CHAIN_6 = { r: 0.003, length: 0.0185, width: 0.009 };
+/** 6 mm Grade 80 lifting chain (1200 kg WLL), as Appendix E's platform stays: 18 mm long and 7.8 mm across inside. */
+export const CHAIN_G80_6: ChainSize = { r: 0.003, length: 0.018, width: 0.0078 };
 /** 10 mm short link: 28 mm long and 14 mm across inside (34 mm outside), wide enough for a 3/8 in shackle's pin. */
 export const CHAIN_10: ChainSize = { r: 0.005, length: 0.028, width: 0.014 };
 export type ChainSize = typeof CHAIN_6;
@@ -1747,26 +1772,50 @@ export function stepsAlong(path: Vector3[], step: number): Vector3[] {
     return out;
 }
 
+/** Where a chain link is: its inside's near end, the way along it, and a way in its plane square to that. */
+export type LinkFrame = { near: Vector3; d: Vector3; m: Vector3 };
+
 /**
  * Chain laid along `path`, from its start: each link's inside runs from one point a link's inside length along to the
  * next, where the next link's inside starts, so each link's end sits in the next one's. The links lie alternately in
- * the plane of the path and `face`, and square to it. Returns its pieces, the inside of its last link's far end (short
- * of the path's end by less than a link), and how many links.
+ * the plane of the path and `face`, and square to it. Returns where each link is, and the inside of the last link's far
+ * end (short of the path's end by less than a link).
  */
+export function chainLinks(
+    path: Vector3[],
+    face: Vector3,
+    size: ChainSize = CHAIN_6,
+): { links: LinkFrame[]; end: Vector3 } {
+    const joints = stepsAlong(path, size.length);
+    const links: LinkFrame[] = [];
+    for (let k = 0; k + 1 < joints.length; k++) {
+        const d = joints[k + 1].sub(joints[k]).unit();
+        const f = linkFrame(d, face);
+        links.push({ near: joints[k], d, m: k % 2 ? f.w : f.m });
+    }
+    return { links, end: joints[joints.length - 1] };
+}
+
+/** The middle line of a chain link's wire, about its own origin: its inside from the origin along x, in the x–y plane. */
+export function linkOutline(size: ChainSize = CHAIN_6): Vector3[] {
+    return chainLink(vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), "", size).pieces.flatMap((p) =>
+        p.kind === "strand" ? p.points : [],
+    );
+}
+
+/** Chain laid along `path` (see `chainLinks`), as pieces: its links, the end, and how many links. */
 export function chain(
     path: Vector3[],
     face: Vector3,
     color: string,
     size: ChainSize = CHAIN_6,
 ): { pieces: Piece[]; end: Vector3; links: number } {
-    const joints = stepsAlong(path, size.length);
-    const pieces: Piece[] = [];
-    for (let k = 0; k + 1 < joints.length; k++) {
-        const d = joints[k + 1].sub(joints[k]);
-        const f = linkFrame(d, face);
-        pieces.push(...chainLink(joints[k], d, k % 2 ? f.w : f.m, color, size).pieces);
-    }
-    return { pieces, end: joints[joints.length - 1], links: joints.length - 1 };
+    const { links, end } = chainLinks(path, face, size);
+    return {
+        pieces: links.flatMap((l) => chainLink(l.near, l.d, l.m, color, size).pieces),
+        end,
+        links: links.length,
+    };
 }
 
 /**
@@ -1791,4 +1840,60 @@ export function hangingPath(a: Vector3, b: Vector3, length: number, n = 400): Ve
         const x = (h * i) / n;
         return a.add(along.scale(x)).add(vec3(0, y(x), 0));
     });
+}
+
+/**
+ * Metric bolt sizes (metres): the shank's radius, the head's and nut's width across their flats and how thick each is
+ * (the nut a nylon-insert lock nut), and the flat washer under each, as Appendix E's tower is bolted with.
+ */
+export const M16 = {
+    r: 0.008,
+    across: 0.024,
+    head: 0.01,
+    nut: 0.02,
+    washer: { r: 0.015, thick: 0.003 },
+};
+export const M12: typeof M16 = {
+    r: 0.006,
+    across: 0.018,
+    head: 0.0075,
+    nut: 0.015,
+    washer: { r: 0.012, thick: 0.0025 },
+};
+export type BoltSize = typeof M16;
+
+/**
+ * A bolt `length` long (under its head) through `grip` of steel, from `face` (the near face) along `into`: a washer and
+ * hex head on the near face, and a washer and lock nut on the far face, the thread standing out past the nut by
+ * whatever the length leaves. Without `head`, it's the shank of an eye bolt whose collar sits on the near face: just
+ * the shank through, and the washer and nut.
+ */
+export function throughBolt(
+    face: Vector3,
+    into: Vector3,
+    grip: number,
+    length: number,
+    color: string,
+    size: BoltSize = M16,
+    head = true,
+): Piece[] {
+    const d = into.unit();
+    const { r, across, washer } = size;
+    const at = (t: number) => face.add(d.scale(t));
+    const pieces: Piece[] = [];
+    const disc = (from: number, to: number, radius: number) =>
+        part(at(from), at(to), radius, color, to - from);
+    // Under the head: its washer, then the head.
+    const start = head ? -washer.thick : 0;
+    if (head) {
+        pieces.push(...disc(-washer.thick, 0, washer.r));
+        pieces.push(...nut(at(-washer.thick - size.head / 2), d, across, size.head, color));
+    }
+    // The far face's washer and the nut.
+    pieces.push(...disc(grip, grip + washer.thick, washer.r));
+    pieces.push(...nut(at(grip + washer.thick + size.nut / 2), d, across, size.nut, color));
+    // The shank, through it all and out past the nut.
+    const end = Math.max(start + length, grip + washer.thick + size.nut + 0.002);
+    pieces.push(...part(at(start), at(end), r, color, r));
+    return pieces;
 }

@@ -1,6 +1,13 @@
 import type { RigLabel } from "@/abseil-tower/rig";
 import { timber, type Piece } from "@/abseil-tower/tower";
 import {
+    CHAIN_WEIGHT,
+    chainWeight,
+    chainWeightHanging,
+    chainWeightMass,
+    chainWeightPieces,
+} from "@/flying-fox/chain-weight";
+import {
     ANCHOR_SHACKLE,
     backstayLoop,
     BLOCKS_X,
@@ -11,6 +18,7 @@ import {
     groundY,
     guyLoops,
     HAWSER_R,
+    HAWSER_Z,
     line,
     LOG,
     onHawser,
@@ -82,6 +90,21 @@ const UP = vec3(0, 1, 0);
 const DOWN = vec3(0, -1, 0);
 const ACROSS = vec3(0, 0, 1);
 const STEEL = "var(--tower-steel)";
+/** The chain weight with its shackle's crown `height` up, and the shackle its ring hangs on. */
+const weightOnShackle = (height: number) => [
+    ...chainWeightPieces(chainWeight(ORIGIN, height, ALONG), STEEL),
+    ...shackle(
+        "bow",
+        vec3(0, height, 0),
+        DOWN,
+        DOWN.cross(ALONG.cross(UP)),
+        STEEL,
+        C.pin,
+        CHAIN_WEIGHT.shackle,
+    ).pieces,
+];
+/** How high the chain weight's shackle is at the heaviest rider's furthest push: 0.5 m at rest, lifted 4.2 m. */
+const FULL_LIFT = 0.5 + 4.2;
 
 /** A stretch of wire `half` either side of `at` along x, as the trolleys ride. */
 const wire = (at: Vector3, half: number): Piece[] =>
@@ -582,18 +605,18 @@ export const PARTS: Part[] = [
         slug: "fox-platform-stay-top",
         name: "Platform stay, top",
         group: "Flying fox",
-        about: "The top of one of the platform's stays: 10 mm chain from the top cross bar's outer eye bolt down to the platform's front corner, taut and so straight, on a 3/8 in bow shackle at each end: its pin through the eye bolt's ring, its crown through the chain's end link.",
+        about: "The top of one of the platform's stays (Appendix E): 6 mm Grade 80 chain from the M16 eye bolt on the bolt through the top cross bar and its upright, down to the platform's front corner, taut and so straight, on a 6 mm D shackle at each end: its pin through the eye bolt's ring, its crown through the chain's end link.",
         pieces: () =>
             within(foxPieces(), {
-                lo: vec3(0, TOWER.bar - 0.2, TOWER.z + 1.25),
-                hi: vec3(0.3, TOWER.bar + 0.1, TOWER.z + 1.45),
+                lo: vec3(0, TOWER.bar - 0.2, TOWER.z + 1.4),
+                hi: vec3(0.3, TOWER.bar + 0.1, TOWER.z + 1.6),
             }),
     },
     {
         slug: "fox-platform-stay-foot",
         name: "Platform stay, foot",
         group: "Flying fox",
-        about: "The foot of the same stay: the chain down to its bow shackle on the eye bolt in the platform's front corner.",
+        about: "The foot of the same stay: the chain down to its D shackle on the M16 eye bolt in the platform's front corner.",
         pieces: () =>
             within(foxPieces(), {
                 lo: vec3(TOWER.shs / 2 + TOWER.platform.depth - 0.25, TOWER.lower, TOWER.z + 1.2),
@@ -602,6 +625,104 @@ export const PARTS: Part[] = [
                     TOWER.lower + 0.45,
                     TOWER.z + 1.6,
                 ),
+            }),
+    },
+    {
+        slug: "fox-chain-weight",
+        name: "Chain weight, at rest",
+        group: "Flying fox",
+        about: `The chain brake's weight at rest, its shackle 0.5 m off the ground: 10 mm chain, 10 strands 2.1 to 2.7 m long hung from a big ring on a shackle's pin, heaped on the ground and lifted from the heap's middle. ${Math.round(chainWeightMass())} kg in all, ${Math.round(chainWeightHanging(0.5))} kg of it hanging.`,
+        pieces: () => weightOnShackle(0.5),
+    },
+    {
+        slug: "fox-chain-weight-mid",
+        name: "Chain weight, half lifted",
+        group: "Flying fox",
+        about: `The chain brake's weight half lifted, its shackle 1.7 m off the ground: 10 mm chain, 10 strands 2.1 to 2.7 m long hung from a big ring on a shackle's pin, heaped on the ground and lifted from the heap's middle. ${Math.round(chainWeightMass())} kg in all, ${Math.round(chainWeightHanging(1.7))} kg of it hanging.`,
+        pieces: () => weightOnShackle(1.7),
+    },
+    {
+        slug: "fox-chain-weight-full",
+        name: "Chain weight, fully lifted",
+        group: "Flying fox",
+        about: `The chain brake's weight as far as the heaviest rider (120 kg) lifts it, 4.2 m, its shackle 4.7 m off the ground: 10 mm chain, 10 strands 2.1 to 2.7 m long hung from a big ring on a shackle's pin, heaped on the ground and lifted from the heap's middle. ${Math.round(chainWeightMass())} kg in all, ${Math.round(chainWeightHanging(FULL_LIFT))} kg of it hanging.`,
+        pieces: () => weightOnShackle(FULL_LIFT),
+    },
+    {
+        slug: "fox-tower-top-joint",
+        name: "Tower: top bar on an upright",
+        group: "Flying fox",
+        about: "The top cross bar's end on hawser A's upright, cut out of the whole: the 175 mm M16 eye bolt through the bar and the upright, its nut on the upright's back, the platform's stay hanging from its eye.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.15, TOWER.bar - 0.2, TOWER.z + TOWER.half - 0.25),
+                hi: vec3(0.25, TOWER.bar + 0.25, TOWER.z + TOWER.half + 0.2),
+            }),
+    },
+    {
+        slug: "fox-tower-middle",
+        name: "Tower: top bar's middle",
+        group: "Flying fox",
+        about: "The middle of the top cross bar, cut out of the whole: the braces' tops and the brake support's post behind it, each bolted to it with a 150 mm M16 bolt, and an M16 eye bolt in each 350 mm below the bar.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.1, TOWER.bar - 0.45, TOWER.z - 0.35),
+                hi: vec3(0.2, TOWER.bar + 0.2, TOWER.z + 0.35),
+            }),
+    },
+    {
+        slug: "fox-tower-lower-bar",
+        name: "Tower: bottom bar's middle",
+        group: "Flying fox",
+        about: "The middle of the bottom cross bar, cut out of the whole: the braces and the brake support's post behind it, each bolted to it with a 150 mm M16 bolt, the platform resting on top.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.1, TOWER.lower - 0.2, TOWER.z - 0.9),
+                hi: vec3(0.2, TOWER.lower + 0.2, TOWER.z + 0.9),
+            }),
+    },
+    {
+        slug: "fox-hawser-guide",
+        name: "Tower: hawser guide",
+        group: "Flying fox",
+        about: "Hawser A's guide on the top cross bar, cut out of the whole (Appendix E): a 3 mm steel strap over the bar clamped under it by a 110 mm M16 bolt, two cheeks 32 mm apart on top with a PTFE liner between them for the hawser to sit on, and a bolt across above the hawser.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.12, TOWER.bar - 0.2, HAWSER_Z - 0.15),
+                hi: vec3(0.25, TOWER.bar + 0.15, HAWSER_Z + 0.15),
+            }),
+    },
+    {
+        slug: "fox-tower-brace-foot",
+        name: "Tower: brace foot",
+        group: "Flying fox",
+        about: "A diagonal brace's foot on hawser A's upright, cut out of the whole (Appendix E's \"Diagonal Brace End\"): the brace welded between two 10 mm plates 76 mm apart with a 25 mm spacer behind it, the plates either side of the upright and a 150 mm M16 bolt through them.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.15, TOWER.braceFoot - 0.2, TOWER.z + TOWER.half - 0.35),
+                hi: vec3(0.15, TOWER.braceFoot + 0.2, TOWER.z + TOWER.half + 0.15),
+            }),
+    },
+    {
+        slug: "fox-tower-extension-joint",
+        name: "Tower: extension joint",
+        group: "Flying fox",
+        about: "Where hawser A's upright meets its 2 m extension, cut out of the whole: a joint plate either side and four 125 mm M16 bolts through them.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.1, TOWER.joint - 0.4, TOWER.z + TOWER.half - 0.12),
+                hi: vec3(0.1, TOWER.joint + 0.4, TOWER.z + TOWER.half + 0.12),
+            }),
+    },
+    {
+        slug: "fox-tower-foot",
+        name: "Tower: foot",
+        group: "Flying fox",
+        about: "The foot of hawser A's upright, cut out of the whole: its foot plate and the two 125 mm M16 bolts through the upright and the adjustable foot inside it.",
+        pieces: () =>
+            within(foxPieces(), {
+                lo: vec3(-0.2, -0.02, TOWER.z + TOWER.half - 0.2),
+                hi: vec3(0.2, 0.3, TOWER.z + TOWER.half + 0.2),
             }),
     },
     {
@@ -628,8 +749,8 @@ export const PARTS: Part[] = [
 ];
 
 /**
- * The pieces inside the box from `lo` to `hi`, to look at one place in a whole rig: rods and faces whose middles are
- * in it, and the stretches of ropes and wires that run through it.
+ * The pieces inside the box from `lo` to `hi`, to look at one place in a whole rig: everything cut off at the box's
+ * walls, so a long bar running through it shows as a stub. A face cut by a wall loses its holes and corner shading.
  */
 function within(pieces: Piece[], { lo, hi }: { lo: Vector3; hi: Vector3 }): Piece[] {
     const inside = (c: Vector3) =>
@@ -651,11 +772,45 @@ function within(pieces: Piece[], { lo, hi }: { lo: Vector3; hi: Vector3 }): Piec
             }
             return runs.map((points) => ({ ...p, points }));
         }
-        const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
-        return inside(pts.reduce((sum, q) => sum.add(q), vec3(0, 0, 0)).scale(1 / pts.length))
-            ? [p]
-            : [];
+        if (p.kind === "rod") {
+            const cut = clip(p.a, p.b, lo, hi);
+            if (!cut) return [];
+            return [
+                {
+                    ...p,
+                    a: cut[0],
+                    b: cut[1],
+                    capA: cut[0] === p.a && p.capA,
+                    capB: cut[1] === p.b && p.capB,
+                },
+            ];
+        }
+        if (p.points.every(inside)) return [p];
+        const points = clipPolygon(p.points, lo, hi);
+        if (points.length < 3) return [];
+        return [{ ...p, points, holes: undefined, shades: undefined }];
     });
+}
+
+/** A convex polygon cut to the box (Sutherland–Hodgman, a wall at a time). */
+function clipPolygon(points: Vector3[], lo: Vector3, hi: Vector3): Vector3[] {
+    let poly = points;
+    for (const k of ["x", "y", "z"] as const)
+        for (const [bound, keep] of [
+            [lo[k], (v: number) => v >= lo[k]],
+            [hi[k], (v: number) => v <= hi[k]],
+        ] as const) {
+            const out: Vector3[] = [];
+            poly.forEach((q, i) => {
+                const prev = poly[(i + poly.length - 1) % poly.length];
+                const [qIn, pIn] = [keep(q[k]), keep(prev[k])];
+                if (qIn !== pIn) out.push(prev.lerp(q, (bound - prev[k]) / (q[k] - prev[k])));
+                if (qIn) out.push(q);
+            });
+            poly = out;
+            if (poly.length === 0) return [];
+        }
+    return poly;
 }
 
 /** The part of the segment from `a` to `b` inside the box (Liang–Barsky), its ends kept as they are when inside. */

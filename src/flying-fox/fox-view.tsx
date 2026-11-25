@@ -231,14 +231,20 @@ function reframe(
     zoom: number,
     least: number,
     fit: Fit,
+    pan?: { lo: Vector3; hi: Vector3 },
 ): Frame {
     const z = clamp(zoom, least, MAX_ZOOM);
     const inView = (s: Vector2, ppm: number) =>
         vec2((s.x - origin.x) / ppm, (origin.y - s.y) / ppm);
     const [u, v] = [inView(from, PPM * start.zoom), inView(to, PPM * z)];
     const shift = cam.right.scale(u.x - v.x).add(cam.up.scale(u.y - v.y));
-    return { zoom: z, target: inFit(cam, fit, start.target.add(shift)) };
+    const moved = start.target.add(shift);
+    return { zoom: z, target: pan ? inBox(pan, moved) : inFit(cam, fit, moved) };
 }
+
+/** `p` kept inside the box from `lo` to `hi`: where a target's view may be panned. */
+const inBox = ({ lo, hi }: { lo: Vector3; hi: Vector3 }, p: Vector3) =>
+    vec3(clamp(p.x, lo.x, hi.x), clamp(p.y, lo.y, hi.y), clamp(p.z, lo.z, hi.z));
 
 /**
  * What a flat view shows of `target`: the box round it as seen from `cam`, with some room round it, and never smaller
@@ -465,6 +471,7 @@ export default function FoxView() {
                     f.zoom * Math.exp(-delta * rate),
                     leastZoom(fit, siteFit, size, focus !== null),
                     fit,
+                    focus?.pan,
                 );
             });
         };
@@ -607,11 +614,12 @@ export default function FoxView() {
             const zoom = d.frame.zoom * (a.distanceTo(b) / Math.max(d.spread, 1));
             // Locked onto a target, it zooms about the middle and doesn't move.
             const [from, to] = focus ? [origin, origin] : [d.mid, a.mid(b)];
-            setMoved(reframe(cam, origin, d.frame, from, to, zoom, least, fit));
+            setMoved(reframe(cam, origin, d.frame, from, to, zoom, least, fit, focus?.pan));
             return;
         }
-        if (focus) return;
-        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom, least, fit));
+        // Locked onto a target, only one that may be panned moves, and only within its box.
+        if (focus && !focus.pan) return;
+        setMoved(reframe(cam, origin, d.frame, d.at, at, d.frame.zoom, least, fit, focus?.pan));
     };
     const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
         // A click (not a drag) on a target's box in the free view locks onto it.
@@ -842,13 +850,13 @@ export default function FoxView() {
                     </ul>
                     <p className="mt-3 border-t border-border pt-2 text-xs text-ink-muted">
                         Set up to Scouts NSW&rsquo;s flying fox procedure on a made-up site: the
-                        ground is level round each end and falls {FALL} m between them (a{" "}
-                        {Math.round(GRADE * 1000) / 10}% grade over the span), with a hollow between
-                        shaped to keep even a {RIDER.mass} kg rider&rsquo;s feet{" "}
-                        {CLEARANCE.ride * 100} cm clear standing up, until the dismount zone, where
-                        they can&rsquo;t quite stand. A {SPAN} m span, the hawsers tensioned to sag
-                        5% with a {TEST_LOAD} kg test load at the middle, and drawn unloaded. Sizes
-                        the procedure doesn&rsquo;t give are estimates.
+                        ground is level round each end and falls {Math.round(FALL * 10) / 10} m
+                        between them (a {Math.round((Math.atan(GRADE) * 180) / Math.PI)}° grade over
+                        the span), with a hollow between shaped to keep even a {RIDER.mass} kg
+                        rider&rsquo;s feet {CLEARANCE.ride * 100} cm clear standing up, until the
+                        dismount zone, where they can&rsquo;t quite stand. A {SPAN} m span, the
+                        hawsers tensioned to sag 5% with a {TEST_LOAD} kg test load at the middle,
+                        and drawn unloaded. Sizes the procedure doesn&rsquo;t give are estimates.
                     </p>
                 </section>
                 <DropdownMenu>

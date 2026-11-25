@@ -8,7 +8,9 @@ import { useFrame } from "@react-three/fiber";
 
 import { buildHairlines, buildScene, Solids, T, type Colors } from "@/abseil-tower/tower-gl";
 
-import { brakeRig, loaded, type Pose } from "./fox";
+import { CHAIN_WEIGHT } from "./chain-weight";
+import { brakeRig, C, loaded, type Pose } from "./fox";
+import { linkOutline } from "./hardware";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";
@@ -39,22 +41,38 @@ export default function BrakeGL({
     const rig = useMemo(() => brakeRig(), []);
     // The ropes' colours, which don't change, each drawn as one mesh and one set of hairlines.
     const ropeColors = useMemo(
-        () => [...new Set(rig.pose().ropes.flatMap((p) => (p.color ? [p.color] : [])))],
+        () => [
+            ...new Set([...rig.pose().ropes.flatMap((p) => (p.color ? [p.color] : [])), C.steel]),
+        ],
         [rig],
     );
+    // The chain weight's links, all one shape: a tube round a link's middle line, each placed every frame.
+    const link = useMemo(() => {
+        const outline = linkOutline(CHAIN_WEIGHT.size).slice(0, -1);
+        const curve = new THREE.CatmullRomCurve3(
+            outline.map((p) => new THREE.Vector3(p.x, p.y, p.z)),
+            true,
+        );
+        return new THREE.TubeGeometry(curve, 28, CHAIN_WEIGHT.size.r, 6, true);
+    }, []);
+    const most = useMemo(() => Math.ceil(rig.pose().weight.links.length * 1.1) + 20, [rig]);
+    const links = useRef<THREE.InstancedMesh>(null);
     const groups = useRef(new Map<string, THREE.Group>());
     const meshes = useRef(new Map<string, THREE.Mesh>());
     const lines = useRef(new Map<string, ComponentRef<typeof Line>>());
     useEffect(() => {
         const drawn = meshes.current;
-        return () => drawn.forEach((m) => m.geometry.dispose());
-    }, []);
+        return () => {
+            drawn.forEach((m) => m.geometry.dispose());
+            link.dispose();
+        };
+    }, [link]);
 
     useFrame(() => {
         const s = sessionAt(session, clock.t);
         // The hawsers as they hang now, each with its rider's weight on it once they've stepped off.
         const [a, b] = [s.a, s.b].map((q) => loaded(q.x, setup.trolley + setup.mass * q.load, 160));
-        const { poses, ropes } = rig.pose({
+        const { poses, ropes, weight } = rig.pose({
             pushed: s.a.pushed,
             pushedB: s.b.pushed,
             heightA: (x) => heightAt(a, x),
@@ -64,7 +82,21 @@ export default function BrakeGL({
             const pose = poses.get(name);
             if (pose) place(group, pose);
         }
-        const { solids } = buildScene(ropes, {}, sides);
+        const instanced = links.current;
+        if (instanced) {
+            const m = new THREE.Matrix4();
+            const count = Math.min(weight.links.length, most);
+            for (let i = 0; i < count; i++) {
+                const { near, d, m: across } = weight.links[i];
+                const x = T(d);
+                const y = T(across.sub(d.scale(across.dot(d))).unit());
+                m.makeBasis(x, y, x.clone().cross(y)).setPosition(T(near));
+                instanced.setMatrixAt(i, m);
+            }
+            instanced.count = count;
+            instanced.instanceMatrix.needsUpdate = true;
+        }
+        const { solids } = buildScene([...ropes, { ...weight.ring, color: C.steel }], {}, sides);
         for (const { color, geometry } of solids) {
             const mesh = meshes.current.get(color);
             if (!mesh) {
@@ -81,6 +113,9 @@ export default function BrakeGL({
     const solid = { colors, minR: {}, hairlines: 2.5, sides };
     return (
         <>
+            <instancedMesh ref={links} args={[link, undefined, most]} frustumCulled={false}>
+                <meshLambertMaterial color={colors.read(C.steel)} />
+            </instancedMesh>
             <Solids pieces={rig.fixed} {...solid} />
             {rig.parts.map((p) => (
                 <group

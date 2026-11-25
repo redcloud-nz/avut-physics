@@ -1,14 +1,23 @@
 import { describe, expect, it } from "vitest";
 
+import { chainWeightMass } from "./chain-weight";
 import { DISMOUNT, RIDER, STATIC_X, TROLLEY_X } from "./fox";
 import { HIT_X, RUN, simulateRun, simulateSession, TIMELINE } from "./run";
 
 describe("a rider's run", () => {
-    it("stops the heaviest rider (120 kg) just short of the static brakes, the chain weight tuned for it", () => {
+    it("stops the heaviest rider (120 kg) short of the static brakes with the book's chain weight", () => {
         const run = simulateRun({ ...RUN, mass: RIDER.mass });
         expect(run.reachedStatic).toBe(false);
         expect(run.shortOfStatic).toBeGreaterThan(0);
-        expect(run.shortOfStatic).toBeLessThan(0.5);
+        // At least 50 kg of chain (section 5.4.3), all of it lifted clear of the pile by the furthest push.
+        expect(chainWeightMass()).toBeGreaterThanOrEqual(50);
+        // Pulling no more than 0.8 kN (AS 2316.2.1, as section 5.4.3 gives it): the chain hanging, and the pull of
+        // snatching more of it off the pile at the speed it's lifted.
+        for (const s of run.samples) {
+            if (s.pushed <= 0) continue;
+            const { mass, perMetre } = RUN.chain(s.pushed);
+            expect(mass * 9.81 + perMetre * s.speed * s.speed).toBeLessThanOrEqual(800);
+        }
     });
 
     for (const mass of [30, 60, 90, 120]) {

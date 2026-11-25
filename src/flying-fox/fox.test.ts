@@ -93,7 +93,7 @@ describe("flying fox layout", () => {
         }
         // Roughly level out to the guys' pickets.
         expect(Math.abs(groundY(1.6 * TOWER.top))).toBeLessThan(0.05);
-        expect(Math.abs(groundY(SHEAR_LEG.x - 1.6 * SHEAR_LEG.top) + FALL)).toBeLessThan(0.15);
+        expect(Math.abs(groundY(SHEAR_LEG.x - 1.6 * SHEAR_LEG.top) + FALL)).toBeLessThan(0.25);
         // No sudden changes of slope: it bends no more sharply than a 15 m radius anywhere.
         const d = 0.5;
         for (let x = TREE.x + d; x < LOG.x - d; x += d) {

@@ -1,9 +1,12 @@
 import { G } from "@/lib/constants";
 import { vec3 } from "@/lib/vector3";
 
+import { chainWeightHanging } from "./chain-weight";
 import {
     BLOCKS_X,
+    BRAKE,
     DISMOUNT,
+    groundY,
     HAWSER_Z,
     hawserY,
     loaded,
@@ -38,12 +41,8 @@ export type RunSetup = {
     rolling: number;
     /** The rider's drag area, seated: drag coefficient times frontal area (m²). */
     dragArea: number;
-    /**
-     * The chain weight: not one chain but several hanging together, branching into more lower down, so the further
-     * it's lifted the more chain comes off the ground with each metre. Its hanging mass with the block pushed `d`
-     * along is `hanging + perMetre d + growth d² / 2` (kg); each metre lifted then weighs `perMetre + growth d`.
-     */
-    chain: { hanging: number; perMetre: number; growth: number };
+    /** The chain weight: how much of it hangs (kg) with the block pushed `d` along, and how much each metre lifted weighs. */
+    chain: (d: number) => { mass: number; perMetre: number };
     /** The block, joining rope and brake line, dragged along with the trolley once it meets the block (kg). */
     brake: number;
     /**
@@ -58,26 +57,36 @@ export type RunSetup = {
     swingDamping: number;
 };
 
-/** How fast the chain weight's metres grow heavier as it's lifted (kg/m²): see `RUN.chain`, tuned in `run.test.ts`. */
-export const CHAIN_GROWTH = 8.3;
+/** How high the chain weight's top is at rest, above the ground under it (m). */
+const CHAIN_REST = BRAKE.chainTop.y - groundY(BRAKE.chainTop.x);
+
+/**
+ * The chain weight's pull as it's lifted (`CHAIN_WEIGHT`, as drawn): the block drags the brake line, which lifts the
+ * chain's top as far as the block's pushed. The chain hanging, and each metre lifted's weight: what comes off the pile.
+ */
+export function chainWeightPull(d: number) {
+    const step = 0.005;
+    const mass = chainWeightHanging(CHAIN_REST + d);
+    return { mass, perMetre: (chainWeightHanging(CHAIN_REST + d + step) - mass) / step };
+}
 
 export const RUN: RunSetup = {
     // A typical heavy rider, short of the heaviest the book allows (`RIDER.mass`).
     mass: 100,
     trolley: 1.5,
     length: RIDER.harness,
-    rolling: 0.02,
+    // High for a twin-sheave trolley on wire (a worn one, a rider upright in a breeze), so riders on this site reach
+    // the brake slowly enough for a chain weight within the book's limits.
+    rolling: 0.04,
     dragArea: 0.5,
-    // About six light chains, a metre of each hanging at rest; how fast more joins in is set so the heaviest rider
-    // (120 kg) stops just short of the static brakes.
-    chain: { hanging: 6, perMetre: 6, growth: CHAIN_GROWTH },
+    chain: chainWeightPull,
     brake: 6,
     swingDamping: 100,
     catchTime: 0.7,
 };
 
-/** How slow a rider has to be going for ground staff to catch them (m/s): a jog. */
-const CATCH_SPEED = 3;
+/** How slow a rider has to be going for ground staff to catch them (m/s): 5 km/h, a walk. */
+const CATCH_SPEED = 5 / 3.6;
 
 /** Air's density (kg/m³). */
 const AIR = 1.2;
@@ -87,11 +96,6 @@ export const LOAD_ON = 0.5;
 
 /** Where the trolley's bumper meets block A, the trolley's middle this far along the span. */
 export const HIT_X = TROLLEY_X.b;
-
-/** How much chain hangs with the block pushed `d` along (kg), and how much each metre lifted then weighs (kg/m). */
-export function chainAt({ hanging, perMetre, growth }: RunSetup["chain"], d: number) {
-    return { mass: hanging + perMetre * d + (growth * d * d) / 2, perMetre: perMetre + growth * d };
-}
 
 /** One moment of the run. */
 export type RunSample = {
@@ -183,7 +187,7 @@ export function simulateRun(
         const [sa, ca] = [Math.sin(a), Math.cos(a)];
         const pushed = onBlock ? Math.max(x - HIT_X, 0) : 0;
         // What moves with the trolley: itself, and the brake and the lifted chain once it's on the block.
-        const lifted = chainAt(setup.chain, pushed);
+        const lifted = setup.chain(pushed);
         const mt = setup.trolley + (onBlock ? setup.brake + lifted.mass : 0);
         // Mass matrix and the forces on each coordinate (generalised).
         const M11 = (mt + m) * (1 + yp * yp);
@@ -199,7 +203,8 @@ export function simulateRun(
         const ux = 1 / along;
         const uy = yp / along;
         // Rolling resistance against the trolley's motion (eased in at a walking pace, so it settles smoothly).
-        const roll = setup.rolling * (m + mt) * G * ux * Math.tanh(vx / 0.02);
+        // Rolling resistance, until staff hold the rider (who then hold them still themselves).
+        const roll = held === null ? setup.rolling * (m + mt) * G * ux * Math.tanh(vx / 0.02) : 0;
         // The chain's pull back up the span: the weight hanging, and lifting it off the pile as it goes.
         const chain = onBlock ? lifted.mass * G + (vx > 0 ? lifted.perMetre * vx * vx : 0) : 0;
         const ft = { x: -(roll + chain) * ux, y: -(roll + chain) * uy - mt * G };
@@ -292,11 +297,10 @@ export function simulateRun(
             onBlock = false;
             braked = true;
         }
-        // Thrown back up the span by the brake, caught on the way back down, in the dismount zone.
+        // Once they're off the brake and slower than a walk, caught by the staff in the dismount zone and held there.
         if (
             caught === null &&
             braked &&
-            vx > 0 &&
             x > DISMOUNT.from &&
             x < DISMOUNT.to &&
             now.speed < CATCH_SPEED
@@ -390,7 +394,7 @@ export function returnLength(setup: RunSetup = RUN) {
 }
 
 /** How fast an empty trolley's rolling resistance and the hauled trolley's catch work (share of its weight). */
-const EMPTY_ROLLING = 0.03;
+const EMPTY_ROLLING = RUN.rolling;
 
 /**
  * Both trolleys through the timeline. The riding trolley follows `run`; the return line, which doesn't stretch and

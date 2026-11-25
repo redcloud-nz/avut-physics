@@ -71,6 +71,11 @@ export type Focus = {
     distance: number;
     /** For something that moves: how far it's moved from `centre` now, read each frame so the view follows it. */
     moving?: () => Vector3;
+    /**
+     * Where the point the view turns about may be moved to while it's locked on, as a box (scene coordinates): an axis
+     * the box has no depth in stays put, so a tall thing can be panned only up and down. None: it can't be moved off.
+     */
+    pan?: { lo: Vector3; hi: Vector3 };
 };
 
 /** Where a focus is now, moved on from its centre if it moves. */
@@ -1004,7 +1009,15 @@ function Handle({
         // so the view slides to a stop at the edge rather than turning), and no further out than the scene allows.
         const box = boundsBox(scene);
         const furthest = Math.min(scene.maxDistance, start * (scene.zoomOut ?? Infinity));
+        const panBox = focus?.pan
+            ? new THREE.Box3().setFromPoints([T(focus.pan.lo), T(focus.pan.hi)])
+            : null;
         const keep = () => {
+            if (panBox) {
+                const shift = panBox.clampPoint(c.target, new THREE.Vector3()).sub(c.target);
+                c.target.add(shift);
+                camera.position.add(shift);
+            }
             if (box) {
                 const shift = box.clampPoint(c.target, new THREE.Vector3()).sub(c.target);
                 c.target.add(shift);
@@ -1385,7 +1398,7 @@ export function SceneGL({
                         // Off while standing somewhere, where the view only turns about the eye.
                         enabled={!stance}
                         // Locked onto a focus, it zooms towards it and can't be moved off it.
-                        enablePan={!focus}
+                        enablePan={!focus || !!focus.pan}
                         zoomToCursor={!focus}
                         minDistance={focus ? focus.distance / 8 : (scene.minDistance ?? 1.5)}
                         maxDistance={scene.maxDistance}
