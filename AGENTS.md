@@ -23,11 +23,11 @@ Every checkout gets its own port, and Next allows one `next dev` per checkout (a
 with "Another next dev server is already running" and names the port the running one is on). The
 ports sit clear of the `avut` repo's, so both can run at once.
 
-| Port  | Whose                                                                                                                                                           |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3200  | The user's server in the main checkout. Agents may use it but never start it.                                                                                   |
-| 3300  | An agent's server in the main checkout, only when the user's 3200 isn't running: `PORT=3300 npm run dev`. Stop it when you're done, since it blocks the user's. |
-| 3301+ | One fixed port per worktree, in its `.dev-port` (gitignored). `npm run dev` there serves on it.                                                                 |
+| Port  | Whose                                                                                                                                                                       |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3200  | The user's server in the main checkout. Agents may use it but never start it.                                                                                               |
+| 3300  | An agent's server in the main checkout, only when the user's 3200 isn't running: `PORT=3300 npm run dev`. It blocks the user's, so stop it once they've finished reviewing. |
+| 3301+ | One fixed port per worktree, in its `.dev-port` (gitignored). `npm run dev` there serves on it.                                                                             |
 
 - Agents may start and stop servers on 3300 and up without asking. Never touch 3200.
 - `npm run dev:port` prints the checkout's port: 3200 in the main checkout, the `.dev-port` in a
@@ -38,6 +38,11 @@ ports sit clear of the `avut` repo's, so both can run at once.
 If this checkout's server is running, use it rather than starting another (it reloads as files
 change). Check pages in a browser after changing anything the user sees: passing tests don't show
 that a diagram draws correctly. The article's first load compiles for around 20 seconds.
+
+The user looks at every change themselves before it's done. When a change shows on a page, leave
+the dev server running when you hand it over, give the URL (and any address that opens the view in
+question), and stop the server only when they say they've finished reviewing. Don't commit until
+they've looked.
 
 ## Worktrees
 
