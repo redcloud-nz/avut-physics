@@ -36,6 +36,7 @@ import {
     StrandSwatch,
     toDrawing,
 } from "@/abseil-tower/tower-view";
+import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -160,10 +161,6 @@ const STANCES = foxStances();
 /** How close a flat view is, and the point it's centred on. */
 type Frame = { zoom: number; target: Vector3 };
 type Fit = { centre: Vector3; width: number; height: number };
-
-/** The look of the round-cornered buttons over the drawing, matching the zoom buttons. */
-const CONTROL =
-    "flex h-9 items-center justify-center rounded-lg border border-border bg-surface/90 text-ink-soft shadow-lg backdrop-blur transition-colors hover:bg-line-faint [&_svg]:size-4";
 
 type Mode = "3d" | "side" | "overhead";
 const MODES: Record<
@@ -813,7 +810,7 @@ export default function FoxView() {
                     onClick={() => setLegendOpen(true)}
                     aria-label="Show the legend"
                     title="Legend"
-                    className={`${CONTROL} w-9 shrink-0 ${
+                    className={`${OVERLAY_CONTROL} w-9 shrink-0 ${
                         legendOpen === null ? "flex sm:hidden" : legendOpen ? "hidden" : "flex"
                     }`}
                 >
@@ -850,7 +847,7 @@ export default function FoxView() {
                             type="button"
                             aria-label={`Detail: ${choice === "auto" ? `Auto, ${DETAILS[auto].label}` : DETAILS[choice].label}`}
                             title="Detail"
-                            className={`${CONTROL} w-9 shrink-0`}
+                            className={`${OVERLAY_CONTROL} w-9 shrink-0`}
                         >
                             <Gauge />
                         </button>
@@ -884,7 +881,7 @@ export default function FoxView() {
                             type="button"
                             aria-label={`View: ${MODES[mode].label}`}
                             title="View"
-                            className={`${CONTROL} gap-1.5 px-2.5`}
+                            className={`${OVERLAY_CONTROL} gap-1.5 px-2.5`}
                         >
                             {MODE_ICONS[mode]}
                             <span className="hidden text-xs sm:inline">{MODES[mode].label}</span>
@@ -918,7 +915,7 @@ export default function FoxView() {
                                     : `Look at: ${focus?.label ?? "Free"}`
                             }
                             title="Look at"
-                            className={`${CONTROL} gap-1.5 px-2.5 whitespace-nowrap`}
+                            className={`${OVERLAY_CONTROL} gap-1.5 px-2.5 whitespace-nowrap`}
                         >
                             {stance ? <PersonStanding /> : focus ? <Eye /> : <Move3d />}
                             <span className="text-xs">

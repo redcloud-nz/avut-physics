@@ -9,11 +9,13 @@ import {
 } from "@/abseil-tower/tower";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
+import { catmullRom, cubicPoints } from "@/lib/curve3";
 import { convexHull } from "@/lib/hull";
 import { clamp } from "@/lib/math";
-import { arcLengths as ropeArcLengths } from "@/lib/rope-3d/rope";
+import { bisect } from "@/lib/numeric/roots";
+import { arcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
-import { vec3, type Vector3 } from "@/lib/vector3";
+import { boundsOf, turnBetween, vec3, type Vector3 } from "@/lib/vector3";
 
 import { CHAIN_WEIGHT, chainWeight, chainWeightPieces, type ChainWeight } from "./chain-weight";
 import {
@@ -353,16 +355,6 @@ const ACROSS = vec3(0, 0, 1);
 const colored = <T extends Piece>(pieces: T[], color: string): T[] =>
     pieces.map((p) => ({ ...p, color }));
 
-/** `pieces` moved `dy` up: what's built on level ground, put on the ground where it stands. */
-function shift(pieces: Piece[], dy: number): Piece[] {
-    const d = vec3(0, dy, 0);
-    return pieces.map((p) =>
-        p.kind === "rod"
-            ? { ...p, a: p.a.add(d), b: p.b.add(d) }
-            : { ...p, points: p.points.map((q) => q.add(d)) },
-    );
-}
-
 /** A point `h` above the ground at `x`, `z`. */
 const onGround = (x: number, h: number, z: number) => vec3(x, groundY(x) + h, z);
 
@@ -427,7 +419,7 @@ function halveTail(points: readonly Vector3[]): Vector3[] {
             .dot(way) > Math.cos(Math.PI / 18)
     )
         k--;
-    const arc = ropeArcLengths(points.slice(k));
+    const arc = arcLengths(points.slice(k));
     const half = arc.at(-1)! / 2;
     const keep = arc.findIndex((s) => s > half);
     return points.slice(0, k + keep);
@@ -1081,13 +1073,7 @@ export function sagLike(a: Vector3, b: Vector3, times = 1, clear = 0.5): number 
         hanging(a, b, sag, 60).every((p) => p.y >= groundY(p.x) + clear);
     if (clears(want)) return want;
     // As much as still clears, by halving the difference.
-    let [lo, hi] = [0, want];
-    for (let i = 0; i < 30; i++) {
-        const m = (lo + hi) / 2;
-        if (clears(m)) lo = m;
-        else hi = m;
-    }
-    return lo;
+    return bisect(clears, 0, want, 30)[0];
 }
 
 /** A hawser's height along the span, unloaded, at `x` (from the tower's cradle to the shear leg's saddle). */
@@ -1319,7 +1305,7 @@ function squareLashing(
             at(spar, -w, -over),
             spar.add(a.scale(-w)).add(n.scale(over)),
         ];
-        pieces.push(...line(smooth(loop, 4), LASHING_R, C.fibre, "rail"));
+        pieces.push(...line(catmullRom(loop, 4), LASHING_R, C.fibre, "rail"));
     }
     return pieces;
 }
@@ -1852,9 +1838,9 @@ function tree(): Piece[] {
     const crownBar = crown.add(g).sub(toTower.scale(SHACKLE_19.body));
     pieces.push(...basketedSling("round", centre, TREE.r, crownBar, SHACKLE_19.body, ACROSS, UP));
     // The branches are left out of the overhead view, where they'd hide the slings round the trunk.
-    const up = shift(branches, groundY(TREE.x));
+    const up = moved(branches, vec3(0, groundY(TREE.x), 0));
     for (const b of up) NOT_OVERHEAD.add(b);
-    return [...shift(pieces, groundY(TREE.x)), ...up];
+    return [...moved(pieces, vec3(0, groundY(TREE.x), 0)), ...up];
 }
 
 /** Pieces left out of the overhead view. */
@@ -2279,7 +2265,7 @@ function shearLeg(): Piece[] {
         );
     // The frame's built on level ground; it stands on the ground at its uprights.
     const g = groundY(L.x);
-    const frame = shift(pieces, g);
+    const frame = moved(pieces, vec3(0, g, 0));
     // A star picket at each upright's heel, on the anchor side, so it can't kick out.
     for (const s of [-1, 1])
         frame.push(...picket(vec3(L.x + L.r + 0.05, 0, s * (half - 0.12)), vec3(1, 0, 0)).pieces);
@@ -2444,14 +2430,14 @@ function hawserFoot(s: number): Piece[] {
             const out = vec3(-1, 0, s * 0.2).unit();
             const land = onGround(end.x - 2.0, HAWSER_R, end.z + s * 0.25);
             const rest = onGround(land.x - 1.0, HAWSER_R, land.z + s * 0.35);
-            const drop = bezier3(
+            const drop = cubicPoints(
                 end,
                 end.add(along.scale(0.4)),
                 land.sub(out.scale(0.9)),
                 land,
                 24,
             );
-            const lie = bezier3(
+            const lie = cubicPoints(
                 land,
                 land.add(out.scale(0.4)),
                 rest.sub(vec3(-0.35, 0, s * 0.2)),
@@ -2514,26 +2500,6 @@ const TIRFOR_RIG = (() => {
     return { tirfor: t, hook: h, u };
 })();
 
-/** `n` points along the cubic Bézier from `a` to `b` with control points `c1` and `c2`, both ends included. */
-function bezier3(a: Vector3, c1: Vector3, c2: Vector3, b: Vector3, n: number): Vector3[] {
-    return Array.from({ length: n + 1 }, (_, i) => {
-        const t = i / n;
-        const s = 1 - t;
-        return a
-            .scale(s * s * s)
-            .add(c1.scale(3 * s * s * t))
-            .add(c2.scale(3 * s * t * t))
-            .add(b.scale(t * t * t));
-    });
-}
-
-/** How far along `path` each of its points is. */
-const arcLengths = (path: Vector3[]) => {
-    const at = [0];
-    for (let i = 1; i < path.length; i++) at.push(at[i - 1] + path[i].distanceTo(path[i - 1]));
-    return at;
-};
-
 /** The point `d` along `path`, and the way it runs there. */
 function alongPath(path: Vector3[], d: number): { at: Vector3; dir: Vector3; i: number } {
     const at = arcLengths(path);
@@ -2592,7 +2558,7 @@ function lizard(s: number, hang: Vector3[]): Piece[] {
     const tip = past.add(along.scale(LIZARD.tail - 0.2)).sub(UP.scale(0.06));
     const top = swagedEye(tip.add(droop.scale(LIZARD_EYE)), droop.neg(), along.cross(UP).unit());
     pieces.push(...top.pieces);
-    const free = bezier3(
+    const free = cubicPoints(
         past,
         past.add(along.scale(0.15)),
         top.end.sub(droop.scale(0.12)),
@@ -2618,7 +2584,7 @@ function lizardAndTirfor(): Piece[] {
     const A = lizardLine(1);
     const footA = lizardFoot(1);
     const span = footA.distanceTo(t.ropeOut);
-    const run = bezier3(
+    const run = cubicPoints(
         t.ropeOut,
         t.ropeOut.add(u.scale(0.45 * span)),
         footA.sub(A.along.scale(0.35 * span)),
@@ -2671,7 +2637,7 @@ function lizardAndTirfor(): Piece[] {
     pieces.push(
         ...lizard(
             -1,
-            bezier3(
+            cubicPoints(
                 bottomB.end,
                 bottomB.end.add(UP.scale(0.18)),
                 footB.sub(B.along.scale(0.2)),
@@ -2694,15 +2660,21 @@ function lizardAndTirfor(): Piece[] {
     pieces.push(
         ...line(
             [
-                ...bezier3(tail, tail.add(back.scale(0.2)), crest.sub(back.scale(0.25)), crest, 16),
-                ...bezier3(
+                ...cubicPoints(
+                    tail,
+                    tail.add(back.scale(0.2)),
+                    crest.sub(back.scale(0.25)),
+                    crest,
+                    16,
+                ),
+                ...cubicPoints(
                     crest,
                     crest.add(back.scale(0.3)),
                     land.sub(away.scale(0.35)),
                     land,
                     16,
                 ).slice(1),
-                ...bezier3(
+                ...cubicPoints(
                     land,
                     land.add(away.scale(0.4)),
                     end.sub(vec3(1, 0, -0.6).unit().scale(0.4)),
@@ -2716,33 +2688,6 @@ function lizardAndTirfor(): Piece[] {
         ),
     );
     return pieces;
-}
-
-/** A smooth path through `pts`, `n` points between each pair (Catmull–Rom). */
-function smooth(pts: Vector3[], n: number): Vector3[] {
-    const out: Vector3[] = [];
-    for (let i = 0; i + 1 < pts.length; i++) {
-        const [p0, p1, p2, p3] = [
-            pts[Math.max(0, i - 1)],
-            pts[i],
-            pts[i + 1],
-            pts[Math.min(pts.length - 1, i + 2)],
-        ];
-        for (let k = 0; k < n; k++) {
-            const t = k / n;
-            const t2 = t * t;
-            const t3 = t2 * t;
-            out.push(
-                p0
-                    .scale(-0.5 * t3 + t2 - 0.5 * t)
-                    .add(p1.scale(1.5 * t3 - 2.5 * t2 + 1))
-                    .add(p2.scale(-1.5 * t3 + 2 * t2 + 0.5 * t))
-                    .add(p3.scale(0.5 * t3 - 0.5 * t2)),
-            );
-        }
-    }
-    out.push(pts.at(-1)!);
-    return out;
 }
 
 /** Each hawser from its tree shackle over the tower's cradle and down the span to the shear leg's saddle. */
@@ -3021,28 +2966,10 @@ function trolleysAndReturn(run = false): Piece[] {
 /** Where a rigid part of a moving rig is: turned by `angle` about `axis` (through its own origin), then moved to `at`. */
 export type Pose = { at: Vector3; axis: Vector3; angle: number };
 
-/** `v` turned by `angle` about the unit `axis` (Rodrigues). */
-export function turned(v: Vector3, axis: Vector3, angle: number): Vector3 {
-    const [c, s] = [Math.cos(angle), Math.sin(angle)];
-    return v
-        .scale(c)
-        .add(axis.cross(v).scale(s))
-        .add(axis.scale(axis.dot(v) * (1 - c)));
-}
-
-/** The turn that takes direction `from` to direction `to`, about the line square to both. */
-export function turnBetween(from: Vector3, to: Vector3): { axis: Vector3; angle: number } {
-    const [a, b] = [from.unit(), to.unit()];
-    const axis = a.cross(b);
-    const sin = axis.len();
-    if (sin < 1e-9) return { axis: vec3(0, 0, 1), angle: 0 };
-    return { axis: axis.scale(1 / sin), angle: Math.atan2(sin, a.dot(b)) };
-}
-
 /** `pieces`, built about the origin, put in `pose`. */
 export function posed(pieces: Piece[], { at, axis, angle }: Pose): Piece[] {
-    const point = (q: Vector3) => turned(q, axis, angle).add(at);
-    const dir = (q: Vector3) => turned(q, axis, angle);
+    const point = (q: Vector3) => q.turned(axis, angle).add(at);
+    const dir = (q: Vector3) => q.turned(axis, angle);
     return pieces.map((p) => {
         if (p.kind === "rod") return { ...p, a: point(p.a), b: point(p.b) };
         if (p.kind === "face")
@@ -3246,7 +3173,7 @@ export function brakeRig(): BrakeRig {
             const angle = at.slope - b.slope;
             return {
                 pose: { at: at.at, axis: Z, angle },
-                eye: at.at.add(turned(b.eye.sub(b.at), Z, angle)),
+                eye: at.at.add(b.eye.sub(b.at).turned(Z, angle)),
             };
         };
         let a = place(blockA, BLOCKS_X + pushed, heightA);
@@ -3276,7 +3203,7 @@ export function brakeRig(): BrakeRig {
             const turn = turnBetween(k.toward, from.sub(block.eye));
             poses.set(i === 0 ? "knot-a" : "knot-b", { at: block.eye, ...turn });
             // Its leg, sagging a touch out to the middle.
-            const end = block.eye.add(turned(k.end, turn.axis, turn.angle));
+            const end = block.eye.add(k.end.turned(turn.axis, turn.angle));
             ropes.push(...line(hanging(end, from, 0.03, 8), ropeR, C.joining));
         });
         // The brake line up the span to the pulley, sagging much as the hawsers do, and from the pulley straight down
@@ -3413,7 +3340,7 @@ export function returnRig() {
             const pull = tie.sub(p.centre).unit().add(other.sub(p.centre).unit());
             const turn = turnBetween(p.up.neg(), pull);
             poses.set(name, { at: p.hook, ...turn });
-            return p.round.map((q) => p.hook.add(turned(q.sub(p.hook), turn.axis, turn.angle)));
+            return p.round.map((q) => p.hook.add(q.sub(p.hook).turned(turn.axis, turn.angle)));
         });
         // Pulley A's wrap runs from trolley A's side to pulley B's, pulley B's from A's side to trolley B's.
         const [ra, rb] = rounds;
@@ -3753,12 +3680,7 @@ export type FoxTarget = {
 
 /** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
 function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
-    const lo = points.reduce((a, p) =>
-        vec3(Math.min(a.x, p.x), Math.min(a.y, p.y), Math.min(a.z, p.z)),
-    );
-    const hi = points.reduce((a, p) =>
-        vec3(Math.max(a.x, p.x), Math.max(a.y, p.y), Math.max(a.z, p.z)),
-    );
+    const { lo, hi } = boundsOf(points);
     // The 3D view's 30° high, so a ball this big just fits it from about 3.9 times its radius out: a little further,
     // to leave some room round it.
     const r = hi.sub(lo).len() / 2;

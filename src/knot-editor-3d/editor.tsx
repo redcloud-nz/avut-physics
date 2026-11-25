@@ -52,7 +52,7 @@ import {
     type Stepper,
 } from "@/lib/rope-3d/operations";
 import { redistribute, segmentMiddle, slideBoundary, type Rope3 } from "@/lib/rope-3d/rope";
-import { vec3, type Vector3 } from "@/lib/vector3";
+import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 import { FLATS, FlatView } from "@/parts/flat-view";
 
 import { canUseFiles, openKnot3d, saveKnot3d, saveKnot3dAs } from "./files";
@@ -93,16 +93,7 @@ const mod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
 
 /** The box round the rope: its middle and its longest side. */
 function bounds(points: readonly Vector3[]) {
-    const lo = vec3(
-        Math.min(...points.map((p) => p.x)),
-        Math.min(...points.map((p) => p.y)),
-        Math.min(...points.map((p) => p.z)),
-    );
-    const hi = vec3(
-        Math.max(...points.map((p) => p.x)),
-        Math.max(...points.map((p) => p.y)),
-        Math.max(...points.map((p) => p.z)),
-    );
+    const { lo, hi } = boundsOf(points);
     const d = hi.sub(lo);
     return { centre: lo.lerp(hi, 0.5), size: Math.max(d.x, d.y, d.z, 0.02) };
 }

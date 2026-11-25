@@ -110,30 +110,10 @@ they've looked.
   fox's are in `src/flying-fox/knots/`.
 - `src/knots/`: knots drawn from their centrelines (work in progress at `/rescue-knots/<slug>`; see
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
-- `src/lib/`: all the shared maths. Use it rather than writing local helpers:
-  - `vector2.ts`, `vector3.ts`: immutable `Vector2`/`Vector3` classes. Chain methods (`a.sub(b).len()`,
-    `a.distanceTo(b)`, `a.mid(b)`, `a.lerp(b, t)`, `Vector2.sum(vs)`); every operation returns a new vector.
-  - `segment.ts`: `Segment`, a straight piece between two points (a stretcher, a ladder, or each piece
-    of a polyline from `Segment.along`): nearest points, distances, crossings and gaps. `wall.ts`: the
-    wall the lowers share, its anchor and the rope's path over its edge.
-  - `numeric/`: one file per kind of method, imported by file (there's no index, so a figure's hash
-    covers only the methods it uses). `linear.ts`: the `Matrix` alias (row-major `number[][]`),
-    transposes, linear and least-squares solves, `maxAbs`. `nonnegative.ts`: least squares kept
-    non-negative. `minimise.ts`: Nelder–Mead, grid minima, golden-section search. `roots.ts`: bisection
-    and a quadratic's roots. `differences.ts`: central differences. `held-balance.ts`: Newton's method
-    on a balance with some constraints held exactly (the lowers' final solve).
-  - `rope-3d/`: a rope in 3D as points in numbered segments (`rope.ts`), settled by position-based dynamics
-    (`sim.ts`), and the 3D knot editor's edits as steppers (`operations.ts`): moving a handle along a smooth curve
-    through locked ends (`curve.ts`), tightening and smoothing.
-  - `bezier.ts`: cubic Béziers (`Cubic`) and their boxes and crossings. `hobby.ts`: Hobby's smooth
-    curves through points. `polyline.ts`: the `Polyline` type (a `readonly Vector2[]`), its arc lengths
-    and its length. `svg-path.ts`: SVG path data: numbers, points and polylines written for it
-    (`svgNumber`, `svgPoint`, `svgPoints` for a `points` attribute, `polylinePath`), and paths (M, L, H,
-    V, C, A) read back as points.
-  - `math.ts` (`clamp`, `deg`, `rad`, `wrapDegrees`, `roundTo`, `linearScale`), `constants.ts` (`G`),
-    `format.ts` (numbers for display: `readout` in the visualisations, `teaching` in the articles and
-    the visual introduction, each with its own default places), `random.ts` (the seeded picker tests
-    use for random setups).
+- `src/lib/`: all the shared maths: vectors (`Vector2`/`Vector3`, immutable, with chained methods), plane geometry,
+  2D and 3D curves, ropes in 3D, numerical methods, and number formatting. `src/lib/README.md` lists every file and
+  what's in it: read it before writing a helper, use what's there rather than writing a local one, and add anything
+  general that's missing there (and to the README).
 
 To add a visualisation: write the solver and its tests, the component and notes, register it in
 `src/visualisations/index.ts` (and its `href` type), and add its page under `src/app`.

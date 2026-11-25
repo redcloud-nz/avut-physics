@@ -21,6 +21,22 @@ export type Material =
     | "bucket"
     | "person";
 
+/** Each material's colour, for a piece that doesn't give its own. */
+export const MATERIAL_COLOR: Record<Material, string> = {
+    log: "var(--tower-log)",
+    rail: "var(--tower-rail)",
+    board: "var(--tower-board)",
+    deck: "var(--tower-deck)",
+    steel: "var(--tower-steel)",
+    sling: "var(--knot-yellow)",
+    rope: "var(--knot-blue)",
+    bucket: "var(--rig-black)",
+    person: "var(--rig-person)",
+};
+
+/** How wide the gaps between boards are (metres); the flat views draw them no thinner than a pixel. */
+export const JOINT_GAP = 0.01;
+
 /** A round piece (a log, a rail or a pipe): a cylinder from `a` to `b`, drawn with a rounded end where `capA`/`capB`. */
 export type Rod = {
     kind: "rod";

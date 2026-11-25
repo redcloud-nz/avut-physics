@@ -14,7 +14,7 @@ import {
     tubeGeometry,
     useSceneColors,
 } from "@/abseil-tower/tower-gl";
-import { vec3, type Vector3 } from "@/lib/vector3";
+import { turnBetween, vec3, type Vector3 } from "@/lib/vector3";
 
 import BrakeGL, { place } from "./brake-gl";
 import {
@@ -27,8 +27,6 @@ import {
     RETURN_PULLEY,
     returnRig,
     runTrolley,
-    turnBetween,
-    turned,
 } from "./fox";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
@@ -140,7 +138,7 @@ export default function RunGL({
         const knots = (toward: Vector3[]) =>
             trolleys.map((tr, i) => {
                 const turn = turnBetween(tr.tie, toward[i]);
-                return { turn, tie: bars[i].add(turned(tr.tie, turn.axis, turn.angle)) };
+                return { turn, tie: bars[i].add(tr.tie.turned(turn.axis, turn.angle)) };
             });
         const first = knots(trolleys.map((tr, i) => RETURN_PULLEY(tr.side).sub(bars[i])));
         const along = line.pose(first[0].tie, first[1].tie, s.slack).leaving;

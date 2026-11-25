@@ -26,6 +26,8 @@ import type { RigLabel } from "./rig";
 import {
     groundAt,
     groundCorners,
+    JOINT_GAP,
+    MATERIAL_COLOR,
     plankLines,
     tapeLayers,
     type Face,
@@ -40,17 +42,6 @@ import {
  */
 export const T = (p: Vector3) => new THREE.Vector3(p.x, p.y, -p.z);
 
-const COLOR: Record<Material, string> = {
-    log: "var(--tower-log)",
-    rail: "var(--tower-rail)",
-    board: "var(--tower-board)",
-    deck: "var(--tower-deck)",
-    steel: "var(--tower-steel)",
-    sling: "var(--knot-yellow)",
-    rope: "var(--knot-blue)",
-    bucket: "var(--rig-black)",
-    person: "var(--rig-person)",
-};
 /** The thinnest some things are drawn (metres of radius), by their material. */
 type MinR = Partial<Record<Material, number>>;
 
@@ -502,8 +493,6 @@ function cutEnd(
     return [band, face].filter((g): g is THREE.BufferGeometry => !!g);
 }
 
-/** How wide the gaps between boards are (metres). */
-const JOINT_GAP = 0.01;
 /** What a gap's colour key starts with, before the colour of its boards. */
 const JOINT = "joint:";
 
@@ -523,7 +512,7 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
         byColor.set(color, list);
     };
     for (const p of pieces) {
-        const color = p.color || COLOR[p.material];
+        const color = p.color || MATERIAL_COLOR[p.material];
         // Hardware's drawn its true size; ropes and wire no thinner than the scene's least.
         const r = p.toScale
             ? "r" in p
@@ -624,7 +613,7 @@ export function buildHairlines(pieces: Piece[]) {
     const byColor = new Map<string, [number, number, number][]>();
     for (const p of pieces) {
         if (p.kind === "face" || p.r > HAIRLINE_R || p.toScale) continue;
-        const color = p.color || COLOR[p.material];
+        const color = p.color || MATERIAL_COLOR[p.material];
         const list = byColor.get(color) ?? [];
         const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
         for (let i = 0; i + 1 < pts.length; i++)

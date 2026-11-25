@@ -84,6 +84,33 @@ export class Vector3 {
     xy(): Vector2 {
         return new Vector2(this.x, this.y);
     }
+    /** This turned by `angle` about the unit `axis` through the origin (Rodrigues). */
+    turned(axis: Vector3, angle: number): Vector3 {
+        const [c, s] = [Math.cos(angle), Math.sin(angle)];
+        return this.scale(c)
+            .add(axis.cross(this).scale(s))
+            .add(axis.scale(axis.dot(this) * (1 - c)));
+    }
 }
 
 export const vec3 = (x: number, y: number, z: number) => new Vector3(x, y, z);
+
+/** The turn that takes direction `from` to direction `to`, about the line square to both. */
+export function turnBetween(from: Vector3, to: Vector3): { axis: Vector3; angle: number } {
+    const [a, b] = [from.unit(), to.unit()];
+    const axis = a.cross(b);
+    const sin = axis.len();
+    if (sin < 1e-9) return { axis: vec3(0, 0, 1), angle: 0 };
+    return { axis: axis.scale(1 / sin), angle: Math.atan2(sin, a.dot(b)) };
+}
+
+/** The box `points` span, square to the axes: its lowest and highest corners. */
+export function boundsOf(points: readonly Vector3[]): { lo: Vector3; hi: Vector3 } {
+    const lo = points.reduce((a, p) =>
+        vec3(Math.min(a.x, p.x), Math.min(a.y, p.y), Math.min(a.z, p.z)),
+    );
+    const hi = points.reduce((a, p) =>
+        vec3(Math.max(a.x, p.x), Math.max(a.y, p.y), Math.max(a.z, p.z)),
+    );
+    return { lo, hi };
+}

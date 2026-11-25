@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import Loading3D from "@/abseil-tower/loading-3d";
 import type { Piece } from "@/abseil-tower/tower";
 import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
+import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DETAILS, type Detail } from "@/flying-fox/detail";
 import { rad } from "@/lib/math";
-import { vec3, type Vector3 } from "@/lib/vector3";
+import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 
 import { GROUPS, partOf, PARTS } from "./catalogue";
 import { FLATS, FlatView, pointsOf } from "./flat-view";
@@ -33,10 +34,6 @@ const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.Sc
 /** The view's turns aren't followed here; one function for good, as a new one each render would rerun the view's setup. */
 const ignoreTurn = () => {};
 
-/** The look of the round-cornered buttons over the drawing. */
-const CONTROL =
-    "flex h-9 items-center justify-center rounded-lg border border-border bg-surface/90 text-ink-soft shadow-lg backdrop-blur transition-colors hover:bg-line-faint [&_svg]:size-4";
-
 /** Where the 3D view can look from: a bearing and a height (degrees). */
 const LOOKS = [
     { label: "Three-quarter", azimuth: 145, elevation: 20 },
@@ -47,17 +44,7 @@ const LOOKS = [
 
 /** The box round the pieces: its middle, and how big it is across its longest side (metres). */
 function bounds(pieces: Piece[]): { centre: Vector3; size: number } {
-    const all = pieces.flatMap(pointsOf);
-    const lo = vec3(
-        Math.min(...all.map((p) => p.x)),
-        Math.min(...all.map((p) => p.y)),
-        Math.min(...all.map((p) => p.z)),
-    );
-    const hi = vec3(
-        Math.max(...all.map((p) => p.x)),
-        Math.max(...all.map((p) => p.y)),
-        Math.max(...all.map((p) => p.z)),
-    );
+    const { lo, hi } = boundsOf(pieces.flatMap(pointsOf));
     const d = hi.sub(lo);
     return { centre: lo.lerp(hi, 0.5), size: Math.max(d.x, d.y, d.z, 0.01) };
 }
@@ -120,7 +107,10 @@ export default function PartsView() {
                 <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] items-start gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button type="button" className={`${CONTROL} gap-1.5 px-2.5 text-sm`}>
+                            <button
+                                type="button"
+                                className={`${OVERLAY_CONTROL} gap-1.5 px-2.5 text-sm`}
+                            >
                                 {shown.name}
                                 <ChevronDown />
                             </button>
@@ -152,7 +142,7 @@ export default function PartsView() {
                                 type="button"
                                 aria-label={`Detail: ${DETAILS[detail].label}`}
                                 title="Detail"
-                                className={`${CONTROL} w-9`}
+                                className={`${OVERLAY_CONTROL} w-9`}
                             >
                                 <Gauge />
                             </button>
@@ -177,7 +167,7 @@ export default function PartsView() {
                                 type="button"
                                 aria-label="Look at the part from"
                                 title="Look from"
-                                className={`${CONTROL} w-9`}
+                                className={`${OVERLAY_CONTROL} w-9`}
                             >
                                 <Eye />
                             </button>
@@ -199,7 +189,7 @@ export default function PartsView() {
                         aria-label="Show the whole part again"
                         title="Show the whole part again"
                         onClick={() => glView?.reset()}
-                        className={`${CONTROL} w-9`}
+                        className={`${OVERLAY_CONTROL} w-9`}
                     >
                         <RotateCcw />
                     </button>

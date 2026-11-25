@@ -178,7 +178,37 @@ is to be worked out when the first one's drawn; it may need the core to say wher
   trolley's hole, a knot on a carabiner) and save the adjustments, by item name, to files the same way, for the code
   that builds the parts to read. Connected items follow what they're joined to, and a connection limits how far its
   item can move (a carabiner through two plates can only slide and swing in its hole). It can share this editor's
-  3D view, selection and handles.
+  3D view, selection and handles. See "The assembly editor" below.
+
+## The assembly editor (later)
+
+For fiddling by hand with the small parts and how they're joined, not the ropes and hawsers, which stay worked out in
+code. The first case is the rigged trolley, whose joins are now numbers in `rigTrolley` and `trolley` in
+`src/flying-fox/fox.ts`: how far each carabiner hangs in its hole, the gates' directions, the grigri's height over the
+tie-in, the safety clip's offset.
+
+- **Parts name their attachment points.** A builder returns named frames (a point and its directions, as hardware's
+  `Frame`) instead of loose points: the trolley's `main-hole` and `tow-hole`, a carabiner's `top-bar` and
+  `bottom-bar`, the grigri's `hole`.
+- **Each join is named** (`trolley/rider-clip`: the rider's carabiner's top bar in the trolley's main hole). It
+  places the child's point in the parent's frame, and says how the child may move there: swing about the hole's axis,
+  slide along it.
+- **Files hold only adjustments** to the code's own layout: a small offset and turn for each join, by name, in a
+  versioned file (`assemblies/trolley.json`, say). A join the file leaves out isn't adjusted; a name the code doesn't
+  know fails the build, as `knot3dFile` does. The code keeps the structure.
+- **What's worked out follows the adjusted parts.** Ropes and knots start from the adjusted points (the figure 8 and
+  the dropper from the rider clip's bottom bar), and anything derived from a part's placement is worked out from where
+  it ends up, not where the code first put it: the return line's layout depends on how its carabiner's turned.
+- **A join's free axis is shown, not edited.** The editor draws it and can swing the part about it to check it (a
+  slider standing in for the run's swing); the axis itself stays in code, and the run reads it from there.
+- **The editor** is the parts viewer with a panel for the picked item's join: number fields or a handle that moves only
+  as the join allows, the swing preview, and Save through the browser's file access, as this editor saves.
+- **A first slice:** the rigged trolley's joins (the rider's clip, the back-up clip, the grigri's carabiner, the safety
+  clip, the return line's knot on its carabiner) in `/parts`, to try the file before anything else uses it.
+
+Bear it in mind when tidying the scene code: builders that return named frames, and placements kept apart from the
+pieces drawn, make this easier later.
+
 - More props than the bar, and knots of two ropes (the joining 8 in two colours).
 - Keeping the doubled strands paired: each point and its partner on the other leg held touching and not rolling round
   each other, as the 2D editor's linked pins hold strands side by side. That might stop the twists forming at all.

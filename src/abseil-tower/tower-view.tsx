@@ -20,7 +20,9 @@ import { layoutRig, legend, RIGS, rigSide, type RigLabel } from "./rig";
 import {
     groundAt,
     groundCorners,
+    JOINT_GAP,
     LEVELS,
+    MATERIAL_COLOR,
     OVERHEAD,
     plankLines,
     SIDE,
@@ -76,24 +78,10 @@ function reframe(
     return { zoom: z, target: start.target.add(shift) };
 }
 
-const COLOR: Record<Material, string> = {
-    log: "var(--tower-log)",
-    rail: "var(--tower-rail)",
-    board: "var(--tower-board)",
-    deck: "var(--tower-deck)",
-    steel: "var(--tower-steel)",
-    sling: "var(--knot-yellow)",
-    rope: "var(--knot-blue)",
-    bucket: "var(--rig-black)",
-    person: "var(--rig-person)",
-};
 /** The narrowest some things are drawn (SVG units), however thin they are, so a rope never vanishes. */
 const MIN_WIDTH: Partial<Record<Material, number>> = { sling: 4.5, rope: 3.5, steel: 1.6 };
 const shade = (color: string, percent: number) =>
     `color-mix(in oklab, ${color} ${Math.round(percent)}%, black)`;
-
-/** How wide the gaps between boards are (metres), drawn no thinner than a pixel. */
-const JOINT_GAP = 0.01;
 
 /** Where the light comes from: high in the north, as the sun is here. */
 const LIGHT = vec3(0.3, 0.8, 0.5).unit();
@@ -982,7 +970,7 @@ export function PieceDrawing({
     /** The narrowest each material's drawn (SVG units), if not the tower's. */
     minWidth?: Partial<Record<Material, number>>;
 }) {
-    const own = piece.color || COLOR[piece.material];
+    const own = piece.color || MATERIAL_COLOR[piece.material];
     const color = dim < 1 ? shade(own, dim * 100) : own;
     if (piece.kind === "face") {
         const fill = shade(color, faceShade(piece));
