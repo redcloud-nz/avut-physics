@@ -1232,13 +1232,20 @@ export const TURNBUCKLE_24 = {
     out: 0.06,
 };
 
-/** A turnbuckle along `d`, its eyes in the plane square to `m`, the near eye's inside end at `near`. */
+/**
+ * A turnbuckle along `d`, its eyes in the plane square to `m`, the near eye's inside end at `near`. Its frame lies in
+ * the eyes' plane too, unless `turned`, when it's turned a quarter round the rods from them (as it's free to, screwed
+ * on): flat to `m`.
+ */
 export function turnbuckle(
     near: Vector3,
     d: Vector3,
     m: Vector3,
     color: string,
-    size = TURNBUCKLE_24,
+    {
+        size = TURNBUCKLE_24,
+        turned = false,
+    }: { size?: typeof TURNBUCKLE_24; turned?: boolean } = {},
 ): { pieces: Piece[]; far: Vector3 } {
     const f = linkFrame(d, m);
     const { rod, eye, frame, boss, into, out } = size;
@@ -1304,9 +1311,8 @@ export function turnbuckle(
             return [w0 + r * Math.cos(t), r * Math.sin(t)];
         }),
     ];
-    pieces.push(
-        ...plate({ o: p(frame0), u: f.d, v: f.w, n: f.m }, outline, [slot], frame.thick, color),
-    );
+    const face = turned ? { v: f.m, n: f.w.scale(-1) } : { v: f.w, n: f.m };
+    pieces.push(...plate({ o: p(frame0), u: f.d, ...face }, outline, [slot], frame.thick, color));
     eyeAt(total, -1);
     return { pieces, far: p(total) };
 }

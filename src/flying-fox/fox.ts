@@ -1583,6 +1583,7 @@ export const BRAKE = (() => {
 function tree(): Piece[] {
     const c = vec3(TREE.x, 0, 0);
     const pieces: Piece[] = [];
+    const branches: Piece[] = [];
     pieces.push(
         ...bar(c.add(vec3(0, -0.2, 0)), c.add(vec3(0, TREE.height, 0)), TREE.r, C.tree, "log"),
     );
@@ -1591,7 +1592,7 @@ function tree(): Piece[] {
         [6.5, vec3(-0.8, 1, -0.6), 0.14, 3.5],
         [7.6, vec3(0.3, 1, -1), 0.12, 3],
     ] as const)
-        pieces.push(
+        branches.push(
             ...bar(
                 c.add(vec3(0, y, 0)),
                 c.add(vec3(0, y, 0)).add(dir.unit().scale(len)),
@@ -1620,8 +1621,16 @@ function tree(): Piece[] {
     const centre = vec3(TREE.x, BACKSTAY_SLING_Y, 0);
     const crownBar = crown.add(g).sub(toTower.scale(SHACKLE_19.body));
     pieces.push(...basketedSling("round", centre, TREE.r, crownBar, SHACKLE_19.body, ACROSS, UP));
-    return shift(pieces, groundY(TREE.x));
+    // The branches are left out of the overhead view, where they'd hide the slings round the trunk.
+    const up = shift(branches, groundY(TREE.x));
+    for (const b of up) NOT_OVERHEAD.add(b);
+    return [...shift(pieces, groundY(TREE.x)), ...up];
 }
+
+/** Pieces left out of the overhead view. */
+const NOT_OVERHEAD = new WeakSet<Piece>();
+/** Whether `piece` (one of `foxPieces`) is drawn in the overhead view. */
+export const drawnOverhead = (piece: Piece) => !NOT_OVERHEAD.has(piece);
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
 const BACKSTAY_SLING_Y = 0.7;
@@ -2142,17 +2151,28 @@ function madeOff(
  * 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye made off round its thimble,
  * its tail lying on the ground. Each link lies a quarter turn from the last.
  */
-function hawserFoot(s: number): Piece[] {
-    const pieces: Piece[] = [];
+/**
+ * The in-line hardware at hawser `s`'s foot (Figure 66), from the sling: a 19 mm bow shackle, the 24 mm turnbuckle and
+ * three 19 mm D shackles, each link a quarter turn from the last (the turnbuckle's frame turned flat, to show from
+ * above).
+ */
+function footLinks(s: number) {
     const a = ANCHOR_SHACKLE(s * SLING_Z);
-    const saddle = SADDLE(s);
-    const along = saddle.sub(a).unit();
+    const along = SADDLE(s).sub(a).unit();
     const { flat, upright } = linkPlanes(along);
     const bow = shackle("bow", a, along, flat, C.steel, C.pin);
-    const tb = turnbuckle(bow.far, along, upright, C.steel);
+    // Its frame turned flat, so it shows from above.
+    const tb = turnbuckle(bow.far, along, upright, C.steel, { turned: true });
     const d1 = shackle("d", tb.far, along, flat, C.steel, C.pin);
     const d2 = shackle("d", d1.far, along, upright, C.steel, C.pin);
     const d3 = shackle("d", d2.far, along, flat, C.steel, C.pin);
+    return { along, flat, upright, bow, tb, d1, d2, d3 };
+}
+
+function hawserFoot(s: number): Piece[] {
+    const pieces: Piece[] = [];
+    const saddle = SADDLE(s);
+    const { along, upright, bow, tb, d1, d2, d3 } = footLinks(s);
     pieces.push(...bow.pieces, ...tb.pieces, ...d1.pieces, ...d2.pieces, ...d3.pieces);
     pieces.push(
         ...madeOff(d3.far, along, upright, saddle, (end) => {
@@ -2789,6 +2809,9 @@ function dynamicBrake(): Piece[] {
 }
 
 /** The chain weight: hanging from the brake line's end, then piled on the ground, its end tied off to a picket. */
+/** Where the chain weight's picket is driven: back from the pile, between it and hawser A, clear of the hawser. */
+const CHAIN_PICKET = vec3(BRAKE.chainTop.x - 0.9, 0, BRAKE.chainTop.z + 0.35);
+
 function chainWeight(): Piece[] {
     const pieces: Piece[] = [];
     const top = BRAKE.chainTop;
@@ -2803,10 +2826,7 @@ function chainWeight(): Piece[] {
         [0.18, 0.12],
     ])
         pieces.push(...line(ring(onGround(top.x, y, top.z), r, 18), 0.014, C.steel, "steel"));
-    const pk = picket(
-        vec3(top.x - 0.9, 0, top.z + 0.6),
-        towards(foot, vec3(top.x - 0.9, 0, top.z + 0.6)),
-    );
+    const pk = picket(CHAIN_PICKET, towards(foot, CHAIN_PICKET));
     pieces.push(
         ...pk.pieces,
         ...line([onGround(top.x - 0.25, 0.03, top.z + 0.15), pk.tie], 0.012, C.steel, "steel"),
@@ -2856,38 +2876,287 @@ export function foxPieces(): Piece[] {
     ];
 }
 
+/** The flat views. */
+export type FlatView = "side" | "overhead";
+
+/**
+ * A label in the flat views: what it names, the target it's part of (its slug: it's shown only when the views are
+ * locked onto that), and the views it's written in (both unless it names them).
+ */
+export type FoxLabel = RigLabel & { target: string; views?: FlatView[] };
+
 /** What the drawings name, written beside it in the flat views. */
-export function foxLabels(): RigLabel[] {
+export function foxLabels(): FoxLabel[] {
     const floor = TOWER.lower + TOWER.rhs.h / 2 + 0.05;
+    const overhead: FlatView[] = ["overhead"];
+    // A little way out along a guy from the top of the upright it's tied to, at `top`, towards its picket at `foot`.
+    const alongGuy = (top: Vector3, foot: Vector3, out: number) => {
+        const level = foot.sub(top);
+        return top.lerp(foot, out / Math.hypot(level.x, level.z));
+    };
+    // The tower's guy on hawser A's side, out to the front.
+    const towerGuyTop = vec3(0, TOWER.bar + TOWER.rhs.h / 2, TOWER.z + TOWER.half);
+    const towerGuyFoot = vec3(1.6 * TOWER.top, 0, TOWER.z + TOWER.half + 1.6 * TOWER.top);
+    // The shear leg's guy on hawser A's side, out towards the anchor.
+    const legGuyTop = onGround(SHEAR_LEG.x, SHEAR_LEG.top, SHEAR_LEG.b / 2);
+    const legGuyFoot = vec3(
+        SHEAR_LEG.x + 1.6 * SHEAR_LEG.top,
+        0,
+        SHEAR_LEG.b / 2 + 1.6 * SHEAR_LEG.top,
+    );
+    // Hawser A's eye at the tree, and the way along it to the tower.
+    const treeEye = TREE_SHACKLE(1);
+    const toTower = vec3(BAR_X, CRADLE_Y, HAWSER_Z).sub(treeEye).unit();
+    // The ladder's middle, between its foot and where it rests on the bottom bar, between the platform and the upright
+    // on hawser B's side.
+    const ladderZ = TOWER.z + (TOWER.platform.shift - TOWER.platform.width / 2 - TOWER.half) / 2;
+    const ladderRest = vec3(BAR_X, TOWER.lower, ladderZ);
+    const ladder = ladderRest.lerp(onGround(BAR_X + TOWER.lower / 4, 0, ladderZ), 0.5);
+    const foot = footLinks(1);
     return [
-        { text: "Tree anchor", at: onGround(TREE.x, 1.2, 0), side: "left" },
-        { text: "Steel tower", at: vec3(0, TOWER.top, TOWER.z + TOWER.half), side: "left" },
+        // The tree.
+        { target: "top-anchor", text: "Big tree", at: onGround(TREE.x, 1.2, 0), side: "left" },
         {
+            target: "top-anchor",
+            views: overhead,
+            text: "Round slings, choked to offset hawsers",
+            // On hawser B's sling's leg, between the choke and its shackle.
+            at: TREE_CHOKE(-1).at.lerp(TREE_SHACKLE(-1), 0.6),
+            side: "left",
+        },
+        {
+            target: "top-anchor",
+            views: overhead,
+            text: "Backstay",
+            at: BACKSTAY_TIE.end.lerp(BACKSTAY_TOP, 0.04),
+            side: "right",
+        },
+        {
+            target: "top-anchor",
+            views: overhead,
+            text: "Wire clamps",
+            at: treeEye.add(toTower.scale(0.45)),
+            side: "right",
+        },
+        // The tower.
+        {
+            target: "top-tower",
+            text: "Steel tower",
+            at: vec3(0, TOWER.top, TOWER.z + TOWER.half),
+            side: "left",
+        },
+        {
+            target: "top-tower",
             text: "Launch platform",
             at: vec3(0.6, floor, TOWER.z + TOWER.platform.shift),
             side: "right",
         },
-        { text: "Brake pulley", at: BRAKE.pulley, side: "left" },
+        { target: "top-tower", text: "Brake pulley", at: BRAKE.pulley, side: "left" },
         {
+            target: "top-tower",
             text: "Chain weight",
             at: onGround(BRAKE.chainTop.x, 0.3, BRAKE.chainTop.z),
             side: "left",
         },
-        { text: "Trolley A", at: onHawser(TROLLEY_X.a, 1), side: "right" },
-        { text: "Trolley B", at: onHawser(TROLLEY_X.b, -1), side: "left" },
-        { text: "Brake blocks", at: onHawser(BLOCKS_X, -1), side: "right" },
-        { text: "Static brakes", at: onHawser(STATIC_X, -1).add(vec3(0, -0.05, 0)), side: "right" },
-        { text: "H-frame shear leg", at: onGround(SHEAR_LEG.x, SHEAR_LEG.top, 0), side: "right" },
-        { text: "Turnbuckle", at: TURNBUCKLE_AT(-1), side: "right" },
         {
+            target: "top-tower",
+            views: overhead,
+            text: "Chain weight picket",
+            at: onGround(CHAIN_PICKET.x, 0, CHAIN_PICKET.z),
+            side: "left",
+        },
+        {
+            target: "top-tower",
+            views: overhead,
+            text: "Guys",
+            at: alongGuy(towerGuyTop, towerGuyFoot, 1),
+            side: "right",
+        },
+        { target: "top-tower", views: overhead, text: "Ladder", at: ladder, side: "right" },
+        {
+            target: "top-tower",
+            views: overhead,
+            text: "Backstay",
+            at: BACKSTAY_TOP.lerp(BACKSTAY_TIE.end, 0.06),
+            side: "left",
+        },
+        {
+            target: "top-tower",
+            views: overhead,
+            text: "Hawsers",
+            at: vec3(BAR_X, CRADLE_Y, -HAWSER_Z).lerp(TREE_SHACKLE(-1), 0.07),
+            side: "left",
+        },
+        {
+            target: "top-tower",
+            views: overhead,
+            text: "Brake line",
+            at: BRAKE.pulley.lerp(vec3(BLOCKS_X, hawserY(BLOCKS_X), 0), 0.03),
+            side: "right",
+        },
+        {
+            target: "top-tower",
+            views: overhead,
+            text: "Return line",
+            at: RETURN_PULLEY(1).lerp(onHawser(TROLLEY_X.a, 1), 0.5),
+            side: "right",
+        },
+        // The trolleys.
+        { target: "trolley-a", text: "Trolley A", at: onHawser(TROLLEY_X.a, 1), side: "right" },
+        { target: "trolley-b", text: "Trolley B", at: onHawser(TROLLEY_X.b, -1), side: "left" },
+        // The dynamic brake.
+        {
+            target: "dynamic-brake",
+            text: "Brake blocks",
+            at: onHawser(BLOCKS_X, -1),
+            side: "right",
+        },
+        {
+            target: "dynamic-brake",
+            views: overhead,
+            text: "Hawsers",
+            at: onHawser(BLOCKS_X + 0.6, 1),
+            side: "right",
+        },
+        {
+            target: "dynamic-brake",
+            views: overhead,
+            text: "Return line",
+            at: RETURN_PULLEY(-1).lerp(onHawser(TROLLEY_X.b, -1), 0.99),
+            side: "right",
+        },
+        {
+            target: "dynamic-brake",
+            views: overhead,
+            text: "Brake line",
+            at: vec3(BLOCKS_X - 1.6, hawserY(BLOCKS_X) - 0.2, 0),
+            side: "left",
+        },
+        {
+            target: "dynamic-brake",
+            views: overhead,
+            text: "Stabiliser",
+            at: vec3(BLOCKS_X + 0.6, hawserY(BLOCKS_X) - 0.3, 0),
+            side: "right",
+        },
+        // The static brakes.
+        {
+            target: "static-brake",
+            text: "Static brakes",
+            at: onHawser(STATIC_X, -1).add(vec3(0, -0.05, 0)),
+            side: "right",
+        },
+        {
+            target: "static-brake",
+            views: overhead,
+            text: "Carabiner",
+            at: onHawser(STATIC_X, 1),
+            side: "right",
+        },
+        {
+            target: "static-brake",
+            views: overhead,
+            text: "Rope",
+            at: onHawser(STATIC_X, 1).lerp(onGround(STATIC_X, 0, HAWSER_Z + 2.5), 0.5),
+            side: "right",
+        },
+        {
+            target: "static-brake",
+            views: overhead,
+            text: "Picket",
+            at: onGround(STATIC_X, 0, HAWSER_Z + 2.5),
+            side: "right",
+        },
+        // The shear leg.
+        {
+            target: "bottom-tower",
+            text: "H-frame shear leg",
+            at: onGround(SHEAR_LEG.x, SHEAR_LEG.top, 0),
+            side: "right",
+        },
+        {
+            target: "bottom-tower",
+            views: overhead,
+            text: "Guys",
+            at: alongGuy(legGuyTop, legGuyFoot, 0.8),
+            side: "right",
+        },
+        {
+            target: "bottom-tower",
+            views: overhead,
+            text: "Lashings",
+            at: onGround(SHEAR_LEG.x + 0.1, SHEAR_LEG.spar, SHEAR_LEG.b / 2 + 0.05),
+            side: "right",
+        },
+        {
+            target: "bottom-tower",
+            views: overhead,
+            text: "Hessian sacks",
+            at: vec3(SPAR_X, SADDLE_Y, -HAWSER_Z - 0.09),
+            side: "right",
+        },
+        {
+            target: "bottom-tower",
+            views: overhead,
+            text: "Stabiliser",
+            at: onGround(SHEAR_LEG.x - 1.5, 1, 0),
+            side: "left",
+        },
+        {
+            target: "bottom-tower",
+            views: overhead,
+            text: "Hawsers",
+            at: SADDLE(1).lerp(ANCHOR_SHACKLE(SLING_Z), 0.12),
+            side: "right",
+        },
+        // The log anchor.
+        {
+            target: "bottom-anchor",
+            text: "Turnbuckle",
+            at: TURNBUCKLE_AT(-1),
+            side: "right",
+        },
+        {
+            target: "bottom-anchor",
             text: "Lizard",
             at: ANCHOR_SHACKLE(SLING_Z).add(
                 SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(LIZARD.clamps[1]),
             ),
             side: "left",
         },
-        { text: "Tirfor", at: TIRFOR_RIG.tirfor.ropeOut.add(vec3(0, 0.25, 0)), side: "left" },
-        { text: "Log and picket anchor", at: onGround(LOG.x + 0.3, 0.3, 0), side: "right" },
+        {
+            target: "bottom-anchor",
+            text: "Tirfor",
+            at: TIRFOR_RIG.tirfor.ropeOut.add(vec3(0, 0.25, 0)),
+            side: "left",
+        },
+        {
+            target: "bottom-anchor",
+            text: "Log and picket anchor",
+            at: onGround(LOG.x + 0.3, 0.3, 0),
+            side: "right",
+        },
+        {
+            target: "bottom-anchor",
+            views: overhead,
+            text: "D shackles",
+            at: foot.d1.far.lerp(foot.d2.far, 0.5),
+            side: "left",
+        },
+        {
+            target: "bottom-anchor",
+            views: overhead,
+            text: "Round slings",
+            at: LOG_AT(SLING_Z).lerp(ANCHOR_SHACKLE(SLING_Z), 0.5),
+            side: "left",
+        },
+        {
+            target: "bottom-anchor",
+            views: overhead,
+            text: "Banjo lashings",
+            at: onGround(LOG.x + 0.25, 0.2, -1.0),
+            side: "right",
+        },
     ];
 }
 
@@ -2903,12 +3172,10 @@ export type FoxTarget = {
     hi: Vector3;
     centre: Vector3;
     distance: number;
-    /** The labels (by their text, from `foxLabels`) of what's part of it, shown when the views are locked onto it. */
-    labels: string[];
 };
 
 /** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
-function framing(slug: string, label: string, labels: string[], points: Vector3[]): FoxTarget {
+function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
     const lo = points.reduce((a, p) =>
         vec3(Math.min(a.x, p.x), Math.min(a.y, p.y), Math.min(a.z, p.z)),
     );
@@ -2925,7 +3192,6 @@ function framing(slug: string, label: string, labels: string[], points: Vector3[
         hi,
         centre: lo.lerp(hi, 0.5),
         distance: Math.max(4.2 * r, 1.5),
-        labels,
     };
 }
 
@@ -2960,68 +3226,38 @@ export function foxTargets(): FoxTarget[] {
         );
     };
     return [
-        framing(
-            "top-anchor",
-            "Top anchor",
-            ["Tree anchor"],
-            [
-                onGround(TREE.x - TREE.r, 0, -TREE.r),
-                onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
-                ...sides.map(treeEye),
-            ],
-        ),
+        framing("top-anchor", "Top anchor", [
+            onGround(TREE.x - TREE.r, 0, -TREE.r),
+            onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
+            ...sides.map(treeEye),
+        ]),
         // The tower from its backstay's tie to the foot of its ladder, up to the top of the brake support.
-        framing(
-            "top-tower",
-            "Top tower",
-            ["Steel tower", "Launch platform", "Brake pulley", "Chain weight"],
-            [
-                onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
-                onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
-            ],
-        ),
-        framing("trolley-a", "Trolley A", ["Trolley A"], trolleyAt(TROLLEY_X.a, 1)),
-        framing("trolley-b", "Trolley B", ["Trolley B"], trolleyAt(TROLLEY_X.b, -1)),
+        framing("top-tower", "Top tower", [
+            onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
+            onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
+        ]),
+        framing("trolley-a", "Trolley A", trolleyAt(TROLLEY_X.a, 1)),
+        framing("trolley-b", "Trolley B", trolleyAt(TROLLEY_X.b, -1)),
         // The two blocks and the joining rope sagging between them.
-        framing(
-            "dynamic-brake",
-            "Dynamic brake",
-            ["Brake blocks"],
-            [
-                between(BLOCKS_X - 0.4).add(vec3(0, 0.2, -HAWSER_Z - 0.2)),
-                between(BLOCKS_X + 0.4).add(vec3(0, -0.9, HAWSER_Z + 0.2)),
-            ],
-        ),
+        framing("dynamic-brake", "Dynamic brake", [
+            between(BLOCKS_X - 0.4).add(vec3(0, 0.2, -HAWSER_Z - 0.2)),
+            between(BLOCKS_X + 0.4).add(vec3(0, -0.9, HAWSER_Z + 0.2)),
+        ]),
         // The carabiners on the hawsers and their ropes out to the pickets either side.
-        framing(
-            "static-brake",
-            "Static brakes",
-            ["Static brakes"],
-            [
-                vec3(STATIC_X - 0.5, groundY(STATIC_X), -HAWSER_Z - 2.6),
-                between(STATIC_X).add(vec3(0.5, 0.2, HAWSER_Z + 2.6)),
-            ],
-        ),
+        framing("static-brake", "Static brakes", [
+            vec3(STATIC_X - 0.5, groundY(STATIC_X), -HAWSER_Z - 2.6),
+            between(STATIC_X).add(vec3(0.5, 0.2, HAWSER_Z + 2.6)),
+        ]),
         // The H-frame, from its brace to the bagging on its top spar.
-        framing(
-            "bottom-tower",
-            "Bottom tower",
-            ["H-frame shear leg"],
-            [
-                onGround(SHEAR_LEG.x - 0.4, 0, -SHEAR_LEG.b / 2 - 0.3),
-                onGround(SHEAR_LEG.x + 0.5, SHEAR_LEG.top + 0.1, SHEAR_LEG.b / 2 + 0.3),
-            ],
-        ),
-        framing(
-            "bottom-anchor",
-            "Bottom anchor",
-            ["Turnbuckle", "Lizard", "Tirfor", "Log and picket anchor"],
-            [
-                onGround(LOG.x + 0.5, 0, -LOG.length / 2),
-                onGround(LOG.x - 0.2, 1, LOG.length / 2),
-                ...sides.map(lizardEnd),
-            ],
-        ),
+        framing("bottom-tower", "Bottom tower", [
+            onGround(SHEAR_LEG.x - 0.4, 0, -SHEAR_LEG.b / 2 - 0.3),
+            onGround(SHEAR_LEG.x + 0.5, SHEAR_LEG.top + 0.1, SHEAR_LEG.b / 2 + 0.3),
+        ]),
+        framing("bottom-anchor", "Bottom anchor", [
+            onGround(LOG.x + 0.5, 0, -LOG.length / 2),
+            onGround(LOG.x - 0.2, 1, LOG.length / 2),
+            ...sides.map(lizardEnd),
+        ]),
     ];
 }
 

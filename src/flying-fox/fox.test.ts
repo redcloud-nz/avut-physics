@@ -177,12 +177,8 @@ describe("flying fox layout", () => {
 });
 
 describe("the views' targets", () => {
-    it("each label belongs to one target", () => {
-        const owned = foxTargets().flatMap((t) => t.labels);
-        expect(owned.toSorted()).toEqual(
-            foxLabels()
-                .map((l) => l.text)
-                .toSorted(),
-        );
+    it("each label belongs to a target", () => {
+        const slugs = foxTargets().map((t) => t.slug);
+        for (const l of foxLabels()) expect(slugs, l.text).toContain(l.target);
     });
 });

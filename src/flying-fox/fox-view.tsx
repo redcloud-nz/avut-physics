@@ -63,6 +63,7 @@ import {
 } from "./detail";
 import {
     CLEARANCE,
+    drawnOverhead,
     FALL,
     foxLabels,
     foxLegend,
@@ -78,6 +79,7 @@ import {
     SPAN,
     TEST_LOAD,
     TREE,
+    type FlatView,
     type FoxTarget,
 } from "./fox";
 
@@ -499,9 +501,11 @@ export default function FoxView() {
         };
     }, []);
 
-    // Back to front by each piece's middle; a section's sides facing away are left out.
+    // Back to front by each piece's middle; a section's sides facing away are left out, and what the overhead view
+    // leaves out (the tree's branches).
     // Fine detail (a plate's edge, a bolt's head) is left out where it would be too small to see.
     const sorted = pieces
+        .filter((p) => mode !== "overhead" || drawnOverhead(p))
         .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
         .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
@@ -668,10 +672,14 @@ export default function FoxView() {
                         </g>
                     );
                 })}
-            {/* Locked onto a target, everything in view is labelled. */}
+            {/* Locked onto a target, what's part of it is labelled, as this view writes it. */}
             {inBrowser && focus && (
                 <Callouts
-                    labels={labels.filter((l) => focus.labels.includes(l.text))}
+                    labels={labels.filter(
+                        (l) =>
+                            l.target === focus.slug &&
+                            (!l.views || l.views.includes(mode as FlatView)),
+                    )}
                     toSvg={toSvg}
                     ppm={ppm}
                     middle={toSvg(MIDDLE).x}
