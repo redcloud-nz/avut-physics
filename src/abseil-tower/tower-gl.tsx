@@ -2,6 +2,7 @@
 
 import {
     createContext,
+    useCallback,
     useContext,
     useEffect,
     useMemo,
@@ -62,9 +63,12 @@ export type GLHandle = {
 
 /**
  * A point the view's locked onto: it turns about it and zooms towards it, and can't be moved off it. The view eases
- * there, keeping the way it's looking, to `distance` (metres) out from it.
+ * there, keeping the way it's looking, to `distance` (metres) out from it, and zooms out no further than `FOCUS_OUT`
+ * times that.
  */
 export type Focus = { centre: Vector3; distance: number };
+/** How many times its starting distance out a view locked onto a focus may zoom. */
+export const FOCUS_OUT = 2;
 
 /**
  * What a 3D scene needs besides its pieces: where the camera turns about to start with, how far from it it sits and
@@ -1009,13 +1013,24 @@ function FocusOn({
     focus,
     controls,
     near,
+    far,
 }: {
     focus: Focus | null;
     controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
     near: number;
+    /** How far out the view may zoom when it's not locked onto anything. */
+    far: number;
 }) {
     const camera = useThree((s) => s.camera);
     const get = useThree((s) => s.get);
+    // The furthest out the orbit controls may zoom, set through the store (where they're the default controls).
+    const zoomOutTo = useCallback(
+        (d: number) => {
+            const c = get().controls as { maxDistance: number } | null;
+            if (c) c.maxDistance = d;
+        },
+        [get],
+    );
     const ease = useRef<{
         from: THREE.Vector3;
         to: THREE.Vector3;
@@ -1031,7 +1046,11 @@ function FocusOn({
             lens.updateProjectionMatrix();
         }
         const c = controls.current;
-        if (!c || !focus) return;
+        if (!c) return;
+        // Locked onto a focus, it zooms out only so far from it (set here, not as the controls' prop, so it can be
+        // eased into from further out).
+        zoomOutTo(focus ? Math.min(far, FOCUS_OUT * focus.distance) : far);
+        if (!focus) return;
         const out = camera.position.clone().sub(c.target);
         ease.current = {
             from: c.target.clone(),
@@ -1040,13 +1059,17 @@ function FocusOn({
             out: [out.length(), focus.distance],
             start: performance.now(),
         };
-        const stop = () => (ease.current = null);
+        const limit = Math.min(far, FOCUS_OUT * focus.distance);
+        const stop = () => {
+            ease.current = null;
+            zoomOutTo(limit);
+        };
         c.addEventListener("start", stop);
         return () => {
             c.removeEventListener("start", stop);
             ease.current = null;
         };
-    }, [focus, controls, camera, near, get]);
+    }, [focus, controls, camera, near, far, get, zoomOutTo]);
     useFrame(() => {
         const e = ease.current;
         const c = controls.current;
@@ -1057,8 +1080,14 @@ function FocusOn({
         const distance = e.out[0] * (e.out[1] / e.out[0]) ** k;
         c.target.lerpVectors(e.from, e.to, k);
         camera.position.copy(c.target).add(e.dir.clone().multiplyScalar(distance));
+        // Coming in from further out than it may zoom out to once there, it's let out that far until it's in.
+        const limit = focus ? Math.min(far, FOCUS_OUT * focus.distance) : far;
+        zoomOutTo(Math.max(limit, distance));
         c.update();
-        if (t >= 1) ease.current = null;
+        if (t >= 1) {
+            ease.current = null;
+            zoomOutTo(limit);
+        }
     });
     return null;
 }
@@ -1190,7 +1219,12 @@ export function SceneGL({
                         onTurn={onTurn}
                         focus={focus}
                     />
-                    <FocusOn focus={focus} controls={controls} near={near} />
+                    <FocusOn
+                        focus={focus}
+                        controls={controls}
+                        near={near}
+                        far={scene.maxDistance}
+                    />
                     {scene.pivotToPointer && !focus && (
                         <PivotToPointer controls={controls} limits={limits} />
                     )}

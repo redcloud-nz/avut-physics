@@ -8,7 +8,9 @@ import {
     DESCENDER,
     DISMOUNT,
     FALL,
+    foxLabels,
     foxPieces,
+    foxTargets,
     GRADE,
     groundY,
     hawserY,
@@ -171,5 +173,16 @@ describe("flying fox layout", () => {
             const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
             for (const q of pts) expect([q.x, q.y, q.z].every(Number.isFinite)).toBe(true);
         }
+    });
+});
+
+describe("the views' targets", () => {
+    it("each label belongs to one target", () => {
+        const owned = foxTargets().flatMap((t) => t.labels);
+        expect(owned.toSorted()).toEqual(
+            foxLabels()
+                .map((l) => l.text)
+                .toSorted(),
+        );
     });
 });

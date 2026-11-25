@@ -2892,33 +2892,51 @@ export function foxLabels(): RigLabel[] {
 }
 
 /**
- * What the 3D view can lock onto, up the site from the tree to the log: each thing's middle, which the view turns
- * about, and how far from it the view starts (metres), far enough to see all of it.
+ * What the views can lock onto, up the site from the tree to the log: the box round all of each thing (`lo` to `hi`),
+ * its middle, which the views turn and zoom about, and how far from it the 3D view starts (metres), far enough to see
+ * all of the box.
  */
-export type FoxTarget = { slug: string; label: string; centre: Vector3; distance: number };
+export type FoxTarget = {
+    slug: string;
+    label: string;
+    lo: Vector3;
+    hi: Vector3;
+    centre: Vector3;
+    distance: number;
+    /** The labels (by their text, from `foxLabels`) of what's part of it, shown when the views are locked onto it. */
+    labels: string[];
+};
 
 /** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
-function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
+function framing(slug: string, label: string, labels: string[], points: Vector3[]): FoxTarget {
     const lo = points.reduce((a, p) =>
         vec3(Math.min(a.x, p.x), Math.min(a.y, p.y), Math.min(a.z, p.z)),
     );
     const hi = points.reduce((a, p) =>
         vec3(Math.max(a.x, p.x), Math.max(a.y, p.y), Math.max(a.z, p.z)),
     );
-    // The 3D view's 30° high: a ball this big fits it from about 3.9 times its radius out, a little closer on screens
-    // wider than they're high.
+    // The 3D view's 30° high, so a ball this big just fits it from about 3.9 times its radius out: a little further,
+    // to leave some room round it.
     const r = hi.sub(lo).len() / 2;
-    return { slug, label, centre: lo.lerp(hi, 0.5), distance: Math.max(3.5 * r, 1.5) };
+    return {
+        slug,
+        label,
+        lo,
+        hi,
+        centre: lo.lerp(hi, 0.5),
+        distance: Math.max(4.2 * r, 1.5),
+        labels,
+    };
 }
 
 export function foxTargets(): FoxTarget[] {
     const sides = [-1, 1];
     const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
     // A trolley and its dropper: from just over the hawser down past the harness to the end of the descender's brake
-    // strand, about 0.9 m below the descender.
+    // strand, about 1.2 m below the harness.
     const trolleyAt = (x: number, s: number) => {
         const at = onHawser(x, s);
-        return [at.add(vec3(-0.15, 0.08, 0)), at.add(vec3(0.15, -RIDER.harness - 0.9, 0))];
+        return [at.add(vec3(-0.15, 0.08, 0)), at.add(vec3(0.15, -RIDER.harness - 1.2, 0))];
     };
     // The tree's anchor: the trunk where the slings go round it, out to the end of each hawser's made-off eye (its bow
     // shackle, thimble, clamps and tail, about 0.8 m along the hawser from the sling's shackle).
@@ -2942,37 +2960,68 @@ export function foxTargets(): FoxTarget[] {
         );
     };
     return [
-        framing("top-anchor", "Top anchor", [
-            onGround(TREE.x - TREE.r, 0, -TREE.r),
-            onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
-            ...sides.map(treeEye),
-        ]),
-        {
-            slug: "top-tower",
-            label: "Top tower",
-            centre: onGround(0, TOWER.top / 2, TOWER.z),
-            distance: 22,
-        },
-        framing("trolley-a", "Trolley A", trolleyAt(TROLLEY_X.a, 1)),
-        framing("trolley-b", "Trolley B", trolleyAt(TROLLEY_X.b, -1)),
-        { slug: "dynamic-brake", label: "Dynamic brake", centre: between(BLOCKS_X), distance: 4 },
-        {
-            slug: "static-brake",
-            label: "Static brakes",
-            centre: between(STATIC_X).lerp(onGround(STATIC_X, 0, 0), 0.5),
-            distance: 14,
-        },
-        {
-            slug: "bottom-tower",
-            label: "Bottom tower",
-            centre: onGround(SHEAR_LEG.x, SHEAR_LEG.top / 2, 0),
-            distance: 15,
-        },
-        framing("bottom-anchor", "Bottom anchor", [
-            onGround(LOG.x + 0.5, 0, -LOG.length / 2),
-            onGround(LOG.x - 0.2, 1, LOG.length / 2),
-            ...sides.map(lizardEnd),
-        ]),
+        framing(
+            "top-anchor",
+            "Top anchor",
+            ["Tree anchor"],
+            [
+                onGround(TREE.x - TREE.r, 0, -TREE.r),
+                onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
+                ...sides.map(treeEye),
+            ],
+        ),
+        // The tower from its backstay's tie to the foot of its ladder, up to the top of the brake support.
+        framing(
+            "top-tower",
+            "Top tower",
+            ["Steel tower", "Launch platform", "Brake pulley", "Chain weight"],
+            [
+                onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
+                onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
+            ],
+        ),
+        framing("trolley-a", "Trolley A", ["Trolley A"], trolleyAt(TROLLEY_X.a, 1)),
+        framing("trolley-b", "Trolley B", ["Trolley B"], trolleyAt(TROLLEY_X.b, -1)),
+        // The two blocks and the joining rope sagging between them.
+        framing(
+            "dynamic-brake",
+            "Dynamic brake",
+            ["Brake blocks"],
+            [
+                between(BLOCKS_X - 0.4).add(vec3(0, 0.2, -HAWSER_Z - 0.2)),
+                between(BLOCKS_X + 0.4).add(vec3(0, -0.9, HAWSER_Z + 0.2)),
+            ],
+        ),
+        // The carabiners on the hawsers and their ropes out to the pickets either side.
+        framing(
+            "static-brake",
+            "Static brakes",
+            ["Static brakes"],
+            [
+                vec3(STATIC_X - 0.5, groundY(STATIC_X), -HAWSER_Z - 2.6),
+                between(STATIC_X).add(vec3(0.5, 0.2, HAWSER_Z + 2.6)),
+            ],
+        ),
+        // The H-frame, from its brace to the bagging on its top spar.
+        framing(
+            "bottom-tower",
+            "Bottom tower",
+            ["H-frame shear leg"],
+            [
+                onGround(SHEAR_LEG.x - 0.4, 0, -SHEAR_LEG.b / 2 - 0.3),
+                onGround(SHEAR_LEG.x + 0.5, SHEAR_LEG.top + 0.1, SHEAR_LEG.b / 2 + 0.3),
+            ],
+        ),
+        framing(
+            "bottom-anchor",
+            "Bottom anchor",
+            ["Turnbuckle", "Lizard", "Tirfor", "Log and picket anchor"],
+            [
+                onGround(LOG.x + 0.5, 0, -LOG.length / 2),
+                onGround(LOG.x - 0.2, 1, LOG.length / 2),
+                ...sides.map(lizardEnd),
+            ],
+        ),
     ];
 }
 
