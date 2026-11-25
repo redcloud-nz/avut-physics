@@ -7,7 +7,8 @@ export type Visualisation = {
         | "/body-belay"
         | "/ute-load"
         | "/multi-point-anchor"
-        | "/pulley-lab";
+        | "/pulley-lab"
+        | "/flying-foxes/nsw-standard";
     title: string;
     description: string;
 };
@@ -68,6 +69,13 @@ export const multiPointAnchor: Visualisation = {
         "Two or three anchors joined to a master point, rigged either pre-equalised or sliding. Swing the load to one side and see how each rig shares it between the anchors, how the angle between the legs adds to their load, and how far the master point moves.",
 };
 
+export const flyingFox: Visualisation = {
+    href: "/flying-foxes/nsw-standard",
+    title: "NSW Standard Dual-Hawser Flying Fox",
+    description:
+        "A dual-hawser flying fox with a chain-weight brake, rigged to Scouts NSW's procedure: the steel tower, the anchors and every part, in 3D and in flat views. Play a session to watch two riders go down in turn, braked by the chain and hauling each other's trolley back up on the return line.",
+};
+
 /** Listed on the home page (the incline and the pulley lab aren't, but keep their pages). Each one also needs its own page under `src/app`. */
 export const visualisations: Visualisation[] = [
     ladderHinge,
@@ -76,4 +84,5 @@ export const visualisations: Visualisation[] = [
     bodyBelay,
     multiPointAnchor,
     uteLoad,
+    flyingFox,
 ];

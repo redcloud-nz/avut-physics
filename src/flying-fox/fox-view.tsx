@@ -63,7 +63,6 @@ import {
     type DetailChoice,
 } from "./detail";
 import {
-    CLEARANCE,
     drawnOverhead,
     FALL,
     foxLabels,
@@ -71,16 +70,12 @@ import {
     foxPieces,
     foxStances,
     foxTargets,
-    GRADE,
     GROUND,
     groundFaces,
     groundShade,
     groundY,
     LOG,
     onHawser,
-    RIDER,
-    SPAN,
-    TEST_LOAD,
     TREE,
     TROLLEY_X,
     type FlatView,
@@ -848,16 +843,6 @@ export default function FoxView() {
                             </li>
                         ))}
                     </ul>
-                    <p className="mt-3 border-t border-border pt-2 text-xs text-ink-muted">
-                        Set up to Scouts NSW&rsquo;s flying fox procedure on a made-up site: the
-                        ground is level round each end and falls {Math.round(FALL * 10) / 10} m
-                        between them (a {Math.round((Math.atan(GRADE) * 180) / Math.PI)}° grade over
-                        the span), with a hollow between shaped to keep even a {RIDER.mass} kg
-                        rider&rsquo;s feet {CLEARANCE.ride * 100} cm clear standing up, until the
-                        dismount zone, where they can&rsquo;t quite stand. A {SPAN} m span, the
-                        hawsers tensioned to sag 5% with a {TEST_LOAD} kg test load at the middle,
-                        and drawn unloaded. Sizes the procedure doesn&rsquo;t give are estimates.
-                    </p>
                 </section>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

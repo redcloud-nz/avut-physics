@@ -743,6 +743,8 @@ export const SLINGS = {
         thickness: 0.014,
         r: 0.016,
         color: "var(--fox-round-sling)",
+        /** The heavier 6 t slings choked round the tree for the hawsers: pale pink. */
+        heavy: "var(--fox-round-sling-6t)",
         bunched: { width: 0.038, thickness: 0.02, over: 0.15 },
     },
     climbing: {
@@ -1983,7 +1985,7 @@ const BACKSTAY_TIE = (() => {
  * bunching up into it, and the choke's bight twists to lie flat round the leg.
  */
 function chokedSling(angle: number, turn: number, y: number, R: number, crown: Vector3): Strand[] {
-    const { width, thickness, r, color, bunched } = SLINGS.round;
+    const { width, thickness, r, heavy: color, bunched } = SLINGS.round;
     const ease = (t: number) => t * t * (3 - 2 * t);
     const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
     const onTrunk = (a: number, h: number) => vec3(TREE.x + R * Math.cos(a), h, R * Math.sin(a));
@@ -3914,6 +3916,7 @@ export function foxLegend(): { name: string; color: string; look: "tape" | "rope
         { name: "Guys", color: C.guy, look: "rope" },
         { name: "Tower backstay", color: C.backstay, look: "rope" },
         { name: "Lashings and ties (natural fibre)", color: C.fibre, look: "rope" },
+        { name: "Round slings (6 t)", color: SLINGS.round.heavy, look: "tape" },
         { name: "Round slings (4 t)", color: SLINGS.round.color, look: "tape" },
         { name: "Climbing slings", color: SLINGS.climbing.color, look: "tape" },
     ];

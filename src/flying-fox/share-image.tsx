@@ -4,15 +4,17 @@ import { join } from "node:path";
 import { stillImage } from "@/abseil-tower/share-image";
 
 /*
- * The picture a link to the flying fox shows when it's shared: its name and what it is beside a still of its 3D view,
- * from past the landing looking back up the span. See `stillImage` for how the still was taken.
+ * The picture a link to the flying fox shows when it's shared: its name and what it is beside a still of its overhead
+ * view, locked onto the top tower (`?view=overhead&target=top-tower`). It's taken as `stillImage` describes for a 3D
+ * still: a 1000 × 1000 drawing area at twice the pixels, zoomed in one step, the buttons, legend and labels hidden,
+ * cropped and scaled to 1004 pixels square.
  */
 
 export const FOX_SHARE = {
     eyebrow: "Rigging plan",
-    title: "Dual-hawser flying fox",
-    text: "Chain-braked, set up to Scouts NSW's flying fox procedure: the towers, hawsers, brakes and anchors in 3D.",
+    title: "NSW standard dual-hawser flying fox",
+    text: "Set up to Scouts NSW's flying fox procedure, with a chain-weight brake: the towers, hawsers, brakes and anchors, in 3D and from above and the side.",
 };
 
 export const foxImage = () =>
-    stillImage(readFileSync(join(process.cwd(), "src/flying-fox/share-3d.png")), FOX_SHARE);
+    stillImage(readFileSync(join(process.cwd(), "src/flying-fox/share-overhead.png")), FOX_SHARE);

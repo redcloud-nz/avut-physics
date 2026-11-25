@@ -4,16 +4,16 @@ import { Suspense } from "react";
 
 import FoxView from "@/flying-fox/fox-view";
 
-const TITLE = "Dual-hawser flying fox";
+const TITLE = "NSW standard dual-hawser flying fox";
 
 export const metadata: Metadata = {
-    title: `${TITLE}: chain-braked`,
+    title: TITLE,
     description:
         "A rigging plan for a dual-hawser flying fox with a chain-weight brake, set up to Scouts NSW's flying fox procedure on a made-up site falling towards the bottom end.",
 };
 
 /**
- * A dual-hawser flying fox with a chain-weight brake: a work in progress, not yet listed on the home page. It fills the
+ * A dual-hawser flying fox with a chain-weight brake, listed on the home page. It fills the
  * window, the drawing taking whatever room the title leaves. The view's in the address (`?view=side`, `overhead` or
  * `3d`), so each can be linked to.
  */
@@ -25,7 +25,6 @@ export default function Page() {
                     ← Physics Visualisations
                 </Link>
                 <h1 className="text-xl font-semibold tracking-tight text-ink-bright">{TITLE}</h1>
-                <p className="text-sm text-ink-muted">Chain-braked</p>
             </div>
             {/* The view comes from the address, which is only known in the browser. */}
             <Suspense
