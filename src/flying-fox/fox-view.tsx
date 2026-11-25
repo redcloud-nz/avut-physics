@@ -2,11 +2,14 @@
 
 import {
     Box,
+    ChevronLeft,
+    ChevronRight,
     Eye,
     Gauge,
     Info,
     Map as MapIcon,
     Minus,
+    Move3d,
     PanelBottom,
     Plus,
     RotateCcw,
@@ -33,6 +36,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useInBrowser } from "@/components/use-in-browser";
@@ -58,6 +62,7 @@ import {
     foxLabels,
     foxLegend,
     foxPieces,
+    foxTargets,
     GRADE,
     GROUND,
     groundFaces,
@@ -132,13 +137,8 @@ const SCENE: SceneConfig = {
     label: "The flying fox in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
 };
 
-/** The 3D view's presets: from behind the launch, from the side, and from behind the landing. */
-type ViewName = "top" | "side" | "bottom";
-const VIEWS: Record<ViewName, { label: string; azimuth: number; elevation: number }> = {
-    top: { label: "From the top", azimuth: 270, elevation: 15 },
-    side: { label: "Side", azimuth: 180, elevation: 15 },
-    bottom: { label: "From the bottom", azimuth: 90, elevation: 15 },
-};
+/** What the 3D view can lock onto, up the site from the tree to the log. */
+const TARGETS = foxTargets();
 
 /** How close a flat view is, and the point it's centred on. */
 type Frame = { zoom: number; target: Vector3 };
@@ -231,22 +231,27 @@ function inFit(cam: OrbitCamera, fit: Fit, target: Vector3): Vector3 {
 
 /** The flying fox, in the view the page's address names (`?view=side` or `overhead`; 3D unless it names one). */
 export default function FoxView() {
-    const mode = modeOf(useSearchParams().get("view"));
-    const setMode = (m: Mode) => {
+    const params = useSearchParams();
+    const mode = modeOf(params.get("view"));
+    const setParam = (name: string, value: string | null) => {
         const url = new URL(window.location.href);
-        url.searchParams.set("view", m);
+        if (value === null) url.searchParams.delete(name);
+        else url.searchParams.set(name, value);
         window.history.replaceState(null, "", url);
+    };
+    const setMode = (m: Mode) => setParam("view", m);
+    // What the 3D view's locked onto (`?focus=trolley-a`), or nothing to move freely.
+    const focus = TARGETS.find((t) => t.slug === params.get("focus")) ?? null;
+    // Through the targets in turn, round from the last to the first.
+    const step = (by: number) => {
+        const i = focus ? TARGETS.indexOf(focus) : by > 0 ? -1 : TARGETS.length;
+        setParam("focus", TARGETS[(i + by + TARGETS.length) % TARGETS.length].slug);
     };
     const pieces = useMemo(() => foxPieces(), []);
     const labels = useMemo(() => foxLabels(), []);
     const legend = foxLegend();
     const [moved, setMoved] = useState<Frame | null>(null);
     const [glView, setGlView] = useState<GLHandle | null>(null);
-    const [glTurned, setGlTurned] = useState({ azimuth: 0, elevation: 0 });
-    const onGlTurn = useCallback(
-        (azimuth: number, elevation: number) => setGlTurned({ azimuth, elevation }),
-        [],
-    );
     const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
     const inBrowser = useInBrowser();
     // How finely it's drawn: chosen on the page, or left to Auto, which follows the frame rate. Auto gives up after a
@@ -406,10 +411,6 @@ export default function FoxView() {
         else if (rest && e.pointerType === "touch") gesture.current = drag(rest[1]);
     };
 
-    const view = (Object.keys(VIEWS) as ViewName[]).find(
-        (k) => VIEWS[k].azimuth === glTurned.azimuth && VIEWS[k].elevation === glTurned.elevation,
-    );
-
     const diagram = (
         <svg
             ref={svgRef}
@@ -492,7 +493,7 @@ export default function FoxView() {
                     pieces={pieces}
                     labels={[]}
                     onReady={setGlView}
-                    onTurn={onGlTurn}
+                    focus={focus}
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
                     onFrameRate={choice === "auto" ? onFrameRate : undefined}
                 />
@@ -578,36 +579,69 @@ export default function FoxView() {
                     </DropdownMenuContent>
                 </DropdownMenu>
                 {mode === "3d" && (
+                    // Back to the target before, from Free to the last.
+                    <button
+                        type="button"
+                        aria-label="Look at the one before"
+                        title="Previous"
+                        onClick={() => step(-1)}
+                        className={`${CONTROL} w-9`}
+                    >
+                        <ChevronLeft />
+                    </button>
+                )}
+                {mode === "3d" && (
+                    // Free to move about the site, or locked onto one thing on it: turning about it and zooming
+                    // towards it.
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
                                 type="button"
-                                aria-label="Look at the flying fox from"
-                                title="Look from"
-                                className={`${CONTROL} w-9`}
+                                aria-label={`Look at: ${focus?.label ?? "Free"}`}
+                                title="Look at"
+                                className={`${CONTROL} gap-1.5 px-2.5`}
                             >
-                                <Eye />
+                                {focus ? <Eye /> : <Move3d />}
+                                <span className={`text-xs ${focus ? "" : "hidden sm:inline"}`}>
+                                    {focus?.label ?? "Free"}
+                                </span>
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="top" align="start" className="min-w-44">
-                            <DropdownMenuLabel>Look from</DropdownMenuLabel>
+                        <DropdownMenuContent side="top" align="start" className="min-w-52">
+                            <DropdownMenuLabel>Look at</DropdownMenuLabel>
                             <DropdownMenuRadioGroup
-                                value={view ?? ""}
-                                onValueChange={(k) =>
-                                    glView?.look(
-                                        VIEWS[k as ViewName].azimuth,
-                                        VIEWS[k as ViewName].elevation,
-                                    )
-                                }
+                                value={focus?.slug ?? "free"}
+                                onValueChange={(k) => setParam("focus", k === "free" ? null : k)}
                             >
-                                {(Object.keys(VIEWS) as ViewName[]).map((k) => (
-                                    <DropdownMenuRadioItem key={k} value={k}>
-                                        {VIEWS[k].label}
+                                <DropdownMenuRadioItem value="free">
+                                    <Move3d />
+                                    Free
+                                </DropdownMenuRadioItem>
+                                <DropdownMenuSeparator />
+                                {TARGETS.map((t) => (
+                                    <DropdownMenuRadioItem key={t.slug} value={t.slug}>
+                                        {t.label}
                                     </DropdownMenuRadioItem>
                                 ))}
                             </DropdownMenuRadioGroup>
+                            <p className="max-w-52 px-1.5 pt-1 pb-1.5 text-xs text-ink-muted">
+                                Locked onto something, the view turns about its middle and zooms
+                                towards it. Free moves anywhere.
+                            </p>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                )}
+                {mode === "3d" && (
+                    // On to the next target, from Free to the first.
+                    <button
+                        type="button"
+                        aria-label="Look at the next one"
+                        title="Next"
+                        onClick={() => step(1)}
+                        className={`${CONTROL} w-9`}
+                    >
+                        <ChevronRight />
+                    </button>
                 )}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -656,7 +690,10 @@ export default function FoxView() {
                         off: mode !== "3d" && frame.zoom <= least,
                     },
                     {
-                        label: "Show the whole view again",
+                        label:
+                            mode === "3d" && focus
+                                ? `Back to the start: ${focus.label}`
+                                : "Show the whole view again",
                         icon: <RotateCcw />,
                         onClick: () => {
                             if (mode === "3d") return glView?.reset();

@@ -61,6 +61,12 @@ export type GLHandle = {
 };
 
 /**
+ * A point the view's locked onto: it turns about it and zooms towards it, and can't be moved off it. The view eases
+ * there, keeping the way it's looking, to `distance` (metres) out from it.
+ */
+export type Focus = { centre: Vector3; distance: number };
+
+/**
  * What a 3D scene needs besides its pieces: where the camera turns about to start with, how far from it it sits and
  * which way it looks from (degrees: the compass bearing to the eye, and how far above level), how far out it may zoom,
  * the ground, the compass letters round it and how tall they're drawn, the thinnest each material's drawn (metres of
@@ -906,11 +912,13 @@ function Handle({
     onReady,
     controls,
     onTurn,
+    focus,
 }: {
     scene: SceneConfig;
     onReady: (handle: GLHandle | null) => void;
     controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
-    onTurn: (azimuth: number, elevation: number) => void;
+    onTurn?: (azimuth: number, elevation: number) => void;
+    focus: Focus | null;
 }) {
     const { camera } = useThree();
     const size = useThree((s) => s.size);
@@ -938,11 +946,17 @@ function Handle({
                 const out = camera.position.clone().sub(c.target).divideScalar(factor);
                 move(c.target.clone().add(out), c.target.clone());
             },
+            // Back to the start: of the whole scene, or of what it's locked onto, seen from the scene's starting bearing.
             reset: () =>
-                move(
-                    eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
-                    T(scene.centre),
-                ),
+                focus
+                    ? move(
+                          eyeAt(T(focus.centre), focus.distance, scene.azimuth, scene.elevation),
+                          T(focus.centre),
+                      )
+                    : move(
+                          eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
+                          T(scene.centre),
+                      ),
             look: (azimuth, elevation) => {
                 const distance = camera.position.distanceTo(c.target);
                 move(eyeAt(c.target, distance, azimuth, elevation), c.target.clone());
@@ -970,7 +984,7 @@ function Handle({
             const azimuth =
                 ((Math.round((Math.atan2(d.x, -d.z) * 180) / Math.PI) % 360) + 360) % 360;
             const elevation = Math.round((Math.asin(d.y / d.length()) * 180) / Math.PI);
-            onTurn(azimuth, elevation);
+            onTurn?.(azimuth, elevation);
         };
         c.addEventListener("change", report);
         report();
@@ -979,7 +993,73 @@ function Handle({
             c.removeEventListener("change", report);
             onReady(null);
         };
-    }, [camera, controls, onReady, onTurn, scene, start]);
+    }, [camera, controls, onReady, onTurn, scene, start, focus]);
+    return null;
+}
+
+/** How long the view takes to ease onto a new focus (milliseconds). */
+const FOCUS_EASE = 700;
+
+/**
+ * Eases the view onto its focus when it's given one: the point it turns about slides to the focus's centre while the
+ * eye comes in or out to its distance, looking the same way throughout. Turning or zooming stops it where it is. The
+ * camera's near plane comes in with it, so a small part can be looked at from close up.
+ */
+function FocusOn({
+    focus,
+    controls,
+    near,
+}: {
+    focus: Focus | null;
+    controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
+    near: number;
+}) {
+    const camera = useThree((s) => s.camera);
+    const get = useThree((s) => s.get);
+    const ease = useRef<{
+        from: THREE.Vector3;
+        to: THREE.Vector3;
+        dir: THREE.Vector3;
+        out: [number, number];
+        start: number;
+    } | null>(null);
+    useEffect(() => {
+        // Read from the store, as it's changed here rather than drawn from.
+        const lens = get().camera;
+        if (lens instanceof THREE.PerspectiveCamera) {
+            lens.near = focus ? Math.min(near, focus.distance / 40) : near;
+            lens.updateProjectionMatrix();
+        }
+        const c = controls.current;
+        if (!c || !focus) return;
+        const out = camera.position.clone().sub(c.target);
+        ease.current = {
+            from: c.target.clone(),
+            to: T(focus.centre),
+            dir: out.clone().normalize(),
+            out: [out.length(), focus.distance],
+            start: performance.now(),
+        };
+        const stop = () => (ease.current = null);
+        c.addEventListener("start", stop);
+        return () => {
+            c.removeEventListener("start", stop);
+            ease.current = null;
+        };
+    }, [focus, controls, camera, near, get]);
+    useFrame(() => {
+        const e = ease.current;
+        const c = controls.current;
+        if (!e || !c) return;
+        const t = Math.min((performance.now() - e.start) / FOCUS_EASE, 1);
+        const k = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+        // In and out by the same fraction each step, so a long way in doesn't rush the close end.
+        const distance = e.out[0] * (e.out[1] / e.out[0]) ** k;
+        c.target.lerpVectors(e.from, e.to, k);
+        camera.position.copy(c.target).add(e.dir.clone().multiplyScalar(distance));
+        c.update();
+        if (t >= 1) ease.current = null;
+    });
     return null;
 }
 
@@ -987,7 +1067,7 @@ type ViewProps = {
     pieces: Piece[];
     labels: RigLabel[];
     onReady: (handle: GLHandle | null) => void;
-    onTurn: (azimuth: number, elevation: number) => void;
+    onTurn?: (azimuth: number, elevation: number) => void;
 };
 
 /** How finely a scene's drawn: the most pixels per CSS pixel, and how many sides its tubes have. */
@@ -1010,9 +1090,12 @@ export function SceneGL({
     onTurn,
     detail,
     onFrameRate,
+    focus = null,
     children,
 }: ViewProps & {
     scene: SceneConfig;
+    /** A point to lock the view onto, or none to move freely. */
+    focus?: Focus | null;
     /** How finely to draw it (as fine as the screen allows, up to 2 pixels a CSS pixel, unless given). */
     detail?: GLDetail;
     /** Told when the frame rate stays short of smooth, or has room to spare, for a choice of detail to follow. */
@@ -1035,6 +1118,7 @@ export function SceneGL({
     const target = useMemo(() => T(scene.centre), [scene]);
     const limits = useMemo(() => boundsBox(scene), [scene]);
     const light = T(vec3(0.3, 0.8, 0.5)).multiplyScalar(20);
+    const near = Math.min(0.3, (scene.minDistance ?? 1.5) / 5);
     return (
         <div ref={box} className="absolute inset-0 touch-none">
             {!drawn && <Loading3D />}
@@ -1043,7 +1127,7 @@ export function SceneGL({
                     camera={{
                         fov: FOV,
                         position: eyeAt(target, scene.distance, scene.azimuth, scene.elevation),
-                        near: Math.min(0.3, (scene.minDistance ?? 1.5) / 5),
+                        near,
                         far: scene.maxDistance * 2.5,
                     }}
                     gl={{ antialias: true, alpha: true }}
@@ -1091,14 +1175,25 @@ export function SceneGL({
                         ref={controls}
                         target={target}
                         enableDamping={false}
-                        zoomToCursor
-                        minDistance={scene.minDistance ?? 1.5}
+                        // Locked onto a focus, it zooms towards it and can't be moved off it.
+                        enablePan={!focus}
+                        zoomToCursor={!focus}
+                        minDistance={focus ? focus.distance / 8 : (scene.minDistance ?? 1.5)}
                         maxDistance={scene.maxDistance}
                         maxPolarAngle={scene.below ? Math.PI : Math.PI / 2}
                         makeDefault
                     />
-                    <Handle scene={scene} onReady={onReady} controls={controls} onTurn={onTurn} />
-                    {scene.pivotToPointer && <PivotToPointer controls={controls} limits={limits} />}
+                    <Handle
+                        scene={scene}
+                        onReady={onReady}
+                        controls={controls}
+                        onTurn={onTurn}
+                        focus={focus}
+                    />
+                    <FocusOn focus={focus} controls={controls} near={near} />
+                    {scene.pivotToPointer && !focus && (
+                        <PivotToPointer controls={controls} limits={limits} />
+                    )}
                     <ColorsContext value={colors}>{children}</ColorsContext>
                     <FirstFrame onDrawn={() => setDrawn(true)} />
                 </Canvas>

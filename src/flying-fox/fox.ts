@@ -2891,6 +2891,91 @@ export function foxLabels(): RigLabel[] {
     ];
 }
 
+/**
+ * What the 3D view can lock onto, up the site from the tree to the log: each thing's middle, which the view turns
+ * about, and how far from it the view starts (metres), far enough to see all of it.
+ */
+export type FoxTarget = { slug: string; label: string; centre: Vector3; distance: number };
+
+/** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
+function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
+    const lo = points.reduce((a, p) =>
+        vec3(Math.min(a.x, p.x), Math.min(a.y, p.y), Math.min(a.z, p.z)),
+    );
+    const hi = points.reduce((a, p) =>
+        vec3(Math.max(a.x, p.x), Math.max(a.y, p.y), Math.max(a.z, p.z)),
+    );
+    // The 3D view's 30° high: a ball this big fits it from about 3.9 times its radius out, a little closer on screens
+    // wider than they're high.
+    const r = hi.sub(lo).len() / 2;
+    return { slug, label, centre: lo.lerp(hi, 0.5), distance: Math.max(3.5 * r, 1.5) };
+}
+
+export function foxTargets(): FoxTarget[] {
+    const sides = [-1, 1];
+    const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
+    // A trolley and its dropper: from just over the hawser down past the harness to the end of the descender's brake
+    // strand, about 0.9 m below the descender.
+    const trolleyAt = (x: number, s: number) => {
+        const at = onHawser(x, s);
+        return [at.add(vec3(-0.15, 0.08, 0)), at.add(vec3(0.15, -RIDER.harness - 0.9, 0))];
+    };
+    // The tree's anchor: the trunk where the slings go round it, out to the end of each hawser's made-off eye (its bow
+    // shackle, thimble, clamps and tail, about 0.8 m along the hawser from the sling's shackle).
+    const treeEye = (s: number) => {
+        const at = TREE_SHACKLE(s);
+        return at.add(
+            vec3(BAR_X, CRADLE_Y, s * HAWSER_Z)
+                .sub(at)
+                .unit()
+                .scale(0.8),
+        );
+    };
+    // The log's anchor: the log and its pickets, out to the end of each lizard's wire up its hawser.
+    const lizardEnd = (s: number) => {
+        const a = ANCHOR_SHACKLE(s * SLING_Z);
+        return a.add(
+            SADDLE(s)
+                .sub(a)
+                .unit()
+                .scale(LIZARD.clamps.at(-1)! + LIZARD.tail),
+        );
+    };
+    return [
+        framing("top-anchor", "Top anchor", [
+            onGround(TREE.x - TREE.r, 0, -TREE.r),
+            onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
+            ...sides.map(treeEye),
+        ]),
+        {
+            slug: "top-tower",
+            label: "Top tower",
+            centre: onGround(0, TOWER.top / 2, TOWER.z),
+            distance: 22,
+        },
+        framing("trolley-a", "Trolley A", trolleyAt(TROLLEY_X.a, 1)),
+        framing("trolley-b", "Trolley B", trolleyAt(TROLLEY_X.b, -1)),
+        { slug: "dynamic-brake", label: "Dynamic brake", centre: between(BLOCKS_X), distance: 4 },
+        {
+            slug: "static-brake",
+            label: "Static brakes",
+            centre: between(STATIC_X).lerp(onGround(STATIC_X, 0, 0), 0.5),
+            distance: 14,
+        },
+        {
+            slug: "bottom-tower",
+            label: "Bottom tower",
+            centre: onGround(SHEAR_LEG.x, SHEAR_LEG.top / 2, 0),
+            distance: 15,
+        },
+        framing("bottom-anchor", "Bottom anchor", [
+            onGround(LOG.x + 0.5, 0, -LOG.length / 2),
+            onGround(LOG.x - 0.2, 1, LOG.length / 2),
+            ...sides.map(lizardEnd),
+        ]),
+    ];
+}
+
 /** The legend's lines: each rope or wire by its colour, and what it is. */
 export function foxLegend(): { name: string; color: string; look: "tape" | "rope" }[] {
     return [
