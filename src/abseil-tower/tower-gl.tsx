@@ -71,6 +71,20 @@ export type Focus = { centre: Vector3; distance: number };
 export const FOCUS_OUT = 2;
 
 /**
+ * Where someone stands in the scene, their eye `at`, first looking towards `lookAt`. Standing there, the view turns
+ * about the eye, as they'd turn their head, and zooms by narrowing or widening what it takes in; it can't move.
+ */
+export type Stance = { at: Vector3; lookAt: Vector3; fov?: number };
+/**
+ * How wide a standing view takes in to start with (degrees high, unless its stance gives its own `fov`), and how narrow
+ * and wide it zooms.
+ */
+const STANCE_FOV = { start: 55, least: 15, most: 80 };
+
+/** What a standing view does when the page's zoom and back-to-start buttons are pressed. */
+type StanceButtons = { zoomBy: (factor: number) => void; reset: () => void };
+
+/**
  * What a 3D scene needs besides its pieces: where the camera turns about to start with, how far from it it sits and
  * which way it looks from (degrees: the compass bearing to the eye, and how far above level), how far out it may zoom,
  * the ground, the compass letters round it and how tall they're drawn, the thinnest each material's drawn (metres of
@@ -917,12 +931,15 @@ function Handle({
     controls,
     onTurn,
     focus,
+    standing,
 }: {
     scene: SceneConfig;
     onReady: (handle: GLHandle | null) => void;
     controls: RefObject<ComponentRef<typeof OrbitControls> | null>;
     onTurn?: (azimuth: number, elevation: number) => void;
     focus: Focus | null;
+    /** A standing view's own buttons, while there is one, which the page's buttons work instead. */
+    standing: RefObject<StanceButtons | null>;
 }) {
     const { camera } = useThree();
     const size = useThree((s) => s.size);
@@ -947,20 +964,23 @@ function Handle({
         }
         onReady({
             zoomBy: (factor) => {
+                if (standing.current) return standing.current.zoomBy(factor);
                 const out = camera.position.clone().sub(c.target).divideScalar(factor);
                 move(c.target.clone().add(out), c.target.clone());
             },
             // Back to the start: of the whole scene, or of what it's locked onto, seen from the scene's starting bearing.
             reset: () =>
-                focus
-                    ? move(
-                          eyeAt(T(focus.centre), focus.distance, scene.azimuth, scene.elevation),
-                          T(focus.centre),
-                      )
-                    : move(
-                          eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
-                          T(scene.centre),
-                      ),
+                standing.current
+                    ? standing.current.reset()
+                    : focus
+                      ? move(
+                            eyeAt(T(focus.centre), focus.distance, scene.azimuth, scene.elevation),
+                            T(focus.centre),
+                        )
+                      : move(
+                            eyeAt(T(scene.centre), start, scene.azimuth, scene.elevation),
+                            T(scene.centre),
+                        ),
             look: (azimuth, elevation) => {
                 const distance = camera.position.distanceTo(c.target);
                 move(eyeAt(c.target, distance, azimuth, elevation), c.target.clone());
@@ -997,7 +1017,7 @@ function Handle({
             c.removeEventListener("change", report);
             onReady(null);
         };
-    }, [camera, controls, onReady, onTurn, scene, start, focus]);
+    }, [camera, controls, onReady, onTurn, scene, start, focus, standing]);
     return null;
 }
 
@@ -1092,6 +1112,123 @@ function FocusOn({
     return null;
 }
 
+/**
+ * Stands the view at a stance: the eye put there, looking towards its `lookAt`, the orbit controls off. Dragging turns
+ * the view about the eye (grabbing the scene and pulling it round, as with a street view); scrolling, pinching and the
+ * zoom buttons narrow or widen what it takes in. Leaving it, the orbit controls take over turning about a point a
+ * little way ahead, at the usual width.
+ */
+function StandAt({
+    stance,
+    onButtons,
+}: {
+    stance: Stance | null;
+    /** Told the standing view's buttons while it's there, and `null` once it's gone. */
+    onButtons: (buttons: StanceButtons | null) => void;
+}) {
+    const get = useThree((s) => s.get);
+    const gl = useThree((s) => s.gl);
+    useEffect(() => {
+        const lens = get().camera;
+        if (!stance || !(lens instanceof THREE.PerspectiveCamera)) return;
+        const at = T(stance.at);
+        const [fov, near] = [lens.fov, lens.near];
+        // Which way it looks: round from three.js's +z towards +x, and up from level (radians).
+        const look = { yaw: 0, pitch: 0 };
+        const aim = () => {
+            const { yaw, pitch } = look;
+            const ahead = new THREE.Vector3(
+                Math.cos(pitch) * Math.sin(yaw),
+                Math.sin(pitch),
+                Math.cos(pitch) * Math.cos(yaw),
+            );
+            lens.position.copy(at);
+            lens.lookAt(at.clone().add(ahead));
+        };
+        const widen = (f: number) => {
+            lens.fov = Math.min(Math.max(f, STANCE_FOV.least), STANCE_FOV.most);
+            lens.updateProjectionMatrix();
+        };
+        const reset = () => {
+            const d = T(stance.lookAt).sub(at).normalize();
+            look.yaw = Math.atan2(d.x, d.z);
+            look.pitch = Math.asin(d.y);
+            widen(stance.fov ?? STANCE_FOV.start);
+            aim();
+        };
+        lens.near = 0.05;
+        reset();
+        onButtons({ zoomBy: (factor) => widen(lens.fov / factor), reset });
+        // Turning by dragging, as far as the view's height takes in from top to bottom for a drag of its height.
+        const el = gl.domElement;
+        const pointers = new Map<number, { x: number; y: number }>();
+        let spread = 0;
+        const apart = () => {
+            const [a, b] = [...pointers.values()];
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        };
+        const onDown = (e: PointerEvent) => {
+            el.setPointerCapture(e.pointerId);
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size === 2) spread = apart();
+        };
+        const onMove = (e: PointerEvent) => {
+            const was = pointers.get(e.pointerId);
+            if (!was) return;
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pointers.size === 2) {
+                // A pinch: fingers apart zooms in.
+                const now = apart();
+                if (spread > 0) widen((lens.fov * spread) / Math.max(now, 1));
+                spread = now;
+                return;
+            }
+            const perPixel = rad(lens.fov) / Math.max(el.clientHeight, 1);
+            look.yaw += (e.clientX - was.x) * perPixel;
+            look.pitch = Math.min(
+                Math.max(look.pitch + (e.clientY - was.y) * perPixel, -rad(85)),
+                rad(85),
+            );
+            aim();
+        };
+        const onUp = (e: PointerEvent) => {
+            pointers.delete(e.pointerId);
+            spread = 0;
+        };
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            const delta = e.deltaY * (e.deltaMode === 1 ? 33 : 1);
+            widen(lens.fov * Math.exp(delta * (e.ctrlKey ? 0.01 : 0.0015)));
+        };
+        el.addEventListener("pointerdown", onDown);
+        el.addEventListener("pointermove", onMove);
+        el.addEventListener("pointerup", onUp);
+        el.addEventListener("pointercancel", onUp);
+        el.addEventListener("wheel", onWheel, { passive: false });
+        return () => {
+            el.removeEventListener("pointerdown", onDown);
+            el.removeEventListener("pointermove", onMove);
+            el.removeEventListener("pointerup", onUp);
+            el.removeEventListener("pointercancel", onUp);
+            el.removeEventListener("wheel", onWheel);
+            onButtons(null);
+            // Back to the orbit controls, turning about a point 20 m ahead, at the width it had before.
+            lens.fov = fov;
+            lens.near = near;
+            lens.updateProjectionMatrix();
+            // The orbit controls, from the store (where they're the default controls).
+            const c = get().controls as ComponentRef<typeof OrbitControls> | null;
+            if (c) {
+                const ahead = new THREE.Vector3();
+                lens.getWorldDirection(ahead);
+                c.target.copy(lens.position).add(ahead.multiplyScalar(20));
+                c.update();
+            }
+        };
+    }, [stance, onButtons, get, gl]);
+    return null;
+}
+
 type ViewProps = {
     pieces: Piece[];
     labels: RigLabel[];
@@ -1120,11 +1257,14 @@ export function SceneGL({
     detail,
     onFrameRate,
     focus = null,
+    stance = null,
     children,
 }: ViewProps & {
     scene: SceneConfig;
     /** A point to lock the view onto, or none to move freely. */
     focus?: Focus | null;
+    /** Somewhere to stand and look round from, instead of turning about a point. */
+    stance?: Stance | null;
     /** How finely to draw it (as fine as the screen allows, up to 2 pixels a CSS pixel, unless given). */
     detail?: GLDetail;
     /** Told when the frame rate stays short of smooth, or has room to spare, for a choice of detail to follow. */
@@ -1141,6 +1281,10 @@ export function SceneGL({
         return reader.dispose;
     }, []);
     const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
+    const standing = useRef<StanceButtons | null>(null);
+    const onStanceButtons = useCallback((b: StanceButtons | null) => {
+        standing.current = b;
+    }, []);
     // Until the first frame's drawn, the loading message stays up.
     const [drawn, setDrawn] = useState(false);
     const all = useMemo(() => [...scene.ground, ...pieces], [scene, pieces]);
@@ -1204,6 +1348,8 @@ export function SceneGL({
                         ref={controls}
                         target={target}
                         enableDamping={false}
+                        // Off while standing somewhere, where the view only turns about the eye.
+                        enabled={!stance}
                         // Locked onto a focus, it zooms towards it and can't be moved off it.
                         enablePan={!focus}
                         zoomToCursor={!focus}
@@ -1218,14 +1364,16 @@ export function SceneGL({
                         controls={controls}
                         onTurn={onTurn}
                         focus={focus}
+                        standing={standing}
                     />
+                    <StandAt stance={stance} onButtons={onStanceButtons} />
                     <FocusOn
                         focus={focus}
                         controls={controls}
                         near={near}
                         far={scene.maxDistance}
                     />
-                    {scene.pivotToPointer && !focus && (
+                    {scene.pivotToPointer && !focus && !stance && (
                         <PivotToPointer controls={controls} limits={limits} />
                     )}
                     <ColorsContext value={colors}>{children}</ColorsContext>

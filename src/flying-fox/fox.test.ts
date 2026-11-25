@@ -10,8 +10,10 @@ import {
     FALL,
     foxLabels,
     foxPieces,
+    foxStances,
     foxTargets,
     GRADE,
+    GROUND,
     groundY,
     hawserY,
     loaded,
@@ -177,6 +179,19 @@ describe("flying fox layout", () => {
 });
 
 describe("the views' targets", () => {
+    it("each stance stands on the site, its eye a person's height up", () => {
+        for (const e of foxStances()) {
+            expect(Math.abs(e.at.x - (GROUND.x0 + GROUND.x1) / 2), e.slug).toBeLessThan(
+                (GROUND.x1 - GROUND.x0) / 2,
+            );
+            expect(Math.abs(e.at.z), e.slug).toBeLessThan(GROUND.z);
+            // On the ground, or the launch platform's deck.
+            const feet = e.at.y - 1.7;
+            const onDeck = Math.abs(feet - (TOWER.lower + TOWER.rhs.h / 2 + 0.05)) < 1e-9;
+            if (!onDeck) expect(feet, e.slug).toBeCloseTo(groundY(e.at.x), 9);
+        }
+    });
+
     it("each label belongs to a target", () => {
         const slugs = foxTargets().map((t) => t.slug);
         for (const l of foxLabels()) expect(slugs, l.text).toContain(l.target);

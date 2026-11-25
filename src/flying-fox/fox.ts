@@ -3261,6 +3261,54 @@ export function foxTargets(): FoxTarget[] {
     ];
 }
 
+/** How high a standing person's eyes are above their feet (metres). */
+const EYE_HEIGHT = 1.7;
+
+/** Somewhere to stand on the site and look round from in 3D: where the eye is, and what it looks at first. */
+export type FoxStance = {
+    slug: string;
+    label: string;
+    at: Vector3;
+    lookAt: Vector3;
+    /** How wide it takes in to start with (degrees high), if not the usual. */
+    fov?: number;
+};
+export function foxStances(): FoxStance[] {
+    // The platform's deck, on the bottom cross bar.
+    const deck = TOWER.lower + TOWER.rhs.h / 2 + 0.05;
+    // Between the hawsers, at the hawsers' height, `x` along the span.
+    const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
+    return [
+        (() => {
+            // On the launch platform, a step back from its front edge, looking down the span and a little up and
+            // towards hawser A, wide enough to take in trolley A just ahead and above.
+            const at = vec3(0.3, deck + EYE_HEIGHT, TOWER.z + TOWER.platform.shift);
+            return {
+                slug: "loader",
+                label: "Loader",
+                at,
+                lookAt: at.add(vec3(10, 2.1, 2.7)),
+                fov: 70,
+            };
+        })(),
+        {
+            // On the ground between the hawsers, abreast where riders come to rest, looking back up the span at riders
+            // coming down.
+            slug: "unloader",
+            label: "Unloader",
+            at: onGround(REST_X, EYE_HEIGHT, 0),
+            lookAt: between(SPAN / 3),
+        },
+        {
+            // Halfway along the span, off to hawser B's side, looking across at the hawsers.
+            slug: "observer",
+            label: "Observer",
+            at: onGround(SPAN / 2, EYE_HEIGHT, -12),
+            lookAt: between(SPAN / 2),
+        },
+    ];
+}
+
 /** The legend's lines: each rope or wire by its colour, and what it is. */
 export function foxLegend(): { name: string; color: string; look: "tape" | "rope" }[] {
     return [

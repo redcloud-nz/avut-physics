@@ -11,6 +11,7 @@ import {
     Minus,
     Move3d,
     PanelBottom,
+    PersonStanding,
     Plus,
     RotateCcw,
     X,
@@ -68,6 +69,7 @@ import {
     foxLabels,
     foxLegend,
     foxPieces,
+    foxStances,
     foxTargets,
     GRADE,
     GROUND,
@@ -149,6 +151,8 @@ const SCENE: SceneConfig = {
 
 /** What the 3D view can lock onto, up the site from the tree to the log. */
 const TARGETS = foxTargets();
+/** Where the 3D view can stand and look round from. */
+const STANCES = foxStances();
 
 /** How close a flat view is, and the point it's centred on. */
 type Frame = { zoom: number; target: Vector3 };
@@ -283,22 +287,29 @@ export default function FoxView() {
     const mode = modeOf(params.get("view"));
     // How a flat view's been zoomed and moved, from where it starts.
     const [moved, setMoved] = useState<Frame | null>(null);
-    const setParam = (name: string, value: string | null) => {
+    const setParams = (values: Record<string, string | null>) => {
         const url = new URL(window.location.href);
-        if (value === null) url.searchParams.delete(name);
-        else url.searchParams.set(name, value);
+        for (const [name, value] of Object.entries(values)) {
+            if (value === null) url.searchParams.delete(name);
+            else url.searchParams.set(name, value);
+        }
         window.history.replaceState(null, "", url);
     };
+    const setParam = (name: string, value: string | null) => setParams({ [name]: value });
     const setMode = (m: Mode) => {
         setParam("view", m);
         setMoved(null);
     };
     // What every view's locked onto (`?target=trolley-a`), kept from view to view, or nothing to move freely.
     const focus = TARGETS.find((t) => t.slug === params.get("target")) ?? null;
+    // Where the 3D view stands, if anywhere (`?eye=loader`): only in 3D, and instead of a target.
+    const stance =
+        mode === "3d" ? (STANCES.find((e) => e.slug === params.get("eye")) ?? null) : null;
     const lockOn = (t: FoxTarget | null) => {
-        setParam("target", t?.slug ?? null);
+        setParams({ target: t?.slug ?? null, eye: null });
         setMoved(null);
     };
+    const standAs = (slug: string) => setParams({ eye: slug, target: null });
     // Through the targets in turn, round from the last to the first.
     const step = (by: number) => {
         const i = focus ? TARGETS.indexOf(focus) : by > 0 ? -1 : TARGETS.length;
@@ -307,9 +318,11 @@ export default function FoxView() {
     // For the swipes, which are watched from outside React's events.
     const stepRef = useRef(step);
     const lockedRef = useRef(false);
+    const standingRef = useRef(false);
     useEffect(() => {
         stepRef.current = step;
         lockedRef.current = focus !== null;
+        standingRef.current = stance !== null;
     });
     const pieces = useMemo(() => foxPieces(), []);
     const labels = useMemo(() => foxLabels(), []);
@@ -445,6 +458,8 @@ export default function FoxView() {
         if (!box) return;
         const wheel = { sum: 0, last: 0, done: false };
         const onWheel = (e: WheelEvent) => {
+            // Not while standing somewhere, where there's no next one.
+            if (standingRef.current) return;
             if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             // Not to the 3D view's zoom, the drawing's, or the browser's back and forward.
             e.preventDefault();
@@ -717,6 +732,7 @@ export default function FoxView() {
                     labels={[]}
                     onReady={setGlView}
                     focus={focus}
+                    stance={stance}
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
                     onFrameRate={choice === "auto" ? onFrameRate : undefined}
                 />
@@ -857,25 +873,35 @@ export default function FoxView() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-            {/* Free to move about the site, or locked onto one thing on it, in every view. */}
+            {/* Free to move about the site, or locked onto one thing on it, in every view; or, in 3D, standing somewhere. */}
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            aria-label={`Look at: ${focus?.label ?? "Free"}`}
+                            aria-label={
+                                stance
+                                    ? `Standing as: ${stance.label}`
+                                    : `Look at: ${focus?.label ?? "Free"}`
+                            }
                             title="Look at"
                             className={`${CONTROL} gap-1.5 px-2.5 whitespace-nowrap`}
                         >
-                            {focus ? <Eye /> : <Move3d />}
-                            <span className="text-xs">{focus?.label ?? "Free"}</span>
+                            {stance ? <PersonStanding /> : focus ? <Eye /> : <Move3d />}
+                            <span className="text-xs">
+                                {stance?.label ?? focus?.label ?? "Free"}
+                            </span>
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="top" align="center" className="min-w-52">
                         <DropdownMenuLabel>Look at</DropdownMenuLabel>
                         <DropdownMenuRadioGroup
-                            value={focus?.slug ?? "free"}
-                            onValueChange={(k) => lockOn(TARGETS.find((t) => t.slug === k) ?? null)}
+                            value={stance ? `eye:${stance.slug}` : (focus?.slug ?? "free")}
+                            onValueChange={(k) =>
+                                k.startsWith("eye:")
+                                    ? standAs(k.slice(4))
+                                    : lockOn(TARGETS.find((t) => t.slug === k) ?? null)
+                            }
                         >
                             <DropdownMenuRadioItem value="free">
                                 <Move3d />
@@ -887,11 +913,25 @@ export default function FoxView() {
                                     {t.label}
                                 </DropdownMenuRadioItem>
                             ))}
+                            {mode === "3d" && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>Stand as</DropdownMenuLabel>
+                                    {STANCES.map((e) => (
+                                        <DropdownMenuRadioItem key={e.slug} value={`eye:${e.slug}`}>
+                                            <PersonStanding />
+                                            {e.label}
+                                        </DropdownMenuRadioItem>
+                                    ))}
+                                </>
+                            )}
                         </DropdownMenuRadioGroup>
                         <p className="max-w-52 px-1.5 pt-1 pb-1.5 text-xs text-ink-muted">
                             Locked onto something, the view stays centred on it as it zooms (and
                             turns, in 3D). Swipe sideways with two fingers for the next one. Free
                             moves anywhere.
+                            {mode === "3d" &&
+                                " Standing somewhere, you look round from there: drag to turn, zoom to see further."}
                         </p>
                     </DropdownMenuContent>
                 </DropdownMenu>
