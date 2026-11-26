@@ -40,9 +40,11 @@ describe("the first east face rig", () => {
     });
 
     it("hangs the rope down the outside of the east face to the ground, a stopper on its end", () => {
-        // The knots on rope ends outside the east face: those at the ground are the abseil ropes' stoppers.
-        const feet = pieces.flatMap((p) =>
-            p.kind === "rod" && p.material === "rope" && p.shell?.out.x === 1 ? [p.b] : [],
+        // The lowest points of the rope outside the east face: those at the ground are the abseil ropes' stoppers.
+        const feet = ropes.flatMap((p) =>
+            p.kind === "strand" && p.shell?.out.x === 1
+                ? [p.points.reduce((low, q) => (q.y < low.y ? q : low))]
+                : [],
         );
         const onGround = feet.filter((q) => q.y < 0.1);
         expect(onGround.length).toBeGreaterThan(0);
@@ -93,12 +95,14 @@ describe("the first east face rig", () => {
         const red = ropes.filter(
             (p) => p.kind === "strand" && p.color === "var(--knot-red)" && p.shell?.out.x === 1,
         );
-        expect(red).toHaveLength(1);
-        expect(white).toHaveLength(1);
+        expect(red.length).toBeGreaterThan(0);
+        expect(white.length).toBeGreaterThan(0);
+        // Over the rail and down to the figure 8 on its end, and no further.
         for (const rope of [...white, ...red]) {
-            const end = rope.kind === "strand" ? rope.points.at(-1)! : vec3(0, 0, 0);
-            expect(end.x).toBeGreaterThan(EAST_EDGE.rail.x);
-            expect(end.y).toBeGreaterThan(EAST_EDGE.rail.y - 0.5);
+            const points = rope.kind === "strand" ? rope.points : [];
+            const low = points.reduce((l, q) => (q.y < l.y ? q : l));
+            expect(low.x).toBeGreaterThan(EAST_EDGE.rail.x);
+            expect(low.y).toBeGreaterThan(EAST_EDGE.rail.y - 0.5);
         }
     });
 
@@ -125,18 +129,35 @@ describe("the first east face rig", () => {
 
     it("stops the maroon fixed line just below the outrigger, not at the ground", () => {
         // Where it finishes: the bottom of the figure 8 on its end, outside the west side.
-        const knots = pieces.filter(
-            (p) =>
-                p.kind === "rod" &&
-                p.material === "rope" &&
-                p.color === "var(--rig-maroon)" &&
-                p.shell?.out.x === -1,
+        const outside = ropes.flatMap((p) =>
+            p.kind === "strand" && p.color === "var(--rig-maroon)" && p.shell?.out.x === -1
+                ? p.points
+                : [],
         );
-        expect(knots).toHaveLength(1);
-        const end = knots[0].kind === "rod" ? knots[0].b : vec3(0, 0, 0);
+        expect(outside.length).toBeGreaterThan(0);
+        const end = outside.reduce((low, q) => (q.y < low.y ? q : low));
         const { x, y, r } = WEST_EDGE.outrigger;
         expect(end.x).toBeLessThan(x - r);
         expect(end.y).toBeLessThan(y - r);
         expect(end.y).toBeGreaterThan(y - r - 0.3);
+    });
+});
+
+describe("the figure 8s", () => {
+    const knotLabels = (cylinders: boolean) =>
+        layoutRig(RIGS[0], undefined, { knotCylinders: cylinders }).labels.filter(
+            (l) => l.text === "F8OB" || l.text === "F8",
+        );
+
+    it("are drawn as they're tied, their labels written beside them", () => {
+        const labels = knotLabels(false);
+        expect(labels.length).toBeGreaterThan(0);
+        for (const l of labels) expect(l.on).toBeUndefined();
+    });
+
+    it("are drawn as labelled cylinders when asked, one for each knot", () => {
+        const labels = knotLabels(true);
+        expect(labels).toHaveLength(knotLabels(false).length);
+        for (const l of labels) expect(l.on).toBeDefined();
     });
 });

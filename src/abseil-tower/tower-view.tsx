@@ -28,7 +28,7 @@ import type { GLHandle } from "@/scene/scene-gl";
 import { useFlatView, type Fit } from "@/scene/use-flat-view";
 import { LegendPanel, ZoomButtons } from "@/scene/viewer-controls";
 
-import { layoutRig, legend, RIGS, rigSide } from "./rig";
+import { KNOT_LABELS, layoutRig, legend, RIGS, rigSide } from "./rig";
 import { groundAt, groundCorners, LEVELS, OVERHEAD, SIDE, towerPieces } from "./tower";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
@@ -165,9 +165,20 @@ export default function TowerView({ slug }: { slug: string }) {
     const below = plan ? LEVELS[4] - 0.3 : undefined;
     const { azimuth, elevation } = camera;
     const rig = RIGS.find((r) => r.slug === slug) ?? RIGS[0];
-    const laid = useMemo(() => layoutRig(rig, side ? rigSide(rig, side) : undefined), [rig, side]);
+    // The figure 8s are drawn as they're tied, so their labels can be turned off. In 3D, where labels are written on
+    // cylinders, the knots are drawn as labelled cylinders while their labels are on.
+    const [showKnotLabels, setShowKnotLabels] = useState(true);
+    const knotCylinders = mode === "3d" && showKnotLabels;
+    const laid = useMemo(
+        () => layoutRig(rig, side ? rigSide(rig, side) : undefined, { knotCylinders }),
+        [rig, side, knotCylinders],
+    );
     // Where people stand, shown only when asked for, as they crowd the rigging.
     const [showPeople, setShowPeople] = useState(false);
+    const labels = useMemo(() => {
+        const knotLabels = new Set(Object.values(KNOT_LABELS));
+        return laid.labels.filter((l) => showKnotLabels || !knotLabels.has(l.text));
+    }, [laid, showKnotLabels]);
     const pieces = useMemo(() => {
         const tower = towerPieces();
         const rigging = laid.pieces.filter((p) => showPeople || p.material !== "person");
@@ -227,7 +238,7 @@ export default function TowerView({ slug }: { slug: string }) {
         ...(mode === "3d" ? [] : pieces)
             .filter(shown)
             .map((piece) => ({ piece, key: sortKey(piece) })),
-        ...(plan ? laid.labels : [])
+        ...(plan ? labels : [])
             // Looking straight down, what's under the top deck is hidden, so its labels are too.
             .filter((l) => below === undefined || l.at.y >= below)
             .map((label) => ({ label, key: labelKey(label) })),
@@ -281,7 +292,7 @@ export default function TowerView({ slug }: { slug: string }) {
                 )}
             {inBrowser && !plan && (
                 <Callouts
-                    labels={laid.labels}
+                    labels={labels}
                     toSvg={toSvg}
                     ppm={ppm}
                     middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}
@@ -302,12 +313,7 @@ export default function TowerView({ slug }: { slug: string }) {
             className="relative min-h-0 flex-1 overflow-hidden border-t border-border bg-surface"
         >
             {mode === "3d" ? (
-                <TowerGL
-                    pieces={pieces}
-                    labels={laid.labels}
-                    onReady={setGlView}
-                    onTurn={onGlTurn}
-                />
+                <TowerGL pieces={pieces} labels={labels} onReady={setGlView} onTurn={onGlTurn} />
             ) : (
                 diagram
             )}
@@ -340,6 +346,28 @@ export default function TowerView({ slug }: { slug: string }) {
                                 </li>
                             ))}
                         </ul>
+                        {key.knots.length > 0 && (
+                            <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-2">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-medium text-ink-strong">Knots</h3>
+                                    <Toggle
+                                        label="Labels"
+                                        checked={showKnotLabels}
+                                        onChange={setShowKnotLabels}
+                                    />
+                                </div>
+                                <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
+                                    {key.knots.map((k) => (
+                                        <li key={k.text} className="flex items-center gap-2">
+                                            <span className="w-16 shrink-0 text-center font-mono text-[0.65rem] font-semibold text-ink-strong">
+                                                {k.text}
+                                            </span>
+                                            <span>{k.name}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         {key.people.length > 0 && (
                             <div className="mt-1 flex items-center justify-between border-t border-border pt-2">
                                 <h3 className="text-xs font-medium text-ink-strong">People</h3>
