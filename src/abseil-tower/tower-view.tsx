@@ -38,8 +38,11 @@ const TowerGL = dynamic(() => import("./tower-gl"), { ssr: false, loading: () =>
 const LEAST = vec2(800, 1000);
 /** SVG units per metre unzoomed: the same in every view, so the tower doesn't grow and shrink as it turns. */
 const PPM = 60;
-/** How far the flat views zoom in, and the least zoom they start at (and may zoom out to). */
-const ZOOM = { most: 8, leastStart: 1 };
+/**
+ * How far the flat views zoom in, and the least zoom they start at (and may zoom out to): in far enough to see a knot
+ * on a carabiner, about fifteen times as close as the top deck's first shown.
+ */
+const ZOOM = { most: 40, leastStart: 1 };
 /**
  * The narrowest rope and steel are drawn (SVG units): their true width, in proportion with everything else, but never
  * thinner than a hairline, so they still show zoomed out.
@@ -174,9 +177,12 @@ export default function TowerView({ slug }: { slug: string }) {
     // cylinders, the knots are drawn as labelled cylinders while their labels are on.
     const [showKnotLabels, setShowKnotLabels] = useState(true);
     const knotCylinders = mode === "3d" && showKnotLabels;
+    const cam = useMemo(() => new OrbitCamera(rad(azimuth), rad(elevation)), [azimuth, elevation]);
+    // In the flat views the carabiners and knots are laid face on to the eye, so each shows its shape.
+    const face = mode === "3d" ? undefined : cam.toward;
     const laid = useMemo(
-        () => layoutRig(rig, side ? rigSide(rig, side) : undefined, { knotCylinders }),
-        [rig, side, knotCylinders],
+        () => layoutRig(rig, side ? rigSide(rig, side) : undefined, { knotCylinders, face }),
+        [rig, side, knotCylinders, face],
     );
     // Where people stand, shown only when asked for, as they crowd the rigging.
     const [showPeople, setShowPeople] = useState(false);
@@ -198,7 +204,6 @@ export default function TowerView({ slug }: { slug: string }) {
     );
     // The drawing's last digits can differ between the server and the browser, so it's drawn only in the browser.
     const inBrowser = useInBrowser();
-    const cam = useMemo(() => new OrbitCamera(rad(azimuth), rad(elevation)), [azimuth, elevation]);
     // A flat view, moved like a map; changing view starts it afresh.
     const flatView = useFlatView({
         camera: cam,
@@ -209,7 +214,7 @@ export default function TowerView({ slug }: { slug: string }) {
         drop: DROP,
         resetKey: mode,
     });
-    const { boxRef, svgRef, size, ppm, toSvg } = flatView;
+    const { boxRef, svgRef, liveRef, size, ppm, toSvg } = flatView;
 
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). Looking straight
@@ -224,6 +229,7 @@ export default function TowerView({ slug }: { slug: string }) {
             ? Math.max(...[p.group.at, ...(p.group.across ?? [])].map((q) => cam.depth(q))) +
               (p.group.ahead ? Math.sign(p.group.ahead.dot(cam.toward)) * 0.01 : 0) +
               (p.group.over ? 0.02 : 0) +
+              (p.group.order ?? 0) * 1e-3 +
               own * 1e-4
             : own;
         if (!p.shell || plan) return depth;
@@ -272,42 +278,48 @@ export default function TowerView({ slug }: { slug: string }) {
             aria-label={`The Cracroft abseil tower: ${MODES[mode].label}. Drag to move the view, and scroll or pinch to zoom.`}
             {...flatView.handlers}
         >
-            <polygon points={svgPoints(groundCorners().map(toSvg))} fill="var(--tower-ground)" />
-            {compass
-                // Level with the tower, the two straight towards and away from the eye would sit on one spot.
-                .filter(([, p]) => {
-                    const away = vec3(p.x - SIDE / 2, 0, p.z - SIDE / 2).unit();
-                    return Math.abs(away.dot(cam.toward)) < 0.95;
-                })
-                .map(([name, p]) => (
-                    <Label key={name} at={toSvg(p)} color="var(--ink-muted)">
-                        {name}
-                    </Label>
-                ))}
-            {inBrowser &&
-                sorted.map((d, i) =>
-                    "piece" in d ? (
-                        <PieceDrawing
-                            key={i}
-                            piece={d.piece}
-                            toSvg={toSvg}
-                            ppm={ppm}
-                            dim={below !== undefined && highest(d.piece) < below ? 0.55 : 1}
-                            minWidth={HAIRLINE}
-                            thinEdges
-                        />
-                    ) : (
-                        <RigLabelDrawing key={i} label={d.label} toSvg={toSvg} ppm={ppm} />
-                    ),
-                )}
-            {inBrowser && (
-                <Callouts
-                    labels={plan ? planLabels.filter((l) => !l.on) : labels}
-                    toSvg={toSvg}
-                    ppm={ppm}
-                    middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}
+            {/* All of it, so a wheel zoom can be shown at once by scaling it (see `useFlatView`). */}
+            <g ref={liveRef}>
+                <polygon
+                    points={svgPoints(groundCorners().map(toSvg))}
+                    fill="var(--tower-ground)"
                 />
-            )}
+                {compass
+                    // Level with the tower, the two straight towards and away from the eye would sit on one spot.
+                    .filter(([, p]) => {
+                        const away = vec3(p.x - SIDE / 2, 0, p.z - SIDE / 2).unit();
+                        return Math.abs(away.dot(cam.toward)) < 0.95;
+                    })
+                    .map(([name, p]) => (
+                        <Label key={name} at={toSvg(p)} color="var(--ink-muted)">
+                            {name}
+                        </Label>
+                    ))}
+                {inBrowser &&
+                    sorted.map((d, i) =>
+                        "piece" in d ? (
+                            <PieceDrawing
+                                key={i}
+                                piece={d.piece}
+                                toSvg={toSvg}
+                                ppm={ppm}
+                                dim={below !== undefined && highest(d.piece) < below ? 0.55 : 1}
+                                minWidth={HAIRLINE}
+                                thinEdges
+                            />
+                        ) : (
+                            <RigLabelDrawing key={i} label={d.label} toSvg={toSvg} ppm={ppm} />
+                        ),
+                    )}
+                {inBrowser && (
+                    <Callouts
+                        labels={plan ? planLabels.filter((l) => !l.on) : labels}
+                        toSvg={toSvg}
+                        ppm={ppm}
+                        middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}
+                    />
+                )}
+            </g>
         </svg>
     );
 

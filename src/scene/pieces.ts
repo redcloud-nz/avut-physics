@@ -138,6 +138,8 @@ export type Group = {
     over?: boolean;
     /** Other groups' middles it lies across too (a coil over two deck boards): it sorts with the nearest of them all. */
     across?: Vector3[];
+    /** Where it comes among the rest of its group, whatever the view: higher over lower (a carabiner's grip over its sleeve). */
+    order?: number;
 };
 
 export type Piece = (Rod | Face | Strand) & {

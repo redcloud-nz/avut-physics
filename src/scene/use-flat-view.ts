@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { clamp } from "@/lib/math";
 import type { OrbitCamera } from "@/lib/orbit-camera";
@@ -103,9 +103,15 @@ type Gesture =
     | { kind: "pan"; at: Vector2; frame: FlatFrame }
     | { kind: "pinch"; mid: Vector2; spread: number; frame: FlatFrame };
 
+/** How long after the wheel's last turn a wheel zoom is drawn afresh (milliseconds). */
+const WHEEL_SETTLE = 150;
+/** How long each turn of the wheel takes to ease to its zoom while it's shown by scaling what's drawn (milliseconds). */
+const WHEEL_EASE = 90;
+
 /**
  * A flat view's state and its pointer and wheel handling. Give `boxRef` to the element the drawing fills, `svgRef` and
- * `handlers` to the `<svg>`, and draw with `toSvg` and `ppm`.
+ * `handlers` to the `<svg>`, and draw with `toSvg` and `ppm`. Give `liveRef` to a `<g>` holding the whole drawing, and
+ * the wheel zooms smoothly: as it turns, what's drawn is scaled about the pointer, and it's drawn afresh once it stops.
  */
 export function useFlatView(o: FlatViewOptions) {
     const drop = o.drop ?? 0;
@@ -146,10 +152,37 @@ export function useFlatView(o: FlatViewOptions) {
     // The latest of all this for the wheel, which is listened to outside React's events. Its frame's updated as soon as
     // it's set, so wheel events arriving faster than it's drawn each carry on from the last.
     const latest = useRef({ frame, reframe, o });
+    // A wheel zoom not yet drawn afresh: how what's drawn is scaled and moved to show it (SVG units), and the timer that
+    // draws it afresh once the wheel stops.
+    const liveRef = useRef<SVGGElement>(null);
+    const live = useRef<{
+        scale: number;
+        x: number;
+        y: number;
+        timer: ReturnType<typeof setTimeout> | null;
+    }>({ scale: 1, x: 0, y: 0, timer: null });
     useEffect(() => {
-        latest.current = { frame, reframe, o };
+        // While a wheel zoom's showing, the frame it's at carries on from it, not from what's drawn.
+        latest.current = { frame: live.current.timer ? latest.current.frame : frame, reframe, o };
     });
+    // Drawn afresh, what's drawn is no longer scaled, before it's shown.
+    useLayoutEffect(() => {
+        const g = liveRef.current;
+        live.current = { scale: 1, x: 0, y: 0, timer: null };
+        if (!g) return;
+        g.style.transition = "none";
+        g.style.transform = "";
+    }, [moved, size, o.resetKey]);
+    // Draws a wheel zoom afresh now, if one's showing.
+    const settle = () => {
+        if (!live.current.timer) return;
+        clearTimeout(live.current.timer);
+        live.current.timer = null;
+        setMoved({ key: latest.current.o.resetKey, frame: latest.current.frame });
+    };
+    useEffect(() => () => clearTimeout(live.current.timer ?? undefined), []);
     const setFrame = (f: FlatFrame) => {
+        settle();
         latest.current.frame = f;
         setMoved({ key: o.resetKey, frame: f });
     };
@@ -184,7 +217,26 @@ export function useFlatView(o: FlatViewOptions) {
             const about = at ?? originOf(size, o.drop ?? 0);
             const next = reframe(frame, about, about, frame.zoom * Math.exp(-delta * rate));
             latest.current.frame = next;
-            setMoved({ key: o.resetKey, frame: next });
+            const g = liveRef.current;
+            if (!g) {
+                setMoved({ key: o.resetKey, frame: next });
+                return;
+            }
+            // Shown at once by scaling what's drawn about the pointer (on top of any scaling already showing), easing
+            // there; drawn afresh once the wheel's stopped.
+            const s = next.zoom / frame.zoom;
+            const l = live.current;
+            const shown = {
+                scale: l.scale * s,
+                x: s * (l.x - about.x) + about.x,
+                y: s * (l.y - about.y) + about.y,
+            };
+            g.style.transformBox = "view-box";
+            g.style.transformOrigin = "0 0";
+            g.style.transition = `transform ${WHEEL_EASE}ms ease-out`;
+            g.style.transform = `matrix(${shown.scale}, 0, 0, ${shown.scale}, ${shown.x}, ${shown.y})`;
+            if (l.timer) clearTimeout(l.timer);
+            live.current = { ...shown, timer: setTimeout(settle, WHEEL_SETTLE) };
         };
         svg.addEventListener("wheel", onWheel, { passive: false });
         return () => svg.removeEventListener("wheel", onWheel);
@@ -195,14 +247,20 @@ export function useFlatView(o: FlatViewOptions) {
     const pointers = useRef(new Map<number, Vector2>());
     const gesture = useRef<Gesture | null>(null);
     const pressed = useRef<Vector2 | null>(null);
-    const drag = (at: Vector2): Gesture => ({ kind: "pan", at, frame });
+    const drag = (at: Vector2): Gesture => ({ kind: "pan", at, frame: latest.current.frame });
     const startPinch = () => {
         const [a, b] = [...pointers.current.values()];
-        gesture.current = { kind: "pinch", mid: a.mid(b), spread: a.distanceTo(b), frame };
+        gesture.current = {
+            kind: "pinch",
+            mid: a.mid(b),
+            spread: a.distanceTo(b),
+            frame: latest.current.frame,
+        };
     };
 
     const handlers = {
         onPointerDown: (e: React.PointerEvent<SVGSVGElement>) => {
+            settle();
             e.currentTarget.setPointerCapture(e.pointerId);
             const at = toDrawing(e.currentTarget, e.clientX, e.clientY);
             pointers.current.set(e.pointerId, at);
@@ -261,6 +319,7 @@ export function useFlatView(o: FlatViewOptions) {
     return {
         svgRef,
         boxRef,
+        liveRef,
         size,
         origin,
         frame,
@@ -275,7 +334,10 @@ export function useFlatView(o: FlatViewOptions) {
         /** Whether it's zoomed in or out as far as it goes. */
         nearest: frame.zoom >= o.zoom.most,
         furthest: frame.zoom <= least,
-        zoomBy: (factor: number) => setFrame(reframe(frame, origin, origin, frame.zoom * factor)),
+        zoomBy: (factor: number) => {
+            const was = latest.current.frame;
+            setFrame(reframe(was, origin, origin, was.zoom * factor));
+        },
         reset: () => setMoved(null),
         handlers: { ...handlers, onPointerCancel: handlers.onPointerUp },
     };
