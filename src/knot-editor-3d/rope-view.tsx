@@ -6,11 +6,11 @@ import * as THREE from "three";
 import { GizmoHelper } from "@react-three/drei";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 
-import { T, textTexture, tubeGeometry, useSceneColors, type Colors } from "@/abseil-tower/tower-gl";
 import type { LockedEnd } from "@/lib/rope-3d/curve";
 import type { Play } from "@/lib/rope-3d/operations";
 import type { Rope3 } from "@/lib/rope-3d/rope";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { T, textTexture, tubeGeometry, useSceneColors, type Colors } from "@/scene/scene-gl";
 
 import type { ChooseMode } from "./state";
 

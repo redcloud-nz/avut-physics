@@ -5,9 +5,6 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import Loading3D from "@/abseil-tower/loading-3d";
-import type { Piece } from "@/abseil-tower/tower";
-import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
 import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
     DropdownMenu,
@@ -19,14 +16,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DETAILS, type Detail } from "@/flying-fox/detail";
 import { rad } from "@/lib/math";
 import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
+import { DETAILS, type Detail } from "@/scene/detail";
+import Loading3D from "@/scene/loading-3d";
+import type { Piece } from "@/scene/pieces";
+import type { GLHandle, SceneConfig } from "@/scene/scene-gl";
 
 import { GROUPS, partOf, PARTS } from "./catalogue";
 import { FLATS, FlatView, pointsOf } from "./flat-view";
 
-const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.SceneGL), {
+const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {
     ssr: false,
     loading: () => <Loading3D />,
 });

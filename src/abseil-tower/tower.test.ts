@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { groundAt, SIDE, TOP, towerPieces, type Piece } from "./tower";
+import { type Piece } from "@/scene/pieces";
+
+import { groundAt, SIDE, TOP, towerPieces } from "./tower";
 
 const points = (p: Piece) => (p.kind === "rod" ? [p.a, p.b] : p.points);
 

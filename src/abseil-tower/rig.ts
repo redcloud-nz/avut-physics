@@ -1,6 +1,7 @@
 import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { type Face, type Material, type Piece, type RigLabel } from "@/scene/pieces";
 
 import { basket, stackedLogs } from "./basket";
 import {
@@ -15,9 +16,6 @@ import {
     TOP,
     topOpening,
     WEST_EDGE,
-    type Face,
-    type Material,
-    type Piece,
 } from "./tower";
 
 /**
@@ -684,24 +682,6 @@ const PULL: Record<Rope["route"], Vector2> = {
     "east-face": vec2(EAST_EDGE.rail.x, EAST_EDGE.rail.y + ROPE_R),
     "west-outrigger": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
     "west-face": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
-};
-
-/**
- * A label to draw at a point on the rig. One `on` a cylinder (its direction, length and radius) is written along it:
- * on it where it's drawn big enough, beside it otherwise.
- */
-export type RigLabel = {
-    at: Vector3;
-    text: string;
-    on?: { along: Vector3; length: number; r: number };
-    /** Written light on a dark cylinder, not dark on a light one. */
-    light?: boolean;
-    /** How big it's written in 3D, as a fraction of the most that fits on what it's on (all of it unless given). */
-    size?: number;
-    /** Where it is in the tower's shell, as what it's written on is, so it sorts with it. */
-    shell?: Piece["shell"];
-    /** Which side of it an elevation writes it, if not the side of the drawing it's on. */
-    side?: "left" | "right";
 };
 
 /** How a rope's tied to a carabiner (a munter and two half hitches), drawn as a short cylinder in the rope's colour. */

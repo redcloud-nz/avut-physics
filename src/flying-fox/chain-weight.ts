@@ -1,5 +1,5 @@
-import type { Piece } from "@/abseil-tower/tower";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import type { Piece } from "@/scene/pieces";
 
 import { CHAIN_10, chainLink, chainLinks, SHACKLE_10, type LinkFrame } from "./hardware";
 

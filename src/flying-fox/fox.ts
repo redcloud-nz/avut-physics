@@ -1,12 +1,4 @@
-import { TAPE, type RigLabel } from "@/abseil-tower/rig";
-import {
-    rod,
-    tapeLayers,
-    timber,
-    type Material,
-    type Piece,
-    type Strand,
-} from "@/abseil-tower/tower";
+import { TAPE } from "@/abseil-tower/rig";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { G } from "@/lib/constants";
 import { catmullRom, cubicPoints } from "@/lib/curve3";
@@ -16,6 +8,15 @@ import { bisect } from "@/lib/numeric/roots";
 import { arcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
 import { boundsOf, turnBetween, vec3, type Vector3 } from "@/lib/vector3";
+import {
+    rod,
+    tapeLayers,
+    timber,
+    type Material,
+    type Piece,
+    type RigLabel,
+    type Strand,
+} from "@/scene/pieces";
 
 import { CHAIN_WEIGHT, chainWeight, chainWeightPieces, type ChainWeight } from "./chain-weight";
 import {

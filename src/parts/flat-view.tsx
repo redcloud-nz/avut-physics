@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { RigLabel } from "@/abseil-tower/rig";
-import type { Piece } from "@/abseil-tower/tower";
-import { nearness, PieceDrawing } from "@/abseil-tower/tower-view";
 import { useInBrowser } from "@/components/use-in-browser";
-import { DETAILS, type Detail } from "@/flying-fox/detail";
 import { rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
+import { DETAILS, type Detail } from "@/scene/detail";
+import { nearness, PieceDrawing } from "@/scene/piece-svg";
+import type { Piece, RigLabel } from "@/scene/pieces";
 
 /** A flat view: square on from a bearing and a height (degrees). */
 export type FlatLook = { label: string; azimuth: number; elevation: number };

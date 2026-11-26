@@ -1,5 +1,3 @@
-import type { RigLabel } from "@/abseil-tower/rig";
-import { timber, type Piece } from "@/abseil-tower/tower";
 import {
     CHAIN_WEIGHT,
     chainWeight,
@@ -68,6 +66,8 @@ import FIGURE_8_JSON from "@/flying-fox/knots/figure-8.json";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import type { RigLabel } from "@/scene/pieces";
+import { timber, type Piece } from "@/scene/pieces";
 
 /**
  * The parts the visualisations build from pieces, each on its own so it can be looked at and refined: the shared

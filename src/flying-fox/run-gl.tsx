@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 
+import { turnBetween, vec3, type Vector3 } from "@/lib/vector3";
 import {
     buildHairlines,
     buildScene,
@@ -13,8 +14,7 @@ import {
     T,
     tubeGeometry,
     useSceneColors,
-} from "@/abseil-tower/tower-gl";
-import { turnBetween, vec3, type Vector3 } from "@/lib/vector3";
+} from "@/scene/scene-gl";
 
 import BrakeGL, { place } from "./brake-gl";
 import {

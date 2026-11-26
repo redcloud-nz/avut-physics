@@ -12,10 +12,6 @@ import {
     useState,
 } from "react";
 
-import Loading3D from "@/abseil-tower/loading-3d";
-import type { RigLabel } from "@/abseil-tower/rig";
-import type { Piece } from "@/abseil-tower/tower";
-import type { GLHandle, SceneConfig } from "@/abseil-tower/tower-gl";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -54,6 +50,9 @@ import {
 import { redistribute, segmentMiddle, slideBoundary, type Rope3 } from "@/lib/rope-3d/rope";
 import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 import { FLATS, FlatView } from "@/parts/flat-view";
+import Loading3D from "@/scene/loading-3d";
+import type { Piece, RigLabel } from "@/scene/pieces";
+import type { GLHandle, SceneConfig } from "@/scene/scene-gl";
 
 import { canUseFiles, openKnot3d, saveKnot3d, saveKnot3dAs } from "./files";
 import { fromDrawing } from "./from-drawing";
@@ -62,7 +61,7 @@ import { Panel } from "./panel";
 import { RopeView, SEGMENT_COLORS } from "./rope-view";
 import { initialState, keyDirection, reduce, type ChooseMode } from "./state";
 
-const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.SceneGL), {
+const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {
     ssr: false,
     loading: () => <Loading3D />,
 });

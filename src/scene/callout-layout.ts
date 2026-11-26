@@ -2,7 +2,7 @@ import { Segment } from "@/lib/segment";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
 
-import type { Material, Piece } from "./tower";
+import type { Material, Piece } from "./pieces";
 
 /** A label's box on the page (SVG units). */
 export type Box = { x0: number; x1: number; y0: number; y1: number };

@@ -1,6 +1,6 @@
-import { rod, type Face, type Piece } from "@/abseil-tower/tower";
 import { bisect } from "@/lib/numeric/roots";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { rod, type Face, type Piece } from "@/scene/pieces";
 
 /**
  * Rigging hardware built from the tower's pieces: grooved sheaves, plates cut to shape with holes, bolts, carabiners,

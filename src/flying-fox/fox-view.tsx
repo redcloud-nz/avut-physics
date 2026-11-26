@@ -20,16 +20,6 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ObstacleGrid, obstaclesOf } from "@/abseil-tower/callout-layout";
-import Loading3D from "@/abseil-tower/loading-3d";
-import type { Piece } from "@/abseil-tower/tower";
-import {
-    FOCUS_OUT,
-    type FrameRate,
-    type GLHandle,
-    type SceneConfig,
-} from "@/abseil-tower/tower-gl";
-import { Callouts, nearness, PieceDrawing, StrandSwatch } from "@/abseil-tower/tower-view";
 import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
     DropdownMenu,
@@ -46,18 +36,25 @@ import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
-import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
-
+import { ObstacleGrid, obstaclesOf } from "@/scene/callout-layout";
 import {
     AUTO_START,
     DETAILS,
+    FLIPS,
     judge,
     loadChoice,
     saveChoice,
     stepDetail,
     type Detail,
     type DetailChoice,
-} from "./detail";
+    type FrameRate,
+} from "@/scene/detail";
+import Loading3D from "@/scene/loading-3d";
+import { Callouts, nearness, PieceDrawing, StrandSwatch } from "@/scene/piece-svg";
+import type { Piece } from "@/scene/pieces";
+import { FOCUS_OUT, type GLHandle, type SceneConfig } from "@/scene/scene-gl";
+import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
+
 import {
     drawnOverhead,
     FALL,
@@ -82,7 +79,7 @@ import { RunClock } from "./run-clock";
 import RunControls from "./run-controls";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
-const SceneGL = dynamic(() => import("@/abseil-tower/tower-gl").then((m) => m.SceneGL), {
+const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {
     ssr: false,
     loading: () => <Loading3D />,
 });
@@ -147,6 +144,9 @@ const SCENE: SceneConfig = {
     zoomOut: 1,
     label: "The flying fox in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
 };
+
+/** Where the detail chosen on the page is kept between visits. */
+const DETAIL_KEY = "flying-fox:detail";
 
 /** What the 3D view can lock onto, up the site from the tree to the log. */
 const TARGETS = foxTargets();
@@ -304,21 +304,21 @@ export default function FoxView() {
     // few changes of direction, rather than keep flipping between two levels.
     // The saved choice until one's made on the page (read once it's in the browser, where it's kept).
     const [picked, setPicked] = useState<DetailChoice | null>(null);
-    const choice = picked ?? (inBrowser ? loadChoice() : "auto");
+    const choice = picked ?? (inBrowser ? loadChoice(DETAIL_KEY) : "auto");
     const choiceRef = useRef<DetailChoice>("auto");
     useEffect(() => {
         choiceRef.current = choice;
     }, [choice]);
     const choose = (c: DetailChoice) => {
         setPicked(c);
-        saveChoice(c);
+        saveChoice(DETAIL_KEY, c);
     };
     const [auto, setAuto] = useState<Detail>(AUTO_START);
     const flips = useRef<{ last: FrameRate | null; count: number }>({ last: null, count: 0 });
     const onFrameRate = useCallback((rate: FrameRate) => {
         if (choiceRef.current !== "auto") return;
         const f = flips.current;
-        if (f.count >= 4) return;
+        if (f.count >= FLIPS) return;
         if (f.last && f.last !== rate) f.count++;
         f.last = rate;
         setAuto((d) => stepDetail(d, rate));

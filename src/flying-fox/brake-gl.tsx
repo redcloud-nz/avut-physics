@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 
-import { buildHairlines, buildScene, Solids, T, type Colors } from "@/abseil-tower/tower-gl";
+import { buildHairlines, buildScene, Solids, T, type Colors } from "@/scene/scene-gl";
 
 import { CHAIN_WEIGHT } from "./chain-weight";
 import { brakeRig, C, loaded, type Pose } from "./fox";

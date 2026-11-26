@@ -1,9 +1,8 @@
-import type { RigLabel } from "@/abseil-tower/rig";
-import type { Piece } from "@/abseil-tower/tower";
 import { pictureCrossings } from "@/knot-editor/crossing-geometry";
 import { pictureGeometry, strandPosition } from "@/knot-editor/geometry";
 import { strandSize, type Picture, type RopeColour } from "@/knot-editor/knot-file";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import type { Piece, RigLabel } from "@/scene/pieces";
 
 import { line } from "./fox";
 
