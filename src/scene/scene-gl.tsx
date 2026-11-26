@@ -5,6 +5,7 @@ import {
     useCallback,
     useContext,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -32,6 +33,7 @@ import {
     type Face,
     type Material,
     type Piece,
+    type Strand,
 } from "./pieces";
 
 /**
@@ -485,6 +487,11 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
         list.push(g);
         byColor.set(color, list);
     };
+    // Shapes drawn many times: each built once, with where each copy goes.
+    const copies = new Map<
+        string,
+        { parts: Map<string, THREE.BufferGeometry[]>; places: THREE.Matrix4[] }
+    >();
     for (const p of pieces) {
         const color = p.color || MATERIAL_COLOR[p.material];
         // Hardware's drawn its true size; ropes and wire no thinner than the scene's least.
@@ -514,25 +521,21 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
                     ),
                 );
         } else if (p.kind === "strand") {
-            // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
-            const lift = new THREE.Vector3(0, r - p.r, 0);
-            const points = p.points.map((q) => T(q).add(lift));
-            add(color, tubeGeometry(points, r, sides));
-            for (const [cap, cut, q, before] of [
-                [p.capA, p.cutA, points[0], points[1]],
-                [p.capB, p.cutB, points.at(-1)!, points.at(-2)!],
-            ] as const)
-                if (cap && cut && before) {
-                    const fused = `color-mix(in srgb, ${color} 35%, var(--rig-black))`;
-                    for (const g of cutEnd(q, q.clone().sub(before).normalize(), r, sides))
-                        add(fused, g);
-                } else if (cap) {
-                    const at = q;
-                    add(
-                        color,
-                        bare(new THREE.SphereGeometry(r, sides, 6).translate(at.x, at.y, at.z)),
-                    );
+            // A shape many strands share, simply moved and turned into place (and drawn its own size): built once.
+            const place = p.shape && r === p.r ? placeOf(p.shape, p.points) : null;
+            if (p.shape && place) {
+                const key = `${shapeId(p.shape)} ${color} ${r} ${[p.capA, p.capB, p.cutA, p.cutB].map((b) => +!!b).join("")}`;
+                let copy = copies.get(key);
+                if (!copy) {
+                    const parts = new Map<string, THREE.BufferGeometry[]>();
+                    strandSolids({ ...p, points: p.shape }, r, color, sides, (c, g) => {
+                        if (g) parts.set(c, [...(parts.get(c) ?? []), g]);
+                    });
+                    copy = { parts, places: [] };
+                    copies.set(key, copy);
                 }
+                copy.places.push(place);
+            } else strandSolids(p, r, color, sides, add);
         } else if (p.shades && !p.holes?.length) {
             shadedParts.push(faceGeometry(p.points.map(T)));
             shades.push(...p.shades);
@@ -573,7 +576,87 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
     });
     const shaded = shadedParts.length ? mergeGeometries(shadedParts)! : null;
     shadedParts.forEach((g) => g.dispose());
-    return { solids, shaded: shaded && { geometry: shaded, shades } };
+    const repeats = [...copies].flatMap(([key, { parts, places }]) =>
+        [...parts].map(([color, list]) => {
+            const geometry = mergeGeometries(list)!;
+            list.forEach((g) => g.dispose());
+            return { key: `${key} ${color}`, color, geometry, places };
+        }),
+    );
+    return { solids, shaded: shaded && { geometry: shaded, shades }, repeats };
+}
+
+/** A strand's solids: its tube, and its ends rounded or cut. */
+function strandSolids(
+    p: Strand,
+    r: number,
+    color: string,
+    sides: number,
+    add: (color: string, g: THREE.BufferGeometry | null) => void,
+) {
+    // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
+    const lift = new THREE.Vector3(0, r - p.r, 0);
+    const points = p.points.map((q) => T(q).add(lift));
+    add(color, tubeGeometry(points, r, sides));
+    // A closed loop (a chain link) has no ends to show.
+    if (points.length > 3 && points[0].distanceTo(points.at(-1)!) < 1e-6) return;
+    for (const [cap, cut, q, before] of [
+        [p.capA, p.cutA, points[0], points[1]],
+        [p.capB, p.cutB, points.at(-1)!, points.at(-2)!],
+    ] as const)
+        if (cap && cut && before) {
+            const fused = `color-mix(in srgb, ${color} 35%, var(--rig-black))`;
+            for (const g of cutEnd(q, q.clone().sub(before).normalize(), r, sides)) add(fused, g);
+        } else if (cap)
+            add(color, bare(new THREE.SphereGeometry(r, sides, 6).translate(q.x, q.y, q.z)));
+}
+
+/** A number for each shared shape, for telling them apart. */
+const SHAPE_IDS = new WeakMap<Vector3[], number>();
+let shapesSeen = 0;
+const shapeId = (shape: Vector3[]) => {
+    if (!SHAPE_IDS.has(shape)) SHAPE_IDS.set(shape, shapesSeen++);
+    return SHAPE_IDS.get(shape)!;
+};
+
+/**
+ * Where a flat shape (in its x–y plane) has been put to give `points`, as a three.js matrix taking it there, or null if
+ * the points aren't it simply moved and turned. Its turn's fitted to all the points (least squares), then checked
+ * against each of them.
+ */
+function placeOf(shape: Vector3[], points: Vector3[]): THREE.Matrix4 | null {
+    const n = shape.length;
+    if (n < 3 || points.length !== n) return null;
+    const mean = (ps: Vector3[]) => ps.reduce((s, q) => s.add(q), vec3(0, 0, 0)).scale(1 / n);
+    const [c0, c1] = [mean(shape), mean(points)];
+    let [sxx, sxy, syy] = [0, 0, 0];
+    let [wx, wy] = [vec3(0, 0, 0), vec3(0, 0, 0)];
+    for (let i = 0; i < n; i++) {
+        const l = shape[i].sub(c0);
+        if (Math.abs(l.z) > 1e-9) return null;
+        const w = points[i].sub(c1);
+        [sxx, sxy, syy] = [sxx + l.x * l.x, sxy + l.x * l.y, syy + l.y * l.y];
+        [wx, wy] = [wx.add(w.scale(l.x)), wy.add(w.scale(l.y))];
+    }
+    const det = sxx * syy - sxy * sxy;
+    if (det < 1e-18) return null;
+    const x = wx
+        .scale(syy)
+        .sub(wy.scale(sxy))
+        .scale(1 / det);
+    const y = wy
+        .scale(sxx)
+        .sub(wx.scale(sxy))
+        .scale(1 / det);
+    const TOL = 1e-6;
+    if (Math.abs(x.len() - 1) > TOL || Math.abs(y.len() - 1) > TOL || Math.abs(x.dot(y)) > TOL)
+        return null;
+    const at = c1.sub(x.scale(c0.x)).sub(y.scale(c0.y));
+    for (let i = 0; i < n; i++)
+        if (at.add(x.scale(shape[i].x)).add(y.scale(shape[i].y)).distanceTo(points[i]) > TOL)
+            return null;
+    // In three.js's frame (z turned round), the turn's columns are x, y and x × y, the last turned round once more.
+    return new THREE.Matrix4().makeBasis(T(x), T(y), T(x.cross(y)).negate()).setPosition(T(at));
 }
 
 /** How thick a piece may be (metres of radius) and still get a hairline. */
@@ -767,7 +850,7 @@ export function Solids({
     hairlines: number;
     sides: number;
 }) {
-    const { solids, shaded } = useMemo(
+    const { solids, shaded, repeats } = useMemo(
         () => buildScene(pieces, minR, sides),
         [pieces, minR, sides],
     );
@@ -775,8 +858,9 @@ export function Solids({
         () => () => {
             solids.forEach((s) => s.geometry.dispose());
             shaded?.geometry.dispose();
+            repeats.forEach((s) => s.geometry.dispose());
         },
-        [solids, shaded],
+        [solids, shaded, repeats],
     );
     // The shaded faces' corner colours, worked out by the browser and set on their mesh.
     const shadedGeometry = useMemo(() => {
@@ -811,6 +895,14 @@ export function Solids({
                     />
                 </mesh>
             )}
+            {repeats.map((s) => (
+                <Repeated
+                    key={s.key}
+                    geometry={s.geometry}
+                    places={s.places}
+                    color={colors.read(s.color)}
+                />
+            ))}
             {solids.map((s) =>
                 s.color.startsWith(JOINT) ? (
                     // A gap between boards: their colour, in shadow.
@@ -837,6 +929,38 @@ export function Solids({
                 ),
             )}
         </>
+    );
+}
+
+/** One solid drawn at many places (as a chain's links), in one go. */
+function Repeated({
+    geometry,
+    places,
+    color,
+}: {
+    geometry: THREE.BufferGeometry;
+    places: THREE.Matrix4[];
+    color: THREE.Color;
+}) {
+    const mesh = useRef<THREE.InstancedMesh>(null);
+    useLayoutEffect(() => {
+        const m = mesh.current;
+        if (!m) return;
+        places.forEach((place, i) => m.setMatrixAt(i, place));
+        m.instanceMatrix.needsUpdate = true;
+        // Its bounds, from every copy's, so it's left out only when they're all out of view.
+        m.computeBoundingSphere();
+    }, [places]);
+    return (
+        <instancedMesh ref={mesh} args={[geometry, undefined, places.length]}>
+            <meshLambertMaterial
+                color={color}
+                side={THREE.DoubleSide}
+                polygonOffset
+                polygonOffsetFactor={1}
+                polygonOffsetUnits={1}
+            />
+        </instancedMesh>
     );
 }
 
@@ -868,7 +992,7 @@ function PivotToPointer({
             // Solids only: not the labels drawn over them or the compass letters.
             const hit = raycaster
                 .intersectObjects(scene.children, true)
-                .find((h) => h.object.type === "Mesh" && h.object.renderOrder === 0);
+                .find((h) => (h.object as THREE.Mesh).isMesh && h.object.renderOrder === 0);
             if (!hit) return;
             const ahead = c.target.clone().sub(camera.position).normalize();
             const depth = hit.point.clone().sub(camera.position).dot(ahead);

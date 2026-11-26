@@ -1138,11 +1138,15 @@ function linkFrame(d: Vector3, m: Vector3) {
     return { d: dd, m: mm, w: mm.cross(dd) };
 }
 
-/** A strand of steel through `points`, true to size, open or (if its ends meet) closed. */
-function steelStrand(points: Vector3[], r: number, color: string): Piece {
+/**
+ * A strand of steel through `points`, true to size, open or (if its ends meet) closed; `shape` if it's a shape many
+ * strands share (see `Strand`).
+ */
+function steelStrand(points: Vector3[], r: number, color: string, shape?: Vector3[]): Piece {
     return {
         kind: "strand",
         points,
+        ...(shape && { shape }),
         r,
         material: "steel",
         color,
@@ -1729,23 +1733,40 @@ export function chainLink(
     size: ChainSize = CHAIN_6,
 ): { pieces: Piece[]; far: Vector3 } {
     const f = linkFrame(d, m);
-    const { r, length, width } = size;
-    const p = (u: number, v: number) => near.add(f.d.scale(u)).add(f.m.scale(v));
-    // Its middle line: round each end on a half circle through the middle of the wire, straight along the sides.
+    const shape = linkShape(size);
+    const pts = shape.map((q) => near.add(f.d.scale(q.x)).add(f.m.scale(q.y)));
+    return {
+        pieces: [steelStrand(pts, size.r, color, shape)],
+        far: near.add(f.d.scale(size.length)),
+    };
+}
+
+/** Each size's link shape, made once so every link of a size shares it (and the 3D view builds it once). */
+const LINK_SHAPES = new Map<string, Vector3[]>();
+
+/**
+ * A chain link's middle line about its own origin: its inside from the origin along x, in the x–y plane. Two straight
+ * sides joined by a half round at each end, round each end on a half circle through the middle of the wire.
+ */
+function linkShape({ r, length, width }: ChainSize): Vector3[] {
+    const key = `${r} ${length} ${width}`;
+    const made = LINK_SHAPES.get(key);
+    if (made) return made;
     const round = width / 2 + r;
     const [a, b] = [width / 2, length - width / 2];
     const n = 10;
     const pts: Vector3[] = [];
     for (let i = 0; i <= n; i++) {
         const t = -Math.PI / 2 + (Math.PI * i) / n;
-        pts.push(p(b + round * Math.cos(t), round * Math.sin(t)));
+        pts.push(vec3(b + round * Math.cos(t), round * Math.sin(t), 0));
     }
     for (let i = 0; i <= n; i++) {
         const t = Math.PI / 2 + (Math.PI * i) / n;
-        pts.push(p(a + round * Math.cos(t), round * Math.sin(t)));
+        pts.push(vec3(a + round * Math.cos(t), round * Math.sin(t), 0));
     }
     pts.push(pts[0]);
-    return { pieces: [steelStrand(pts, r, color)], far: p(length, 0) };
+    LINK_SHAPES.set(key, pts);
+    return pts;
 }
 
 /**
@@ -1798,9 +1819,7 @@ export function chainLinks(
 
 /** The middle line of a chain link's wire, about its own origin: its inside from the origin along x, in the x–y plane. */
 export function linkOutline(size: ChainSize = CHAIN_6): Vector3[] {
-    return chainLink(vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0), "", size).pieces.flatMap((p) =>
-        p.kind === "strand" ? p.points : [],
-    );
+    return linkShape(size);
 }
 
 /** Chain laid along `path` (see `chainLinks`), as pieces: its links, the end, and how many links. */

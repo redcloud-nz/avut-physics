@@ -41,8 +41,11 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 | Carabiners                                                   | 3%                 |
 | Every other piece of hardware                                | under 2% each      |
 
-- **Chain as instances.** Every link's the same shape: build it once and draw it as a three.js `InstancedMesh`. Helps
-  at every detail level.
+- **Done: chain as instances.** A chain link's strand carries its `shape` (shared by every link of its size), and
+  `buildScene` checks from each link's points where it's been put, builds the shape once and draws it as a three.js
+  `InstancedMesh`. Closed loops no longer get two round ends hidden inside them. On the whole flying fox: geometry built
+  1.26 to 0.54 million triangles, triangles drawn 1.26 to 1.03 million, `buildScene` about 175 to 105 ms. Any other
+  shape used many times can carry a `shape` too.
 - **Low draws simpler shapes**: chain links with fewer points and 4 sides, figure 8s as the old ring (or resampled to
   fewer points), no stitching, plates without their edge faces. One `simple` option through the builders
   (`foxPieces({ run, simple })`), only on Low, so the other levels don't rebuild any more than now.

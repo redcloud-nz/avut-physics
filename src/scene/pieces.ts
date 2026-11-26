@@ -101,6 +101,12 @@ export type Strand = {
     cutA?: boolean;
     cutB?: boolean;
     /**
+     * A shape many strands share (a chain's links), about its own origin: `points` are it moved and turned into place.
+     * The 3D view builds it once and draws it at each place it's used, checking from `points` where that is, so pieces
+     * moved or turned after they're built still draw right (and any not simply moved and turned are drawn on their own).
+     */
+    shape?: Vector3[];
+    /**
      * Flat tape, for the views that can draw it so: `layers` of it side by side, each `width` wide (lying `across`) and
      * `thickness` thick, fanned apart where they run round what they're on and gathered together at `gather` (a
      * carabiner), over the last `ramp` metres to it.
