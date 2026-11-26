@@ -40,6 +40,11 @@ const LEAST = vec2(800, 1000);
 const PPM = 60;
 /** How far the flat views zoom in, and the least zoom they start at (and may zoom out to). */
 const ZOOM = { most: 8, leastStart: 1 };
+/**
+ * The narrowest rope and steel are drawn (SVG units): their true width, in proportion with everything else, but never
+ * thinner than a hairline, so they still show zoomed out.
+ */
+const HAIRLINE = { rope: 1.2, steel: 1 };
 /** How far below the drawing's middle the view's middle is (SVG units). */
 const DROP = 10;
 
@@ -232,16 +237,19 @@ export default function TowerView({ slug }: { slug: string }) {
         if (!l.shell || plan) return depth;
         return depth + (l.shell.out.dot(cam.toward) > 0 ? 1 : -1) * l.shell.layer * 100;
     };
-    // Looking down, labels are written on what they name, among the pieces; in the elevations they're written beside it,
-    // over everything (see `Callouts`). None in 3D, where the flat drawing isn't shown.
+    // Looking straight down, what's under the top deck is hidden, so its labels are too.
+    const planLabels = labels.filter((l) => below === undefined || l.at.y >= below);
+    // Looking down, labels are written on the cylinders they name, among the pieces, and the drawn knots' beside them;
+    // in the elevations they're all written beside what they name, over everything (see `Callouts`). None in 3D, where
+    // the flat drawing isn't shown.
     const sorted: ({ piece: Piece } | { label: RigLabel })[] = [
         ...(mode === "3d" ? [] : pieces)
             .filter(shown)
             .map((piece) => ({ piece, key: sortKey(piece) })),
-        ...(plan ? labels : [])
-            // Looking straight down, what's under the top deck is hidden, so its labels are too.
-            .filter((l) => below === undefined || l.at.y >= below)
-            .map((label) => ({ label, key: labelKey(label) })),
+        ...(plan ? planLabels.filter((l) => l.on) : []).map((label) => ({
+            label,
+            key: labelKey(label),
+        })),
     ].sort((a, b) => a.key - b.key);
 
     const view = (Object.keys(VIEWS) as ViewName[]).find(
@@ -285,14 +293,16 @@ export default function TowerView({ slug }: { slug: string }) {
                             toSvg={toSvg}
                             ppm={ppm}
                             dim={below !== undefined && highest(d.piece) < below ? 0.55 : 1}
+                            minWidth={HAIRLINE}
+                            thinEdges
                         />
                     ) : (
                         <RigLabelDrawing key={i} label={d.label} toSvg={toSvg} ppm={ppm} />
                     ),
                 )}
-            {inBrowser && !plan && (
+            {inBrowser && (
                 <Callouts
-                    labels={labels}
+                    labels={plan ? planLabels.filter((l) => !l.on) : labels}
                     toSvg={toSvg}
                     ppm={ppm}
                     middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}

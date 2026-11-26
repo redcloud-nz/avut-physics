@@ -176,7 +176,7 @@ function stitching(points: Vector3[], profile: TapeSize[], across: Vector3): Str
 
 /**
  * One layer of tape through `points`, `profile` its size at each, lying `across` (where the profile doesn't say), in
- * short strands so it sorts where it is; `r` is how thick the flat views draw it.
+ * short strands of `piece` points so it sorts where it is; `r` is how thick the flat views draw it.
  */
 export function tapeRun(
     points: Vector3[],
@@ -184,8 +184,8 @@ export function tapeRun(
     across: Vector3,
     color: string,
     r: number,
+    piece = 12,
 ): Strand[] {
-    const piece = 12;
     const out: Strand[] = [];
     for (let i = 0; i < points.length - 1; i += piece) {
         const end = Math.min(points.length, i + piece + 1);
@@ -364,7 +364,9 @@ export function basketedSling(
             thickness: bunched.thickness + (thickness - bunched.thickness) * e,
         };
     });
-    const tape = tapeRun(points, profile, z, color, r);
+    // Round an outline (finer than round a log) in shorter strands, so none reaching from a leg over the top of what
+    // it wraps sorts below it in the flat views.
+    const tape = tapeRun(points, profile, z, color, r, typeof around === "number" ? 12 : 4);
     return [
         ...tape,
         ...(kind === "round"

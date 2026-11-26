@@ -2,7 +2,7 @@ import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { CARABINER_R, carabiner as ctCarabiner } from "@/rigging/hardware";
-import { carabinerKnot, figure8, stopper } from "@/rigging/knots";
+import { figure8, stopper } from "@/rigging/knots";
 import { basketedSling, SLINGS } from "@/rigging/slings";
 import { type Face, type Material, type Piece, type RigLabel } from "@/scene/pieces";
 
@@ -682,7 +682,8 @@ function carabiner(
     const down = along.unit();
     const gate = across.y > 1e-6 ? across.neg() : across;
     return {
-        // `carabiner` hangs a D from its wide end (the photo's top), so it's hung from the far end, turned up.
+        // `carabiner` hangs a D from its wide end (the photo's top), so it's hung from the far end, turned up. Its body's
+        // cut into short lengths, so in the flat views it sorts in and out of the sling or rope clipped through it.
         pieces: ctCarabiner(
             near.add(down.scale(KRAB_L)),
             down.neg(),
@@ -690,6 +691,10 @@ function carabiner(
             "var(--tower-steel)",
             KRAB_L,
             { settled: true },
+        ).flatMap((p, i) =>
+            i === 0 && p.kind === "strand"
+                ? lengths(p.points).map((points) => ({ ...p, points }))
+                : [p],
         ),
         far: near.add(down.scale(KRAB_L)),
         gate,
@@ -711,6 +716,31 @@ const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
  */
 export const KNOT_LABELS = { bight: "F8OB", stopper: "F8" };
 const DOWN = vec3(0, -1, 0);
+/**
+ * The way an end carabiner's narrow bar runs, hanging off a side whose outside is `out`: turned half way out from the
+ * side, so both it and the figure 8 clipped to it (which lies square to it) show in the elevations.
+ */
+const endBar = (out: Vector3) => out.add(vec3(0, 0, 1)).unit();
+/**
+ * A knot's rope in short pieces, so they sort among themselves in the flat views and its crossings show: open at its
+ * start, where the rope runs into it, and capped at its tail's end.
+ */
+const knotRope = (rope: Vector3[], color: string): Piece[] =>
+    lengths(rope).map((points, i, all) =>
+        strand(points, ROPE_R, "rope", color, false, i === all.length - 1),
+    );
+
+/**
+ * Points cut into short lengths of `n` steps, so a knot or a carabiner sorts piece by piece in the flat views: in front
+ * of what it passes over and behind what it passes under. Each reaches a step into the next and the last, so they join
+ * on a straight stretch both cover, and no seam shows across a bend whichever's drawn over the other.
+ */
+function lengths(points: Vector3[], n = 4): Vector3[][] {
+    const out: Vector3[][] = [];
+    for (let i = 0; i < points.length - 1; i += n)
+        out.push(points.slice(Math.max(0, i - 1), Math.min(points.length, i + n + 2)));
+    return out;
+}
 /** A figure 8's radius drawn as a cylinder, slimmer than the munter's. */
 const KNOT_CYLINDER_R = 0.045;
 /** How far a figure 8 stopper reaches down from where the rope goes into it. */
@@ -746,13 +776,13 @@ function endKnot(
         ? figure8(end, bar, CARABINER_R, end.sub(DOWN), ROPE_R).rope.reverse()
         : stopper(end.add(vec3(0, STOPPER_DROP, 0)), DOWN, ROPE_R);
     const back = Math.max(...tied.map((p) => end.sub(p).dot(shell.out)));
-    const shift = shell.out.scale(Math.max(0, back - ROPE_R));
+    const shift = shell.out.scale(Math.max(0, back));
     const rope = tied.map((p) => p.add(shift));
     const text = bar ? KNOT_LABELS.bight : KNOT_LABELS.stopper;
     const into = rope[0];
     if (!cylinder)
         return {
-            pieces: [{ ...strand(rope, ROPE_R, "rope", rigColor(color), false, true), shell }],
+            pieces: knotRope(rope, rigColor(color)).map((p) => ({ ...p, shell })),
             into,
             label: knotLabel(rope, text, shell),
             at: end.add(shift),
@@ -857,7 +887,7 @@ function ropeOverSide(
     const out = route === "east-face" ? EAST : EAST.neg();
     const shell = { out, layer: 3 };
     // A carabiner on the end, hanging from its knot flat against the side.
-    const across = vec3(0, 0, 1);
+    const across = endBar(out);
     const clipped = end === "below-outrigger" || (typeof end === "object" && end.carabiner);
     // Every end has a knot: a figure 8 for its carabiner, or a stopper.
     const tail = endKnot(last, rope.color, shell, clipped ? across : undefined, cylinders);
@@ -868,7 +898,7 @@ function ropeOverSide(
     let tied: { pieces: Piece[]; from: Vector3[]; label: RigLabel };
     if (rope.knot === "F8OB") {
         const rail = vec3(PULL[route].x, PULL[route].y, clip.z);
-        const { knot } = carabinerKnot(clip, rail, ROPE_R, 0, along, gate);
+        const knot = figure8(clip, gate, CARABINER_R, rail, ROPE_R);
         tied = cylinders
             ? {
                   ...knotCylinder(
@@ -971,11 +1001,11 @@ function toGround(
     const cuts = [0, 2, 3, past.length - 2, past.length - 1].filter(
         (c, i, cs) => cs.indexOf(c) === i && c < past.length,
     );
-    // A knot it's tied with at the start is a strand of its own, so it sorts where it is.
+    // A knot it's tied with at the start is in pieces of its own, so they sort where they are.
     const start =
         from.length > 1
             ? [
-                  strand(from, ROPE_R, "rope", color, true, false),
+                  ...knotRope([...from].reverse(), color),
                   strand([from[from.length - 1], nearRail], ROPE_R, "rope", color, false, false),
               ]
             : [strand([...from, nearRail], ROPE_R, "rope", color, true, false)];
@@ -1128,8 +1158,8 @@ function belayOverSide(
     const nearRail = rail.sub(rail.sub(tbpB).unit().scale(0.3));
     // A carabiner on the rope's end, hanging from its knot flat against the side, for the abseiler to clip in.
     const shell = { out, layer: 3 };
-    const tail = endKnot(hang, belay.color, shell, vec3(0, 0, 1), cylinders);
-    const endKrab = carabiner(tail.at, DOWN, vec3(0, 0, 1));
+    const tail = endKnot(hang, belay.color, shell, endBar(out), cylinders);
+    const endKrab = carabiner(tail.at, DOWN, endBar(out));
     return {
         pieces: [
             ...hitches.pieces,
@@ -1168,8 +1198,8 @@ function belayRedirected(
     const end = round.add(vec3(0, -drop, 0));
     // A carabiner on the rope's end, hanging from its knot, for the abseiler to clip in.
     const outside = { out: EAST.neg(), layer: 3 };
-    const tail = endKnot(end, belay.color, outside, vec3(0, 0, 1), cylinders);
-    const endKrab = carabiner(tail.at, DOWN, vec3(0, 0, 1));
+    const tail = endKnot(end, belay.color, outside, endBar(outside.out), cylinders);
+    const endKrab = carabiner(tail.at, DOWN, endBar(outside.out));
     return {
         pieces: [
             ...hitches.pieces,

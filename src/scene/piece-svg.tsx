@@ -354,6 +354,7 @@ export function PieceDrawing({
     ppm,
     dim = 1,
     minWidth = MIN_WIDTH,
+    thinEdges = false,
     depth,
 }: {
     piece: Piece;
@@ -365,6 +366,11 @@ export function PieceDrawing({
     dim?: number;
     /** The narrowest each material's drawn (SVG units), if not the tower's. */
     minWidth?: Partial<Record<Material, number>>;
+    /**
+     * Rope's and wire's dark edges in proportion to how wide they're drawn, so a line drawn its true width, however
+     * thin, stays that wide: by default the edges are a unit each side.
+     */
+    thinEdges?: boolean;
 }) {
     const own = piece.color || MATERIAL_COLOR[piece.material];
     const color = dim < 1 ? shade(own, dim * 100) : own;
@@ -430,22 +436,46 @@ export function PieceDrawing({
             </g>
         );
     }
+    if (piece.kind === "strand" && piece.tape) {
+        // Tape is drawn as its flat layers, each a ribbon between its two edges, so it's narrower the more it's turned
+        // edge on to the eye.
+        const { tape } = piece;
+        return (
+            <g>
+                {tapeLayers(piece).map((layer, k) => (
+                    <TapeRibbon
+                        key={k}
+                        edges={layer.map((q, i) => {
+                            const at = tape.profile?.[i];
+                            const half = (at?.across ?? tape.across)
+                                .unit()
+                                .scale((at?.width ?? tape.width) / 2);
+                            return [toSvg(q.add(half)), toSvg(q.sub(half))] as const;
+                        })}
+                        color={color}
+                        capA={piece.capA}
+                        capB={piece.capB}
+                    />
+                ))}
+            </g>
+        );
+    }
     if (piece.kind === "strand") {
-        // Tape is drawn as its flat layers, each its width wide; rope and wire as round as they are.
-        const w = piece.tape
-            ? Math.max(piece.tape.width * ppm, 1.5)
-            : Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
+        // Rope and wire are drawn as round as they are.
+        const w = Math.max(2 * piece.r * ppm, minWidth[piece.material] ?? 0);
+        // Thin edges lie inside its width, so it's drawn no wider than it is.
+        const edge = thinEdges ? Math.min(1, 0.15 * w) : 1;
         return (
             <g>
                 {tapeLayers(piece).map((layer, k) => (
                     <StrandLine
                         key={k}
                         pts={layer.map(toSvg)}
-                        w={w}
+                        w={thinEdges ? w - 2 * edge : w}
+                        edge={edge}
                         color={color}
                         capA={piece.capA}
                         capB={piece.capB}
-                        square={!!piece.tape}
                     />
                 ))}
             </g>
@@ -584,24 +614,82 @@ function Cylinder({
 }
 
 /**
+ * One layer of tape as a ribbon between its two edges (`edges`, a pair at each point, SVG units), with a dark line
+ * along each edge and across its real ends.
+ */
+function TapeRibbon({
+    edges,
+    color,
+    capA,
+    capB,
+}: {
+    edges: (readonly [Vector2, Vector2])[];
+    color: string;
+    capA: boolean;
+    capB: boolean;
+}) {
+    const left = edges.map(([l]) => l);
+    const right = edges.map(([, r]) => r);
+    const outline = shade(color, 40);
+    const n = edges.length - 1;
+    return (
+        <g>
+            <polygon points={svgPoints([...left, ...right.reverse()])} fill={color} />
+            <polyline
+                points={svgPoints(edges.map(([l]) => l))}
+                fill="none"
+                stroke={outline}
+                strokeWidth={1}
+            />
+            <polyline
+                points={svgPoints(edges.map(([, r]) => r))}
+                fill="none"
+                stroke={outline}
+                strokeWidth={1}
+            />
+            {capA && (
+                <line
+                    x1={edges[0][0].x}
+                    y1={edges[0][0].y}
+                    x2={edges[0][1].x}
+                    y2={edges[0][1].y}
+                    stroke={outline}
+                    strokeWidth={1}
+                />
+            )}
+            {capB && (
+                <line
+                    x1={edges[n][0].x}
+                    y1={edges[n][0].y}
+                    x2={edges[n][1].x}
+                    y2={edges[n][1].y}
+                    stroke={outline}
+                    strokeWidth={1}
+                />
+            )}
+        </g>
+    );
+}
+
+/**
  * One line of rope or tape through `pts` (SVG units), `w` wide with a dark edge. Where it joins another strand its ends
- * are cut square, with the fill running a little past so no line shows across the join; real ends are rounded, or
- * square for tape.
+ * are cut square, with the fill running a little past so no line shows across the join; real ends are rounded.
  */
 function StrandLine({
     pts,
     w,
+    edge = 1,
     color,
     capA,
     capB,
-    square,
 }: {
     pts: Vector2[];
     w: number;
+    /** How wide its dark edge is each side. */
+    edge?: number;
     color: string;
     capA: boolean;
     capB: boolean;
-    square: boolean;
 }) {
     const n = pts.length - 1;
     const past = (end: Vector2, next: Vector2) =>
@@ -614,15 +702,15 @@ function StrandLine({
     const cut = {
         fill: "none",
         strokeLinecap: "butt",
-        strokeLinejoin: square ? "miter" : "round",
+        strokeLinejoin: "round",
     } as const;
-    const caps = square ? [] : [capA && pts[0], capB && pts[n]].filter((p): p is Vector2 => !!p);
+    const caps = [capA && pts[0], capB && pts[n]].filter((p): p is Vector2 => !!p);
     // A closed loop (a ring, a carabiner) is drawn as one, so it joins round where it starts and ends.
     if (!capA && !capB && n > 2 && pts[0].distanceTo(pts[n]) < 1e-3) {
         const d = `M${svgPoints(pts.slice(0, n))}Z`;
         return (
             <g>
-                <path {...cut} d={d} stroke={shade(color, 40)} strokeWidth={w + 2} />
+                <path {...cut} d={d} stroke={shade(color, 40)} strokeWidth={w + 2 * edge} />
                 <path {...cut} d={d} stroke={color} strokeWidth={w} />
             </g>
         );
@@ -633,10 +721,10 @@ function StrandLine({
                 {...cut}
                 points={svgPoints(pts)}
                 stroke={shade(color, 40)}
-                strokeWidth={w + 2}
+                strokeWidth={w + 2 * edge}
             />
             {caps.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r={w / 2 + 1} fill={shade(color, 40)} />
+                <circle key={i} cx={p.x} cy={p.y} r={w / 2 + edge} fill={shade(color, 40)} />
             ))}
             <polyline {...cut} points={svgPoints(fillPts)} stroke={color} strokeWidth={w} />
             {caps.map((p, i) => (
