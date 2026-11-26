@@ -6,11 +6,12 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 
+import { linkOutline } from "@/rigging/hardware";
 import { buildHairlines, buildScene, Solids, T, type Colors } from "@/scene/scene-gl";
+import { type Pose } from "@/scene/transforms";
 
 import { CHAIN_WEIGHT } from "./chain-weight";
-import { brakeRig, C, loaded, type Pose } from "./fox";
-import { linkOutline } from "./hardware";
+import { brakeRig, C, loaded } from "./fox";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";

@@ -98,8 +98,12 @@ they've looked.
   the 3D knot editor). `pieces.ts`: the `Piece` types (rods, faces, strands), `rod`, `timber`, materials' colours,
   and `RigLabel`. `scene-gl.tsx`: `SceneGL`, a scene in 3D with WebGL (each scene gives a `SceneConfig`).
   `piece-svg.tsx`: pieces drawn flat in SVG (`PieceDrawing`, `Callouts`, the legend's swatches). `use-flat-view.ts`:
-  a flat view's camera, fit, pan, zoom and pinch. `callout-layout.ts`, `detail.ts` (how finely a scene's drawn, and
+  a flat view's camera, fit, pan, zoom and pinch. `transforms.ts`: pieces moved, turned (`posed`) and recoloured. `callout-layout.ts`, `detail.ts` (how finely a scene's drawn, and
   Auto), `loading-3d.tsx`. What's still to move is in `docs/scene-code.md`.
+- `src/rigging/`: rescue gear as pieces, for any scene: `hardware.ts` (carabiners, shackles, pulleys, plates, bolts,
+  chain, hooks, the trolley, the grigri, the Tirfor), `rope.ts` (rope and wire through points, bars and sections),
+  `knots.ts` (figure 8s, big loops, stoppers, knots on carabiners, from the files in `knots/`), `slings.ts` (round
+  slings and tape) and `knot-3d.ts` (a knot drawing lifted into 3D).
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`, and
   `worldToSvg` for placing physics points), slider controls, `Notice` and `NONE`. Drawing only, no
   maths. `src/components/notes.tsx` has the notes card (`NotesCard`, `Part`), and `use-in-browser.ts`
@@ -112,8 +116,8 @@ they've looked.
   (`src/visual/share-image.tsx` and `src/pulley-systems/share-image.tsx`, drawn without the stylesheet), `viewport.themeColor`, `src/components/ui` (shadcn's
   own overlays) and the articles' `print:` classes.
 - `src/knot-editor-3d/`: the 3D knot editor (see `docs/knot-editor-3d.md`): its page, state, file format and
-  versions. Its files are read by pages with `knot3dFile`, which fails the build on one that doesn't read; the flying
-  fox's are in `src/flying-fox/knots/`.
+  versions. Its files are read by pages with `knot3dFile`, which fails the build on one that doesn't read; the
+  knots the scenes tie (the flying fox's figure 8s) are in `src/rigging/knots/`.
 - `src/knots/`: knots drawn from their centrelines (work in progress at `/rescue-knots/<slug>`; see
   `docs/knots.md`). `rope-path.ts` writes a rope as SVG path segments, `rope-drawing.tsx` draws one.
 - `src/lib/`: all the shared maths: vectors (`Vector2`/`Vector3`, immutable, with chained methods), plane geometry,

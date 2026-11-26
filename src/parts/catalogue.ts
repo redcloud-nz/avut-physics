@@ -11,13 +11,11 @@ import {
     BLOCKS_X,
     BRAKE,
     C,
-    figure8,
     foxPieces,
     groundY,
     guyLoops,
     HAWSER_R,
     HAWSER_Z,
-    line,
     LOG,
     onHawser,
     PULLEY_COLORS,
@@ -26,11 +24,9 @@ import {
     SADDLE,
     SHEAR_LEG,
     shearLegGuyLoops,
-    sling,
     SLING_Z,
     STATIC_X,
     STOP_BLOCK_COLORS,
-    tiedTo,
     TIRFOR_COLORS,
     TOWER,
     TREE,
@@ -38,6 +34,9 @@ import {
     TROLLEY_COLORS,
     TROLLEY_X,
 } from "@/flying-fox/fox";
+import { knot3dFile } from "@/knot-editor-3d/knot-file";
+import { KNOTS } from "@/knots";
+import { vec3, type Vector3 } from "@/lib/vector3";
 import {
     baseClamp,
     baseClampWire,
@@ -60,12 +59,12 @@ import {
     turnbuckle,
     wrap,
     zipTrolley,
-} from "@/flying-fox/hardware";
-import { axes, knotPieces, numberedRope } from "@/flying-fox/knot-3d";
-import FIGURE_8_JSON from "@/flying-fox/knots/figure-8.json";
-import { knot3dFile } from "@/knot-editor-3d/knot-file";
-import { KNOTS } from "@/knots";
-import { vec3, type Vector3 } from "@/lib/vector3";
+} from "@/rigging/hardware";
+import { axes, knotPieces, numberedRope } from "@/rigging/knot-3d";
+import { figure8, tiedTo } from "@/rigging/knots";
+import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
+import { line } from "@/rigging/rope";
+import { sling } from "@/rigging/slings";
 import type { RigLabel } from "@/scene/pieces";
 import { timber, type Piece } from "@/scene/pieces";
 
@@ -147,7 +146,7 @@ export const PARTS: Part[] = [
         slug: "figure-8-trial",
         name: "Figure 8, tightened (trial)",
         group: "Knots",
-        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar (src/flying-fox/knots/figure-8.json, edited in /knot-editor-3d), its rope numbered in segments from the standing end, with X, Y and Z arrows.",
+        about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar (src/rigging/knots/figure-8.json, edited in /knot-editor-3d), its rope numbered in segments from the standing end, with X, Y and Z arrows.",
         ...(() => {
             const file = knot3dFile("figure-8.json", FIGURE_8_JSON);
             const { points, seg } = file.rope;

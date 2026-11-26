@@ -1,7 +1,7 @@
 # 3D knot editor: design
 
 **Status (2026-11-25):** built, at `/knot-editor-3d`, on branch `knot-editor-3d`. The figure 8's twist is fixed
-(`src/flying-fox/knots/figure-8.json`), and it's drawn on the flying fox's trolleys, tying the dropper into the rider's
+(`src/rigging/knots/figure-8.json`), and it's drawn on the flying fox's trolleys, tying the dropper into the rider's
 carabiner. Its other uses (the rethreaded 8s, the joining rope's) still stand in as turns round a bar. What changed from the design below as it was built is under Built.
 
 An editor for shaping knots in 3D by hand, a few segments at a time, and tightening them, saved to files. It's for
@@ -133,7 +133,7 @@ files live in the repo and are committed, so a change shows in its diff.
   file is refused, and a sample of each version is kept and opened by a test.
 - **Read when imported.** Pages import the files and read them with the same checks, failing the build where one
   doesn't read.
-- **Where they go:** `src/flying-fox/knots/<name>.json` for the flying fox's.
+- **Where they go:** `src/rigging/knots/<name>.json` for the flying fox's.
 
 ## Using the knots
 
@@ -224,7 +224,7 @@ pieces drawn, make this easier later.
 
 - **Where things are:** the engine is `src/lib/rope-3d/` (`rope.ts`, `sim.ts`, `curve.ts`, `operations.ts`), replacing
   `knot-tighten.ts` and `knot-edit.ts`; the editor is `src/knot-editor-3d/`; the trial figure 8 is
-  `src/flying-fox/knots/figure-8.json`, which the parts viewer's trial part now reads. The flat views are shared
+  `src/rigging/knots/figure-8.json`, which the parts viewer's trial part now reads. The flat views are shared
   with the parts viewer (`src/parts/flat-view.tsx`), and `SceneGL` takes children, so the editor draws the live rope,
   its handle and the locked ends inside the parts viewer's 3D view.
 - **The handle** is the middle of its segment's points (`segmentMiddle`), not its middle by length: the handle's

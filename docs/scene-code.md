@@ -2,14 +2,15 @@
 
 From a review of the flying fox's code (November 2026), for the 3D scenes built from pieces: the flying fox, the
 Cracroft abseil tower, the parts viewer and the 3D knot editor. Done so far: the duplicate helpers it found are in
-`src/lib`, and the shared scene engine is in `src/scene/` (see AGENTS.md). The rest is here, roughly in the order
+`src/lib`, the shared scene engine is in `src/scene/`, and the rigging gear any scene can use is in `src/rigging/` (see
+AGENTS.md). The rest is here, roughly in the order
 worth doing.
 
 ## Where things are now
 
 The engine every scene shares is in `src/scene/`: the pieces, the 3D view (`SceneGL`), the flat SVG drawing, the
-flat views' camera and gestures, the callout layout and detail. The flying fox's `hardware.ts` and `knot-3d.ts` are
-still in `src/flying-fox/`, though the parts viewer uses them too.
+flat views' camera and gestures, the callout layout and detail. The hardware, rope, knots and slings are in
+`src/rigging/`.
 
 `src/flying-fox/fox.ts` (about 4,000 lines) holds the site's ground and sizes, the hawser rig, rigging builders
 (slings, figure 8s, big loops, swaged eyes, lashings, pulleys), geometry helpers, the whole model, the brake's poses,
@@ -19,13 +20,13 @@ from it, so the physics depends on the whole drawing.
 ## Structure
 
 - **More for `src/scene/`**, which has the pieces, renderers, flat view and detail now:
-  - transforms on pieces: `moved` and `posed` (in `fox.ts`), `pointsOf` (in `parts/flat-view.tsx`);
+  - `pointsOf` (in `parts/flat-view.tsx`), beside the other transforms in `transforms.ts`;
   - targets and stances (`Target`, `framing`, `panned`, from `fox.ts`);
   - detail's Auto setting as a `useDetail(storageKey)` hook (the state and the flat views' frame timing are in
     `fox-view.tsx`);
   - the viewer's controls: legend, view menu, look-at menu, zoom buttons, previous and next.
-- **Hardware and soft goods together**, out of `flying-fox/`: `hardware.ts`, and from `fox.ts` the slings, figure 8s,
-  big loops, `swagedEye`, `rigPulley`, `squareLashing`, `chokedSling`.
+- **The rest of the rigging builders in `fox.ts`** could join `src/rigging/` once they take their colours and the
+  ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
 - **Split `fox.ts`**: `site.ts` (ground and sizes, which both physics and drawing read), a file for each part of the
   rig (tower, tree anchor, shear leg, log anchor, hawsers and Tirfor, trolleys, brake), `labels.ts`, `targets.ts`.
 - **`fox-view.tsx` down to the flying fox's own parts**: its scene settings, its fits and the run. The rest is
@@ -66,5 +67,5 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 ## Smaller fixes
 
 - Two ways of drawing a carabiner: the simple one in `abseil-tower/rig.ts` and `hardware.ts`'s.
-- Two hanging lines: `hanging` (a parabola, in `fox.ts`) and `hangingPath` (a catenary, in `hardware.ts`). Worth one
+- Two hanging lines: `hanging` (a parabola, in `rigging/rope.ts`) and `hangingPath` (a catenary, in `hardware.ts`). Worth one
   name saying which is which.

@@ -4,7 +4,7 @@ import { strandSize, type Picture, type RopeColour } from "@/knot-editor/knot-fi
 import { vec3, type Vector3 } from "@/lib/vector3";
 import type { Piece, RigLabel } from "@/scene/pieces";
 
-import { line } from "./fox";
+import { line } from "./rope";
 
 /**
  * Knots in 3D, lifted from the knot editor's flat drawings (`src/knots/files/`). A drawing says where each rope runs

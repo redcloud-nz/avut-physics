@@ -1,7 +1,7 @@
-import { liftKnot } from "@/flying-fox/knot-3d";
 import type { Knot } from "@/knots";
 import { segmentCount, segmentsOf } from "@/lib/rope-3d/rope";
 import { vec3 } from "@/lib/vector3";
+import { liftKnot } from "@/rigging/knot-3d";
 
 import type { BarProp, Knot3dFile } from "./knot-file";
 

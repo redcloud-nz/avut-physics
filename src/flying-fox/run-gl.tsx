@@ -15,6 +15,7 @@ import {
     tubeGeometry,
     useSceneColors,
 } from "@/scene/scene-gl";
+import { moved } from "@/scene/transforms";
 
 import BrakeGL, { place } from "./brake-gl";
 import {
@@ -23,7 +24,6 @@ import {
     HAWSER_Z,
     hawserY,
     loaded,
-    moved,
     RETURN_PULLEY,
     returnRig,
     runTrolley,

@@ -32,8 +32,6 @@ import {
     MenubarTrigger,
 } from "@/components/ui/menubar";
 import { useInBrowser } from "@/components/use-in-browser";
-import { line } from "@/flying-fox/fox";
-import FIGURE_8_JSON from "@/flying-fox/knots/figure-8.json";
 import { KNOTS, type Knot } from "@/knots";
 import { rad } from "@/lib/math";
 import type { LockedEnd } from "@/lib/rope-3d/curve";
@@ -50,6 +48,8 @@ import {
 import { redistribute, segmentMiddle, slideBoundary, type Rope3 } from "@/lib/rope-3d/rope";
 import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 import { FLATS, FlatView } from "@/parts/flat-view";
+import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
+import { line } from "@/rigging/rope";
 import Loading3D from "@/scene/loading-3d";
 import type { Piece, RigLabel } from "@/scene/pieces";
 import type { GLHandle, SceneConfig } from "@/scene/scene-gl";

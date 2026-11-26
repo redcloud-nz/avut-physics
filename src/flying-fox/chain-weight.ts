@@ -1,7 +1,6 @@
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { CHAIN_10, chainLink, chainLinks, SHACKLE_10, type LinkFrame } from "@/rigging/hardware";
 import type { Piece } from "@/scene/pieces";
-
-import { CHAIN_10, chainLink, chainLinks, SHACKLE_10, type LinkFrame } from "./hardware";
 
 /**
  * The chain brake's weight as a fan off one ring, after Figure 50 of the book: the brake line tied into a shackle whose

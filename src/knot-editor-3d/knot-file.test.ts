@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import FIGURE_8 from "@/flying-fox/knots/figure-8.json";
+import FIGURE_8 from "@/rigging/knots/figure-8.json";
 
 import { knot3dFile, parseKnot3d } from "./knot-file";
 import { CURRENT_VERSION } from "./versions";
