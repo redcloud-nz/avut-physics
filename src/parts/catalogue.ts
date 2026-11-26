@@ -1,4 +1,4 @@
-import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, RIGS } from "@/abseil-tower/rig";
+import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, rigColor, RIGS } from "@/abseil-tower/rig";
 import { towerPieces } from "@/abseil-tower/tower";
 import { CHAIN_WEIGHT, chainWeightHanging, chainWeightMass } from "@/flying-fox/chain-weight";
 import {
@@ -59,6 +59,7 @@ import {
 import { axes, knotPieces, numberedRope } from "@/rigging/knot-3d";
 import { figure8, tiedTo } from "@/rigging/knots";
 import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
+import MUNTER_HITCH_JSON from "@/rigging/knots/munter-hitch.json";
 import { line } from "@/rigging/rope";
 import { sling } from "@/rigging/slings";
 import type { RigLabel } from "@/scene/pieces";
@@ -205,6 +206,19 @@ export const PARTS: Part[] = [
         about: "The same rope's end, a metre down the east face, cut out of the tower as its 3D view lays it out: a figure 8 on a bight with a carabiner clipped through its loop, hanging spine in line with the rope.",
         pieces: () => towerKnot(true),
         flat: towerKnotFlat(true),
+    },
+    {
+        slug: "tower-munter",
+        name: "Munter hitch on a carabiner",
+        group: "Abseil tower",
+        about: "The munter hitch round the tower's carabiner's wide end, tightened in /knot-editor-3d from the Rescue Knots drawing (src/rigging/knots/munter-hitch.json). Not yet tied off.",
+        pieces: () => munterOnCarabiner(),
+        flat: {
+            main: { azimuth: 90, elevation: 90 },
+            pieces: (toward) => munterOnCarabiner(toward),
+            minWidth: FLAT_HAIRLINE,
+            thinEdges: true,
+        },
     },
     {
         slug: "carabiner-oval",
@@ -791,6 +805,78 @@ function towerKnot(end: boolean, face?: Vector3): Piece[] {
     const reach = vec3(0.3, 0.3, 0.3);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
     return moved(within([...(end ? towerPieces() : []), ...pieces], box), label.at.neg());
+}
+
+/**
+ * Where a munter hitch sits on a carabiner's wide end: the straight run of its bar from the corner by the spine towards
+ * the gate (from `from` to `to` metres across it), which it follows, centred `gate` (metres) on from its middle towards
+ * the gate, so the brake strand's turn clears the corner.
+ */
+const MUNTER_BAR = { from: 0.003, to: 0.03, gate: 0.006 };
+
+/**
+ * The munter hitch on the tower's carabiner, as tightened in the 3D knot editor from the Rescue Knots drawing
+ * (`knots/munter-hitch.json`, its bar along x through the origin). The carabiner hangs straight, its spine upright,
+ * from its narrow end above; the hitch is moved onto the straight run of its wide end, which rises towards the gate, and
+ * sheared to follow it. In 3D it hangs in the upright plane across x; in a flat view it's laid `face` on to the eye, pulled along
+ * the view, and drawn in a fixed order: the carabiner's body, then its sleeve and grip, the rope in short lengths
+ * sorting in front of and behind its bar.
+ */
+function munterOnCarabiner(face?: Vector3): Piece[] {
+    const L = 0.11;
+    const n = face?.unit() ?? ACROSS;
+    const seen = DOWN.sub(n.scale(DOWN.dot(n)));
+    const pull = seen.len() > 0.5 ? seen.unit() : ALONG;
+    // The drawing's axes: x across it, y up it and z out of it towards the viewer. The scenes' x is east, y up and z
+    // north, so seen from z, x runs to the right as z × y.
+    const [y, z] = [pull.neg(), n];
+    const x = z.cross(y);
+    const [body, ...sleeve] = carabiner(ORIGIN, y, x, STEEL, L);
+    // The wide end's straight run, in the drawing's plane: where the bar is at each end of it, across and up.
+    const bar = body.kind === "strand" ? body.points : [];
+    const near = (u: number) =>
+        bar
+            .filter((q) => q.dot(y) < L / 4)
+            .reduce((m, q) => (Math.abs(q.dot(x) - u) < Math.abs(m.dot(x) - u) ? q : m));
+    const [a, b] = [near(MUNTER_BAR.from), near(MUNTER_BAR.to)];
+    const along = b.sub(a).unit();
+    const middle = a.lerp(b, 0.5).add(along.scale(MUNTER_BAR.gate));
+    const rise = b.sub(a).dot(y) / b.sub(a).dot(x);
+    // Each point moved onto the bar's middle and lifted as far as the bar rises where it is across, so the turns follow
+    // the slanted bar and the strands still hang straight down.
+    const at = (p: Vector3) =>
+        middle
+            .add(x.scale(p.x))
+            .add(y.scale(p.y + rise * p.x))
+            .add(z.scale(p.z));
+    const file = knot3dFile("munter-hitch.json", MUNTER_HITCH_JSON);
+    const points = file.rope.points.map(at);
+    const r = file.diameter / 2;
+    const color = rigColor("blue");
+    if (!face) return [body, ...sleeve, ...line(points, r, color, "rope", { a: true, b: true })];
+    // Face on: the rope in short lengths (each reaching a point into the next, so no seam shows), sorting by depth
+    // among the carabiner's pieces, which keep their order.
+    const group = { at: ORIGIN.add(y.scale(L / 2)) };
+    const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
+    const lengths: Piece[] = [];
+    for (let i = 0; i < points.length - 1; i += 4)
+        lengths.push({
+            kind: "strand",
+            points: points.slice(Math.max(0, i - 1), Math.min(points.length, i + 6)),
+            r,
+            material: "rope",
+            color,
+            capA: i === 0,
+            capB: i + 4 >= points.length - 1,
+        });
+    return [
+        { ...body, group: { ...group, order: 1 } },
+        ...sleeve.map((p) => ({
+            ...p,
+            group: { ...group, order: p.kind === "rod" && p.r > sleeveR ? 3 : 2 },
+        })),
+        ...lengths,
+    ];
 }
 
 /** The tower's figure 8 on a carabiner as its overhead view draws it. */

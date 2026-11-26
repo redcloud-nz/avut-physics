@@ -11,25 +11,31 @@ export const SEGMENT_LENGTH = 0.02;
 /**
  * A new 3D knot from a knot drawing: its first rope lifted into 3D as it's drawn (`liftKnot`: loose, nearly flat,
  * rising and sinking at the crossings), in segments 20 mm long, with the drawing's bars (seen end on, they run through
- * the drawing; seen side on, across it). Its ends are held, ready to choose the knot's segments and tighten it. Other
- * props (carabiners) and further ropes aren't brought in.
+ * the drawing; seen side on, across it) and its carabiners as the bars across their bottom ends. Its ends are held,
+ * ready to choose the knot's segments and tighten it. Further ropes aren't brought in.
  */
 export function fromDrawing(knot: Knot): Knot3dFile {
     const picture = knot.file.knot;
     const [rope] = liftKnot(picture);
     const seg = segmentsOf(rope.points, SEGMENT_LENGTH);
-    const props: BarProp[] = picture.props.flatMap((prop, i) =>
+    const props: BarProp[] = picture.props.map((prop, i) =>
         prop.kind === "bar"
-            ? [
-                  {
-                      id: i + 1,
-                      kind: "bar" as const,
-                      at: vec3(prop.x / 1000, -prop.y / 1000, 0),
-                      along: prop.length === undefined ? vec3(0, 0, 1) : vec3(1, 0, 0),
-                      r: prop.r / 1000,
-                  },
-              ]
-            : [],
+            ? {
+                  id: i + 1,
+                  kind: "bar" as const,
+                  at: vec3(prop.x / 1000, -prop.y / 1000, 0),
+                  along: prop.length === undefined ? vec3(0, 0, 1) : vec3(1, 0, 0),
+                  r: prop.r / 1000,
+              }
+            : // A carabiner as the bar across its bottom end, which the hitch is round: its middle a radius in from
+              // the outer edge the drawing places it by.
+              {
+                  id: i + 1,
+                  kind: "bar" as const,
+                  at: vec3(prop.x / 1000, -(prop.y - prop.r) / 1000, 0),
+                  along: vec3(1, 0, 0),
+                  r: prop.r / 1000,
+              },
     );
     const count = segmentCount({ points: rope.points, seg });
     return {

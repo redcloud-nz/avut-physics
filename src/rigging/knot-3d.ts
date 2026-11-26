@@ -11,7 +11,8 @@ import { line } from "./rope";
  * and, where two cross, which is on top. Lifted, each rope keeps its place in the drawing's plane and rises towards the
  * viewer where it's on top, or sinks where it's underneath, so at a crossing the two are a rope's thickness apart
  * (each half the two ropes' diameters added, from the plane), easing back to the plane over `EASE` diameters either
- * side. A dressed knot's strands lie nearly flat beside each other, so it's close to how one sits.
+ * side. Where it passes in front of or behind a prop (a bar, a carabiner's end) it's clear of it the same way, by the
+ * prop's radius and its own. A dressed knot's strands lie nearly flat beside each other, so it's close to how one sits.
  */
 
 /** How many of a rope's diameters either side of a crossing it eases back to the drawing's plane over. */
@@ -26,7 +27,7 @@ export type Rope3D = { points: Vector3[]; diameter: number; colour: RopeColour }
  */
 export function liftKnot(picture: Picture): Rope3D[] {
     const geometry = pictureGeometry(picture);
-    const { crossings } = pictureCrossings(picture, geometry);
+    const { crossings, passes } = pictureCrossings(picture, geometry);
     // Each strand's crossings: how far along it, which way it's lifted and how far (millimetres).
     const lifts = picture.strands.map(() => [] as { s: number; by: number; ease: number }[]);
     for (const c of crossings) {
@@ -37,6 +38,13 @@ export function liftKnot(picture: Picture): Rope3D[] {
             const size = strandSize(picture.strands[i]);
             lifts[i].push({ s: c.s[j], by: c.over === j ? half : -half, ease: EASE * size });
         });
+    }
+    // Each pass across a prop (a bar, a carabiner's end): in front of it or behind it, clear of it by the rope's radius.
+    for (const p of passes) {
+        if (p.side === undefined) continue;
+        const size = strandSize(picture.strands[p.strand]);
+        const half = picture.props[p.prop].r + size / 2;
+        lifts[p.strand].push({ s: p.s, by: p.side === "front" ? half : -half, ease: EASE * size });
     }
     const ropes: Rope3D[] = [];
     picture.strands.forEach((strand, i) => {
