@@ -1,4 +1,3 @@
-import { TAPE } from "@/abseil-tower/rig";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { tapeLayers } from "@/scene/pieces";
 import type { Strand } from "@/scene/pieces";
@@ -30,11 +29,11 @@ export const SLINGS = {
     },
     climbing: {
         width: 0.025,
-        thickness: TAPE.thickness,
+        thickness: 0.003,
         r: 0.0125,
         color: "var(--fox-sling)",
         // Climbing tape is flat already, and a carabiner's bar is wide enough for it not to bunch.
-        bunched: { width: 0.025, thickness: TAPE.thickness, over: 0.06 },
+        bunched: { width: 0.025, thickness: 0.003, over: 0.06 },
     },
 };
 
@@ -217,20 +216,23 @@ export function tapeRun(
  * A sling basketed round a log (or spar) and up into a shackle's bow (or a carabiner), both its ends on it: the loop
  * lies doubled, its two strands flat side by side round the log, and each leg ends in a bight round the shackle's crown
  * (or the carabiner's bar), one strand in over it and the other under it, the two bights one atop the other. Over the
- * last of its legs it bunches up, narrower and thicker. `log` is the log's middle (its axis `along`, `logR` its
- * radius), `bar` the middle of the crown bar (its radius `barR`), and `up` a way square to the line between them and
- * to `along`, which the top leg is on. The loop crosses itself round the crown, where it changes layer.
+ * last of its legs it bunches up, narrower and thicker. `log` is the log's middle (its axis `along`), `around` its
+ * radius, or for anything not round (logs stacked, a sawn timber) its section as a convex outline round `log` (points
+ * anywhere along it), `bar` the middle of the crown bar (its radius `barR`), and `up` a way square to the line between
+ * them and to `along`, which the top leg is on. The loop crosses itself round the crown, where it changes layer. It's
+ * in the sling's own colour unless given `color`, and a climbing sling's stitching is drawn unless it's not `stitched`.
  */
 export function basketedSling(
     kind: keyof typeof SLINGS,
     log: Vector3,
-    logR: number,
+    around: number | Vector3[],
     bar: Vector3,
     barR: number,
     up: Vector3,
     along: Vector3,
+    { color = SLINGS[kind].color, stitched = true }: { color?: string; stitched?: boolean } = {},
 ): Strand[] {
-    const { width, thickness, r, color, bunched } = SLINGS[kind];
+    const { width, thickness, r, bunched } = SLINGS[kind];
     // Worked out square to the log, then sheared along it as far as the bar rises along it, so the loop hugs the log
     // on a slant.
     const axis = along.unit();
@@ -257,21 +259,49 @@ export function basketedSling(
     const stacked = kind === "climbing";
     const side = (k: number) => (k - 0.5) * (width + 0.004);
     const z = axis;
-    const r1 = logR + thickness / 2;
     const rb = (layer: number) => barR + bunched.thickness * (layer + 0.5);
     type Flat2 = [number, number];
+    // What it wraps, as its support: for each way out (an angle in the loop's plane, from the bar), how far out the
+    // tape's middle lies that way, and where it touches. A log is round; an outline is grown by half the tape's
+    // thickness, rounding its corners.
+    const r1 = typeof around === "number" ? around + thickness / 2 : 0;
+    const outline: Flat2[] =
+        typeof around === "number" ? [] : around.map((q) => [q.sub(log).dot(a), q.sub(log).dot(b)]);
+    const support = (angle: number): { h: number; at: Flat2 } => {
+        const [c, s] = [Math.cos(angle), Math.sin(angle)];
+        if (typeof around === "number") return { h: r1, at: [r1 * c, r1 * s] };
+        let best = outline[0];
+        for (const q of outline) if (q[0] * c + q[1] * s > best[0] * c + best[1] * s) best = q;
+        const h = best[0] * c + best[1] * s + thickness / 2;
+        return { h, at: [best[0] + (thickness / 2) * c, best[1] + (thickness / 2) * s] };
+    };
     // The straight line from the log (on its top or bottom, `s1` ±1) to the crown (on its top or bottom, `s2`), the
-    // crown `layer` out: where it leaves each.
+    // crown `layer` out: where it leaves each, as the angle its line is square to. Round, that's worked straight out;
+    // round an outline, it's where the outline's support meets the crown's.
     const tangent = (s1: number, s2: number, layer: number): { log: number; bar: number } => {
         const r2 = rb(layer);
-        if (s1 === s2) {
-            const t = Math.acos((r1 - r2) / D);
-            return { log: s1 * t, bar: s1 * t };
+        if (typeof around === "number") {
+            if (s1 === s2) {
+                const t = Math.acos((r1 - r2) / D);
+                return { log: s1 * t, bar: s1 * t };
+            }
+            const t = Math.acos((r1 + r2) / D);
+            return { log: s1 * t, bar: Math.PI + s1 * t };
         }
-        const t = Math.acos((r1 + r2) / D);
-        return { log: s1 * t, bar: Math.PI + s1 * t };
+        // Same side: the outline reaches as far out as the crown's side, h(t) = D cos t + r2. Crossing: h(t) = D cos t
+        // - r2. Below the line at t = 0 (it's well clear of the bar), above it by a half turn.
+        const off = s1 === s2 ? r2 : -r2;
+        const f = (t: number) => support(t).h - D * Math.cos(t) - off;
+        let [lo, hi] = [0, Math.PI];
+        for (let i = 0; i < 60; i++) {
+            const mid = (lo + hi) / 2;
+            if (f(mid) < 0) lo = mid;
+            else hi = mid;
+        }
+        const t = (lo + hi) / 2;
+        return s1 === s2 ? { log: s1 * t, bar: s1 * t } : { log: s1 * t, bar: Math.PI + s1 * t };
     };
-    const onLog = (angle: number): Flat2 => [r1 * Math.cos(angle), r1 * Math.sin(angle)];
+    const onLog = (angle: number): Flat2 => support(angle).at;
     const onBar = (angle: number, layer: number): Flat2 => [
         D + rb(layer) * Math.cos(angle),
         rb(layer) * Math.sin(angle),
@@ -291,9 +321,10 @@ export function basketedSling(
             pts.push(p(x, y).add(z.scale(z0 + (z1 - z0) * s)));
         }
     };
+    const steps = typeof around === "number" ? 16 : 64;
     const arc = (from: number, to: number, k: number) => {
-        for (let i = 0; i < 16; i++) {
-            const [x, y] = onLog(from + ((to - from) * i) / 16);
+        for (let i = 0; i < steps; i++) {
+            const [x, y] = onLog(from + ((to - from) * i) / steps);
             pts.push(p(x, y).add(z.scale(side(k))));
         }
     };
@@ -336,7 +367,11 @@ export function basketedSling(
     const tape = tapeRun(points, profile, z, color, r);
     return [
         ...tape,
-        ...(kind === "round" ? stripes(points, profile, z) : stitching(points, profile, z)),
+        ...(kind === "round"
+            ? stripes(points, profile, z)
+            : stitched
+              ? stitching(points, profile, z)
+              : []),
     ];
 }
 

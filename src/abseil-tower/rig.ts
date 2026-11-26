@@ -2,6 +2,7 @@ import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { CARABINER_R, carabiner as ctCarabiner } from "@/rigging/hardware";
+import { basketedSling, SLINGS } from "@/rigging/slings";
 import { type Face, type Material, type Piece, type RigLabel } from "@/scene/pieces";
 
 import { basket, stackedLogs } from "./basket";
@@ -558,10 +559,9 @@ const OWN_COLORS: RigColor[] = [
 /** Colours dark enough that a label on them is written light. */
 const DARK_COLORS: RigColor[] = ["black", "dark-green", "dark-red", "maroon", "dark-blue"];
 
-/** Tape and rope, as round as they're drawn. */
-const SLING_R = 0.0125;
-/** The beam slings' flat tape (climbing slings, sewn from tubular tape). */
-export const TAPE = { width: 0.035, thickness: 0.003 };
+/** The slings' flat tape: climbing slings, 25 mm, as on the flying fox. */
+const SLING_T = SLINGS.climbing.thickness;
+/** Rope, as round as it's drawn. */
 const ROPE_R = 0.0055;
 /** How far from an abseil rope a belay beside it crosses the rail. */
 const BESIDE_GAP = 0.12;
@@ -618,9 +618,9 @@ const run = (
 /**
  * A basket sling at `z`, of `length` laid flat, pulled towards `target` (a point in the beam's cross-section: x across,
  * y up), or straight down without one. A `slant` angles the pull along the beam: that far along it for each metre out
- * across. Its tape wraps the back of both logs and its legs meet at the carabiner, which
- * lies along the pull. Gives its pieces, where the carabiner's far end is for what clips to it, and the pull's
- * direction.
+ * across. It's a climbing sling as on the flying fox, doubled round the back of both logs, each leg's bight round the
+ * top bar of its carabiner, which lies along the pull, flat in the plane of the pull and the beam. Gives its pieces,
+ * where the carabiner's bottom bar is for what clips to it, and the pull's direction.
  */
 function basketSling(
     z: number,
@@ -628,40 +628,42 @@ function basketSling(
     target: Vector2 | null,
     color: string,
     slant = 0,
-): { pieces: Piece[]; clip: Vector3; along: Vector3 } {
+): { pieces: Piece[]; clip: Vector3; along: Vector3; gate: Vector3 } {
     const { x, lowerY, upperY } = OVERHEAD;
     const centre = vec2(x, (lowerY + upperY) / 2);
     const pull = target ? target.sub(centre).unit() : vec2(0, -1);
-    const logs = stackedLogs(vec2(x, lowerY), vec2(x, upperY), OVERHEAD.r + SLING_R);
-    // A sling is a tied loop of tape, so it goes round doubled: drawn as one strand, it's as long as it lies flat.
-    const { clip, path } = basket(logs, centre, pull, length);
-    // Angled along the beam, each point's carried along it in step with how far out along the pull it is.
-    const at = (p: Vector2) => vec3(p.x, p.y, z + Math.max(0, p.sub(centre).dot(pull)) * slant);
-    const loop = path.map(at);
-    // Cut into its two legs and short runs round the logs, so each sorts by where it is: in front of the logs or behind.
-    const cuts = [1];
-    for (let i = 5; i < loop.length - 2; i += 4) cuts.push(i);
-    cuts.push(loop.length - 2);
-    // The carabiner: an oval along the pull, in the same plane, its near end where the legs meet.
+    const [lower, upper] = [vec2(x, lowerY), vec2(x, upperY)];
+    // A sling is a tied loop of tape, so it goes round doubled: as long round as it lies flat.
+    const { clip } = basket(
+        stackedLogs(lower, upper, OVERHEAD.r + SLING_T / 2),
+        centre,
+        pull,
+        length,
+    );
+    // Angled along the beam, the carabiner's carried along it in step with how far out along the pull it is.
+    const near = vec3(clip.x, clip.y, z + clip.sub(centre).dot(pull) * slant);
     const along = vec3(pull.x, pull.y, slant).unit();
-    const across = vec3(-pull.y, pull.x, 0);
-    const krab = carabiner(at(clip), along, across);
-    // It's flat tape: a loop basketed over the beam, so two layers side by side along it, each going down both legs.
-    const near = at(clip);
-    const tape = {
-        ...TAPE,
-        across: vec3(0, 0, 1),
-        layers: 2,
-        gather: near,
-        ramp: 0.7 * near.distanceTo(vec3(centre.x, centre.y, near.z)),
-    };
+    const beam = vec3(0, 0, 1);
+    const krab = carabiner(near, along, beam.sub(along.scale(beam.dot(along))).unit());
+    const section = stackedLogs(lower, upper, OVERHEAD.r).map((p) => vec3(p.x, p.y, z));
+    const up = beam.cross(vec3(pull.x, pull.y, 0));
     return {
         pieces: [
-            ...run(loop, cuts, SLING_R, "sling", color).map((p) => ({ ...p, tape })),
+            ...basketedSling(
+                "climbing",
+                vec3(centre.x, centre.y, z),
+                section,
+                near,
+                CARABINER_R,
+                up,
+                beam,
+                { color, stitched: false },
+            ),
             ...krab.pieces,
         ],
         clip: krab.far,
         along,
+        gate: krab.gate,
     };
 }
 
@@ -1116,7 +1118,7 @@ function belayRedirected(
 function wrapSling(
     item: WrapSling,
     target: Vector3 | null,
-): { pieces: Piece[]; clip: Vector3; along: Vector3 } {
+): { pieces: Piece[]; clip: Vector3; along: Vector3; gate: Vector3 } {
     const up = vec3(0, 1, 0);
     const { around } = item;
     // What it wraps: its middle where the sling goes round, the way it runs, and its section.
@@ -1147,11 +1149,14 @@ function wrapSling(
         "r" in section
             ? Array.from({ length: 24 }, (_, i) => {
                   const a = (i / 24) * Math.PI * 2;
-                  const r = section.r + SLING_R;
+                  const r = section.r + SLING_T / 2;
                   return vec2(r * Math.cos(a), (r / slant) * Math.sin(a));
               })
             : (() => {
-                  const [half, long] = [section.w / 2 + SLING_R, (section.h / 2 + SLING_R) / slant];
+                  const [half, long] = [
+                      section.w / 2 + SLING_T / 2,
+                      (section.h / 2 + SLING_T / 2) / slant,
+                  ];
                   return [
                       vec2(-half, -long),
                       vec2(half, -long),
@@ -1160,22 +1165,41 @@ function wrapSling(
                   ];
               })();
     const pull = vec2(to.dot(s), to.dot(w)).unit();
-    const { clip, path } = basket(outline, vec2(0, 0), pull, item.length);
+    const { clip } = basket(outline, vec2(0, 0), pull, item.length);
     const at = (p: Vector2) => centre.add(s.scale(p.x)).add(w.scale(p.y));
-    const loop = path.map(at);
-    // Cut into short runs, so each sorts by where it is: in front of what it wraps or behind.
-    const cuts = Array.from({ length: loop.length - 2 }, (_, i) => i + 1).filter(
-        (i) => i === 1 || i === loop.length - 2 || i % 3 === 0,
-    );
+    // A climbing sling as on the beam, its carabiner flat in the plane of the pull and what it wraps.
+    const pullDir = s.scale(pull.x).add(w.scale(pull.y));
+    const flatTo = axis.sub(pullDir.scale(axis.dot(pullDir)));
     const krab = carabiner(
         at(clip),
-        s.scale(pull.x).add(w.scale(pull.y)),
-        s.scale(-pull.y).add(w.scale(pull.x)),
+        pullDir,
+        flatTo.len() > 0.1 ? flatTo.unit() : s.scale(-pull.y).add(w.scale(pull.x)),
+    );
+    const wrapped =
+        "r" in section
+            ? section.r
+            : [-1, 1].flatMap((i) =>
+                  [-1, 1].map((j) =>
+                      centre
+                          .add(s.scale((i * section.w) / 2))
+                          .add(depth.scale((i * j * section.h) / 2)),
+                  ),
+              );
+    const sling = basketedSling(
+        "climbing",
+        centre,
+        wrapped,
+        at(clip),
+        CARABINER_R,
+        axis.cross(pullDir),
+        axis,
+        { color: rigColor(item.color), stitched: false },
     );
     return {
-        pieces: [...run(loop, cuts, SLING_R, "sling", rigColor(item.color)), ...krab.pieces],
+        pieces: [...sling, ...krab.pieces],
         clip: krab.far,
         along: target ? target.sub(krab.far).unit() : up.neg(),
+        gate: krab.gate,
     };
 }
 
