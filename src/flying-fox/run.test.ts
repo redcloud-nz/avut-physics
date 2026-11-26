@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { chainWeightMass } from "./chain-weight";
-import { DISMOUNT, RIDER, STATIC_X, TROLLEY_X } from "./fox";
 import { HIT_X, RUN, simulateRun, simulateSession, TIMELINE } from "./run";
+import { DISMOUNT, RIDER, STATIC_X, TROLLEY_X } from "./site";
 
 describe("a rider's run", () => {
     it("stops the heaviest rider (120 kg) short of the static brakes with the book's chain weight", () => {

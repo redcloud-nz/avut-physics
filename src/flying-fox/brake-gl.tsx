@@ -11,10 +11,12 @@ import { buildHairlines, buildScene, Solids, T, type Colors } from "@/scene/scen
 import { type Pose } from "@/scene/transforms";
 
 import { CHAIN_WEIGHT } from "./chain-weight";
-import { brakeRig, C, loaded } from "./fox";
+import { C } from "./colors";
+import { brakeRig } from "./fox";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";
+import { loaded } from "./site";
 
 /** A pose for three.js: its axis flipped with the scene (which turns the turn the other way). */
 export function place(group: THREE.Group, { at, axis, angle }: Pose) {

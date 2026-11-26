@@ -12,10 +12,9 @@ The engine every scene shares is in `src/scene/`: the pieces, the 3D view (`Scen
 flat views' camera and gestures, the callout layout and detail. The hardware, rope, knots and slings are in
 `src/rigging/`.
 
-`src/flying-fox/fox.ts` (about 4,000 lines) holds the site's ground and sizes, the hawser rig, rigging builders
-(slings, figure 8s, big loops, swaged eyes, lashings, pulleys), geometry helpers, the whole model, the brake's poses,
-the labels, the targets, the stances, the legend and the ground's shading. `run.ts`, the physics, imports its sizes
-from it, so the physics depends on the whole drawing.
+`src/flying-fox/fox.ts` (about 2,300 lines) is now the model itself: the tower, the tree, the shear leg, the log anchor,
+the hawsers and Tirfor, the trolleys and return line, and the brake. Beside it are `site.ts` (the ground, sizes and
+fixed positions, which is all the physics in `run.ts` reads), `colors.ts`, `labels.ts`, `targets.ts` and `ground.ts`.
 
 ## Structure
 
@@ -27,8 +26,9 @@ from it, so the physics depends on the whole drawing.
   - the viewer's controls: legend, view menu, look-at menu, zoom buttons, previous and next.
 - **The rest of the rigging builders in `fox.ts`** could join `src/rigging/` once they take their colours and the
   ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
-- **Split `fox.ts`**: `site.ts` (ground and sizes, which both physics and drawing read), a file for each part of the
-  rig (tower, tree anchor, shear leg, log anchor, hawsers and Tirfor, trolleys, brake), `labels.ts`, `targets.ts`.
+- **Split the rest of `fox.ts`** into a file for each part of the rig (tower, tree anchor, shear leg, log anchor,
+  hawsers and Tirfor, trolleys, brake). `chain-weight.ts` also mixes the physics (`chainWeightHanging`) with the
+  drawing.
 - **`fox-view.tsx` down to the flying fox's own parts**: its scene settings, its fits and the run. The rest is
   generic (address state, the two-finger swipe to the next target, detail, target boxes, about 270 lines of
   controls). Its flat view's camera and gestures are in `useFlatView` already.

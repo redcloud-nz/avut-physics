@@ -6,34 +6,38 @@ import {
     chainWeightPieces,
 } from "@/flying-fox/chain-weight";
 import {
+    C,
+    PULLEY_COLORS,
+    STOP_BLOCK_COLORS,
+    TIRFOR_COLORS,
+    TROLLEY_COLORS,
+} from "@/flying-fox/colors";
+import {
     ANCHOR_SHACKLE,
     backstayLoop,
+    foxPieces,
+    guyLoops,
+    rigPulley,
+    rigTrolley,
+    SADDLE,
+    shearLegGuyLoops,
+    SLING_Z,
+    TREE_SHACKLE,
+} from "@/flying-fox/fox";
+import {
     BLOCKS_X,
     BRAKE,
-    C,
-    foxPieces,
     groundY,
-    guyLoops,
     HAWSER_R,
     HAWSER_Z,
     LOG,
     onHawser,
-    PULLEY_COLORS,
-    rigPulley,
-    rigTrolley,
-    SADDLE,
     SHEAR_LEG,
-    shearLegGuyLoops,
-    SLING_Z,
     STATIC_X,
-    STOP_BLOCK_COLORS,
-    TIRFOR_COLORS,
     TOWER,
     TREE,
-    TREE_SHACKLE,
-    TROLLEY_COLORS,
     TROLLEY_X,
-} from "@/flying-fox/fox";
+} from "@/flying-fox/site";
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { KNOTS } from "@/knots";
 import { vec3, type Vector3 } from "@/lib/vector3";

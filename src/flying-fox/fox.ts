@@ -1,9 +1,7 @@
-import { G } from "@/lib/constants";
 import { catmullRom, cubicPoints } from "@/lib/curve3";
 import { bisect } from "@/lib/numeric/roots";
 import { arcLengths } from "@/lib/rope-3d/rope";
-import { Vector2 } from "@/lib/vector2";
-import { boundsOf, turnBetween, vec3, type Vector3 } from "@/lib/vector3";
+import { turnBetween, vec3, type Vector3 } from "@/lib/vector3";
 import {
     ANCHOR_HOOK,
     baseClamp,
@@ -26,7 +24,6 @@ import {
     shackle,
     SHACKLE_6,
     SHACKLE_19,
-    STOP_BLOCK,
     stopBlock,
     thimble,
     THIMBLE_11,
@@ -49,11 +46,44 @@ import {
 } from "@/rigging/knots";
 import { bar, hanging, line, section, towards } from "@/rigging/rope";
 import { basketedSling, SLINGS, stripes, tapeRun, type TapeSize } from "@/rigging/slings";
-import { type Piece, type RigLabel, type Strand } from "@/scene/pieces";
+import { type Piece, type Strand } from "@/scene/pieces";
 import { moved, posed, type Pose } from "@/scene/transforms";
 
 import { CHAIN_WEIGHT, chainWeight, chainWeightPieces, type ChainWeight } from "./chain-weight";
-import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "./hawser";
+import {
+    C,
+    PULLEY_COLORS,
+    STOP_BLOCK_COLORS,
+    STOP_BLOCK_EYE,
+    TIRFOR_COLORS,
+    TROLLEY_COLORS,
+} from "./colors";
+import {
+    BAGGING_R,
+    BAR_X,
+    BLOCKS_X,
+    BRAKE,
+    CRADLE_Y,
+    groundY,
+    HAWSER_R,
+    HAWSER_Z,
+    hawserY,
+    LOG,
+    onGround,
+    onHawser,
+    RETURN_EYE_Z,
+    RETURN_PULLEY,
+    RIDER,
+    RIG,
+    SADDLE_Y,
+    SHEAR_LEG,
+    SPAR_X,
+    STABILISER_PULLEY,
+    STATIC_X,
+    TOWER,
+    TREE,
+    TROLLEY_X,
+} from "./site";
 
 /**
  * A dual-hawser flying fox braked by a chain weight, set up to Scouts NSW's "Flying Fox - Operations and Construction"
@@ -70,287 +100,8 @@ import { hang, heightAt, lengthForSag, WIRE_EA, WIRE_WEIGHT, type Shape } from "
  * hawsers are tensioned.
  */
 
-/**
- * How far the ground falls between the tower and the shear leg, as a grade over the span: 2°, a gentle site, so riders
- * reach the brake slowly enough for a chain weight within the book's limits to stop them. The unloaded hawsers leave the
- * tower inside section 4.7's "conventional" 15°, and well inside the 45° and 65° maximums (Figures 18 and 19).
- */
-export const GRADE = Math.tan((2 * Math.PI) / 180);
-
-/**
- * The lie of the land without the hollow: level round the tower and back to the tree, level round the shear leg and
- * back to the log, and falling smoothly between their guys.
- */
-function natural(x: number): number {
-    const from = 1.6 * TOWER.top;
-    const to = SHEAR_LEG.x - 1.6 * SHEAR_LEG.top;
-    if (x <= from) return 0;
-    if (x >= to) return -FALL;
-    return (-FALL * (1 - Math.cos((Math.PI * (x - from)) / (to - from)))) / 2;
-}
-
-/**
- * How far below the heaviest rider's feet, standing up, the ground is meant to be at `x`: `CLEARANCE.ride` along the
- * ride, easing down to `CLEARANCE.dismount` over the `EASE` before the dismount zone: gently, so the hollow's floor
- * rises smoothly into it rather than in a hump.
- */
-const EASE = 15;
-export function clearanceAt(x: number): number {
-    const { ride, dismount } = CLEARANCE;
-    const from = DISMOUNT.from - EASE;
-    if (x <= from) return ride;
-    if (x >= DISMOUNT.from) return dismount;
-    return ride + ((dismount - ride) * (1 - Math.cos((Math.PI * (x - from)) / EASE))) / 2;
-}
-
-/**
- * The hollow's floor: where the ground would be to keep the heaviest rider's feet its clearance up off it, sampled
- * every `step` metres along the span (worked out when first needed, once the hawsers are).
- */
-const FLOOR_STEP = 0.25;
-let floor: number[] | undefined;
-function floorAt(x: number): number {
-    floor ??= Array.from({ length: Math.round(SPAN / FLOOR_STEP) + 1 }, (_, i) => {
-        const at = Math.min(Math.max(i * FLOOR_STEP, 0.05), SPAN);
-        const trolley = loaded(at, RIDER.mass, 2).load!.y;
-        return trolley - RIDER.harness - RIDER.standing - clearanceAt(at);
-    });
-    const u = Math.min(Math.max(x / FLOOR_STEP, 0), floor.length - 1);
-    const i = Math.min(Math.floor(u), floor.length - 2);
-    return floor[i] + (floor[i + 1] - floor[i]) * (u - i);
-}
-
-/** How far the lower of two heights is rounded off where they meet, so the ground has no crease. */
-const BLEND = 0.4;
-/** The lower of `a` and `b`, rounded off where they're within `BLEND` of each other. */
-function smoothMin(a: number, b: number): number {
-    const h = Math.max(BLEND - Math.abs(a - b), 0) / BLEND;
-    return Math.min(a, b) - (h * h * BLEND) / 4;
-}
-
-/**
- * The ground's height at `x` along the run (level across it): the lie of the land, with a hollow between the towers
- * shaped to the heaviest rider's path, so it keeps their feet the same height off the ground all along the ride.
- */
-export function groundY(x: number): number {
-    if (x <= 0 || x >= SPAN) return natural(x);
-    return smoothMin(natural(x), floorAt(x));
-}
-
-/** The span: from the tower's top cross bar to the shear leg's top spar, measured level. */
-export const SPAN = 80;
-/**
- * The hawsers' sag at mid-span under the test load: the book's minimum catenary, 5% of the span, measured with 150 to
- * 200 kg hanging at the middle (section 5.5.3). Unloaded they hang higher.
- */
-export const SAG = 0.05 * SPAN;
-/**
- * The test load the hawsers are tensioned with, in kg: two people hanging off a rope over the hawser at mid-span. The
- * light end of the book's 150 to 200 kg, which leaves the hawser slackest, so the riders hang lowest.
- */
-export const TEST_LOAD = 150;
-/** How far the ground falls from the tower to the shear leg. */
-export const FALL = GRADE * SPAN;
-/** How far each hawser is from the centre line: 1.5 m apart, to sit between the shear leg's uprights. */
-export const HAWSER_Z = 0.75;
-/** The hawsers' radius: 11 mm galvanised wire rope. */
-export const HAWSER_R = 0.0055;
-
-/** The steel tower (Appendix E): two SHS 75 uprights and RHS 75 × 50 cross bars, braces and brake support. */
-export const TOWER = {
-    /** The uprights' middles, either side of the centre line. */
-    half: 1.5,
-    /**
-     * The adjustable feet: pushed all the way in, so the 2 m extension stands on its foot plate and the 4.8 m upright on
-     * it reaches 6.8 m. That puts the top bar about 6.6 m up and the platform about 4.2 m, as measured off a photo of
-     * the real tower.
-     */
-    feet: 0,
-    /** Where the 2 m extension meets the 4.8 m upright. */
-    joint: 2.0,
-    /** The uprights' tops. */
-    top: 6.8,
-    /** The top cross bar, 175 mm below the uprights' tops. */
-    bar: 6.8 - 0.175,
-    /** The bottom cross bar, five holes (2.5 m) below the top one, with the platform on it. */
-    lower: 6.8 - 0.175 - 2.5,
-    /** Where the diagonal braces meet the uprights: seven holes (3.5 m) below the top bar. */
-    braceFoot: 6.8 - 0.175 - 3.5,
-    shs: 0.075,
-    rhs: { w: 0.05, h: 0.075 },
-    barLength: 3.27,
-    /**
-     * The platform: 1.1 m deep, 2.5 m wide at the front, clamped to the bottom bar with its end in line with hawser A's
-     * upright, as in the photos, leaving the bar's other end clear for the ladder. How far its middle is off the tower's.
-     */
-    platform: { depth: 1.1, width: 2.5, shift: 0.25 },
-    /**
-     * How far the tower's middle is off the hawsers' (towards hawser A): the saddles on its top bar aren't centred on
-     * it but sit towards the platform, as in a photo of the real one: hawser A 0.55 m in from its upright, B 0.95 m.
-     */
-    z: -0.2,
-};
-/** The top cross bar's middle: on the uprights' front (span) faces. */
-const BAR_X = TOWER.shs / 2 + TOWER.rhs.w / 2;
-/** Where a hawser rests in its cradle on the top cross bar. */
-export const CRADLE_Y = TOWER.bar + TOWER.rhs.h / 2 + 0.008 + HAWSER_R;
-
-/** The H-frame shear leg at the bottom end (Figure 32): `b` between the uprights, the top spar 2B up. */
-export const SHEAR_LEG = {
-    x: SPAN,
-    b: 1.85,
-    spar: 3.7,
-    top: 4.0,
-    lower: 0.55,
-    /** How high up its upright the diagonal brace's top is lashed. */
-    braceTop: 2.7,
-    /** Spars at least 125 mm, the brace at least 90 mm. */
-    r: 0.0625,
-    braceR: 0.045,
-};
-/** The hessian bagging round the top spar where each hawser lies on it. */
-const BAGGING_R = SHEAR_LEG.r + 0.025;
-/** Where a hawser crosses the shear leg's top spar, which is on the anchor side of the uprights (Figure 33). */
-const SPAR_X = SHEAR_LEG.x + 2 * SHEAR_LEG.r;
-const SADDLE_Y = -FALL + SHEAR_LEG.spar + BAGGING_R + HAWSER_R;
-
-/**
- * A hawser between its cradle on the tower and its saddle on the shear leg, held there (it can't slide over them), so
- * the stretch of the lengths beyond, back to the anchors, is left out.
- */
-const RIG = {
-    from: new Vector2(BAR_X, CRADLE_Y),
-    to: new Vector2(SPAR_X, SADDLE_Y),
-    weight: WIRE_WEIGHT,
-    ea: WIRE_EA,
-};
-/** Each hawser's unstretched length between its supports, tensioned so the test load sags it 5% (section 5.5.3). */
-export const HAWSER_LENGTH = lengthForSag(RIG, TEST_LOAD * G, SAG);
-/** How the hawsers hang with nothing on them. */
-export const UNLOADED = hang({ ...RIG, length: HAWSER_LENGTH });
-/** How a hawser hangs with `mass` kg hanging from it at `x` along the span. */
-export const loaded = (x: number, mass: number, points = 200): Shape =>
-    hang({ ...RIG, length: HAWSER_LENGTH }, { x, weight: mass * G }, points);
-/** The stabiliser's pulley under the middle of the top spar, on level ground (the frame's shifted onto the ground). */
-const STABILISER_PULLEY = vec3(SPAR_X, SHEAR_LEG.spar - SHEAR_LEG.r - 0.25, 0);
-
-/** The tree the hawsers are slung round, at least 2.15 times the tower's height behind it (Figure 26). */
-export const TREE = { x: -23, r: 0.36, height: 9 };
-/**
- * The log and picket anchor, on the level ground past the shear leg: the book's minimum is 2.15 times the height from
- * the shear leg's base to its saddle (which brings the hawsers down at just under 25°); it's set well back from that,
- * 3 times the height, for flatter hawsers.
- */
-export const LOG = { x: SHEAR_LEG.x + 3 * (SHEAR_LEG.spar + BAGGING_R), r: 0.075, length: 2.4 };
-
-/** The dynamic brake's blocks, this far up the span from the shear leg, and the static brakes. */
-export const BLOCKS_X = SPAN - 10;
-/**
- * A rider on the dropper, the heaviest the book allows with their harness, trolley and hardware (120 kg, section 7.9.3).
- * Their harness's tie-in hangs this far below the hawser, just more than they can reach up from it with their arms (so
- * they can't grab the hawser or the trolley, section 6.10). Sitting in a waist harness, their legs are out in front,
- * their heels about `seated` below the tie-in; standing up to land, their feet are `standing` below it.
- */
-export const RIDER = { mass: 120, harness: 1.4, reach: 1.3, seated: 0.7, standing: 1.0 };
-/** How far a rider's lowest point can hang below the hawser, standing: the book's "drop" (Figure 42). */
-export const DROP = RIDER.harness + RIDER.standing;
-/** The static brakes: at least twice the drop from the shear leg, so a swinging rider can't reach it (Figure 42). */
-export const STATIC_X = SPAN - Math.ceil(2 * DROP);
-/**
- * Where riders come to rest after braking: the lowest point a rider reaches on the hawser, about the same for every
- * weight, which they roll back to from the brake blocks.
- */
-export const REST_X = (() => {
-    let best = { x: 0, y: Infinity };
-    for (let x = SPAN / 2; x < SPAN - 1; x += 0.25) {
-        const y = loaded(x, RIDER.mass, 2).load!.y;
-        if (y < best.y) best = { x, y };
-    }
-    return best.x;
-})();
-/**
- * The dismount zone: from a little up the span from where the heaviest riders slow to a walk, thrown back up from the
- * brake (about 49 m along; lighter riders slow further down), to the static brakes. Staff catch riders there and lower
- * them where they're caught.
- */
-export const DISMOUNT = { from: 47, to: STATIC_X };
-/**
- * How far the heaviest rider's feet are off the ground standing up: well clear along the ride, but only just in the
- * dismount zone, so they can't quite stand up by themselves, and a staff member on the ground can reach their descender
- * (no higher than `STAFF_REACH`) to lower them.
- */
-export const CLEARANCE = { ride: 0.5, dismount: 0.1 };
-/** How high a staff member standing on the ground can reach. */
-export const STAFF_REACH = 2.0;
-/** How far below the hawser a rider's descender is: just above their harness's tie-in. */
-export const DESCENDER = RIDER.harness - 0.16;
-
-/** The ropes and lines, and their colours. */
-export const C = {
-    hawser: "var(--tower-steel)",
-    returnLine: "var(--knot-green)",
-    brakeLine: "var(--knot-yellow)",
-    joining: "var(--knot-blue)",
-    shockCord: "var(--rig-white)",
-    staticBrake: "var(--knot-red)",
-    dropper: "var(--rig-maroon)",
-    guy: "var(--knot-orange)",
-    backstay: "var(--rig-black)",
-    fibre: "var(--fox-fibre)",
-    hessian: "var(--fox-hessian)",
-    picket: "var(--fox-picket)",
-    cap: "var(--knot-yellow)",
-    steel: "var(--tower-steel)",
-    brass: "var(--fox-brass)",
-    /** Shackles' painted screw pins. */
-    pin: "var(--fox-shackle-pin)",
-    trolley: "var(--knot-red)",
-    nylon: "var(--fox-nylon)",
-    tirfor: "var(--fox-tirfor)",
-    oval: "var(--fox-carabiner-oval)",
-    tree: "var(--tower-log)",
-    spar: "var(--fox-spar)",
-    grate: "var(--fox-grate)",
-    pulley: "var(--fox-pulley)",
-    sheave: "var(--fox-sheave)",
-};
-/** The Tirfor's colours: its alloy body, steel pin and handle, yellow release lever, black grips and labels. */
-export const TIRFOR_COLORS = {
-    body: "var(--fox-tirfor)",
-    steel: "var(--tower-steel)",
-    lever: "var(--fox-tirfor-lever)",
-    grip: "var(--rig-black)",
-    label: "var(--rig-black)",
-};
-/** The trolleys' and pulleys' colours. */
-export const TROLLEY_COLORS = {
-    plates: "var(--knot-red)",
-    sheave: "var(--fox-sheave)",
-    steel: "var(--tower-steel)",
-    bumper: "var(--rig-black)",
-};
-/** The size of the stop blocks' eyes, which the joining rope's tied into. */
-const STOP_BLOCK_EYE = STOP_BLOCK.eye.size;
-
-/** The stop blocks' colours: the nylon body, steel eye bolts and brass bolts. */
-export const STOP_BLOCK_COLORS = {
-    body: "var(--fox-nylon)",
-    steel: "var(--tower-steel)",
-    brass: "var(--fox-brass)",
-};
-
-export const PULLEY_COLORS = {
-    plates: "var(--fox-pulley)",
-    sheave: "var(--fox-sheave)",
-    steel: "var(--tower-steel)",
-    carabiner: "var(--fox-carabiner-oval)",
-};
-
 const UP = vec3(0, 1, 0);
 const ACROSS = vec3(0, 0, 1);
-
-/** A point `h` above the ground at `x`, `z`. */
-const onGround = (x: number, h: number, z: number) => vec3(x, groundY(x) + h, z);
 
 /**
  * How far a line from `a` to `b` sags at its middle hanging as the hawsers do, `times` as much: a hanging line's sag
@@ -368,14 +119,6 @@ export function sagLike(a: Vector3, b: Vector3, times = 1, clear = 0.5): number 
     // As much as still clears, by halving the difference.
     return bisect(clears, 0, want, 30)[0];
 }
-
-/** A hawser's height along the span, unloaded, at `x` (from the tower's cradle to the shear leg's saddle). */
-export function hawserY(x: number): number {
-    return heightAt(UNLOADED, x);
-}
-
-/** Where hawser `side` (+1 for A, −1 for B) is at `x` along the span. */
-export const onHawser = (x: number, side: number) => vec3(x, hawserY(x), side * HAWSER_Z);
 
 /**
  * A star picket driven at `at` (its height is above the ground there), leaning back from the pull (a level direction) by 25°, so a rope pulling at that
@@ -1031,45 +774,8 @@ function tower(): Piece[] {
     return [...moved(pieces, vec3(0, 0, T.z)), ...placed];
 }
 
-/** The return line's pulley on side `s` (+1 for hawser A's side), under the top bar. */
-export const RETURN_PULLEY = (s: number) => vec3(0.15, TOWER.bar - 0.2, TOWER.z + s * RETURN_EYE_Z);
-
-/**
- * How far the return line's pulleys' eye bolts are from the tower's middle, in the top cross bar's platform side, their
- * eyes lying flat (their holes upright). The platform's stays hang from the bolts through the bar into the uprights.
- */
-const RETURN_EYE_Z = 1.35;
 /** Where an eye bolt in the top bar's platform side screws in, `z` from the tower's middle. */
 const topEye = (z: number) => vec3(BAR_X + TOWER.rhs.w / 2, TOWER.bar, TOWER.z + z);
-
-/** The chain brake: the brake support's top and arm, its pulley, and the chain weight hanging below it. */
-export const BRAKE = (() => {
-    // Appendix E's brake support: the post's top 615 mm above the top bar's bolt, an arm out level from it (its top
-    // flush with the post's), diagonally back and to one side, 450 mm each way, braced by a strut from 300 mm down the
-    // post to 350 mm (of the 450) out along the arm.
-    const postTop = TOWER.bar + 0.615;
-    const postX = TOWER.shs / 2 - TOWER.rhs.w / 2;
-    const along = vec3(-1, 0, 1).unit();
-    const length = 0.45 * Math.SQRT2;
-    const armStart = vec3(postX, postTop - 0.025, TOWER.z);
-    const armEnd = armStart.add(along.scale(length));
-    // The eye bolt through the hole at the arm's end, in its underside.
-    const eye = armEnd.sub(along.scale(0.025)).add(vec3(0, -0.025, 0));
-    const pulley = eye.add(vec3(0, -0.215, 0));
-    return {
-        postTop,
-        armStart,
-        armEnd,
-        strut: {
-            from: vec3(postX, postTop - 0.3, TOWER.z),
-            to: armStart.add(along.scale((length * 0.35) / 0.45)).add(vec3(0, -0.025, 0)),
-        },
-        eye,
-        pulley,
-        /** Where the brake line ends, tied into the chain weight's shackle, its ring just clear of the heap. */
-        chainTop: onGround(pulley.x - 0.05, 0.5, pulley.z),
-    };
-})();
 
 /** The tree, its bagging, and the two slings round it the hawsers are shackled to. */
 function tree(): Piece[] {
@@ -1158,7 +864,7 @@ function chainStay(a: { eye: Vector3; m: Vector3 }, b: { eye: Vector3; m: Vector
 }
 
 /** How high on the trunk the backstay's own sling is, just above the hawsers'. */
-const BACKSTAY_SLING_Y = 0.7;
+export const BACKSTAY_SLING_Y = 0.7;
 /** The back of the brake support's post up the tower's middle, just behind the top cross bar (`rhs.w` deep). */
 const POST_BACK = TOWER.shs / 2 - TOWER.rhs.w;
 /** The front of the top cross bar, on the uprights' front faces. */
@@ -1167,7 +873,7 @@ const BAR_FRONT = BAR_X + TOWER.rhs.w / 2;
  * The backstay's top end: the joint of the top cross bar and the brake support's post behind it, at the middle of the
  * two together, which its loop wraps diagonally.
  */
-const BACKSTAY_TOP = vec3((POST_BACK + BAR_FRONT) / 2, TOWER.bar, TOWER.z);
+export const BACKSTAY_TOP = vec3((POST_BACK + BAR_FRONT) / 2, TOWER.bar, TOWER.z);
 /**
  * The line the backstay's loop wraps round at that joint: diagonal, so the loop goes past the post above the bar on one
  * side, across the bar's front and back past the post below it on the other.
@@ -1228,7 +934,7 @@ export function backstayLoop(): Piece[] {
 }
 
 /** The backstay's figure 8 on a bight, tied into its shackle's pin. */
-const BACKSTAY_TIE = (() => {
+export const BACKSTAY_TIE = (() => {
     const { crown, along } = BACKSTAY_SHACKLE;
     const { upright } = linkPlanes(along);
     const pin = crown.add(along.scale(SHACKLE_19.length + SHACKLE_19.pin));
@@ -1376,7 +1082,7 @@ const TREE_LEG = 0.7;
  * hawser. Its angle round the trunk (anticlockwise from +x, seen with +z towards that angle's sine), which way round
  * the sling runs to arrive there heading out (`turn`, ±1), and the point, at the sling's height.
  */
-const TREE_CHOKE = (s: number) => {
+export const TREE_CHOKE = (s: number) => {
     const [cx, cz] = [BAR_X - TREE.x, s * HAWSER_Z];
     const d = Math.hypot(cx, cz);
     const R = TREE_WRAP_R(s);
@@ -1557,7 +1263,8 @@ export const SADDLE = (s: number) => vec3(SPAR_X, SADDLE_Y, s * HAWSER_Z);
  */
 export const SLING_Z = 0.4;
 /** The log's middle at `z`, the log resting on the slings under it. */
-const LOG_AT = (z: number) => vec3(LOG.x, groundY(LOG.x) + LOG.r + 2 * SLINGS.round.thickness, z);
+export const LOG_AT = (z: number) =>
+    vec3(LOG.x, groundY(LOG.x) + LOG.r + 2 * SLINGS.round.thickness, z);
 /** How far out in front of the log's middle each sling's shackle is (the inside of its crown). */
 const SLING_REACH = 0.8;
 /**
@@ -1681,7 +1388,7 @@ function madeOff(
  * three 19 mm D shackles, each link a quarter turn from the last (the turnbuckle's frame turned flat, to show from
  * above).
  */
-function footLinks(s: number) {
+export function footLinks(s: number) {
     const a = ANCHOR_SHACKLE(s * SLING_Z);
     const along = SADDLE(s).sub(a).unit();
     const { flat, upright } = linkPlanes(along);
@@ -1765,7 +1472,7 @@ const lizardFoot = (s: number) => {
  * The Tirfor, lying on the ground in front of the log's middle sling, pointing (seen from above) up hawser A towards
  * the lizard; its anchor hook, lying flat, takes the sling's bights.
  */
-const TIRFOR_RIG = (() => {
+export const TIRFOR_RIG = (() => {
     const log = LOG_AT(0);
     const ahead = lizardFoot(1).sub(log);
     const u = vec3(ahead.x, 0, ahead.z).unit();
@@ -2139,9 +1846,6 @@ function trolley(
 
 /** How far round its carabiner's bottom bend towards the spine the return line's tied (radians). */
 const RETURN_SPINE = 1.1;
-
-/** Where the trolleys sit: A at the launch, just out from the platform, and B at the bottom against its brake block. */
-export const TROLLEY_X = { a: 1.4, b: BLOCKS_X - 0.15 };
 
 /**
  * The trolleys and the return line joining them over the tower's pulleys; for a run, only trolley B and the pulleys,
@@ -2578,529 +2282,4 @@ export function foxPieces({ run = false }: { run?: boolean } = {}): Piece[] {
         ...logAnchor(),
         ...lizardAndTirfor(),
     ];
-}
-
-/** The flat views. */
-export type FlatView = "side" | "overhead";
-
-/**
- * A label in the flat views: what it names, the target it's part of (its slug: it's shown only when the views are
- * locked onto that), and the views it's written in (both unless it names them).
- */
-export type FoxLabel = RigLabel & { target: string; views?: FlatView[] };
-
-/** What the drawings name, written beside it in the flat views. */
-export function foxLabels(): FoxLabel[] {
-    const floor = TOWER.lower + TOWER.rhs.h / 2 + 0.05;
-    const overhead: FlatView[] = ["overhead"];
-    // A little way out along a guy from the top of the upright it's tied to, at `top`, towards its picket at `foot`.
-    const alongGuy = (top: Vector3, foot: Vector3, out: number) => {
-        const level = foot.sub(top);
-        return top.lerp(foot, out / Math.hypot(level.x, level.z));
-    };
-    // The tower's guy on hawser A's side, out to the front.
-    const towerGuyTop = vec3(0, TOWER.bar + TOWER.rhs.h / 2, TOWER.z + TOWER.half);
-    const towerGuyFoot = vec3(1.6 * TOWER.top, 0, TOWER.z + TOWER.half + 1.6 * TOWER.top);
-    // The shear leg's guy on hawser A's side, out towards the anchor.
-    const legGuyTop = onGround(SHEAR_LEG.x, SHEAR_LEG.top, SHEAR_LEG.b / 2);
-    const legGuyFoot = vec3(
-        SHEAR_LEG.x + 1.6 * SHEAR_LEG.top,
-        0,
-        SHEAR_LEG.b / 2 + 1.6 * SHEAR_LEG.top,
-    );
-    // Hawser A's eye at the tree, and the way along it to the tower.
-    const treeEye = TREE_SHACKLE(1);
-    const toTower = vec3(BAR_X, CRADLE_Y, HAWSER_Z).sub(treeEye).unit();
-    // The ladder's middle, between its foot and where it rests on the bottom bar, between the platform and the upright
-    // on hawser B's side.
-    const ladderZ = TOWER.z + (TOWER.platform.shift - TOWER.platform.width / 2 - TOWER.half) / 2;
-    const ladderRest = vec3(BAR_X, TOWER.lower, ladderZ);
-    const ladder = ladderRest.lerp(onGround(BAR_X + TOWER.lower / 4, 0, ladderZ), 0.5);
-    const foot = footLinks(1);
-    return [
-        // The tree.
-        { target: "top-anchor", text: "Big tree", at: onGround(TREE.x, 1.2, 0), side: "left" },
-        {
-            target: "top-anchor",
-            views: overhead,
-            text: "Round slings, choked to offset hawsers",
-            // On hawser B's sling's leg, between the choke and its shackle.
-            at: TREE_CHOKE(-1).at.lerp(TREE_SHACKLE(-1), 0.6),
-            side: "left",
-        },
-        {
-            target: "top-anchor",
-            views: overhead,
-            text: "Backstay",
-            at: BACKSTAY_TIE.end.lerp(BACKSTAY_TOP, 0.04),
-            side: "right",
-        },
-        {
-            target: "top-anchor",
-            views: overhead,
-            text: "Wire clamps",
-            at: treeEye.add(toTower.scale(0.45)),
-            side: "right",
-        },
-        // The tower.
-        {
-            target: "top-tower",
-            text: "Steel tower",
-            at: vec3(0, TOWER.top, TOWER.z + TOWER.half),
-            side: "left",
-        },
-        {
-            target: "top-tower",
-            text: "Launch platform",
-            at: vec3(0.6, floor, TOWER.z + TOWER.platform.shift),
-            side: "right",
-        },
-        { target: "top-tower", text: "Brake pulley", at: BRAKE.pulley, side: "left" },
-        {
-            target: "top-tower",
-            text: "Chain weight",
-            at: onGround(BRAKE.chainTop.x, 0.3, BRAKE.chainTop.z),
-            side: "left",
-        },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Guys",
-            at: alongGuy(towerGuyTop, towerGuyFoot, 1),
-            side: "right",
-        },
-        { target: "top-tower", views: overhead, text: "Ladder", at: ladder, side: "right" },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Backstay",
-            at: BACKSTAY_TOP.lerp(BACKSTAY_TIE.end, 0.06),
-            side: "left",
-        },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Hawsers",
-            at: vec3(BAR_X, CRADLE_Y, -HAWSER_Z).lerp(TREE_SHACKLE(-1), 0.07),
-            side: "left",
-        },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Brake line",
-            at: BRAKE.pulley.lerp(vec3(BLOCKS_X, hawserY(BLOCKS_X), 0), 0.03),
-            side: "right",
-        },
-        {
-            target: "top-tower",
-            views: overhead,
-            text: "Return line",
-            at: RETURN_PULLEY(1).lerp(onHawser(TROLLEY_X.a, 1), 0.5),
-            side: "right",
-        },
-        // The trolleys.
-        { target: "trolley-a", text: "Trolley A", at: onHawser(TROLLEY_X.a, 1), side: "right" },
-        { target: "trolley-b", text: "Trolley B", at: onHawser(TROLLEY_X.b, -1), side: "left" },
-        // The dynamic brake.
-        {
-            target: "dynamic-brake",
-            text: "Brake blocks",
-            at: onHawser(BLOCKS_X, -1),
-            side: "right",
-        },
-        {
-            target: "dynamic-brake",
-            views: overhead,
-            text: "Hawsers",
-            at: onHawser(BLOCKS_X + 0.6, 1),
-            side: "right",
-        },
-        {
-            target: "dynamic-brake",
-            views: overhead,
-            text: "Return line",
-            at: RETURN_PULLEY(-1).lerp(onHawser(TROLLEY_X.b, -1), 0.99),
-            side: "right",
-        },
-        {
-            target: "dynamic-brake",
-            views: overhead,
-            text: "Brake line",
-            at: vec3(BLOCKS_X - 1.6, hawserY(BLOCKS_X) - 0.2, 0),
-            side: "left",
-        },
-        {
-            target: "dynamic-brake",
-            views: overhead,
-            text: "Stabiliser",
-            at: vec3(BLOCKS_X + 0.6, hawserY(BLOCKS_X) - 0.3, 0),
-            side: "right",
-        },
-        // The static brakes.
-        {
-            target: "static-brake",
-            text: "Static brakes",
-            at: onHawser(STATIC_X, -1).add(vec3(0, -0.05, 0)),
-            side: "right",
-        },
-        {
-            target: "static-brake",
-            views: overhead,
-            text: "Carabiner",
-            at: onHawser(STATIC_X, 1),
-            side: "right",
-        },
-        {
-            target: "static-brake",
-            views: overhead,
-            text: "Rope",
-            at: onHawser(STATIC_X, 1).lerp(onGround(STATIC_X, 0, HAWSER_Z + 2.5), 0.5),
-            side: "right",
-        },
-        {
-            target: "static-brake",
-            views: overhead,
-            text: "Picket",
-            at: onGround(STATIC_X, 0, HAWSER_Z + 2.5),
-            side: "right",
-        },
-        // The shear leg.
-        {
-            target: "bottom-tower",
-            text: "H-frame shear leg",
-            at: onGround(SHEAR_LEG.x, SHEAR_LEG.top, 0),
-            side: "right",
-        },
-        {
-            target: "bottom-tower",
-            views: overhead,
-            text: "Guys",
-            at: alongGuy(legGuyTop, legGuyFoot, 0.8),
-            side: "right",
-        },
-        {
-            target: "bottom-tower",
-            views: overhead,
-            text: "Lashings",
-            at: onGround(SHEAR_LEG.x + 0.1, SHEAR_LEG.spar, SHEAR_LEG.b / 2 + 0.05),
-            side: "right",
-        },
-        {
-            target: "bottom-tower",
-            views: overhead,
-            text: "Hessian sacks",
-            at: vec3(SPAR_X, SADDLE_Y, -HAWSER_Z - 0.09),
-            side: "right",
-        },
-        {
-            target: "bottom-tower",
-            views: overhead,
-            text: "Stabiliser",
-            at: onGround(SHEAR_LEG.x - 1.5, 1, 0),
-            side: "left",
-        },
-        {
-            target: "bottom-tower",
-            views: overhead,
-            text: "Hawsers",
-            at: SADDLE(1).lerp(ANCHOR_SHACKLE(SLING_Z), 0.12),
-            side: "right",
-        },
-        // The log anchor.
-        {
-            target: "bottom-anchor",
-            text: "Turnbuckle",
-            at: TURNBUCKLE_AT(-1),
-            side: "right",
-        },
-        {
-            target: "bottom-anchor",
-            text: "Lizard",
-            at: ANCHOR_SHACKLE(SLING_Z).add(
-                SADDLE(1).sub(ANCHOR_SHACKLE(SLING_Z)).unit().scale(LIZARD.clamps[1]),
-            ),
-            side: "left",
-        },
-        {
-            target: "bottom-anchor",
-            text: "Tirfor",
-            at: TIRFOR_RIG.tirfor.ropeOut.add(vec3(0, 0.25, 0)),
-            side: "left",
-        },
-        {
-            target: "bottom-anchor",
-            text: "Log and picket anchor",
-            at: onGround(LOG.x + 0.3, 0.3, 0),
-            side: "right",
-        },
-        {
-            target: "bottom-anchor",
-            views: overhead,
-            text: "D shackles",
-            at: foot.d1.far.lerp(foot.d2.far, 0.5),
-            side: "left",
-        },
-        {
-            target: "bottom-anchor",
-            views: overhead,
-            text: "Round slings",
-            at: LOG_AT(SLING_Z).lerp(ANCHOR_SHACKLE(SLING_Z), 0.5),
-            side: "left",
-        },
-        {
-            target: "bottom-anchor",
-            views: overhead,
-            text: "Banjo lashings",
-            at: onGround(LOG.x + 0.25, 0.2, -1.0),
-            side: "right",
-        },
-    ];
-}
-
-/**
- * What the views can lock onto, up the site from the tree to the log: the box round all of each thing (`lo` to `hi`),
- * its middle, which the views turn and zoom about, and how far from it the 3D view starts (metres), far enough to see
- * all of the box.
- */
-export type FoxTarget = {
-    slug: string;
-    label: string;
-    lo: Vector3;
-    hi: Vector3;
-    centre: Vector3;
-    distance: number;
-    /** Where its view's middle may be panned to while locked onto it (see `Focus.pan`); none, it stays put. */
-    pan?: { lo: Vector3; hi: Vector3 };
-};
-
-/** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
-function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
-    const { lo, hi } = boundsOf(points);
-    // The 3D view's 30° high, so a ball this big just fits it from about 3.9 times its radius out: a little further,
-    // to leave some room round it.
-    const r = hi.sub(lo).len() / 2;
-    return {
-        slug,
-        label,
-        lo,
-        hi,
-        centre: lo.lerp(hi, 0.5),
-        distance: Math.max(4.2 * r, 1.5),
-    };
-}
-
-/** `target`, its view's middle free to be panned within the box `box` gives round its centre. */
-const panned = (target: FoxTarget, box: (centre: Vector3) => [Vector3, Vector3]): FoxTarget => {
-    const [lo, hi] = box(target.centre);
-    return { ...target, pan: { lo, hi } };
-};
-
-export function foxTargets(): FoxTarget[] {
-    const sides = [-1, 1];
-    const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
-    // A trolley and its dropper: from just over the hawser down past the harness to the end of the descender's brake
-    // strand, about 1.2 m below the harness.
-    const trolleyAt = (x: number, s: number) => {
-        const at = onHawser(x, s);
-        return [at.add(vec3(-0.15, 0.08, 0)), at.add(vec3(0.15, -RIDER.harness - 1.2, 0))];
-    };
-    // The tree's anchor: the trunk where the slings go round it, out to the end of each hawser's made-off eye (its bow
-    // shackle, thimble, clamps and tail, about 0.8 m along the hawser from the sling's shackle).
-    const treeEye = (s: number) => {
-        const at = TREE_SHACKLE(s);
-        return at.add(
-            vec3(BAR_X, CRADLE_Y, s * HAWSER_Z)
-                .sub(at)
-                .unit()
-                .scale(0.8),
-        );
-    };
-    // The log's anchor: the log and its pickets, out to the end of each lizard's wire up its hawser.
-    const lizardEnd = (s: number) => {
-        const a = ANCHOR_SHACKLE(s * SLING_Z);
-        return a.add(
-            SADDLE(s)
-                .sub(a)
-                .unit()
-                .scale(LIZARD.clamps.at(-1)! + LIZARD.tail),
-        );
-    };
-    return [
-        framing("top-anchor", "Top anchor", [
-            onGround(TREE.x - TREE.r, 0, -TREE.r),
-            onGround(TREE.x + TREE.r, BACKSTAY_SLING_Y + 0.2, TREE.r),
-            ...sides.map(treeEye),
-        ]),
-        // The tower from its backstay's tie to the foot of its ladder, up to the top of the brake support.
-        // Panned up and down, to look at the tower's feet, platform or top from close up.
-        panned(
-            framing("top-tower", "Top tower", [
-                onGround(-1.2, 0, TOWER.z - TOWER.half - 0.3),
-                onGround(1.6, BRAKE.postTop + 0.2, TOWER.z + TOWER.half + 0.3),
-            ]),
-            (c) => [vec3(c.x, 0.5, c.z), vec3(c.x, BRAKE.postTop, c.z)],
-        ),
-        framing("trolley-a", "Trolley A", trolleyAt(TROLLEY_X.a, 1)),
-        framing("trolley-b", "Trolley B", trolleyAt(TROLLEY_X.b, -1)),
-        // The two blocks and the joining rope sagging between them.
-        framing("dynamic-brake", "Dynamic brake", [
-            between(BLOCKS_X - 0.4).add(vec3(0, 0.2, -HAWSER_Z - 0.2)),
-            between(BLOCKS_X + 0.4).add(vec3(0, -0.9, HAWSER_Z + 0.2)),
-        ]),
-        // The carabiners on the hawsers and their ropes out to the pickets either side.
-        framing("static-brake", "Static brakes", [
-            vec3(STATIC_X - 0.5, groundY(STATIC_X), -HAWSER_Z - 2.6),
-            between(STATIC_X).add(vec3(0.5, 0.2, HAWSER_Z + 2.6)),
-        ]),
-        // The H-frame, from its brace to the bagging on its top spar.
-        framing("bottom-tower", "Bottom tower", [
-            onGround(SHEAR_LEG.x - 0.4, 0, -SHEAR_LEG.b / 2 - 0.3),
-            onGround(SHEAR_LEG.x + 0.5, SHEAR_LEG.top + 0.1, SHEAR_LEG.b / 2 + 0.3),
-        ]),
-        // Panned level, back to the shear leg along the lizards and out along the log.
-        panned(
-            framing("bottom-anchor", "Bottom anchor", [
-                onGround(LOG.x + 0.5, 0, -LOG.length / 2),
-                onGround(LOG.x - 0.2, 1, LOG.length / 2),
-                ...sides.map(lizardEnd),
-            ]),
-            (c) => [
-                vec3(SHEAR_LEG.x, c.y, -LOG.length / 2),
-                vec3(LOG.x + 0.5, c.y, LOG.length / 2),
-            ],
-        ),
-    ];
-}
-
-/** How high a standing person's eyes are above their feet (metres). */
-const EYE_HEIGHT = 1.7;
-
-/** Somewhere to stand on the site and look round from in 3D: where the eye is, and what it looks at first. */
-export type FoxStance = {
-    slug: string;
-    label: string;
-    at: Vector3;
-    lookAt: Vector3;
-    /** How wide it takes in to start with (degrees high), if not the usual. */
-    fov?: number;
-};
-export function foxStances(): FoxStance[] {
-    // The platform's deck, on the bottom cross bar.
-    const deck = TOWER.lower + TOWER.rhs.h / 2 + 0.05;
-    // Between the hawsers, at the hawsers' height, `x` along the span.
-    const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
-    return [
-        (() => {
-            // On the launch platform, a step back from its front edge, looking down the span and a little up and
-            // towards hawser A, wide enough to take in trolley A just ahead and above.
-            const at = vec3(0.3, deck + EYE_HEIGHT, TOWER.z + TOWER.platform.shift);
-            return {
-                slug: "loader",
-                label: "Loader",
-                at,
-                lookAt: at.add(vec3(10, 2.1, 2.7)),
-                fov: 70,
-            };
-        })(),
-        {
-            // On the ground between the hawsers, abreast where riders come to rest, looking back up the span at riders
-            // coming down.
-            slug: "unloader",
-            label: "Unloader",
-            at: onGround(REST_X, EYE_HEIGHT, 0),
-            lookAt: between(SPAN / 3),
-        },
-        {
-            // Halfway along the span, off to hawser B's side, looking across at the hawsers.
-            slug: "observer",
-            label: "Observer",
-            at: onGround(SPAN / 2, EYE_HEIGHT, -12),
-            lookAt: between(SPAN / 2),
-        },
-    ];
-}
-
-/** The legend's lines: each rope or wire by its colour, and what it is. */
-export function foxLegend(): { name: string; color: string; look: "tape" | "rope" }[] {
-    return [
-        { name: "Hawsers (11 mm galvanised wire)", color: C.hawser, look: "rope" },
-        { name: "Return line", color: C.returnLine, look: "rope" },
-        { name: "Brake line", color: C.brakeLine, look: "rope" },
-        { name: "Joining rope", color: C.joining, look: "rope" },
-        { name: "Stabiliser (shock cord)", color: C.shockCord, look: "rope" },
-        { name: "Static brakes", color: C.staticBrake, look: "rope" },
-        { name: "Droppers", color: C.dropper, look: "rope" },
-        { name: "Guys", color: C.guy, look: "rope" },
-        { name: "Tower backstay", color: C.backstay, look: "rope" },
-        { name: "Lashings and ties (natural fibre)", color: C.fibre, look: "rope" },
-        { name: "Round slings (6 t)", color: SLINGS.round.heavy, look: "tape" },
-        { name: "Round slings (4 t)", color: SLINGS.round.color, look: "tape" },
-        { name: "Climbing slings", color: SLINGS.climbing.color, look: "tape" },
-    ];
-}
-
-/** The ground: the whole site, from behind the tree to past the anchor and out past the guys. */
-export const GROUND = { x0: TREE.x - 6, x1: LOG.x + 6, z: 15 };
-
-/** How many shades the ground's patches come in, from grass to dry ground. */
-const GROUND_SHADES = 6;
-
-/** A ground shade's colour: grass mixed with dry ground, more of it the higher `k`. */
-export const groundShade = (k: number) =>
-    `color-mix(in oklab, var(--fox-ground-dry) ${Math.round((100 * k) / (GROUND_SHADES - 1))}%, var(--fox-ground))`;
-
-/**
- * How dry the ground is at `x`, `z`, from 0 (grass) to 1 (bare): a few waves at odd angles added up, so it comes in
- * irregular patches a few metres across. It's the same every time, so the drawing doesn't change from one load to the
- * next.
- */
-function dryness(x: number, z: number): number {
-    const waves: [number, number, number, number][] = [
-        [0.31, 0.17, 0.0, 1.0],
-        [-0.13, 0.41, 1.7, 0.7],
-        [0.52, -0.29, 4.1, 0.5],
-        [0.07, 0.73, 2.9, 0.35],
-        [0.89, 0.21, 0.6, 0.3],
-    ];
-    const total = waves.reduce((sum, wave) => sum + wave[3], 0);
-    const v = waves.reduce(
-        (sum, [kx, kz, phase, a]) => sum + a * Math.sin(kx * x + kz * z + phase),
-        0,
-    );
-    return 0.5 + 0.5 * (v / total);
-}
-
-/**
- * The ground as faces: tiles 2 m square following its fall and dip, each one of a few shades from grass to dry ground,
- * so it isn't one flat colour.
- */
-export function groundFaces(step = 2): Piece[] {
-    const nx = Math.ceil((GROUND.x1 - GROUND.x0) / step);
-    const nz = Math.ceil((2 * GROUND.z) / step);
-    // Each corner's own shade too, in finer steps, for the 3D view to blend across the tile.
-    const tint = (x: number, z: number) =>
-        `color-mix(in oklab, var(--fox-ground-dry) ${Math.round(Math.min(1, Math.max(0, dryness(x, z))) * 25) * 4}%, var(--fox-ground))`;
-    const xAt = (i: number) => GROUND.x0 + ((GROUND.x1 - GROUND.x0) * i) / nx;
-    const zAt = (j: number) => -GROUND.z + (2 * GROUND.z * j) / nz;
-    const faces: Piece[] = [];
-    for (let i = 0; i < nx; i++)
-        for (let j = 0; j < nz; j++) {
-            const [a, b] = [xAt(i), xAt(i + 1)];
-            const [c, d] = [zAt(j), zAt(j + 1)];
-            const dry = dryness((a + b) / 2, (c + d) / 2);
-            const k = Math.min(GROUND_SHADES - 1, Math.floor(dry * GROUND_SHADES));
-            faces.push({
-                kind: "face",
-                points: [
-                    vec3(a, groundY(a), c),
-                    vec3(b, groundY(b), c),
-                    vec3(b, groundY(b), d),
-                    vec3(a, groundY(a), d),
-                ],
-                material: "deck",
-                color: groundShade(k),
-                shades: [tint(a, c), tint(b, c), tint(b, d), tint(a, d)],
-            });
-        }
-    return faces;
 }

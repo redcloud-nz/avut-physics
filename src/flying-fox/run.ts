@@ -15,7 +15,7 @@ import {
     SHEAR_LEG,
     STATIC_X,
     TROLLEY_X,
-} from "./fox";
+} from "./site";
 
 /**
  * A rider's run down a hawser: the trolley rolling along the hawser as it sags under them, the rider swinging on the

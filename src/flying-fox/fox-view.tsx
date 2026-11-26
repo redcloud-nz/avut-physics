@@ -55,28 +55,14 @@ import type { Piece } from "@/scene/pieces";
 import { FOCUS_OUT, type GLHandle, type SceneConfig } from "@/scene/scene-gl";
 import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
 
-import {
-    drawnOverhead,
-    FALL,
-    foxLabels,
-    foxLegend,
-    foxPieces,
-    foxStances,
-    foxTargets,
-    GROUND,
-    groundFaces,
-    groundShade,
-    groundY,
-    LOG,
-    onHawser,
-    TREE,
-    TROLLEY_X,
-    type FlatView,
-    type FoxTarget,
-} from "./fox";
+import { drawnOverhead, foxPieces } from "./fox";
+import { GROUND, groundFaces, groundShade } from "./ground";
+import { foxLabels, foxLegend, type FlatView } from "./labels";
 import { RUN, sessionAt, simulateSession } from "./run";
 import { RunClock } from "./run-clock";
 import RunControls from "./run-controls";
+import { FALL, groundY, LOG, onHawser, TREE, TROLLEY_X } from "./site";
+import { foxStances, foxTargets, type FoxTarget } from "./targets";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
 const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {

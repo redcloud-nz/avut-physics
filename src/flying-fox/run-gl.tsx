@@ -18,19 +18,12 @@ import {
 import { moved } from "@/scene/transforms";
 
 import BrakeGL, { place } from "./brake-gl";
-import {
-    C,
-    HAWSER_R,
-    HAWSER_Z,
-    hawserY,
-    loaded,
-    RETURN_PULLEY,
-    returnRig,
-    runTrolley,
-} from "./fox";
+import { C } from "./colors";
+import { returnRig, runTrolley } from "./fox";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";
+import { HAWSER_R, HAWSER_Z, hawserY, loaded, RETURN_PULLEY } from "./site";
 
 /** How many points the hawsers are drawn through as they move. */
 const HAWSER_POINTS = 160;

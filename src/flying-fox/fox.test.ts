@@ -1,37 +1,32 @@
 import { describe, expect, it } from "vitest";
 
+import { ANCHOR_SHACKLE, foxPieces, SADDLE, SLING_Z, TREE_SHACKLE } from "./fox";
+import { GROUND } from "./ground";
+import { foxLabels } from "./labels";
 import {
-    ANCHOR_SHACKLE,
     CLEARANCE,
     clearanceAt,
     CRADLE_Y,
     DESCENDER,
     DISMOUNT,
     FALL,
-    foxLabels,
-    foxPieces,
-    foxStances,
-    foxTargets,
     GRADE,
-    GROUND,
     groundY,
     hawserY,
     loaded,
     LOG,
     REST_X,
     RIDER,
-    SADDLE,
     SAG,
     SHEAR_LEG,
-    SLING_Z,
     SPAN,
     STAFF_REACH,
     STATIC_X,
     TEST_LOAD,
     TOWER,
     TREE,
-    TREE_SHACKLE,
-} from "./fox";
+} from "./site";
+import { foxStances, foxTargets } from "./targets";
 
 const degrees = (rad: number) => (rad * 180) / Math.PI;
 
