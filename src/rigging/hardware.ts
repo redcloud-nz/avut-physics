@@ -1139,6 +1139,17 @@ function linkFrame(d: Vector3, m: Vector3) {
 }
 
 /**
+ * A level frame for a line of hardware along `along`: `flat` square to the links that lie flat, `upright` square to
+ * the ones that stand on edge between them.
+ */
+export function linkPlanes(along: Vector3): { flat: Vector3; upright: Vector3 } {
+    const d = along.unit();
+    const up = vec3(0, 1, 0);
+    const flat = up.sub(d.scale(up.dot(d))).unit();
+    return { flat, upright: d.cross(flat) };
+}
+
+/**
  * A strand of steel through `points`, true to size, open or (if its ends meet) closed; `shape` if it's a shape many
  * strands share (see `Strand`).
  */

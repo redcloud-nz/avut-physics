@@ -59,6 +59,9 @@ export const STOP_BLOCK_COLORS = {
     brass: "var(--fox-brass)",
 };
 
+/** The colours of the flying fox's wire rope and its fittings (see `rigging/wire-ends`). */
+export const WIRE = { steel: "var(--tower-steel)", wire: "var(--tower-steel)" };
+
 export const PULLEY_COLORS = {
     plates: "var(--fox-pulley)",
     sheave: "var(--fox-sheave)",

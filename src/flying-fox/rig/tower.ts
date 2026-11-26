@@ -12,12 +12,14 @@ import {
     TREE,
 } from "@/flying-fox/site";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { BIG_LOOP } from "@/rigging/guys";
 import {
     chain,
     CHAIN_G80_6,
     EYE_BOLT_M16,
     eyeBolt,
     eyeFrame,
+    linkPlanes,
     M12,
     M16,
     plate,
@@ -32,7 +34,7 @@ import { bar, hanging, line, section } from "@/rigging/rope";
 import { type Piece } from "@/scene/pieces";
 import { moved } from "@/scene/transforms";
 
-import { ACROSS, BIG_LOOP, guy, linkPlanes, UP } from "./shared";
+import { ACROSS, guy, UP } from "./shared";
 
 /** The FFSAC steel tower at the top end: its frame, bolts and hawser guides, its guys, the platform's chain stays and the backstay. */
 

@@ -2,11 +2,12 @@ import { C } from "@/flying-fox/colors";
 import { BAGGING_R, groundY, HAWSER_Z, SADDLE_Y, SHEAR_LEG, SPAR_X } from "@/flying-fox/site";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { roundBar } from "@/rigging/knots";
+import { LASHING_R } from "@/rigging/lashings";
 import { bar } from "@/rigging/rope";
 import { type Piece } from "@/scene/pieces";
 import { moved } from "@/scene/transforms";
 
-import { ACROSS, guy, LASHING_R, picket, squareLashing, UP } from "./shared";
+import { ACROSS, guy, picket, squareLashing, UP } from "./shared";
 
 /** The timber H-frame shear leg at the bottom end, the saddles the hawsers run over, and its guys. */
 

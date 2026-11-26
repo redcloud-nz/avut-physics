@@ -1,13 +1,13 @@
-import { C } from "@/flying-fox/colors";
+import { C, WIRE } from "@/flying-fox/colors";
 import { BAR_X, CRADLE_Y, HAWSER_R, HAWSER_Z, onGround, onHawser, SPAR_X } from "@/flying-fox/site";
 import { cubicPoints } from "@/lib/curve3";
 import { vec3, type Vector3 } from "@/lib/vector3";
-import { baseClamp, baseClampWire, shackle, thimble, turnbuckle } from "@/rigging/hardware";
+import { linkPlanes, shackle, turnbuckle } from "@/rigging/hardware";
 import { line } from "@/rigging/rope";
+import * as wireEnds from "@/rigging/wire-ends";
 import { type Piece } from "@/scene/pieces";
 
 import { ANCHOR_SHACKLE } from "./log-anchor";
-import { linkPlanes } from "./shared";
 import { SADDLE, SLING_Z } from "./shear-leg";
 import { TREE_SHACKLE } from "./tree";
 
@@ -97,40 +97,18 @@ export function hawsers(run = false): Piece[] {
 }
 
 /**
- * A hawser's end made off round a thimble: the thimble's crown hooked on at `near`, its point along `along`, lying
- * square to `m`; the hawser's eye round it, its live part on to `live`, and its dead end back beside the live part
- * through three double base clamps and on through `tail` (given the dead end's last point and the way across from the
- * live part to the dead).
+ * A hawser's bottom end: from the saddle down to the anchor through its in-line hardware (Figure 66), from the sling a
+ * 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye made off round its thimble,
+ * its tail lying on the ground. Each link lies a quarter turn from the last.
  */
+
+/** A hawser's end made off round a thimble with three clamps (see `rigging/wire-ends`). */
 export function madeOff(
     near: Vector3,
     along: Vector3,
     m: Vector3,
     live: Vector3,
     tail: (end: Vector3, side: Vector3) => Vector3[],
-): Piece[] {
-    const d = along.unit();
-    const th = thimble(near, d, m, HAWSER_R, C.steel, baseClampWire(HAWSER_R));
-    const [first, last] = [th.wire[0], th.wire.at(-1)!];
-    const tip = first.lerp(last, 0.5);
-    const pieces: Piece[] = [...th.pieces];
-    for (const k of EYE_CLAMPS)
-        pieces.push(...baseClamp(tip.add(d.scale(k)), d, th.side, HAWSER_R, C.steel));
-    const deadEnd = last.add(d.scale(EYE_CLAMPS.at(-1)! + 0.1));
-    const path = [
-        ...tail(deadEnd, th.side).reverse(),
-        deadEnd,
-        last,
-        ...th.wire.slice(1, -1).reverse(),
-        first,
-        live,
-    ];
-    pieces.push(...line(path, HAWSER_R, C.hawser, "steel"));
-    return pieces;
+) {
+    return wireEnds.madeOff(near, along, m, live, tail, HAWSER_R, EYE_CLAMPS, WIRE);
 }
-
-/**
- * A hawser's bottom end: from the saddle down to the anchor through its in-line hardware (Figure 66), from the sling a
- * 19 mm bow shackle, the 24 mm turnbuckle, three 19 mm D shackles, then the hawser's eye made off round its thimble,
- * its tail lying on the ground. Each link lies a quarter turn from the last.
- */

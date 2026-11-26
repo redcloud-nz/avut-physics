@@ -107,7 +107,10 @@ they've looked.
 - `src/rigging/`: rescue gear as pieces, for any scene: `hardware.ts` (carabiners, shackles, pulleys, plates, bolts,
   chain, hooks, the trolley, the grigri, the Tirfor), `rope.ts` (rope and wire through points, bars and sections),
   `knots.ts` (figure 8s, big loops, stoppers, knots on carabiners, from the files in `knots/`), `slings.ts` (round
-  slings and tape) and `knot-3d.ts` (a knot drawing lifted into 3D).
+  slings and tape, basketed and choked), `guys.ts` (star pickets and guys to them), `pulley-rig.ts` (a pulley in an
+  eye bolt or on a basketed sling), `lashings.ts` (a square lashing), `wire-ends.ts` (wire made off round a thimble,
+  and swaged eyes) and `knot-3d.ts` (a knot drawing lifted into 3D). They take their colours as arguments; a scene
+  binds its own (the flying fox's in `src/flying-fox/rig/shared.ts`).
 - `src/components/diagram/`: SVG primitives (`Arrow`, `Label`, `AngleArc`, `Cable`, `Pull`, and
   `worldToSvg` for placing physics points), slider controls, `Notice` and `NONE`. Drawing only, no
   maths. `src/components/notes.tsx` has the notes card (`NotesCard`, `Part`), and `use-in-browser.ts`

@@ -10,7 +10,7 @@ worth doing.
 
 The engine every scene shares is in `src/scene/`: the pieces, the 3D view (`SceneGL`), the flat SVG drawing, the
 flat views' camera and gestures, the callout layout and detail. The hardware, rope, knots and slings are in
-`src/rigging/`.
+`src/rigging/`, with guys and pickets, rigged pulleys, lashings and wire ends, each taking its colours as arguments.
 
 The flying fox is in parts: `site.ts` (the ground, sizes and fixed positions) and `chain-weight.ts` (the chain
 weight's size and how much of it hangs), which are all the physics in `run.ts` reads, `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `rig/`, a file for each part of the rig
@@ -19,8 +19,6 @@ weight's size and how much of it hangs), which are all the physics in `run.ts` r
 
 ## Structure
 
-- **The flying fox's own rigging builders** (in `src/flying-fox/rig/`) could join `src/rigging/` once they take their colours and the
-  ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
 - Keep the assembly editor in mind (`docs/knot-editor-3d.md`, "The assembly editor"): builders that return named
   frames, and placements kept apart from the pieces drawn.
 

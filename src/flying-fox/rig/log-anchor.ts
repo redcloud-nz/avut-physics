@@ -1,4 +1,4 @@
-import { C, TIRFOR_COLORS } from "@/flying-fox/colors";
+import { C, TIRFOR_COLORS, WIRE } from "@/flying-fox/colors";
 import { groundY, HAWSER_R, HAWSER_Z, LOG, onGround } from "@/flying-fox/site";
 import { cubicPoints } from "@/lib/curve3";
 import { arcLengths } from "@/lib/rope-3d/rope";
@@ -10,12 +10,12 @@ import {
     CABLE_HOOK,
     hook,
     SHACKLE_19,
-    thimble,
     THIMBLE_11,
     tirfor,
 } from "@/rigging/hardware";
 import { bar, line } from "@/rigging/rope";
 import { basketedSling, SLINGS } from "@/rigging/slings";
+import * as wireEnds from "@/rigging/wire-ends";
 import { type Piece } from "@/scene/pieces";
 
 import { picket, UP } from "./shared";
@@ -104,30 +104,6 @@ export function alongPath(path: Vector3[], d: number): { at: Vector3; dir: Vecto
     );
     const k = (d - at[i - 1]) / (at[i] - at[i - 1]);
     return { at: path[i - 1].lerp(path[i], k), dir: path[i].sub(path[i - 1]).unit(), i };
-}
-
-/**
- * A swaged eye in a wire of radius `wireR` (a lizard's ends, the Tirfor cable's hook end): a thimble with its crown's
- * inside at `near`, pointing `d` along the wire, square to `m`, the wire's tail pressed into a ferrule ten times the
- * wire's radius long. Returns its pieces and the end of the ferrule, where the wire runs on.
- */
-export function swagedEye(
-    near: Vector3,
-    d: Vector3,
-    m: Vector3,
-    wireR = LIZARD_R,
-): { pieces: Piece[]; end: Vector3 } {
-    const th = thimble(near, d, m, wireR, C.steel);
-    const tips = th.wire[0].lerp(th.wire.at(-1)!, 0.5);
-    const ferrule = [tips.add(d.scale(3.75 * wireR)), tips.add(d.scale(13.75 * wireR))];
-    return {
-        pieces: [
-            ...th.pieces,
-            ...bar(ferrule[0], ferrule[1], wireR * 2.2, C.steel),
-            ...line([ferrule[0], ...th.wire, ferrule[0]], wireR, C.hawser, "steel"),
-        ],
-        end: ferrule[1],
-    };
 }
 
 /**
@@ -332,4 +308,9 @@ export function lizardAndTirfor(): Piece[] {
         ),
     );
     return pieces;
+}
+
+/** A swaged eye in the flying fox's wire, by default a lizard's (see `rigging/wire-ends`). */
+export function swagedEye(near: Vector3, d: Vector3, m: Vector3, wireR = LIZARD_R) {
+    return wireEnds.swagedEye(near, d, m, wireR, WIRE);
 }
