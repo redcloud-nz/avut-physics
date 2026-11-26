@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ANCHOR_SHACKLE } from "@/flying-fox/rig/log-anchor";
 import { SADDLE, SLING_Z } from "@/flying-fox/rig/shear-leg";
 import { TREE_SHACKLE } from "@/flying-fox/rig/tree";
+import { piecePoints } from "@/scene/pieces";
 
 import { foxPieces } from "./fox";
 import { GROUND } from "./ground";
@@ -171,7 +172,7 @@ describe("flying fox layout", () => {
 
     it("builds every piece from finite numbers", () => {
         for (const p of foxPieces()) {
-            const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
+            const pts = piecePoints(p);
             for (const q of pts) expect([q.x, q.y, q.z].every(Number.isFinite)).toBe(true);
         }
     });

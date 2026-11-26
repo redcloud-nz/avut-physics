@@ -19,7 +19,6 @@ reads), `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `r
 
 ## Structure
 
-- **`pointsOf`** (in `parts/flat-view.tsx`) could join the other transforms in `src/scene/transforms.ts`.
 - **The flying fox's own rigging builders** (in `src/flying-fox/rig/`) could join `src/rigging/` once they take their colours and the
   ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
 - **`chain-weight.ts` mixes the physics** (`chainWeightHanging`, which `run.ts` reads) with the drawing of the chain
@@ -65,11 +64,14 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 - **Detail barely changes the flat views.** Only the 4,701 pieces with `fine` are affected, and across the whole site
   all three levels leave out the same ones; they differ only zoomed well in (at 60×, Low leaves out 2,939, Medium 610,
   High 224). The 3D view ignores `fine` altogether.
-- `fox-view.tsx` builds the callouts' `ObstacleGrid` on every render (every pointer move, locked onto a target), and
-  `foxLegend()` too. Memoise both.
+- Checked, nothing to do: the callouts' `ObstacleGrid` in `fox-view.tsx` is in SVG coordinates, so it's rebuilt as the
+  view moves whatever's memoised, and it's built only from what's on screen now. `foxLegend()` was already memoised.
 
 ## Smaller fixes
 
-- Two ways of drawing a carabiner: the simple one in `abseil-tower/rig.ts` and `hardware.ts`'s.
+- Four carabiners: in 3D, `hardware.ts`'s CT D and oval, and a plain oval in `abseil-tower/rig.ts` (which should use
+  `hardware.ts`'s); in SVG, the HMS in `knots/carabiner.tsx` and the edge-on rod in `articles/pulley-blocks.tsx`. The
+  HMS is the most detailed of them and given wholly in numbers, so its geometry could move to a module of its own and
+  build a 3D HMS too (a knot lifted into 3D could then bring its carabiner with it).
 - Two hanging lines: `hanging` (a parabola, in `rigging/rope.ts`) and `hangingPath` (a catenary, in `hardware.ts`). Worth one
   name saying which is which.

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { type Piece } from "@/scene/pieces";
+import { piecePoints } from "@/scene/pieces";
 
 import { groundAt, SIDE, TOP, towerPieces } from "./tower";
 
-const points = (p: Piece) => (p.kind === "rod" ? [p.a, p.b] : p.points);
+const points = piecePoints;
 
 describe("the tower, by the compass", () => {
     const pieces = towerPieces();

@@ -29,6 +29,7 @@ import type { RigLabel } from "./pieces";
 import {
     JOINT_GAP,
     MATERIAL_COLOR,
+    piecePoints,
     plankLines,
     tapeLayers,
     type Face,
@@ -688,7 +689,7 @@ export function buildHairlines(pieces: Piece[]) {
         if (p.kind === "face" || p.r > HAIRLINE_R || p.toScale) continue;
         const color = p.color || MATERIAL_COLOR[p.material];
         const list = byColor.get(color) ?? [];
-        const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
+        const pts = piecePoints(p);
         for (let i = 0; i + 1 < pts.length; i++)
             list.push(T(pts[i]).toArray(), T(pts[i + 1]).toArray());
         byColor.set(color, list);

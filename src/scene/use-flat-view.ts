@@ -5,7 +5,7 @@ import type { OrbitCamera } from "@/lib/orbit-camera";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
 
-import type { Piece } from "./pieces";
+import { piecePoints, type Piece } from "./pieces";
 
 /**
  * A flat view of a 3D scene (a side elevation, an overhead view), drawn in SVG and moved like a map: dragged to pan,
@@ -77,7 +77,7 @@ function reachOf(p: Piece, cam: OrbitCamera) {
     if (!made) REACH.set(cam, (made = new WeakMap()));
     let r = made.get(p);
     if (r) return r;
-    const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
+    const pts = piecePoints(p);
     const pad =
         p.kind === "face" ? 0 : Math.max(p.r, p.kind === "strand" && p.tape ? p.tape.width : 0);
     r = [Infinity, -Infinity, Infinity, -Infinity];

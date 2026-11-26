@@ -152,6 +152,9 @@ export type Piece = (Rod | Face | Strand) & {
     toScale?: boolean;
 };
 
+/** A piece's points: a rod's two ends, or a face's or strand's points. */
+export const piecePoints = (p: Piece): Vector3[] => (p.kind === "rod" ? [p.a, p.b] : p.points);
+
 /**
  * The centrelines of a tape strand's layers: side by side `across`, a little more than the tape's width apart where
  * they run round what they're on, closing in to almost touching at the carabiner they gather at.

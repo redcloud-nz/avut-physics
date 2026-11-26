@@ -10,7 +10,7 @@ import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
 import { DETAILS, type Detail } from "@/scene/detail";
 import { nearness, PieceDrawing } from "@/scene/piece-svg";
-import type { Piece, RigLabel } from "@/scene/pieces";
+import { piecePoints, type Piece, type RigLabel } from "@/scene/pieces";
 
 /** A flat view: square on from a bearing and a height (degrees). */
 export type FlatLook = { label: string; azimuth: number; elevation: number };
@@ -23,7 +23,6 @@ export const FLATS: FlatLook[] = [
 ];
 
 /** Every point a piece is drawn through. */
-export const pointsOf = (p: Piece): Vector3[] => (p.kind === "rod" ? [p.a, p.b] : p.points);
 
 /** A scale bar's length (metres): a round 1, 2 or 5 times a power of ten, about `about` long. */
 function roundLength(about: number): number {
@@ -66,7 +65,7 @@ export function FlatView({
     // Fitted to what this view sees of the part, rods and ropes their full thickness, with room round it.
     const flat = pieces.flatMap((piece) => {
         const r = piece.kind === "face" ? 0 : piece.r;
-        return pointsOf(piece).map((p) => ({ at: cam.project(p), r }));
+        return piecePoints(piece).map((p) => ({ at: cam.project(p), r }));
     });
     const [x0, x1] = [
         Math.min(...flat.map((p) => p.at.x - p.r)),

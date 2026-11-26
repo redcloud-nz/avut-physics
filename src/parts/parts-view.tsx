@@ -20,12 +20,12 @@ import { rad } from "@/lib/math";
 import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 import { DETAILS, type Detail } from "@/scene/detail";
 import Loading3D from "@/scene/loading-3d";
-import type { Piece } from "@/scene/pieces";
+import { piecePoints, type Piece } from "@/scene/pieces";
 import type { GLHandle, SceneConfig } from "@/scene/scene-gl";
 import { DetailMenu } from "@/scene/viewer-controls";
 
 import { GROUPS, partOf, PARTS } from "./catalogue";
-import { FLATS, FlatView, pointsOf } from "./flat-view";
+import { FLATS, FlatView } from "./flat-view";
 
 const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {
     ssr: false,
@@ -45,7 +45,7 @@ const LOOKS = [
 
 /** The box round the pieces: its middle, and how big it is across its longest side (metres). */
 function bounds(pieces: Piece[]): { centre: Vector3; size: number } {
-    const { lo, hi } = boundsOf(pieces.flatMap(pointsOf));
+    const { lo, hi } = boundsOf(pieces.flatMap(piecePoints));
     const d = hi.sub(lo);
     return { centre: lo.lerp(hi, 0.5), size: Math.max(d.x, d.y, d.z, 0.01) };
 }
