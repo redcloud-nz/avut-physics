@@ -1,22 +1,13 @@
+import { footLinks, TURNBUCKLE_AT } from "@/flying-fox/rig/hawsers";
+import { ANCHOR_SHACKLE, LIZARD, LOG_AT, TIRFOR_RIG } from "@/flying-fox/rig/log-anchor";
+import { SADDLE, SLING_Z } from "@/flying-fox/rig/shear-leg";
+import { BACKSTAY_TIE, BACKSTAY_TOP } from "@/flying-fox/rig/tower";
+import { TREE_CHOKE, TREE_SHACKLE } from "@/flying-fox/rig/tree";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { SLINGS } from "@/rigging/slings";
 import { type RigLabel } from "@/scene/pieces";
 
 import { C } from "./colors";
-import {
-    ANCHOR_SHACKLE,
-    BACKSTAY_TIE,
-    BACKSTAY_TOP,
-    footLinks,
-    LIZARD,
-    LOG_AT,
-    SADDLE,
-    SLING_Z,
-    TIRFOR_RIG,
-    TREE_CHOKE,
-    TREE_SHACKLE,
-    TURNBUCKLE_AT,
-} from "./fox";
 import {
     BAR_X,
     BLOCKS_X,

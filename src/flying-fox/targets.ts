@@ -1,6 +1,9 @@
+import { ANCHOR_SHACKLE, LIZARD } from "@/flying-fox/rig/log-anchor";
+import { SADDLE, SLING_Z } from "@/flying-fox/rig/shear-leg";
+import { BACKSTAY_SLING_Y } from "@/flying-fox/rig/tower";
+import { TREE_SHACKLE } from "@/flying-fox/rig/tree";
 import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
 
-import { ANCHOR_SHACKLE, BACKSTAY_SLING_Y, LIZARD, SADDLE, SLING_Z, TREE_SHACKLE } from "./fox";
 import {
     BAR_X,
     BLOCKS_X,

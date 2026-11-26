@@ -31,6 +31,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useInBrowser } from "@/components/use-in-browser";
+import { drawnOverhead } from "@/flying-fox/rig/shared";
 import { clamp, rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
@@ -55,7 +56,7 @@ import type { Piece } from "@/scene/pieces";
 import { FOCUS_OUT, type GLHandle, type SceneConfig } from "@/scene/scene-gl";
 import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
 
-import { drawnOverhead, foxPieces } from "./fox";
+import { foxPieces } from "./fox";
 import { GROUND, groundFaces, groundShade } from "./ground";
 import { foxLabels, foxLegend, type FlatView } from "./labels";
 import { RUN, sessionAt, simulateSession } from "./run";

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ANCHOR_SHACKLE, foxPieces, SADDLE, SLING_Z, TREE_SHACKLE } from "./fox";
+import { ANCHOR_SHACKLE } from "@/flying-fox/rig/log-anchor";
+import { SADDLE, SLING_Z } from "@/flying-fox/rig/shear-leg";
+import { TREE_SHACKLE } from "@/flying-fox/rig/tree";
+
+import { foxPieces } from "./fox";
 import { GROUND } from "./ground";
 import { foxLabels } from "./labels";
 import {

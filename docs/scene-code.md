@@ -12,9 +12,10 @@ The engine every scene shares is in `src/scene/`: the pieces, the 3D view (`Scen
 flat views' camera and gestures, the callout layout and detail. The hardware, rope, knots and slings are in
 `src/rigging/`.
 
-`src/flying-fox/fox.ts` (about 2,300 lines) is now the model itself: the tower, the tree, the shear leg, the log anchor,
-the hawsers and Tirfor, the trolleys and return line, and the brake. Beside it are `site.ts` (the ground, sizes and
-fixed positions, which is all the physics in `run.ts` reads), `colors.ts`, `labels.ts`, `targets.ts` and `ground.ts`.
+The flying fox is in parts: `site.ts` (the ground, sizes and fixed positions, which is all the physics in `run.ts`
+reads), `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `rig/`, a file for each part of the rig
+(`tower.ts`, `tree.ts`, `shear-leg.ts`, `log-anchor.ts` with the lizards and Tirfor, `hawsers.ts`, `trolleys.ts`,
+`brake.ts`) and `shared.ts` for the builders several use. `fox.ts` puts them together.
 
 ## Structure
 
@@ -26,9 +27,8 @@ fixed positions, which is all the physics in `run.ts` reads), `colors.ts`, `labe
   - the viewer's controls: legend, view menu, look-at menu, zoom buttons, previous and next.
 - **The rest of the rigging builders in `fox.ts`** could join `src/rigging/` once they take their colours and the
   ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
-- **Split the rest of `fox.ts`** into a file for each part of the rig (tower, tree anchor, shear leg, log anchor,
-  hawsers and Tirfor, trolleys, brake). `chain-weight.ts` also mixes the physics (`chainWeightHanging`) with the
-  drawing.
+- **`chain-weight.ts` mixes the physics** (`chainWeightHanging`, which `run.ts` reads) with the drawing of the chain
+  heap.
 - **`fox-view.tsx` down to the flying fox's own parts**: its scene settings, its fits and the run. The rest is
   generic (address state, the two-finger swipe to the next target, detail, target boxes, about 270 lines of
   controls). Its flat view's camera and gestures are in `useFlatView` already.

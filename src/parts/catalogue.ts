@@ -12,18 +12,13 @@ import {
     TIRFOR_COLORS,
     TROLLEY_COLORS,
 } from "@/flying-fox/colors";
-import {
-    ANCHOR_SHACKLE,
-    backstayLoop,
-    foxPieces,
-    guyLoops,
-    rigPulley,
-    rigTrolley,
-    SADDLE,
-    shearLegGuyLoops,
-    SLING_Z,
-    TREE_SHACKLE,
-} from "@/flying-fox/fox";
+import { foxPieces } from "@/flying-fox/fox";
+import { ANCHOR_SHACKLE } from "@/flying-fox/rig/log-anchor";
+import { rigPulley } from "@/flying-fox/rig/shared";
+import { SADDLE, shearLegGuyLoops, SLING_Z } from "@/flying-fox/rig/shear-leg";
+import { backstayLoop, guyLoops } from "@/flying-fox/rig/tower";
+import { TREE_SHACKLE } from "@/flying-fox/rig/tree";
+import { rigTrolley } from "@/flying-fox/rig/trolleys";
 import {
     BLOCKS_X,
     BRAKE,

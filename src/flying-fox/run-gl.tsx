@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 
+import { returnRig, runTrolley } from "@/flying-fox/rig/trolleys";
 import { turnBetween, vec3, type Vector3 } from "@/lib/vector3";
 import {
     buildHairlines,
@@ -19,7 +20,6 @@ import { moved } from "@/scene/transforms";
 
 import BrakeGL, { place } from "./brake-gl";
 import { C } from "./colors";
-import { returnRig, runTrolley } from "./fox";
 import { heightAt } from "./hawser";
 import { sessionAt, type RunSetup, type Session } from "./run";
 import type { RunClock } from "./run-clock";
