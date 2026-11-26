@@ -49,8 +49,12 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 - **Low draws simpler shapes**: chain links with fewer points and 4 sides, figure 8s as the old ring (or resampled to
   fewer points), no stitching, plates without their edge faces. One `simple` option through the builders
   (`foxPieces({ run, simple })`), only on Low, so the other levels don't rebuild any more than now.
-- **Changing detail rebuilds the whole 3D scene**, as `buildScene` is memoised on `sides`: about a million triangles,
-  a stall Auto can mistake for a slow frame rate. Rebuild only what's changed, or let Auto change only the pixel ratio.
+- **Done: changing detail no longer rebuilds the whole 3D scene.** The faces are built once for each set of pieces, and
+  the rods and strands are kept for the last two levels, so Auto stepping down and back up doesn't build them again; the
+  level left lets go of the graphics card's copy. Auto's frame-rate watch starts afresh at each level. Most of the pause
+  was the page itself: in 3D the flying fox and the tower still sorted every piece for the flat drawing on each render.
+  Now they don't, and a change of level pauses about 130 ms the first time and under 120 ms after (a dev build on a Mac,
+  from 450 to 580 ms).
 - **The flat views draw everything, on screen or not.** Zoomed 60 times, the view covers a few metres but still sorts
   and draws all 14,745 pieces. Leave out what's outside the view first: it saves far more than the detail setting.
 - **Detail barely changes the flat views.** Only the 4,701 pieces with `fine` are affected, and across the whole site

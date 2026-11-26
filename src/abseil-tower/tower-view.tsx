@@ -221,9 +221,11 @@ export default function TowerView({ slug }: { slug: string }) {
         return depth + (l.shell.out.dot(cam.toward) > 0 ? 1 : -1) * l.shell.layer * 100;
     };
     // Looking down, labels are written on what they name, among the pieces; in the elevations they're written beside it,
-    // over everything (see `Callouts`).
+    // over everything (see `Callouts`). None in 3D, where the flat drawing isn't shown.
     const sorted: ({ piece: Piece } | { label: RigLabel })[] = [
-        ...pieces.filter(shown).map((piece) => ({ piece, key: sortKey(piece) })),
+        ...(mode === "3d" ? [] : pieces)
+            .filter(shown)
+            .map((piece) => ({ piece, key: sortKey(piece) })),
         ...(plan ? laid.labels : [])
             // Looking straight down, what's under the top deck is hidden, so its labels are too.
             .filter((l) => below === undefined || l.at.y >= below)

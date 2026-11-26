@@ -474,9 +474,10 @@ const JOINT = "joint:";
 
 /**
  * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
- * of the boards they're between.
+ * of the boards they're between. `only` builds just the faces (`flat`, the same however many sides tubes have) or just
+ * the rods and strands (`round`).
  */
-export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
+export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES, only?: "flat" | "round") {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     // Faces shaded corner to corner, gathered into one mesh, with their corners' colours in order.
     const shadedParts: THREE.BufferGeometry[] = [];
@@ -493,6 +494,7 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES) {
         { parts: Map<string, THREE.BufferGeometry[]>; places: THREE.Matrix4[] }
     >();
     for (const p of pieces) {
+        if (only && (p.kind === "face") !== (only === "flat")) continue;
         const color = p.color || MATERIAL_COLOR[p.material];
         // Hardware's drawn its true size; ropes and wire no thinner than the scene's least.
         const r = p.toScale
@@ -836,6 +838,15 @@ function CompassLetter({
     );
 }
 
+/**
+ * Lets go of a built scene's copy on the graphics card. Its geometry can still be drawn: it's sent to the card again.
+ */
+function disposeBuilt({ solids, shaded, repeats }: ReturnType<typeof buildScene>) {
+    solids.forEach((s) => s.geometry.dispose());
+    shaded?.geometry.dispose();
+    repeats.forEach((s) => s.geometry.dispose());
+}
+
 /** The solids and lines, built once for each set of pieces. */
 export function Solids({
     pieces,
@@ -850,18 +861,29 @@ export function Solids({
     hairlines: number;
     sides: number;
 }) {
-    const { solids, shaded, repeats } = useMemo(
-        () => buildScene(pieces, minR, sides),
-        [pieces, minR, sides],
+    // The faces, built once for each set of pieces: they're the same at every detail.
+    const flat = useMemo(() => buildScene(pieces, minR, SIDES, "flat"), [pieces, minR]);
+    useEffect(() => () => disposeBuilt(flat), [flat]);
+    // The rods and strands, for the last two numbers of sides asked for, so Auto stepping a level down and back up (or
+    // up and back down) doesn't build them again.
+    const built = useMemo(
+        () => ({ pieces, minR, levels: new Map<number, ReturnType<typeof buildScene>>() }),
+        [pieces, minR],
     );
-    useEffect(
-        () => () => {
-            solids.forEach((s) => s.geometry.dispose());
-            shaded?.geometry.dispose();
-            repeats.forEach((s) => s.geometry.dispose());
-        },
-        [solids, shaded, repeats],
-    );
+    const round = useMemo(() => {
+        const { levels } = built;
+        const had = levels.get(sides);
+        const now = had ?? buildScene(built.pieces, built.minR, sides, "round");
+        levels.delete(sides);
+        levels.set(sides, now);
+        if (levels.size > 2) levels.delete(levels.keys().next().value!);
+        return now;
+    }, [built, sides]);
+    // Left for another level, it lets go of the graphics card's copy, keeping its own to draw from again.
+    useEffect(() => () => disposeBuilt(round), [round]);
+    const solids = [...flat.solids, ...round.solids];
+    const { shaded } = flat;
+    const { repeats } = round;
     // The shaded faces' corner colours, worked out by the browser and set on their mesh.
     const shadedGeometry = useMemo(() => {
         if (!shaded) return null;
@@ -903,10 +925,10 @@ export function Solids({
                     color={colors.read(s.color)}
                 />
             ))}
-            {solids.map((s) =>
+            {solids.map((s, i) =>
                 s.color.startsWith(JOINT) ? (
                     // A gap between boards: their colour, in shadow.
-                    <mesh key={s.color} geometry={s.geometry}>
+                    <mesh key={`${i} ${s.color}`} geometry={s.geometry}>
                         <meshBasicMaterial
                             color={colors
                                 .read(s.color.slice(JOINT.length))
@@ -916,7 +938,7 @@ export function Solids({
                         />
                     </mesh>
                 ) : (
-                    <mesh key={s.color} geometry={s.geometry}>
+                    <mesh key={`${i} ${s.color}`} geometry={s.geometry}>
                         {/* Pushed back a touch so the gaps between boards, lying on them, show. */}
                         <meshLambertMaterial
                             color={colors.read(s.color)}
@@ -1443,8 +1465,10 @@ export function SceneGL({
                         sides={detail?.sides ?? SIDES}
                     />
                     {onFrameRate && (
-                        // Watching for a frame rate that stays short of smooth, or has room to spare.
+                        // Watching for a frame rate that stays short of smooth, or has room to spare: afresh at each
+                        // level, so the pause as it changes isn't taken for a slow frame rate.
                         <PerformanceMonitor
+                            key={`${detail?.dpr} ${detail?.sides}`}
                             bounds={() => [BOUNDS.short, BOUNDS.spare]}
                             flipflops={FLIPS}
                             onDecline={() => onFrameRate("short")}
