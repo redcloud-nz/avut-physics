@@ -60,6 +60,27 @@ export function nearness(piece: Piece, toward: Vector3): number {
     return middle + piece.r * across;
 }
 
+/**
+ * How near the eye a piece is drawn in a flat view looking `toward` the eye, to draw back to front: by its middle, or
+ * in a group by the group's middle (the nearest of its `across` too), those `ahead` facing the eye first, then `over`
+ * pieces, then by `order`, then by their own middles. Pieces on the shell come before or after everything inside it,
+ * by which way the side they're on faces (see `Shell`), except looking straight down (`plan`), where every side is
+ * edge on and height alone sets the order.
+ */
+export function flatDepth(p: Piece, toward: Vector3, plan = false): number {
+    const at = (q: Vector3) => q.dot(toward);
+    const own = at(centreOf(p));
+    const depth = p.group
+        ? Math.max(...[p.group.at, ...(p.group.across ?? [])].map(at)) +
+          (p.group.ahead ? Math.sign(p.group.ahead.dot(toward)) * 0.01 : 0) +
+          (p.group.over ? 0.02 : 0) +
+          (p.group.order ?? 0) * 1e-3 +
+          own * 1e-4
+        : own;
+    if (!p.shell || plan) return depth;
+    return depth + (p.shell.out.dot(toward) > 0 ? 1 : -1) * p.shell.layer * 100;
+}
+
 const MONO = "var(--font-geist-mono), monospace";
 
 /** A legend's short length of tape or rope: a flat band for tape, a thinner cord for rope. */

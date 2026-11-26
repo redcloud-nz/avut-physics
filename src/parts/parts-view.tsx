@@ -178,7 +178,13 @@ export default function PartsView() {
                 </div>
             </div>
             <div className="flex min-h-0 flex-[2] border-t border-border lg:flex-1 lg:flex-col lg:border-t-0 lg:border-l">
-                {FLATS.map((f) => (
+                {(shown.flat
+                    ? [
+                          { label: "2D", ...shown.flat.main },
+                          ...(shown.flat.alt ? [{ label: "Alt", ...shown.flat.alt }] : []),
+                      ]
+                    : FLATS
+                ).map((f) => (
                     <FlatView
                         key={f.label}
                         name={shown.name}
@@ -186,6 +192,7 @@ export default function PartsView() {
                         labels={labels}
                         view={f}
                         detail={detail}
+                        flat={shown.flat}
                     />
                 ))}
             </div>

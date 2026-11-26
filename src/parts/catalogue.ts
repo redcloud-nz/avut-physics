@@ -1,3 +1,5 @@
+import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, RIGS } from "@/abseil-tower/rig";
+import { towerPieces } from "@/abseil-tower/tower";
 import { CHAIN_WEIGHT, chainWeightHanging, chainWeightMass } from "@/flying-fox/chain-weight";
 import {
     C,
@@ -61,6 +63,7 @@ import { line } from "@/rigging/rope";
 import { sling } from "@/rigging/slings";
 import type { RigLabel } from "@/scene/pieces";
 import { timber, type Piece } from "@/scene/pieces";
+import { moved } from "@/scene/transforms";
 
 /**
  * The parts the visualisations build from pieces, each on its own so it can be looked at and refined: the shared
@@ -75,6 +78,23 @@ export type Part = {
     pieces: () => Piece[];
     /** What's written on it, if anything. */
     labels?: () => RigLabel[];
+    /** Its flat views drawn as its visualisation draws them, if they differ from the 3D pieces seen square on. */
+    flat?: PartFlat;
+};
+
+/**
+ * A part's own flat views, in place of the front, side and top: the `main` one it's seen from in its visualisation, and
+ * an `alt` one only where it's drawn differently from another way too (the flying fox's turnbuckle looking down and
+ * from the side). Its pieces are laid out for each, given the way towards the eye, and drawn as its visualisation draws
+ * them: sorted by their groups and shell, and no thinner than `minWidth` (with `thinEdges`). The views needn't agree
+ * with each other or the 3D view.
+ */
+export type PartFlat = {
+    main: { azimuth: number; elevation: number };
+    alt?: { azimuth: number; elevation: number };
+    pieces: (toward: Vector3) => Piece[];
+    minWidth?: { rope?: number; steel?: number };
+    thinEdges?: boolean;
 };
 
 const ORIGIN = vec3(0, 0, 0);
@@ -169,6 +189,22 @@ export const PARTS: Part[] = [
                 labels: () => [...rope().labels, ...arrows().labels],
             };
         })(),
+    },
+    {
+        slug: "tower-f8ob-sling",
+        name: "Figure 8 on a bight on its sling's carabiner",
+        group: "Abseil tower",
+        about: "The photographer's maroon rope (rope-6 in NZRT11) tied to its green sling's carabiner under the overhead beam with a figure 8 on a bight, cut out of the tower as its 3D view lays it out: the carabiner hangs from the sling by its narrow end, and the knot's loop goes round its wide end, lying towards the top rail.",
+        pieces: () => towerKnot(false),
+        flat: towerKnotFlat(false),
+    },
+    {
+        slug: "tower-f8ob-end",
+        name: "Figure 8 on a bight on a rope's end carabiner",
+        group: "Abseil tower",
+        about: "The same rope's end, a metre down the east face, cut out of the tower as its 3D view lays it out: a figure 8 on a bight with a carabiner clipped through its loop, hanging spine in line with the rope.",
+        pieces: () => towerKnot(true),
+        flat: towerKnotFlat(true),
     },
     {
         slug: "carabiner-oval",
@@ -740,6 +776,33 @@ export const PARTS: Part[] = [
         pieces: shearLegGuyLoops,
     },
 ];
+
+/**
+ * The abseil tower's photographer's rope (rope-6) and its sling, cut out round one of its figure 8s on a bight and
+ * moved to the origin: the one tied to the sling's carabiner, or (`end`) the one on the rope's end, with the boarding
+ * it hangs against. Laid `face` on to the eye for a flat view, as the tower's flat views lay them.
+ */
+function towerKnot(end: boolean, face?: Vector3): Piece[] {
+    const rig = RIGS.find((r) => r.slug === "nzrt11")!;
+    const { pieces, labels } = layoutRig(rig, new Set(["sling-9", "rope-6"]), { face });
+    const label = labels.find(
+        (l) => l.text === KNOT_LABELS.bight && (l.shell !== undefined) === end,
+    )!;
+    const reach = vec3(0.3, 0.3, 0.3);
+    const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
+    return moved(within([...(end ? towerPieces() : []), ...pieces], box), label.at.neg());
+}
+
+/** The tower's figure 8 on a carabiner as its overhead view draws it. */
+function towerKnotFlat(end: boolean): PartFlat {
+    return {
+        // Looking down, as the tower's overhead view sees it, turned so it runs up and down the panel.
+        main: { azimuth: 90, elevation: 90 },
+        pieces: (toward) => towerKnot(end, toward),
+        minWidth: FLAT_HAIRLINE,
+        thinEdges: true,
+    };
+}
 
 /**
  * The pieces inside the box from `lo` to `hi`, to look at one place in a whole rig: everything cut off at the box's

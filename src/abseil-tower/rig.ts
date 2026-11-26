@@ -4,7 +4,14 @@ import { vec3, type Vector3 } from "@/lib/vector3";
 import { CARABINER_R, carabiner as ctCarabiner } from "@/rigging/hardware";
 import { figure8, stopper } from "@/rigging/knots";
 import { basketedSling, SLINGS } from "@/rigging/slings";
-import { type Face, type Group, type Material, type Piece, type RigLabel } from "@/scene/pieces";
+import {
+    type Face,
+    type Group,
+    type Material,
+    type Piece,
+    type RigLabel,
+    type Strand,
+} from "@/scene/pieces";
 
 import { basket, stackedLogs } from "./basket";
 import {
@@ -656,18 +663,28 @@ function basketSling(
     );
     const section = stackedLogs(lower, upper, OVERHEAD.r).map((p) => vec3(p.x, p.y, z));
     const up = beam.cross(vec3(pull.x, pull.y, 0));
+    const sling = basketedSling(
+        "climbing",
+        vec3(centre.x, centre.y, z),
+        section,
+        near,
+        CARABINER_R,
+        up,
+        beam,
+        { color, stitched: false },
+    );
     return {
         pieces: [
-            ...basketedSling(
-                "climbing",
-                vec3(centre.x, centre.y, z),
-                section,
-                near,
-                CARABINER_R,
-                up,
-                beam,
-                { color, stitched: false },
-            ),
+            ...(face && krab.group
+                ? slingOnKrab(
+                      sling,
+                      near,
+                      krab.pieces,
+                      krab.group,
+                      face,
+                      vec3(centre.x, centre.y, z),
+                  )
+                : sling),
             ...krab.pieces,
         ],
         clip: krab.far,
@@ -675,6 +692,79 @@ function basketSling(
         gate: krab.gate,
         group: krab.group,
     };
+}
+
+/** How near a sling's carabiner its tape draws over it in a flat view: its bights round the carabiner's bar. */
+const SLING_OVER_KRAB = 0.03;
+/** How far past a carabiner's bar a sling's tape ends in a flat view. */
+const SLING_PAST_BAR = 0.007;
+
+/**
+ * A sling on a carabiner hanging from `near` as a flat view draws it: no bights round the carabiner's bar (what's within
+ * `SLING_OVER_KRAB` of it), just its legs carried straight on to the bar and ending just past it all across the tape,
+ * over the carabiner (`krab`, in its `group`), lying as the legs do from the `log` it's round. How far it goes is measured as it's seen, square to
+ * `face`, the way towards the eye: legs coming towards the eye would otherwise end short of the bar.
+ */
+function slingOnKrab(
+    sling: Strand[],
+    near: Vector3,
+    krab: Piece[],
+    group: Group,
+    face: Vector3,
+    log: Vector3,
+): Piece[] {
+    const mid = (p: Strand) =>
+        p.points.reduce((t, q) => t.add(q), vec3(0, 0, 0)).scale(1 / p.points.length);
+    const onKrab = (p: Strand) => mid(p).distanceTo(near) < SLING_OVER_KRAB;
+    const legs = sling.filter((p) => !onKrab(p));
+    const bights = sling.filter(onKrab);
+    const like = bights[0] ?? legs[0];
+    if (!like?.tape) return sling;
+    // Where the legs get to, coming from the `log` it's round, and the way their tape lies there: on the log's side of
+    // the bar, not what's left of the bights round it.
+    const up = log.sub(near).unit();
+    const [leg, i] = legs
+        .flatMap((p) => p.points.map((q, i) => [p, i] as const))
+        .filter(([p, i]) => p.points[i].sub(near).dot(up) > SLING_OVER_KRAB)
+        .reduce((m, c) =>
+            c[0].points[c[1]].distanceTo(near) < m[0].points[m[1]].distanceTo(near) ? c : m,
+        );
+    const entry = leg.points[i];
+    const n = face.unit();
+    const toward = near.sub(entry);
+    const seen = toward.sub(n.scale(toward.dot(n)));
+    const down = seen.len() > 1e-6 ? seen.unit() : toward.unit();
+    const at = leg.tape?.profile?.[i];
+    const size = at ?? leg.tape ?? like.tape;
+    const lying = at?.across ?? leg.tape?.across ?? like.tape.across;
+    const across = lying.sub(down.scale(lying.dot(down))).unit();
+    // Just past the bar wherever the tape's over it: the bend curves away from the middle, so further in at its edges.
+    const half = size.width / 2;
+    const under = krab
+        .flatMap((p) => (p.kind === "strand" ? p.points : []))
+        .filter((q) => {
+            const d = q.sub(near);
+            return Math.abs(d.dot(across)) <= half && d.dot(down) < KRAB_L / 3;
+        })
+        .map((q) => q.sub(near).dot(down));
+    const end = near.add(down.scale(Math.max(0, ...under) + CARABINER_R + SLING_PAST_BAR));
+    const band: Piece = {
+        ...like,
+        points: [entry, end],
+        capA: false,
+        capB: true,
+        tape: {
+            ...like.tape,
+            width: size.width,
+            thickness: size.thickness,
+            across,
+            layers: 1,
+            gather: entry,
+            profile: undefined,
+        },
+        group: { ...group, over: true, order: 6 },
+    };
+    return [...legs, band];
 }
 
 /**
@@ -689,8 +779,10 @@ function basketSling(
  * side of that end's bend draws over the knot, so the bar passes over one side of the knot's bight and under the other,
  * as if it's clipped through.
  *
- * It's `settled` between two loads, each in the bottom of its bend; on a rope's end with nothing clipped to it, it hangs
- * from its knot with its spine in line with the rope instead.
+ * It's `settled` between two loads (by default in 3D), turned until each sits in the bottom of its bend, in line along
+ * the pull. Unsettled (by default in a flat view, and on a rope's end with nothing clipped to it), it hangs unturned,
+ * its spine along the pull, from the middle of its narrow end, and what clips to its wide end sits on that end's bar
+ * straight along from there: drawn face on, a knot's loop then shows clipped through the middle of its end.
  */
 function carabiner(
     near: Vector3,
@@ -698,7 +790,7 @@ function carabiner(
     across: Vector3,
     face?: Vector3,
     knotAt?: "near" | "far",
-    settled = true,
+    settled = face === undefined,
 ): { pieces: Piece[]; far: Vector3; gate: Vector3; group?: Group } {
     let down = along.unit();
     let gate = across.y > 1e-6 ? across.neg() : across;
@@ -717,9 +809,10 @@ function carabiner(
         gate,
         "var(--tower-steel)",
         KRAB_L,
-        { settled },
+        { settled, centred: !settled },
     );
-    const far = near.add(down.scale(KRAB_L));
+    // Unturned, the wide end's bar crosses the line along the pull from the narrow end's middle short of the far end.
+    const far = settled ? near.add(down.scale(KRAB_L)) : wideBar(body, near, down);
     if (!face) return { pieces: [body, ...sleeve], far, gate };
     const group = { at: near.lerp(far, 0.5) };
     const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
@@ -752,6 +845,28 @@ function carabiner(
         group,
     };
 }
+
+/**
+ * Where a carabiner's body crosses the line from `near` on `down`, at its far end: the middle of its bar there, as near
+ * as its points give it.
+ */
+function wideBar(body: Piece, near: Vector3, down: Vector3): Vector3 {
+    if (body.kind !== "strand") return near.add(down.scale(KRAB_L));
+    const off = (p: Vector3) =>
+        p
+            .sub(near)
+            .sub(down.scale(p.sub(near).dot(down)))
+            .len();
+    const far = body.points.filter((p) => p.sub(near).dot(down) > KRAB_L / 2);
+    const crossing = far.reduce((m, p) => (off(p) < off(m) ? p : m));
+    return near.add(down.scale(crossing.sub(near).dot(down)));
+}
+
+/**
+ * The narrowest rope and steel are drawn in the flat views (SVG units): their true width, in proportion with everything
+ * else, but never thinner than a hairline, so they still show zoomed out.
+ */
+export const FLAT_HAIRLINE = { rope: 1.2, steel: 1 };
 
 /** Where a rope pulls towards, in the overhead beam's cross-section: the outer corner of the top rail it goes over. */
 const PULL: Record<Rope["route"], Vector2> = {

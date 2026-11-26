@@ -9,8 +9,10 @@ import { svgNumber } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
 import { DETAILS, type Detail } from "@/scene/detail";
-import { nearness, PieceDrawing } from "@/scene/piece-svg";
+import { flatDepth, nearness, PieceDrawing } from "@/scene/piece-svg";
 import { piecePoints, type Piece, type RigLabel } from "@/scene/pieces";
+
+import type { PartFlat } from "./catalogue";
 
 /** A flat view: square on from a bearing and a height (degrees). */
 export type FlatLook = { label: string; azimuth: number; elevation: number };
@@ -33,13 +35,17 @@ function roundLength(about: number): number {
 const lengthText = (m: number) =>
     m >= 1 ? `${m} m` : m >= 0.01 ? `${Math.round(m * 100)} cm` : `${Math.round(m * 1000)} mm`;
 
-/** One flat view of some pieces, fitted to them, with a scale bar. */
+/**
+ * One flat view of some pieces, fitted to them, with a scale bar: the pieces seen square on, or the part's own pieces for
+ * the view drawn as its visualisation draws them (`flat`).
+ */
 export function FlatView({
     name,
-    pieces,
+    pieces: seen,
     labels,
     view,
     detail,
+    flat,
 }: {
     /** What's drawn, for a screen reader. */
     name: string;
@@ -47,6 +53,7 @@ export function FlatView({
     labels: RigLabel[];
     view: FlatLook;
     detail: Detail;
+    flat?: PartFlat;
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [size, setSize] = useState(vec2(300, 200));
@@ -62,24 +69,27 @@ export function FlatView({
     }, []);
     const inBrowser = useInBrowser();
     const cam = new OrbitCamera(rad(view.azimuth), rad(view.elevation));
+    const pieces = flat ? flat.pieces(cam.toward) : seen;
     // Fitted to what this view sees of the part, rods and ropes their full thickness, with room round it.
-    const flat = pieces.flatMap((piece) => {
+    const projected = pieces.flatMap((piece) => {
         const r = piece.kind === "face" ? 0 : piece.r;
         return piecePoints(piece).map((p) => ({ at: cam.project(p), r }));
     });
     const [x0, x1] = [
-        Math.min(...flat.map((p) => p.at.x - p.r)),
-        Math.max(...flat.map((p) => p.at.x + p.r)),
+        Math.min(...projected.map((p) => p.at.x - p.r)),
+        Math.max(...projected.map((p) => p.at.x + p.r)),
     ];
     const [y0, y1] = [
-        Math.min(...flat.map((p) => p.at.y - p.r)),
-        Math.max(...flat.map((p) => p.at.y + p.r)),
+        Math.min(...projected.map((p) => p.at.y - p.r)),
+        Math.max(...projected.map((p) => p.at.y + p.r)),
     ];
     const room = 28;
-    const ppm = Math.min(
-        (size.x - 2 * room) / Math.max(x1 - x0, 1e-3),
-        (size.y - 2 * room) / Math.max(y1 - y0, 1e-3),
-    );
+    // A part's own flat view is drawn smaller, with space round it, as it would sit among the rest of its rig.
+    const ppm =
+        Math.min(
+            (size.x - 2 * room) / Math.max(x1 - x0, 1e-3),
+            (size.y - 2 * room) / Math.max(y1 - y0, 1e-3),
+        ) * (flat ? 0.6 : 1);
     const mid = vec2((x0 + x1) / 2, (y0 + y1) / 2);
     const toSvg = (p: Vector3): Vector2 => {
         const v = cam.project(p);
@@ -88,7 +98,12 @@ export function FlatView({
     const sorted = pieces
         .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
-        .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
+        .map((piece) => ({
+            piece,
+            key: flat
+                ? flatDepth(piece, cam.toward, view.elevation === 90)
+                : nearness(piece, cam.toward),
+        }))
         .sort((a, b) => a.key - b.key);
     const bar = roundLength((size.x * 0.25) / ppm);
     return (
@@ -109,7 +124,8 @@ export function FlatView({
                             piece={d.piece}
                             toSvg={toSvg}
                             ppm={ppm}
-                            minWidth={{}}
+                            minWidth={flat?.minWidth ?? {}}
+                            thinEdges={flat?.thinEdges}
                             depth={(p) => cam.depth(p)}
                         />
                     ))}

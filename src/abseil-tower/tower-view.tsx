@@ -16,8 +16,8 @@ import { setAddressParams } from "@/scene/address";
 import Loading3D from "@/scene/loading-3d";
 import {
     Callouts,
-    centreOf,
     CylinderSwatch,
+    flatDepth,
     PersonSwatch,
     PieceDrawing,
     RigLabelDrawing,
@@ -28,7 +28,7 @@ import type { GLHandle } from "@/scene/scene-gl";
 import { useFlatView, type Fit } from "@/scene/use-flat-view";
 import { LegendPanel, ZoomButtons } from "@/scene/viewer-controls";
 
-import { KNOT_LABELS, layoutRig, legend, RIGS, rigSide } from "./rig";
+import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, legend, RIGS, rigSide } from "./rig";
 import { groundAt, groundCorners, LEVELS, OVERHEAD, SIDE, towerPieces } from "./tower";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
@@ -43,11 +43,6 @@ const PPM = 60;
  * on a carabiner, about fifteen times as close as the top deck's first shown.
  */
 const ZOOM = { most: 40, leastStart: 1 };
-/**
- * The narrowest rope and steel are drawn (SVG units): their true width, in proportion with everything else, but never
- * thinner than a hairline, so they still show zoomed out.
- */
-const HAIRLINE = { rope: 1.2, steel: 1 };
 /** How far below the drawing's middle the view's middle is (SVG units). */
 const DROP = 10;
 
@@ -222,19 +217,7 @@ export default function TowerView({ slug }: { slug: string }) {
     // facing away are left out, being behind its others, and what's off screen.
     const shown = (p: Piece) =>
         (p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0) && flatView.onScreen(p);
-    const sortKey = (p: Piece) => {
-        // A group's pieces sort together by its middle, then those facing the eye with `ahead` first, then by their own.
-        const own = cam.depth(centreOf(p));
-        const depth = p.group
-            ? Math.max(...[p.group.at, ...(p.group.across ?? [])].map((q) => cam.depth(q))) +
-              (p.group.ahead ? Math.sign(p.group.ahead.dot(cam.toward)) * 0.01 : 0) +
-              (p.group.over ? 0.02 : 0) +
-              (p.group.order ?? 0) * 1e-3 +
-              own * 1e-4
-            : own;
-        if (!p.shell || plan) return depth;
-        return depth + (p.shell.out.dot(cam.toward) > 0 ? 1 : -1) * p.shell.layer * 100;
-    };
+    const sortKey = (p: Piece) => flatDepth(p, cam.toward, plan);
     // A label sorts just after the nearer end of the cylinder it's written on (or its point, without one), so it's
     // drawn over its own cylinder but under whatever's in front of it.
     const labelKey = (l: RigLabel) => {
@@ -304,7 +287,7 @@ export default function TowerView({ slug }: { slug: string }) {
                                 toSvg={toSvg}
                                 ppm={ppm}
                                 dim={below !== undefined && highest(d.piece) < below ? 0.55 : 1}
-                                minWidth={HAIRLINE}
+                                minWidth={FLAT_HAIRLINE}
                                 thinEdges
                             />
                         ) : (

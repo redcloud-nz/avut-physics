@@ -271,7 +271,8 @@ function closedLoop(pts: Flat[], n: number): Flat[] {
  * `across`: `width` across (by default in proportion to the photo), its gate on the `across` side behind its locking
  * sleeve (`sleeve`'s colour), its bar `r` thick. By default its loads sit where the photo's carabiner takes them, by its
  * spine; `settled`, it's hung between two loads and nothing else, so it turns until each sits in the bottom of its bend
- * and the two are in line along the pull.
+ * and the two are in line along the pull; `centred`, it hangs as it's drawn but from the middle of its bottom bend, as on
+ * a knot's loop with nothing on its other end.
  */
 export function carabiner(
     top: Vector3,
@@ -286,6 +287,7 @@ export function carabiner(
         sleeve = "var(--carabiner-sleeve)",
         through,
         settled = false,
+        centred = false,
     }: {
         shape?: keyof typeof CARABINER_SHAPES;
         width?: number;
@@ -293,6 +295,7 @@ export function carabiner(
         sleeve?: string;
         through?: number;
         settled?: boolean;
+        centred?: boolean;
     } = {},
 ): Piece[] {
     const d = down.unit();
@@ -372,6 +375,11 @@ export function carabiner(
         turn = spinBy(angle);
         pts = loop.map(turn);
         [hangX, topY, bottomY] = [ends.high[0], ends.high[1], ends.low[1]];
+    } else if (centred) {
+        // Hanging as it's drawn, from the middle of its bottom bend (its lowest point) rather than where the photo's
+        // took its loads, which is off to the spine's side: as a loop clipped through it with nothing pulling it sits.
+        const low = loop.reduce((m, q) => (q[1] > m[1] ? q : m));
+        [hangX, bottomY] = [low[0], low[1]];
     }
     const kv = length / (bottomY - topY);
     // Settled, it keeps its shape: `length` is between where its loads sit, and it's that much in proportion across.
