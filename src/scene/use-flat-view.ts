@@ -5,6 +5,8 @@ import type { OrbitCamera } from "@/lib/orbit-camera";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import type { Vector3 } from "@/lib/vector3";
 
+import type { Piece } from "./pieces";
+
 /**
  * A flat view of a 3D scene (a side elevation, an overhead view), drawn in SVG and moved like a map: dragged to pan,
  * scrolled or pinched to zoom. The drawing fills its box, taking the box's shape, and is never smaller than `least`.
@@ -67,6 +69,34 @@ export function zoomToFit(fit: Fit, size: Vector2, ppm: number, lo: number, hi: 
 }
 
 /** The middle of the view in a drawing `size`. */
+/** Each camera's pieces' reach across and up its view (metres), each worked out once. */
+const REACH = new WeakMap<OrbitCamera, WeakMap<Piece, [number, number, number, number]>>();
+
+function reachOf(p: Piece, cam: OrbitCamera) {
+    let made = REACH.get(cam);
+    if (!made) REACH.set(cam, (made = new WeakMap()));
+    let r = made.get(p);
+    if (r) return r;
+    const pts = p.kind === "rod" ? [p.a, p.b] : p.points;
+    const pad =
+        p.kind === "face" ? 0 : Math.max(p.r, p.kind === "strand" && p.tape ? p.tape.width : 0);
+    r = [Infinity, -Infinity, Infinity, -Infinity];
+    for (const q of pts) {
+        const [x, y] = [q.dot(cam.right), q.dot(cam.up)];
+        r = [
+            Math.min(r[0], x - pad),
+            Math.max(r[1], x + pad),
+            Math.min(r[2], y - pad),
+            Math.max(r[3], y + pad),
+        ];
+    }
+    made.set(p, r);
+    return r;
+}
+
+/** How far outside the view (SVG units) a piece may be and still be drawn: rope drawn wider than it is, and outlines. */
+const ON_SCREEN_MARGIN = 20;
+
 const originOf = (size: Vector2, drop: number) => vec2(size.x / 2, size.y / 2 + drop);
 
 type Gesture =
@@ -218,6 +248,16 @@ export function useFlatView(o: FlatViewOptions) {
         onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     };
 
+    // What's in view (metres across and up), with a margin for what's drawn wider than it is (thin rope, outlines).
+    const margin = ON_SCREEN_MARGIN / ppm;
+    const [across, upward] = [frame.target.dot(cam.right), frame.target.dot(cam.up)];
+    const seen = [
+        across - origin.x / ppm - margin,
+        across + (size.x - origin.x) / ppm + margin,
+        upward - (size.y - origin.y) / ppm - margin,
+        upward + origin.y / ppm + margin,
+    ];
+
     return {
         svgRef,
         boxRef,
@@ -227,6 +267,11 @@ export function useFlatView(o: FlatViewOptions) {
         ppm,
         toSvg,
         least,
+        /** Whether any of a piece is in view (or near enough it), to leave out drawing what's not. */
+        onScreen: (p: Piece) => {
+            const [x0, x1, y0, y1] = reachOf(p, cam);
+            return x1 >= seen[0] && x0 <= seen[1] && y1 >= seen[2] && y0 <= seen[3];
+        },
         /** Whether it's zoomed in or out as far as it goes. */
         nearest: frame.zoom >= o.zoom.most,
         furthest: frame.zoom <= least,

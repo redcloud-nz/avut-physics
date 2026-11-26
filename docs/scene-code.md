@@ -55,8 +55,11 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
   was the page itself: in 3D the flying fox and the tower still sorted every piece for the flat drawing on each render.
   Now they don't, and a change of level pauses about 130 ms the first time and under 120 ms after (a dev build on a Mac,
   from 450 to 580 ms).
-- **The flat views draw everything, on screen or not.** Zoomed 60 times, the view covers a few metres but still sorts
-  and draws all 14,745 pieces. Leave out what's outside the view first: it saves far more than the detail setting.
+- **Done: the flat views leave out what's off screen.** `useFlatView`'s `onScreen` checks a piece's reach across and up
+  the view (worked out once for each camera) against what's in view, with a 20 pixel margin; the flying fox (with its
+  overhead ground tiles) and the tower use it. Locked onto the flying fox's top tower from the side and zoomed in four
+  steps, 1,886 SVG elements are drawn rather than 26,512, and a zoom step redraws in 110 to 180 ms rather than 360 to
+  575 (dev build). The parts viewer's flat views draw one part, so don't.
 - **Detail barely changes the flat views.** Only the 4,701 pieces with `fine` are affected, and across the whole site
   all three levels leave out the same ones; they differ only zoomed well in (at 60×, Low leaves out 2,939, Medium 610,
   High 224). The 3D view ignores `fine` altogether.

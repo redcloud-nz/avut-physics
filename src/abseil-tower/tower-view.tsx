@@ -198,8 +198,9 @@ export default function TowerView({ slug }: { slug: string }) {
     // Back to front, by each piece's middle, except that the tower's shell comes first: what's on a side facing the eye
     // is drawn after everything inside it, and what's on a side facing away before (see `Shell`). Looking straight
     // down, every side is edge on, and height alone sets the order. A timber's sides
-    // facing away are left out, being behind its others.
-    const shown = (p: Piece) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0;
+    // facing away are left out, being behind its others, and what's off screen.
+    const shown = (p: Piece) =>
+        (p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0) && flatView.onScreen(p);
     const sortKey = (p: Piece) => {
         // A group's pieces sort together by its middle, then those facing the eye with `ahead` first, then by their own.
         const own = cam.depth(centreOf(p));

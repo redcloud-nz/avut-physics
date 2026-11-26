@@ -238,9 +238,10 @@ export default function FoxView() {
 
     // Back to front by each piece's middle; a section's sides facing away are left out, and what the overhead view
     // leaves out (the tree's branches).
-    // Fine detail (a plate's edge, a bolt's head) is left out where it would be too small to see. None in 3D, where the
-    // flat drawing isn't shown.
+    // Fine detail (a plate's edge, a bolt's head) is left out where it would be too small to see, and what's off screen.
+    // None in 3D, where the flat drawing isn't shown.
     const sorted = (mode === "3d" ? [] : pieces)
+        .filter(view.onScreen)
         .filter((p) => mode !== "overhead" || drawnOverhead(p))
         .filter((p) => p.fine === undefined || p.fine * ppm >= DETAILS[detail].finePx)
         .filter((p) => p.kind !== "face" || !p.normal || p.normal.dot(cam.toward) > 0)
@@ -259,7 +260,7 @@ export default function FoxView() {
             {mode === "overhead" && (
                 <g>
                     {GROUND_FACES.map((f, i) =>
-                        f.kind === "face" ? (
+                        f.kind === "face" && view.onScreen(f) ? (
                             <polygon
                                 key={i}
                                 points={svgPoints(f.points.map(toSvg))}
