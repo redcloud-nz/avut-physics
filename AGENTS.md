@@ -98,7 +98,11 @@ they've looked.
   the 3D knot editor). `pieces.ts`: the `Piece` types (rods, faces, strands), `rod`, `timber`, materials' colours,
   and `RigLabel`. `scene-gl.tsx`: `SceneGL`, a scene in 3D with WebGL (each scene gives a `SceneConfig`).
   `piece-svg.tsx`: pieces drawn flat in SVG (`PieceDrawing`, `Callouts`, the legend's swatches). `use-flat-view.ts`:
-  a flat view's camera, fit, pan, zoom and pinch. `transforms.ts`: pieces moved, turned (`posed`) and recoloured. `callout-layout.ts`, `detail.ts` (how finely a scene's drawn, and
+  a flat view's camera, fit, pan, zoom and pinch. `transforms.ts`: pieces moved, turned (`posed`) and recoloured. `targets.ts`: what a view can lock
+  onto (`Target`, `framing`) and stand at, and `target-boxes.tsx` their boxes in a flat view. `use-detail.ts`: the
+  detail choice and Auto; `use-target-swipe.ts`: the two-finger swipe to the next target; `viewer-controls.tsx`: the
+  legend panel, detail menu, zoom buttons and previous/next; `address.ts`: setting the address's search parameters
+  in place. `callout-layout.ts`, `detail.ts` (how finely a scene's drawn, and
   Auto), `loading-3d.tsx`. What's still to move is in `docs/scene-code.md`.
 - `src/rigging/`: rescue gear as pieces, for any scene: `hardware.ts` (carabiners, shackles, pulleys, plates, bolts,
   chain, hooks, the trolley, the grigri, the Tirfor), `rope.ts` (rope and wire through points, bars and sections),

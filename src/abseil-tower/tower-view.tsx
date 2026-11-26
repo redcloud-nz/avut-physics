@@ -1,6 +1,5 @@
 "use client";
 
-import { Info, Minus, Plus, RotateCcw, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -13,6 +12,7 @@ import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { setAddressParams } from "@/scene/address";
 import Loading3D from "@/scene/loading-3d";
 import {
     Callouts,
@@ -26,6 +26,7 @@ import {
 import { type Piece, type RigLabel } from "@/scene/pieces";
 import type { GLHandle } from "@/scene/scene-gl";
 import { useFlatView, type Fit } from "@/scene/use-flat-view";
+import { LegendPanel, ZoomButtons } from "@/scene/viewer-controls";
 
 import { layoutRig, legend, RIGS, rigSide } from "./rig";
 import { groundAt, groundCorners, LEVELS, OVERHEAD, SIDE, towerPieces } from "./tower";
@@ -155,11 +156,7 @@ function highest(p: Piece): number {
 export default function TowerView({ slug }: { slug: string }) {
     const mode = modeOf(useSearchParams().get("view"));
     // Changing view changes the address in place, so it can be shared.
-    const setMode = (m: Mode) => {
-        const url = new URL(window.location.href);
-        url.searchParams.set("view", VIEW_PARAM[m]);
-        window.history.replaceState(null, "", url);
-    };
+    const setMode = (m: Mode) => setAddressParams({ view: VIEW_PARAM[m] });
     const { side } = MODES[mode];
     // The flat views' camera (the 3D view has its own).
     const camera = MODES[mode].camera ?? MODES.plan.camera!;
@@ -183,9 +180,6 @@ export default function TowerView({ slug }: { slug: string }) {
         (azimuth: number, elevation: number) => setGlTurned({ azimuth, elevation }),
         [],
     );
-    // Whether the legend's open: until it's toggled, open on wide screens and closed on phones, where it'd cover the
-    // tower.
-    const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
     // The drawing's last digits can differ between the server and the browser, so it's drawn only in the browser.
     const inBrowser = useInBrowser();
     const cam = useMemo(() => new OrbitCamera(rad(azimuth), rad(elevation)), [azimuth, elevation]);
@@ -314,33 +308,9 @@ export default function TowerView({ slug }: { slug: string }) {
             ) : (
                 diagram
             )}
-            {/* Closed, the legend is just an info button. */}
-            <button
-                type="button"
-                onClick={() => setLegendOpen(true)}
-                aria-label="Show the legend"
-                title="Legend"
-                className={`absolute top-2 right-2 size-9 items-center justify-center rounded-lg border border-border bg-surface/90 text-ink-soft shadow-lg backdrop-blur transition-colors hover:bg-line-faint [&_svg]:size-4 ${
-                    legendOpen === null ? "flex sm:hidden" : legendOpen ? "hidden" : "flex"
-                }`}
-            >
-                <Info />
-            </button>
-            <section
-                className={`absolute top-2 right-2 max-h-[calc(100%-1rem)] w-64 max-w-[calc(100%-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur ${
-                    legendOpen === null ? "hidden sm:block" : legendOpen ? "block" : "hidden"
-                }`}
-            >
-                <button
-                    type="button"
-                    onClick={() => setLegendOpen(false)}
-                    aria-label="Hide the legend"
-                    className="flex w-full items-center justify-between text-sm font-medium text-ink-strong"
-                >
-                    Legend
-                    <X className="size-4 text-ink-soft" />
-                </button>
-                {
+            {/* The legend, or a button to show it. */}
+            <div className="absolute top-2 right-2 flex max-h-[calc(100%-1rem)] max-w-[calc(100%-1rem)] flex-col items-end">
+                <LegendPanel className="w-64">
                     <div className="mt-2 flex flex-col gap-2">
                         <h3 className="text-xs font-medium text-ink-strong">Rigging</h3>
                         <ul className="flex flex-col gap-1.5 text-xs text-ink-soft">
@@ -390,8 +360,8 @@ export default function TowerView({ slug }: { slug: string }) {
                             </ul>
                         )}
                     </div>
-                }
-            </section>
+                </LegendPanel>
+            </div>
             {/* The views, and beside them along the bottom the 3D views' compass presets. */}
             <div className="absolute bottom-2 left-2 flex items-end gap-2">
                 <div
@@ -439,43 +409,12 @@ export default function TowerView({ slug }: { slug: string }) {
                     </div>
                 )}
             </div>
-            <div className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur">
-                {[
-                    {
-                        label: "Zoom in",
-                        icon: <Plus />,
-                        onClick: () => zoomBy(1.4),
-                        off: mode !== "3d" && flatView.nearest,
-                    },
-                    {
-                        label: "Zoom out",
-                        icon: <Minus />,
-                        onClick: () => zoomBy(1 / 1.4),
-                        off: mode !== "3d" && flatView.furthest,
-                    },
-                    {
-                        label: "Show the whole view again",
-                        icon: <RotateCcw />,
-                        onClick: () => {
-                            if (mode === "3d") return glView?.reset();
-                            flatView.reset();
-                        },
-                        off: false,
-                    },
-                ].map((b) => (
-                    <button
-                        key={b.label}
-                        type="button"
-                        aria-label={b.label}
-                        title={b.label}
-                        onClick={b.onClick}
-                        disabled={b.off}
-                        className="flex size-9 items-center justify-center text-ink-soft transition-colors hover:bg-line-faint disabled:opacity-40 [&_svg]:size-4"
-                    >
-                        {b.icon}
-                    </button>
-                ))}
-            </div>
+            <ZoomButtons
+                onZoom={zoomBy}
+                onReset={() => (mode === "3d" ? glView?.reset() : flatView.reset())}
+                nearest={mode !== "3d" && flatView.nearest}
+                furthest={mode !== "3d" && flatView.furthest}
+            />
         </div>
     );
 }

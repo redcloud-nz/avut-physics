@@ -19,19 +19,11 @@ reads), `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `r
 
 ## Structure
 
-- **More for `src/scene/`**, which has the pieces, renderers, flat view and detail now:
-  - `pointsOf` (in `parts/flat-view.tsx`), beside the other transforms in `transforms.ts`;
-  - targets and stances (`Target`, `framing`, `panned`, from `fox.ts`);
-  - detail's Auto setting as a `useDetail(storageKey)` hook (the state and the flat views' frame timing are in
-    `fox-view.tsx`);
-  - the viewer's controls: legend, view menu, look-at menu, zoom buttons, previous and next.
-- **The rest of the rigging builders in `fox.ts`** could join `src/rigging/` once they take their colours and the
+- **`pointsOf`** (in `parts/flat-view.tsx`) could join the other transforms in `src/scene/transforms.ts`.
+- **The flying fox's own rigging builders** (in `src/flying-fox/rig/`) could join `src/rigging/` once they take their colours and the
   ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
 - **`chain-weight.ts` mixes the physics** (`chainWeightHanging`, which `run.ts` reads) with the drawing of the chain
   heap.
-- **`fox-view.tsx` down to the flying fox's own parts**: its scene settings, its fits and the run. The rest is
-  generic (address state, the two-finger swipe to the next target, detail, target boxes, about 270 lines of
-  controls). Its flat view's camera and gestures are in `useFlatView` already.
 - Keep the assembly editor in mind (`docs/knot-editor-3d.md`, "The assembly editor"): builders that return named
   frames, and placements kept apart from the pieces drawn.
 

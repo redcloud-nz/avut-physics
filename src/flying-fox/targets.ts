@@ -2,7 +2,8 @@ import { ANCHOR_SHACKLE, LIZARD } from "@/flying-fox/rig/log-anchor";
 import { SADDLE, SLING_Z } from "@/flying-fox/rig/shear-leg";
 import { BACKSTAY_SLING_Y } from "@/flying-fox/rig/tower";
 import { TREE_SHACKLE } from "@/flying-fox/rig/tree";
-import { boundsOf, vec3, type Vector3 } from "@/lib/vector3";
+import { vec3 } from "@/lib/vector3";
+import { framing, panned, type NamedStance, type Target } from "@/scene/targets";
 
 import {
     BAR_X,
@@ -26,45 +27,7 @@ import {
 
 /** What the flying fox's views can lock onto (targets) and where the 3D view can stand and look round from (stances). */
 
-/**
- * What the views can lock onto, up the site from the tree to the log: the box round all of each thing (`lo` to `hi`),
- * its middle, which the views turn and zoom about, and how far from it the 3D view starts (metres), far enough to see
- * all of the box.
- */
-export type FoxTarget = {
-    slug: string;
-    label: string;
-    lo: Vector3;
-    hi: Vector3;
-    centre: Vector3;
-    distance: number;
-    /** Where its view's middle may be panned to while locked onto it (see `Focus.pan`); none, it stays put. */
-    pan?: { lo: Vector3; hi: Vector3 };
-};
-
-/** A target round `points`: centred in the box they span, and far enough out to see all of the box. */
-function framing(slug: string, label: string, points: Vector3[]): FoxTarget {
-    const { lo, hi } = boundsOf(points);
-    // The 3D view's 30° high, so a ball this big just fits it from about 3.9 times its radius out: a little further,
-    // to leave some room round it.
-    const r = hi.sub(lo).len() / 2;
-    return {
-        slug,
-        label,
-        lo,
-        hi,
-        centre: lo.lerp(hi, 0.5),
-        distance: Math.max(4.2 * r, 1.5),
-    };
-}
-
-/** `target`, its view's middle free to be panned within the box `box` gives round its centre. */
-const panned = (target: FoxTarget, box: (centre: Vector3) => [Vector3, Vector3]): FoxTarget => {
-    const [lo, hi] = box(target.centre);
-    return { ...target, pan: { lo, hi } };
-};
-
-export function foxTargets(): FoxTarget[] {
+export function foxTargets(): Target[] {
     const sides = [-1, 1];
     const between = (x: number) => onHawser(x, 1).lerp(onHawser(x, -1), 0.5);
     // A trolley and its dropper: from just over the hawser down past the harness to the end of the descender's brake
@@ -144,17 +107,7 @@ export function foxTargets(): FoxTarget[] {
 /** How high a standing person's eyes are above their feet (metres). */
 const EYE_HEIGHT = 1.7;
 
-/** Somewhere to stand on the site and look round from in 3D: where the eye is, and what it looks at first. */
-export type FoxStance = {
-    slug: string;
-    label: string;
-    at: Vector3;
-    lookAt: Vector3;
-    /** How wide it takes in to start with (degrees high), if not the usual. */
-    fov?: number;
-};
-
-export function foxStances(): FoxStance[] {
+export function foxStances(): NamedStance[] {
     // The platform's deck, on the bottom cross bar.
     const deck = TOWER.lower + TOWER.rhs.h / 2 + 0.05;
     // Between the hawsers, at the hawsers' height, `x` along the span.

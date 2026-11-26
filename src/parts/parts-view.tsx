@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Eye, Gauge, RotateCcw } from "lucide-react";
+import { ChevronDown, Eye, RotateCcw } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -22,6 +22,7 @@ import { DETAILS, type Detail } from "@/scene/detail";
 import Loading3D from "@/scene/loading-3d";
 import type { Piece } from "@/scene/pieces";
 import type { GLHandle, SceneConfig } from "@/scene/scene-gl";
+import { DetailMenu } from "@/scene/viewer-controls";
 
 import { GROUPS, partOf, PARTS } from "./catalogue";
 import { FLATS, FlatView, pointsOf } from "./flat-view";
@@ -136,31 +137,12 @@ export default function PartsView() {
                     {shown.about}
                 </p>
                 <div className="absolute bottom-2 left-2 flex gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                type="button"
-                                aria-label={`Detail: ${DETAILS[detail].label}`}
-                                title="Detail"
-                                className={`${OVERLAY_CONTROL} w-9`}
-                            >
-                                <Gauge />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="top" align="start" className="min-w-44">
-                            <DropdownMenuLabel>Detail</DropdownMenuLabel>
-                            <DropdownMenuRadioGroup
-                                value={detail}
-                                onValueChange={(d) => setDetail(d as Detail)}
-                            >
-                                {(Object.keys(DETAILS) as Detail[]).map((d) => (
-                                    <DropdownMenuRadioItem key={d} value={d}>
-                                        {DETAILS[d].label}
-                                    </DropdownMenuRadioItem>
-                                ))}
-                            </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <DetailMenu
+                        choice={detail}
+                        onChoose={(d) => setDetail(d as Detail)}
+                        side="top"
+                        align="start"
+                    />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button

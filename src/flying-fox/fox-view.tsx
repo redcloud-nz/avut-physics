@@ -1,24 +1,9 @@
 "use client";
 
-import {
-    Box,
-    ChevronLeft,
-    ChevronRight,
-    Eye,
-    Gauge,
-    Info,
-    Map as MapIcon,
-    Minus,
-    Move3d,
-    PanelBottom,
-    PersonStanding,
-    Plus,
-    RotateCcw,
-    X,
-} from "lucide-react";
+import { Box, Eye, Map as MapIcon, Move3d, PanelBottom, PersonStanding } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { OVERLAY_CONTROL } from "@/components/overlay-control";
 import {
@@ -32,29 +17,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useInBrowser } from "@/components/use-in-browser";
 import { drawnOverhead } from "@/flying-fox/rig/shared";
-import { clamp, rad } from "@/lib/math";
+import { rad } from "@/lib/math";
 import { OrbitCamera } from "@/lib/orbit-camera";
 import { svgNumber, svgPoints } from "@/lib/svg-path";
 import { vec2, type Vector2 } from "@/lib/vector2";
-import { vec3, type Vector3 } from "@/lib/vector3";
+import { vec3 } from "@/lib/vector3";
+import { setAddressParams } from "@/scene/address";
 import { ObstacleGrid, obstaclesOf } from "@/scene/callout-layout";
-import {
-    AUTO_START,
-    DETAILS,
-    FLIPS,
-    judge,
-    loadChoice,
-    saveChoice,
-    stepDetail,
-    type Detail,
-    type DetailChoice,
-    type FrameRate,
-} from "@/scene/detail";
+import { DETAILS } from "@/scene/detail";
 import Loading3D from "@/scene/loading-3d";
 import { Callouts, nearness, PieceDrawing, StrandSwatch } from "@/scene/piece-svg";
 import type { Piece } from "@/scene/pieces";
 import { FOCUS_OUT, type GLHandle, type SceneConfig } from "@/scene/scene-gl";
+import { targetAt, TargetBoxes } from "@/scene/target-boxes";
+import { inBox, inFit, targetFit, type Target } from "@/scene/targets";
+import { useDetail } from "@/scene/use-detail";
 import { useFlatView, zoomToFit, type Fit } from "@/scene/use-flat-view";
+import { useTargetSwipe } from "@/scene/use-target-swipe";
+import { DetailMenu, LegendPanel, StepButtons, ZoomButtons } from "@/scene/viewer-controls";
 
 import { foxPieces } from "./fox";
 import { GROUND, groundFaces, groundShade } from "./ground";
@@ -63,7 +43,7 @@ import { RUN, sessionAt, simulateSession } from "./run";
 import { RunClock } from "./run-clock";
 import RunControls from "./run-controls";
 import { FALL, groundY, LOG, onHawser, TREE, TROLLEY_X } from "./site";
-import { foxStances, foxTargets, type FoxTarget } from "./targets";
+import { foxStances, foxTargets } from "./targets";
 
 /** The WebGL view, loaded only when it's first shown, with a message while it loads. */
 const SceneGL = dynamic(() => import("@/scene/scene-gl").then((m) => m.SceneGL), {
@@ -175,31 +155,6 @@ const MODE_ICONS: Record<Mode, React.ReactNode> = {
 const modeOf = (param: string | null): Mode =>
     param === "side" || param === "overhead" ? param : "3d";
 
-/** `p` kept inside the box from `lo` to `hi`: where a target's view may be panned. */
-const inBox = ({ lo, hi }: { lo: Vector3; hi: Vector3 }, p: Vector3) =>
-    vec3(clamp(p.x, lo.x, hi.x), clamp(p.y, lo.y, hi.y), clamp(p.z, lo.z, hi.z));
-
-/**
- * What a flat view shows of `target`: the box round it as seen from `cam`, with some room round it, and never smaller
- * than a few metres across, so a small part still has some of what's round it.
- */
-function targetFit(target: FoxTarget, cam: OrbitCamera): Fit {
-    const [lo, hi] = [target.lo, target.hi];
-    let [x, y] = [0, 0];
-    for (const cx of [lo.x, hi.x])
-        for (const cy of [lo.y, hi.y])
-            for (const cz of [lo.z, hi.z]) {
-                const d = vec3(cx, cy, cz).sub(target.centre);
-                x = Math.max(x, Math.abs(d.dot(cam.right)));
-                y = Math.max(y, Math.abs(d.dot(cam.up)));
-            }
-    return {
-        centre: target.centre,
-        width: Math.max(3 * x, 3),
-        height: Math.max(3 * y, 3),
-    };
-}
-
 /**
  * How far out a flat view may zoom: no further than the whole site, nor, locked onto a target, further than
  * `FOCUS_OUT` times as far out as it starts on it.
@@ -211,58 +166,24 @@ function leastZoom(fit: Fit, siteFit: Fit, size: Vector2, locked: boolean): numb
         : site;
 }
 
-/** The targets' names over their boxes: how wide each letter is and how far apart lines are (SVG units). */
-const NAME = { width: 6.7, line: 13 };
-
-/** How far two fingers, or a trackpad's swipe, go sideways (pixels) to move on to the next target. */
-const SWIPE = 60;
-
-/** `target` kept inside the view's fit box, so the middle of the view never leaves the site. */
-function inFit(cam: OrbitCamera, fit: Fit, target: Vector3): Vector3 {
-    const d = target.sub(fit.centre);
-    const [x, y] = [d.dot(cam.right), d.dot(cam.up)];
-    const [cx, cy] = [
-        clamp(x, -fit.width / 2, fit.width / 2),
-        clamp(y, -fit.height / 2, fit.height / 2),
-    ];
-    return target.add(cam.right.scale(cx - x)).add(cam.up.scale(cy - y));
-}
-
 /** The flying fox, in the view the page's address names (`?view=side` or `overhead`; 3D unless it names one). */
 export default function FoxView() {
     const params = useSearchParams();
     const mode = modeOf(params.get("view"));
-    const setParams = (values: Record<string, string | null>) => {
-        const url = new URL(window.location.href);
-        for (const [name, value] of Object.entries(values)) {
-            if (value === null) url.searchParams.delete(name);
-            else url.searchParams.set(name, value);
-        }
-        window.history.replaceState(null, "", url);
-    };
-    const setParam = (name: string, value: string | null) => setParams({ [name]: value });
-    const setMode = (m: Mode) => setParam("view", m);
+    const setParams = setAddressParams;
+    const setMode = (m: Mode) => setParams({ view: m });
     // What every view's locked onto (`?target=trolley-a`), kept from view to view, or nothing to move freely.
     const target = TARGETS.find((t) => t.slug === params.get("target")) ?? null;
     // Where the 3D view stands, if anywhere (`?eye=loader`): only in 3D, and instead of a target.
     const stance =
         mode === "3d" ? (STANCES.find((e) => e.slug === params.get("eye")) ?? null) : null;
-    const lockOn = (t: FoxTarget | null) => setParams({ target: t?.slug ?? null, eye: null });
+    const lockOn = (t: Target | null) => setParams({ target: t?.slug ?? null, eye: null });
     const standAs = (slug: string) => setParams({ eye: slug, target: null });
     // Through the targets in turn, round from the last to the first.
     const step = (by: number) => {
         const i = target ? TARGETS.indexOf(target) : by > 0 ? -1 : TARGETS.length;
         lockOn(TARGETS[(i + by + TARGETS.length) % TARGETS.length]);
     };
-    // For the swipes, which are watched from outside React's events.
-    const stepRef = useRef(step);
-    const lockedRef = useRef(false);
-    const standingRef = useRef(false);
-    useEffect(() => {
-        stepRef.current = step;
-        lockedRef.current = target !== null;
-        standingRef.current = stance !== null;
-    });
     // In 3D, what moves through the timeline is drawn apart from the rest (the hawsers, the trolleys, the return line
     // and the dynamic brake).
     const is3d = mode === "3d";
@@ -283,55 +204,10 @@ export default function FoxView() {
         return { ...target, moving };
     }, [target, is3d, session, clock]);
     const labels = useMemo(() => foxLabels(), []);
-    const legend = foxLegend();
+    const legend = useMemo(() => foxLegend(), []);
     const [glView, setGlView] = useState<GLHandle | null>(null);
-    const [legendOpen, setLegendOpen] = useState<boolean | null>(null);
     const inBrowser = useInBrowser();
-    // How finely it's drawn: chosen on the page, or left to Auto, which follows the frame rate. Auto gives up after a
-    // few changes of direction, rather than keep flipping between two levels.
-    // The saved choice until one's made on the page (read once it's in the browser, where it's kept).
-    const [picked, setPicked] = useState<DetailChoice | null>(null);
-    const choice = picked ?? (inBrowser ? loadChoice(DETAIL_KEY) : "auto");
-    const choiceRef = useRef<DetailChoice>("auto");
-    useEffect(() => {
-        choiceRef.current = choice;
-    }, [choice]);
-    const choose = (c: DetailChoice) => {
-        setPicked(c);
-        saveChoice(DETAIL_KEY, c);
-    };
-    const [auto, setAuto] = useState<Detail>(AUTO_START);
-    const flips = useRef<{ last: FrameRate | null; count: number }>({ last: null, count: 0 });
-    const onFrameRate = useCallback((rate: FrameRate) => {
-        if (choiceRef.current !== "auto") return;
-        const f = flips.current;
-        if (f.count >= FLIPS) return;
-        if (f.last && f.last !== rate) f.count++;
-        f.last = rate;
-        setAuto((d) => stepDetail(d, rate));
-    }, []);
-    const detail = choice === "auto" ? auto : choice;
-    // The flat views' frame rate, timed while they're being moved or zoomed (when they redraw).
-    const watch = useRef({ busyUntil: 0, running: false, last: 0, intervals: [] as number[] });
-    const poke = useCallback(() => {
-        const w = watch.current;
-        w.busyUntil = performance.now() + 300;
-        if (w.running) return;
-        w.running = true;
-        w.last = performance.now();
-        const tick = (t: number) => {
-            w.intervals.push(t - w.last);
-            w.last = t;
-            if (w.intervals.length >= 40) {
-                const rate = judge(w.intervals);
-                w.intervals = [];
-                if (rate) onFrameRate(rate);
-            }
-            if (t < w.busyUntil) requestAnimationFrame(tick);
-            else w.running = false;
-        };
-        requestAnimationFrame(tick);
-    }, [onFrameRate]);
+    const { choice, choose, auto, detail, onFrameRate, poke } = useDetail(DETAIL_KEY);
     const flat = MODES[mode].camera ?? MODES.side.camera!;
     const siteFit = MODES[mode].fit ?? MODES.side.fit!;
     const cam = useMemo(
@@ -353,77 +229,12 @@ export default function FoxView() {
         onMove: poke,
         // A click (not a drag) on a target's box in the free view locks onto it.
         onClick: (at) => {
-            const t = focus ? undefined : targetAt(at);
+            const t = focus ? undefined : targetAt(TARGETS, { cam, toSvg, ppm }, at);
             if (t) lockOn(t);
         },
     });
     const { boxRef, svgRef, size, ppm, toSvg } = view;
-
-    // Swiping sideways with two fingers moves on to the next target (or back): on a trackpad, a sideways scroll, in
-    // any view; on a touch screen, two fingers moving together, only when locked onto a target (otherwise they move
-    // the view). Each swipe moves one target, however far it goes.
-    useEffect(() => {
-        const box = boxRef.current;
-        if (!box) return;
-        const wheel = { sum: 0, last: 0, done: false };
-        const onWheel = (e: WheelEvent) => {
-            // Not while standing somewhere, where there's no next one.
-            if (standingRef.current) return;
-            if (e.ctrlKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-            // Not to the 3D view's zoom, the drawing's, or the browser's back and forward.
-            e.preventDefault();
-            e.stopPropagation();
-            // A pause ends one swipe, so its momentum doesn't carry on to another.
-            if (e.timeStamp - wheel.last > 250) Object.assign(wheel, { sum: 0, done: false });
-            wheel.last = e.timeStamp;
-            wheel.sum += e.deltaX;
-            if (!wheel.done && Math.abs(wheel.sum) > SWIPE) {
-                wheel.done = true;
-                stepRef.current(Math.sign(wheel.sum));
-            }
-        };
-        const touches = new Map<number, Vector2>();
-        let swipe: { mid: Vector2; spread: number; done: boolean } | null = null;
-        const both = () => {
-            const [a, b] = [...touches.values()];
-            return { mid: a.mid(b), spread: a.distanceTo(b) };
-        };
-        const onDown = (e: PointerEvent) => {
-            if (e.pointerType !== "touch") return;
-            touches.set(e.pointerId, vec2(e.clientX, e.clientY));
-            swipe = touches.size === 2 ? { ...both(), done: false } : null;
-        };
-        const onMove = (e: PointerEvent) => {
-            if (!touches.has(e.pointerId)) return;
-            touches.set(e.pointerId, vec2(e.clientX, e.clientY));
-            if (!swipe || swipe.done || touches.size !== 2 || !lockedRef.current) return;
-            const now = both();
-            const d = now.mid.sub(swipe.mid);
-            const spreading = Math.abs(now.spread / Math.max(swipe.spread, 1) - 1);
-            if (Math.abs(d.x) > SWIPE && Math.abs(d.x) > 2 * Math.abs(d.y) && spreading < 0.25) {
-                swipe.done = true;
-                // Fingers moving left bring on the next, as turning a page.
-                stepRef.current(d.x < 0 ? 1 : -1);
-            }
-        };
-        const onUp = (e: PointerEvent) => {
-            touches.delete(e.pointerId);
-            if (touches.size < 2) swipe = null;
-        };
-        const opts = { capture: true };
-        box.addEventListener("wheel", onWheel, { capture: true, passive: false });
-        box.addEventListener("pointerdown", onDown, opts);
-        box.addEventListener("pointermove", onMove, opts);
-        box.addEventListener("pointerup", onUp, opts);
-        box.addEventListener("pointercancel", onUp, opts);
-        return () => {
-            box.removeEventListener("wheel", onWheel, opts);
-            box.removeEventListener("pointerdown", onDown, opts);
-            box.removeEventListener("pointermove", onMove, opts);
-            box.removeEventListener("pointerup", onUp, opts);
-            box.removeEventListener("pointercancel", onUp, opts);
-        };
-    }, [boxRef]);
+    useTargetSwipe(boxRef, { step, locked: target !== null, standing: stance !== null });
 
     // Back to front by each piece's middle; a section's sides facing away are left out, and what the overhead view
     // leaves out (the tree's branches).
@@ -435,32 +246,6 @@ export default function FoxView() {
         .map((piece) => ({ piece, key: nearness(piece, cam.toward) }))
         .sort((a, b) => a.key - b.key);
 
-    // Each target's box in the drawing, as its corner and size (SVG units).
-    const boxOf = (t: FoxTarget) => {
-        const f = targetFit(t, cam);
-        const c = toSvg(f.centre);
-        const [w, h] = [f.width * ppm, f.height * ppm];
-        return { x: c.x - w / 2, y: c.y - h / 2, w, h };
-    };
-    // Each target's box, and how high its name's written: just over its box, or higher, clear of the names already
-    // written, where boxes are close together.
-    const namedBoxes = () => {
-        const placed: { x0: number; x1: number; y: number }[] = [];
-        return TARGETS.map((t) => {
-            const b = boxOf(t);
-            const [x0, x1] = [b.x, b.x + t.label.length * NAME.width + 4];
-            let nameY = b.y - 5;
-            while (placed.some((p) => p.x0 < x1 && x0 < p.x1 && Math.abs(p.y - nameY) < NAME.line))
-                nameY -= NAME.line;
-            placed.push({ x0, x1, y: nameY });
-            return { t, b, nameY };
-        });
-    };
-    // The smallest target's box under `at`, if any.
-    const targetAt = (at: Vector2) =>
-        TARGETS.map((t) => ({ t, b: boxOf(t) }))
-            .filter(({ b }) => at.x >= b.x && at.x <= b.x + b.w && at.y >= b.y && at.y <= b.y + b.h)
-            .sort((p, q) => p.b.w * p.b.h - q.b.w * q.b.h)[0]?.t;
     const diagram = (
         <svg
             ref={svgRef}
@@ -501,43 +286,9 @@ export default function FoxView() {
                     />
                 ))}
             {/* Free, each target's box, faint, with its name: a click locks onto it. */}
-            {inBrowser &&
-                !focus &&
-                namedBoxes().map(({ t, b, nameY }) => {
-                    return (
-                        <g
-                            key={t.slug}
-                            className="cursor-pointer opacity-60 transition-opacity hover:opacity-100"
-                        >
-                            <rect
-                                x={b.x}
-                                y={b.y}
-                                width={b.w}
-                                height={b.h}
-                                rx={3}
-                                fill="var(--ink-muted)"
-                                fillOpacity={0.05}
-                                stroke="var(--ink-muted)"
-                                strokeWidth={1.2}
-                                strokeDasharray="5 4"
-                            />
-                            <text
-                                x={b.x + 2}
-                                y={nameY}
-                                fill="var(--ink-soft)"
-                                fontSize={11}
-                                fontWeight={600}
-                                className="font-mono"
-                                paintOrder="stroke"
-                                stroke="var(--halo)"
-                                strokeWidth={3}
-                                strokeLinejoin="round"
-                            >
-                                {t.label}
-                            </text>
-                        </g>
-                    );
-                })}
+            {inBrowser && !focus && (
+                <TargetBoxes targets={TARGETS} cam={cam} toSvg={toSvg} ppm={ppm} />
+            )}
             {/* Locked onto a target, what's part of it is labelled, as this view writes it. */}
             {inBrowser && focus && (
                 <Callouts
@@ -581,7 +332,7 @@ export default function FoxView() {
                     focus={focus}
                     stance={stance}
                     detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
-                    onFrameRate={choice === "auto" ? onFrameRate : undefined}
+                    onFrameRate={onFrameRate}
                 >
                     <RunGL
                         session={session}
@@ -601,56 +352,10 @@ export default function FoxView() {
                 />
             )}
             {/* Back to the target before, or on to the next, round from the last to the first: only on a target. */}
-            {focus !== null &&
-                [
-                    {
-                        by: -1,
-                        label: "Look at the one before",
-                        title: "Previous",
-                        icon: <ChevronLeft />,
-                    },
-                    { by: 1, label: "Look at the next one", title: "Next", icon: <ChevronRight /> },
-                ].map((b) => (
-                    <button
-                        key={b.by}
-                        type="button"
-                        aria-label={b.label}
-                        title={b.title}
-                        onClick={() => step(b.by)}
-                        className={`absolute top-1/2 z-10 flex size-14 -translate-y-1/2 items-center justify-center rounded-full text-ink-soft drop-shadow-[0_0_3px_var(--halo)] transition-colors hover:bg-surface/50 hover:text-ink-strong [&_svg]:size-11 ${
-                            b.by < 0 ? "left-1" : "right-1"
-                        }`}
-                    >
-                        {b.icon}
-                    </button>
-                ))}
+            {focus !== null && <StepButtons onStep={step} />}
             {/* The legend, or a button to show it, and under it how finely it's drawn. */}
             <div className="absolute top-2 right-2 flex max-h-[calc(100%-1rem)] max-w-[calc(100%-1rem)] flex-col items-end gap-2">
-                <button
-                    type="button"
-                    onClick={() => setLegendOpen(true)}
-                    aria-label="Show the legend"
-                    title="Legend"
-                    className={`${OVERLAY_CONTROL} w-9 shrink-0 ${
-                        legendOpen === null ? "flex sm:hidden" : legendOpen ? "hidden" : "flex"
-                    }`}
-                >
-                    <Info />
-                </button>
-                <section
-                    className={`min-h-0 w-72 max-w-full overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface/90 p-3 shadow-lg backdrop-blur ${
-                        legendOpen === null ? "hidden sm:block" : legendOpen ? "block" : "hidden"
-                    }`}
-                >
-                    <button
-                        type="button"
-                        onClick={() => setLegendOpen(false)}
-                        aria-label="Hide the legend"
-                        className="flex w-full items-center justify-between text-sm font-medium text-ink-strong"
-                    >
-                        Legend
-                        <X className="size-4 text-ink-soft" />
-                    </button>
+                <LegendPanel>
                     <ul className="mt-2 flex flex-col gap-1 text-xs text-ink-soft">
                         {legend.map((l) => (
                             <li key={l.name} className="flex items-center gap-2">
@@ -661,38 +366,8 @@ export default function FoxView() {
                             </li>
                         ))}
                     </ul>
-                </section>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label={`Detail: ${choice === "auto" ? `Auto, ${DETAILS[auto].label}` : DETAILS[choice].label}`}
-                            title="Detail"
-                            className={`${OVERLAY_CONTROL} w-9 shrink-0`}
-                        >
-                            <Gauge />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="bottom" align="end" className="min-w-52">
-                        <DropdownMenuLabel>Detail</DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                            value={choice}
-                            onValueChange={(c) => choose(c as DetailChoice)}
-                        >
-                            {(["auto", "low", "medium", "high"] as DetailChoice[]).map((c) => (
-                                <DropdownMenuRadioItem key={c} value={c}>
-                                    {c === "auto"
-                                        ? `Auto (now ${DETAILS[auto].label.toLowerCase()})`
-                                        : DETAILS[c].label}
-                                </DropdownMenuRadioItem>
-                            ))}
-                        </DropdownMenuRadioGroup>
-                        <p className="max-w-52 px-1.5 pt-1 pb-1.5 text-xs text-ink-muted">
-                            Auto follows the frame rate: less detail if it stutters, more if
-                            there&rsquo;s room.
-                        </p>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                </LegendPanel>
+                <DetailMenu choice={choice} onChoose={choose} auto={auto} />
             </div>
             {/* What's shown: the 3D view or a flat one. */}
             <div className="absolute bottom-2 left-2">
@@ -787,46 +462,17 @@ export default function FoxView() {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-            <div className="absolute right-2 bottom-2 flex flex-col overflow-hidden rounded-lg border border-border bg-surface/90 shadow-lg backdrop-blur">
-                {[
-                    {
-                        label: "Zoom in",
-                        icon: <Plus />,
-                        onClick: () => zoomBy(1.4),
-                        off: mode !== "3d" && view.nearest,
-                    },
-                    {
-                        label: "Zoom out",
-                        icon: <Minus />,
-                        onClick: () => zoomBy(1 / 1.4),
-                        off: mode !== "3d" && view.furthest,
-                    },
-                    {
-                        label:
-                            mode === "3d" && focus
-                                ? `Back to the start: ${focus.label}`
-                                : "Show the whole view again",
-                        icon: <RotateCcw />,
-                        onClick: () => {
-                            if (mode === "3d") return glView?.reset();
-                            view.reset();
-                        },
-                        off: false,
-                    },
-                ].map((b) => (
-                    <button
-                        key={b.label}
-                        type="button"
-                        aria-label={b.label}
-                        title={b.label}
-                        onClick={b.onClick}
-                        disabled={b.off}
-                        className="flex size-9 items-center justify-center text-ink-soft transition-colors hover:bg-line-faint disabled:opacity-40 [&_svg]:size-4"
-                    >
-                        {b.icon}
-                    </button>
-                ))}
-            </div>
+            <ZoomButtons
+                onZoom={zoomBy}
+                onReset={() => (mode === "3d" ? glView?.reset() : view.reset())}
+                nearest={mode !== "3d" && view.nearest}
+                furthest={mode !== "3d" && view.furthest}
+                resetLabel={
+                    mode === "3d" && focus
+                        ? `Back to the start: ${focus.label}`
+                        : "Show the whole view again"
+                }
+            />
         </div>
     );
 }
