@@ -65,9 +65,9 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
 
 ## Smaller fixes
 
-- Four carabiners: in 3D, `hardware.ts`'s CT D and oval, and a plain oval in `abseil-tower/rig.ts` (which should use
-  `hardware.ts`'s); in SVG, the HMS in `knots/carabiner.tsx` and the edge-on rod in `articles/pulley-blocks.tsx`. The
-  HMS is the most detailed of them and given wholly in numbers, so its geometry could move to a module of its own and
-  build a 3D HMS too (a knot lifted into 3D could then bring its carabiner with it).
+- Four carabiners: in 3D, `hardware.ts`'s CT D and oval (the abseil tower uses the D throughout); in SVG, the HMS in
+  `knots/carabiner.tsx` and the edge-on rod in `articles/pulley-blocks.tsx`. The HMS is the most detailed of them and
+  given wholly in numbers, so its geometry could move to a module of its own and build a 3D HMS too (a knot lifted into
+  3D could then bring its carabiner with it).
 - Two hanging lines: `hanging` (a parabola, in `rigging/rope.ts`) and `hangingPath` (a catenary, in `hardware.ts`). Worth one
   name saying which is which.

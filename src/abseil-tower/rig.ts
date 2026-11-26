@@ -1,6 +1,7 @@
 import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
+import { CARABINER_R, carabiner as ctCarabiner } from "@/rigging/hardware";
 import { type Face, type Material, type Piece, type RigLabel } from "@/scene/pieces";
 
 import { basket, stackedLogs } from "./basket";
@@ -564,9 +565,8 @@ export const TAPE = { width: 0.035, thickness: 0.003 };
 const ROPE_R = 0.0055;
 /** How far from an abseil rope a belay beside it crosses the rail. */
 const BESIDE_GAP = 0.12;
-/** A carabiner's length and width. */
+/** A carabiner's length, from the middle of its top bar to the middle of its bottom bar. */
 const KRAB_L = 0.11;
-const KRAB_W = 0.06;
 const EAST = vec3(1, 0, 0);
 /** The letter each role's disc is labelled with, which the legend spells out. */
 const ROLE_LETTER: Record<Person["role"], string> = {
@@ -658,23 +658,39 @@ function basketSling(
     return {
         pieces: [
             ...run(loop, cuts, SLING_R, "sling", color).map((p) => ({ ...p, tape })),
-            krab.piece,
+            ...krab.pieces,
         ],
         clip: krab.far,
         along,
     };
 }
 
-/** A carabiner lying `along` a pull from `near`, flat in the plane with `across`: its oval, and where its far end is. */
-function carabiner(near: Vector3, along: Vector3, across: Vector3): { piece: Piece; far: Vector3 } {
-    const mid = near.add(along.scale(KRAB_L / 2));
-    const oval = Array.from({ length: 17 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2;
-        return mid
-            .add(along.scale((KRAB_L / 2) * Math.cos(a)))
-            .add(across.scale((KRAB_W / 2) * Math.sin(a)));
-    });
-    return { piece: strand(oval, 0.006, "steel"), far: mid.add(along.scale(KRAB_L / 2)) };
+/**
+ * A carabiner (the CT D, as on the flying fox) hanging from `near` by its narrow end (the middle of that end's bar),
+ * lying `along` a pull, flat in the plane with `across`: the sling always goes to the narrow end, the rope to the wide
+ * one. Its gate is on whichever side of it is lower, or on the `across` side when it hangs straight down. Gives its
+ * pieces, the middle of its wide end's bar, where what clips to it hangs, and the way its gate faces.
+ */
+function carabiner(
+    near: Vector3,
+    along: Vector3,
+    across: Vector3,
+): { pieces: Piece[]; far: Vector3; gate: Vector3 } {
+    const down = along.unit();
+    const gate = across.y > 1e-6 ? across.neg() : across;
+    return {
+        // `carabiner` hangs a D from its wide end (the photo's top), so it's hung from the far end, turned up.
+        pieces: ctCarabiner(
+            near.add(down.scale(KRAB_L)),
+            down.neg(),
+            gate,
+            "var(--tower-steel)",
+            KRAB_L,
+            { settled: true },
+        ),
+        far: near.add(down.scale(KRAB_L)),
+        gate,
+    };
 }
 
 /** Where a rope pulls towards, in the overhead beam's cross-section: the outer corner of the top rail it goes over. */
@@ -814,7 +830,7 @@ function ropeOverSide(
             ...toGround(route, [hitch], color, end, true),
             tail.piece,
             // A carabiner on the end, hanging from it flat against the side.
-            ...(endKrab ? [{ ...endKrab.piece, shell: { out, layer: 3 } }] : []),
+            ...(endKrab ? endKrab.pieces.map((p) => ({ ...p, shell: { out, layer: 3 } })) : []),
         ],
         labels: [
             tail.label,
@@ -829,7 +845,7 @@ function ropeOverSide(
         // A rope round a fixed line's end carabiner bears on the inside of its lower end.
         through:
             endKrab && end === "below-outrigger"
-                ? endKrab.far.add(vec3(0, ROPE_R + 0.006, 0))
+                ? endKrab.far.add(vec3(0, ROPE_R + CARABINER_R, 0))
                 : undefined,
     };
 }
@@ -981,7 +997,7 @@ function belayHitches(
     return {
         pieces: [
             lrh,
-            krab.piece,
+            ...krab.pieces,
             ...loops,
             ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
             // The rope goes into the prusiks at one end and out at the other, hidden inside them.
@@ -1037,7 +1053,7 @@ function belayOverSide(
                 ...strand([nearRail, rail, intoKnot(hang)], ROPE_R, "rope", color, false, true),
                 shell: { out, layer: 3 },
             },
-            { ...endKrab.piece, shell: { out, layer: 3 } },
+            ...endKrab.pieces.map((p) => ({ ...p, shell: { out, layer: 3 } })),
             tail.piece,
         ],
         labels: [...hitches.labels, tail.label],
@@ -1083,7 +1099,7 @@ function belayRedirected(
                 ),
                 shell: outside,
             },
-            { ...endKrab.piece, shell: outside },
+            ...endKrab.pieces.map((p) => ({ ...p, shell: outside })),
             tail.piece,
         ],
         labels: [...hitches.labels, tail.label],
@@ -1157,7 +1173,7 @@ function wrapSling(
         s.scale(-pull.y).add(w.scale(pull.x)),
     );
     return {
-        pieces: [...run(loop, cuts, SLING_R, "sling", rigColor(item.color)), krab.piece],
+        pieces: [...run(loop, cuts, SLING_R, "sling", rigColor(item.color)), ...krab.pieces],
         clip: krab.far,
         along: target ? target.sub(krab.far).unit() : up.neg(),
     };
@@ -1381,7 +1397,7 @@ export function layoutRig(rig: Rig, only?: Set<string>): { pieces: Piece[]; labe
             });
             // Its carabiner, lying along it, flat in the upright plane it's in.
             const across = vec3(-along.y, along.x, 0).unit();
-            pieces.push(carabiner(end.sub(along.scale(0.01)), along, across).piece);
+            pieces.push(...carabiner(end.sub(along.scale(0.01)), along, across).pieces);
             labels.push({
                 at: start.lerp(end, 0.5),
                 text: DC.text,

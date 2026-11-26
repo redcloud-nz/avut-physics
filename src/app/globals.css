@@ -321,6 +321,9 @@ html {
   --strand-3: #3d83f0;
   --strand-4: #d9a816;
 
+  /* Gear any scene draws: the carabiners' locking sleeves. */
+  --carabiner-sleeve: #c8302a;
+
   /* The abseil tower's drawing: its logs, timber rails and stairs, boarding, decks, steel pipe, the ground round it. */
   --tower-log: #8a6b4a;
   --tower-rail: #a08462;
@@ -337,7 +340,6 @@ html {
   --fox-brass: #c9a64a;
   --fox-tirfor: #c5cad1;
   --fox-tirfor-lever: #e6c21c;
-  --fox-carabiner-sleeve: #c8302a;
   --fox-carabiner-oval: #868c96;
   --fox-shackle-pin: #e3c11f;
   --fox-spar: #c9a36b;

@@ -269,7 +269,9 @@ function closedLoop(pts: Flat[], n: number): Flat[] {
  * A triple-lock carabiner, the CT D-shape or oval (`shape`), hanging from `top` (the middle of its bar where it hangs)
  * towards `down`, `length` on to the middle of its bar where things hang from it, its loop in the plane of `down` and
  * `across`: `width` across (by default in proportion to the photo), its gate on the `across` side behind its locking
- * sleeve (`sleeve`'s colour), its bar `r` thick.
+ * sleeve (`sleeve`'s colour), its bar `r` thick. By default its loads sit where the photo's carabiner takes them, by its
+ * spine; `settled`, it's hung between two loads and nothing else, so it turns until each sits in the bottom of its bend
+ * and the two are in line along the pull.
  */
 export function carabiner(
     top: Vector3,
@@ -281,14 +283,16 @@ export function carabiner(
         shape = "d",
         width,
         r = 0.005,
-        sleeve = "var(--fox-carabiner-sleeve)",
+        sleeve = "var(--carabiner-sleeve)",
         through,
+        settled = false,
     }: {
         shape?: keyof typeof CARABINER_SHAPES;
         width?: number;
         r?: number;
         sleeve?: string;
         through?: number;
+        settled?: boolean;
     } = {},
 ): Piece[] {
     const d = down.unit();
@@ -297,7 +301,7 @@ export function carabiner(
     const loop = closedLoop(S.loop, 6);
     // Metres per pixel across: `width` across, by default in proportion to the photo.
     const span = S.bottom[1] - S.top[1];
-    const ku = (width ?? (length * S.width) / span) / S.width;
+    let ku = (width ?? (length * S.width) / span) / S.width;
     // Where it hangs: by default where the photo's carabiner takes its loads. Passed `through` two plates that far
     // apart (where its bar bears on their holes' edges), it settles in contact with both: its bend level across them,
     // turned in its own plane until what hangs from it, sitting in the lowest point of its bottom bend, is straight
@@ -344,8 +348,34 @@ export function carabiner(
             turn = best.spin;
             [hangX, topY, bottomY] = [best.chord.x, best.chord.y, best.lowest[1]];
         }
+    } else if (settled) {
+        // Turned about the middle until its highest and lowest points (where each load sits) are one above the other.
+        const [cx, cy] = [(S.top[0] + S.bottom[0]) / 2, (S.top[1] + S.bottom[1]) / 2];
+        const spinBy = (angle: number) => {
+            const [c, sn] = [Math.cos(angle), Math.sin(angle)];
+            return ([x, y]: Flat): Flat => [
+                cx + (x - cx) * c - (y - cy) * sn,
+                cy + (x - cx) * sn + (y - cy) * c,
+            ];
+        };
+        let angle = 0;
+        let ends = { high: loop[0], low: loop[0] };
+        for (let i = 0; i < 20; i++) {
+            const turned = loop.map(spinBy(angle));
+            const high = turned.reduce((m, q) => (q[1] < m[1] ? q : m));
+            const low = turned.reduce((m, q) => (q[1] > m[1] ? q : m));
+            ends = { high, low };
+            const step = Math.atan2(low[0] - high[0], low[1] - high[1]);
+            if (Math.abs(step) < 1e-6) break;
+            angle += step;
+        }
+        turn = spinBy(angle);
+        pts = loop.map(turn);
+        [hangX, topY, bottomY] = [ends.high[0], ends.high[1], ends.low[1]];
     }
     const kv = length / (bottomY - topY);
+    // Settled, it keeps its shape: `length` is between where its loads sit, and it's that much in proportion across.
+    if (settled && width === undefined) ku = kv;
     const at = ([x, y]: Flat) => top.add(a.scale((hangX - x) * ku)).add(d.scale((y - topY) * kv));
     const body: Piece = {
         kind: "strand",

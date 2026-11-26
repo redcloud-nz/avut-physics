@@ -27,7 +27,9 @@ const TOWER: SceneConfig = {
         ["W", vec3(-2.2, groundAt(-2.2), 4.5 / 2)],
     ],
     letter: 0.7,
-    minR: { sling: 0.014, rope: 0.012, steel: 0.01 },
+    // Ropes, slings and hardware drawn their true size, in proportion, and never thinner than 2.5 pixels.
+    minR: {},
+    hairlines: 2.5,
     label: "The Cracroft abseil tower in 3D. Drag to turn it, scroll or pinch to zoom, and right-drag or drag with two fingers to move it.",
 };
 
