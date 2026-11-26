@@ -333,7 +333,7 @@ export default function FoxView() {
                     onReady={setGlView}
                     focus={focus}
                     stance={stance}
-                    detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
+                    detail={DETAILS[detail]}
                     onFrameRate={onFrameRate}
                 >
                     <RunGL

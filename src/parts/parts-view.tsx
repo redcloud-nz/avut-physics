@@ -103,7 +103,7 @@ export default function PartsView() {
                     labels={labels}
                     onReady={setGlView}
                     onTurn={ignoreTurn}
-                    detail={{ dpr: DETAILS[detail].dpr, sides: DETAILS[detail].sides }}
+                    detail={DETAILS[detail]}
                 />
                 <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] items-start gap-2">
                     <DropdownMenu>

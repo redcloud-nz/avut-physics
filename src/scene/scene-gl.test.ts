@@ -86,4 +86,27 @@ describe("buildScene's repeated shapes", () => {
         expect(built.solids).toHaveLength(1);
         expect(built.repeats.reduce((n, s) => n + s.places.length, 0)).toBe(rest.length);
     });
+
+    it("thins a strand's points when asked, keeping its ends' directions", () => {
+        const run = Array.from({ length: 41 }, (_, i) => vec3(i / 40, 0.02 * Math.sin(i / 8), 0));
+        const rope: Piece = {
+            kind: "strand",
+            points: run,
+            r: 0.005,
+            material: "rope",
+            capA: false,
+            capB: false,
+        };
+        const corners = (thin: number) =>
+            buildScene([rope], {}, 6, "round", thin).solids[0].geometry.getAttribute("position")
+                .count;
+        expect(corners(0.25)).toBeLessThan(corners(0));
+        // Its end ring is where it was (6 corners), square to its first stretch as before, so it meets the strand on.
+        const ring = (thin: number, from: number) =>
+            Array.from(
+                buildScene([rope], {}, 6, "round", thin).solids[0].geometry.getAttribute("position")
+                    .array,
+            ).slice(from * 18, from * 18 + 18);
+        expect(ring(0.25, 0)).toEqual(ring(0, 0));
+    });
 });

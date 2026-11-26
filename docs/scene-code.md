@@ -46,9 +46,11 @@ triangles at 10 sides a tube (an estimate from point counts, not the renderer's 
   `InstancedMesh`. Closed loops no longer get two round ends hidden inside them. On the whole flying fox: geometry built
   1.26 to 0.54 million triangles, triangles drawn 1.26 to 1.03 million, `buildScene` about 175 to 105 ms. Any other
   shape used many times can carry a `shape` too.
-- **Low draws simpler shapes**: chain links with fewer points and 4 sides, figure 8s as the old ring (or resampled to
-  fewer points), no stitching, plates without their edge faces. One `simple` option through the builders
-  (`foxPieces({ run, simple })`), only on Low, so the other levels don't rebuild any more than now.
+- **Done: Low draws simpler shapes.** On Low the 3D view thins each strand's points (`thinned` in `src/lib/curve3.ts`):
+  its tube's middle may stray 0.15 of its radius from the strand's, keeping the strand's end directions so joins don't
+  notch. On the flying fox, Low draws 170,000 triangles rather than 265,000 (Medium 416,000). At a quarter of the
+  radius it's 151,000, but knots look angular up close. Not done: figure 8s as the old ring, plates without their edge
+  faces and no stitching on Low, which need the builders to know the level (`foxPieces({ run, simple })`).
 - **Done: changing detail no longer rebuilds the whole 3D scene.** The faces are built once for each set of pieces, and
   the rods and strands are kept for the last two levels, so Auto stepping down and back up doesn't build them again; the
   level left lets go of the graphics card's copy. Auto's frame-rate watch starts afresh at each level. Most of the pause

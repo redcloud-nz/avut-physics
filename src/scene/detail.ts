@@ -3,19 +3,21 @@ export type FrameRate = "short" | "spare";
 
 /**
  * How finely a scene is drawn, chosen on the page or left to follow the frame rate (Auto). In 3D it sets how
- * many pixels each CSS pixel gets (the biggest cost on a phone's dense screen) and how round the ropes and rods are; in
- * the flat views, how small a detail can be before it's left out.
+ * many pixels each CSS pixel gets (the biggest cost on a phone's dense screen), how round the ropes and rods are, and
+ * how closely they follow their bends (`thin`: how far a tube's middle may stray from the rope's, as a share of its
+ * radius, to leave out points along nearly straight runs); in the flat views, how small a detail can be before it's
+ * left out.
  */
 export type Detail = "low" | "medium" | "high";
 export type DetailChoice = "auto" | Detail;
 
 export const DETAILS: Record<
     Detail,
-    { label: string; dpr: number; sides: number; finePx: number }
+    { label: string; dpr: number; sides: number; thin: number; finePx: number }
 > = {
-    low: { label: "Low", dpr: 1, sides: 6, finePx: 4 },
-    medium: { label: "Medium", dpr: 1.5, sides: 10, finePx: 1.5 },
-    high: { label: "High", dpr: 2.5, sides: 16, finePx: 0.75 },
+    low: { label: "Low", dpr: 1, sides: 6, thin: 0.15, finePx: 4 },
+    medium: { label: "Medium", dpr: 1.5, sides: 10, thin: 0, finePx: 1.5 },
+    high: { label: "High", dpr: 2.5, sides: 16, thin: 0, finePx: 0.75 },
 };
 
 /** Where Auto starts, before it's seen how the device keeps up. */

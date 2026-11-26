@@ -19,6 +19,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Line, OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 
+import { thinned } from "@/lib/curve3";
 import { rad } from "@/lib/math";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
@@ -475,9 +476,15 @@ const JOINT = "joint:";
 /**
  * Every piece's solid, merged into one geometry per colour, and the gaps between boards as strips, merged per colour
  * of the boards they're between. `only` builds just the faces (`flat`, the same however many sides tubes have) or just
- * the rods and strands (`round`).
+ * the rods and strands (`round`). Strands leave out points their tube's middle passes within `thin` of their radius of.
  */
-export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES, only?: "flat" | "round") {
+export function buildScene(
+    pieces: Piece[],
+    minR: MinR,
+    sides = SIDES,
+    only?: "flat" | "round",
+    thin = 0,
+) {
     const byColor = new Map<string, THREE.BufferGeometry[]>();
     // Faces shaded corner to corner, gathered into one mesh, with their corners' colours in order.
     const shadedParts: THREE.BufferGeometry[] = [];
@@ -530,14 +537,14 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES, only?: "f
                 let copy = copies.get(key);
                 if (!copy) {
                     const parts = new Map<string, THREE.BufferGeometry[]>();
-                    strandSolids({ ...p, points: p.shape }, r, color, sides, (c, g) => {
+                    strandSolids({ ...p, points: p.shape }, r, color, sides, thin, (c, g) => {
                         if (g) parts.set(c, [...(parts.get(c) ?? []), g]);
                     });
                     copy = { parts, places: [] };
                     copies.set(key, copy);
                 }
                 copy.places.push(place);
-            } else strandSolids(p, r, color, sides, add);
+            } else strandSolids(p, r, color, sides, thin, add);
         } else if (p.shades && !p.holes?.length) {
             shadedParts.push(faceGeometry(p.points.map(T)));
             shades.push(...p.shades);
@@ -588,17 +595,24 @@ export function buildScene(pieces: Piece[], minR: MinR, sides = SIDES, only?: "f
     return { solids, shaded: shaded && { geometry: shaded, shades }, repeats };
 }
 
-/** A strand's solids: its tube, and its ends rounded or cut. */
+/** A strand's solids: its tube (through fewer points where `thin` allows), and its ends rounded or cut. */
 function strandSolids(
     p: Strand,
     r: number,
     color: string,
     sides: number,
+    thin: number,
     add: (color: string, g: THREE.BufferGeometry | null) => void,
 ) {
     // Drawn thicker than it is, it's lifted by as much, so rope lying on a deck stays on it, not in it.
     const lift = new THREE.Vector3(0, r - p.r, 0);
-    const points = p.points.map((q) => T(q).add(lift));
+    // Thinned between its first two points and its last two, so its ends still face the same way, meeting the strands
+    // on from them without a notch.
+    const ends = p.points.length > 4 && thin > 0;
+    const kept = ends
+        ? [p.points[0], ...thinned(p.points.slice(1, -1), thin * r), p.points.at(-1)!]
+        : p.points;
+    const points = kept.map((q) => T(q).add(lift));
     add(color, tubeGeometry(points, r, sides));
     // A closed loop (a chain link) has no ends to show.
     if (points.length > 3 && points[0].distanceTo(points.at(-1)!) < 1e-6) return;
@@ -854,31 +868,34 @@ export function Solids({
     minR,
     hairlines,
     sides,
+    thin = 0,
 }: {
     pieces: Piece[];
     colors: Colors;
     minR: MinR;
     hairlines: number;
     sides: number;
+    /** How far tubes' middles may stray from their strands' (a share of their radius), to leave out points. */
+    thin?: number;
 }) {
     // The faces, built once for each set of pieces: they're the same at every detail.
     const flat = useMemo(() => buildScene(pieces, minR, SIDES, "flat"), [pieces, minR]);
     useEffect(() => () => disposeBuilt(flat), [flat]);
-    // The rods and strands, for the last two numbers of sides asked for, so Auto stepping a level down and back up (or
+    // The rods and strands, for the last two levels of detail asked for, so Auto stepping a level down and back up (or
     // up and back down) doesn't build them again.
     const built = useMemo(
-        () => ({ pieces, minR, levels: new Map<number, ReturnType<typeof buildScene>>() }),
+        () => ({ pieces, minR, levels: new Map<string, ReturnType<typeof buildScene>>() }),
         [pieces, minR],
     );
     const round = useMemo(() => {
         const { levels } = built;
-        const had = levels.get(sides);
-        const now = had ?? buildScene(built.pieces, built.minR, sides, "round");
-        levels.delete(sides);
-        levels.set(sides, now);
+        const level = `${sides} ${thin}`;
+        const now = levels.get(level) ?? buildScene(built.pieces, built.minR, sides, "round", thin);
+        levels.delete(level);
+        levels.set(level, now);
         if (levels.size > 2) levels.delete(levels.keys().next().value!);
         return now;
-    }, [built, sides]);
+    }, [built, sides, thin]);
     // Left for another level, it lets go of the graphics card's copy, keeping its own to draw from again.
     useEffect(() => () => disposeBuilt(round), [round]);
     const solids = [...flat.solids, ...round.solids];
@@ -1392,8 +1409,11 @@ export type ViewProps = {
     onTurn?: (azimuth: number, elevation: number) => void;
 };
 
-/** How finely a scene's drawn: the most pixels per CSS pixel, and how many sides its tubes have. */
-export type GLDetail = { dpr: number; sides: number };
+/**
+ * How finely a scene's drawn: the most pixels per CSS pixel, how many sides its tubes have, and how far their middles
+ * may stray from their ropes' (a share of their radius) to leave out points (see `DETAILS`).
+ */
+export type GLDetail = { dpr: number; sides: number; thin?: number };
 
 /** A scene's pieces in 3D, with its ground and compass, turned, zoomed and moved by dragging. */
 export function SceneGL({
@@ -1463,12 +1483,13 @@ export function SceneGL({
                         minR={scene.minR}
                         hairlines={scene.hairlines ?? 0}
                         sides={detail?.sides ?? SIDES}
+                        thin={detail?.thin ?? 0}
                     />
                     {onFrameRate && (
                         // Watching for a frame rate that stays short of smooth, or has room to spare: afresh at each
                         // level, so the pause as it changes isn't taken for a slow frame rate.
                         <PerformanceMonitor
-                            key={`${detail?.dpr} ${detail?.sides}`}
+                            key={`${detail?.dpr} ${detail?.sides} ${detail?.thin}`}
                             bounds={() => [BOUNDS.short, BOUNDS.spare]}
                             flipflops={FLIPS}
                             onDecline={() => onFrameRate("short")}
