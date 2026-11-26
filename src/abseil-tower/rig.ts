@@ -1,9 +1,14 @@
 import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
-import { CARABINER_R, carabiner as ctCarabiner } from "@/rigging/hardware";
-import { figure8, stopper } from "@/rigging/knots";
-import { basketedSling, SLINGS } from "@/rigging/slings";
+import {
+    CARABINER_R,
+    carabinerWith as ctCarabiner,
+    type CarabinerFeatures,
+} from "@/rigging/hardware";
+import type { Connection } from "@/rigging/interactions";
+import { clearOf, figure8, stopper } from "@/rigging/knots";
+import { basketedSlingWith, SLINGS, type TapeFeatures } from "@/rigging/slings";
 import {
     type Face,
     type Group,
@@ -638,7 +643,16 @@ function basketSling(
     slant = 0,
     face?: Vector3,
     knotted = false,
-): { pieces: Piece[]; clip: Vector3; along: Vector3; gate: Vector3; group?: Group } {
+): {
+    pieces: Piece[];
+    clip: Vector3;
+    along: Vector3;
+    gate: Vector3;
+    group?: Group;
+    krab: CarabinerFeatures;
+    tape: TapeFeatures;
+    slingPull: Vector3;
+} {
     const { x, lowerY, upperY } = OVERHEAD;
     const centre = vec2(x, (lowerY + upperY) / 2);
     const pull = target ? target.sub(centre).unit() : vec2(0, -1);
@@ -663,7 +677,7 @@ function basketSling(
     );
     const section = stackedLogs(lower, upper, OVERHEAD.r).map((p) => vec3(p.x, p.y, z));
     const up = beam.cross(vec3(pull.x, pull.y, 0));
-    const sling = basketedSling(
+    const { pieces: sling, tape } = basketedSlingWith(
         "climbing",
         vec3(centre.x, centre.y, z),
         section,
@@ -691,6 +705,9 @@ function basketSling(
         along,
         gate: krab.gate,
         group: krab.group,
+        krab: krab.features,
+        tape,
+        slingPull: along.neg(),
     };
 }
 
@@ -791,7 +808,13 @@ function carabiner(
     face?: Vector3,
     knotAt?: "near" | "far",
     settled = face === undefined,
-): { pieces: Piece[]; far: Vector3; gate: Vector3; group?: Group } {
+): {
+    pieces: Piece[];
+    far: Vector3;
+    gate: Vector3;
+    group?: Group;
+    features: CarabinerFeatures;
+} {
     let down = along.unit();
     let gate = across.y > 1e-6 ? across.neg() : across;
     if (face) {
@@ -803,17 +826,16 @@ function carabiner(
     }
     // `carabiner` hangs a D from its wide end (the photo's top), so it's hung from the far end, turned up. Its body comes
     // first, then the sleeve on its gate and the grip round the sleeve.
-    const [body, ...sleeve] = ctCarabiner(
-        near.add(down.scale(KRAB_L)),
-        down.neg(),
-        gate,
-        "var(--tower-steel)",
-        KRAB_L,
-        { settled, centred: !settled },
-    );
+    const {
+        pieces: [body, ...sleeve],
+        features,
+    } = ctCarabiner(near.add(down.scale(KRAB_L)), down.neg(), gate, "var(--tower-steel)", KRAB_L, {
+        settled,
+        centred: !settled,
+    });
     // Unturned, the wide end's bar crosses the line along the pull from the narrow end's middle short of the far end.
     const far = settled ? near.add(down.scale(KRAB_L)) : wideBar(body, near, down);
-    if (!face) return { pieces: [body, ...sleeve], far, gate };
+    if (!face) return { pieces: [body, ...sleeve], far, gate, features };
     const group = { at: near.lerp(far, 0.5) };
     const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
     // The end the knot's round, and the way into the carabiner from it.
@@ -843,6 +865,7 @@ function carabiner(
         far,
         gate,
         group,
+        features,
     };
 }
 
@@ -924,6 +947,25 @@ function knotLabel(
     return { at, text, shell, side };
 }
 
+/** The connection between a rope's end knot and the carabiner hanging from it, if it's drawn as it's tied. */
+function endConnection(
+    id: string,
+    tail: { knot?: Vector3[]; hang: Vector3 },
+    krab: { features: CarabinerFeatures } | false | undefined,
+): Connection[] {
+    if (!krab || !tail.knot) return [];
+    return [
+        {
+            kind: "figure-8-on-carabiner",
+            id: `${id}: the carabiner on its end`,
+            arrangement: "end",
+            carabiner: krab.features,
+            knot: { rope: tail.knot, r: ROPE_R },
+            pull: tail.hang.neg(),
+        },
+    ];
+}
+
 /**
  * The knot on a rope's end, which hangs straight down to `end`: with a carabiner hanging from `end` (its narrow end's
  * bar running along `bar`), a figure 8 on a bight round that bar; without one, a figure 8 stopper whose foot is at
@@ -945,7 +987,14 @@ function endKnot(
     bar: Vector3 | undefined,
     cylinders: boolean,
     face?: Vector3,
-): { pieces: Piece[]; into: Vector3; label: RigLabel; at: Vector3; hang: Vector3 } {
+): {
+    pieces: Piece[];
+    into: Vector3;
+    label: RigLabel;
+    at: Vector3;
+    hang: Vector3;
+    knot?: Vector3[];
+} {
     const n = face?.unit();
     const seen = (v: Vector3) => (n ? v.sub(n.scale(v.dot(n))) : v);
     // Laid out level where it would hang straight away from the eye.
@@ -989,6 +1038,7 @@ function endKnot(
                 : knotLabel(rope, text, shell),
         at,
         hang,
+        knot: knot ? rope : undefined,
     };
 }
 
@@ -1083,7 +1133,8 @@ function ropeOverSide(
     cylinders: boolean,
     face?: Vector3,
     krabGroup?: Group,
-): { pieces: Piece[]; labels: RigLabel[]; through?: Vector3 } {
+    krab?: CarabinerFeatures,
+): { pieces: Piece[]; labels: RigLabel[]; through?: Vector3; connections: Connection[] } {
     const { route, end } = rope;
     const last = beyondRail(route, clip.z, end).at(-1)!;
     const out = route === "east-face" ? EAST : EAST.neg();
@@ -1099,10 +1150,25 @@ function ropeOverSide(
     // Tied to its sling's carabiner with a figure 8 on a bight round its wide end, lying towards the rail; or with a
     // munter and two half hitches, drawn as a cylinder along the pull from a little back over the carabiner's end.
     let tied: { pieces: Piece[]; from: Vector3[]; label: RigLabel };
+    const connections = endConnection(rope.id, tail, endKrab);
     if (rope.knot === "F8OB") {
         const rail = vec3(PULL[route].x, PULL[route].y, clip.z);
         // Face on in a flat view, over its carabiner.
-        const knot = figure8(clip, face ?? gate, CARABINER_R, rail, ROPE_R);
+        const tiedKnot = figure8(clip, face ?? gate, CARABINER_R, rail, ROPE_R);
+        // In 3D its bight follows the carabiner's tight wide end, not the straight bar it's shaped round.
+        const knot =
+            krab && !face
+                ? { ...tiedKnot, rope: clearOf(tiedKnot.rope, krab.loop, krab.r + ROPE_R) }
+                : tiedKnot;
+        if (krab && !cylinders)
+            connections.push({
+                kind: "figure-8-on-carabiner",
+                id: `${rope.id}: tied to its sling's carabiner`,
+                arrangement: "anchor",
+                carabiner: krab,
+                knot: { rope: knot.rope, r: ROPE_R },
+                pull: rail.sub(clip).unit(),
+            });
         const group = krabGroup && { ...krabGroup, over: true, order: 4 };
         tied = cylinders
             ? {
@@ -1163,6 +1229,7 @@ function ropeOverSide(
             endKrab && end === "below-outrigger"
                 ? endKrab.far.add(vec3(0, ROPE_R + CARABINER_R, 0))
                 : undefined,
+        connections,
     };
 }
 
@@ -1347,7 +1414,7 @@ function belayOverSide(
     along: Vector3,
     cylinders: boolean,
     face?: Vector3,
-): { pieces: Piece[]; labels: RigLabel[]; back: Vector3 } {
+): { pieces: Piece[]; labels: RigLabel[]; back: Vector3; connections: Connection[] } {
     const color = rigColor(belay.color);
     const hitches = belayHitches(belay, clip, along, face);
     const { tbpB, back } = hitches;
@@ -1375,6 +1442,7 @@ function belayOverSide(
         ],
         labels: [...hitches.labels, tail.label],
         back,
+        connections: endConnection(belay.id, tail, endKrab),
     };
 }
 
@@ -1391,7 +1459,13 @@ function belayRedirected(
     drop: number,
     cylinders: boolean,
     face?: Vector3,
-): { pieces: Piece[]; labels: RigLabel[]; back: Vector3; under: Vector3 } {
+): {
+    pieces: Piece[];
+    labels: RigLabel[];
+    back: Vector3;
+    under: Vector3;
+    connections: Connection[];
+} {
     const color = rigColor(belay.color);
     const hitches = belayHitches(belay, clip, along, face);
     const { tbpB } = hitches;
@@ -1417,6 +1491,7 @@ function belayRedirected(
         labels: [...hitches.labels, tail.label],
         back: hitches.back,
         under: hitches.tbpA.lerp(tbpB, 0.5),
+        connections: endConnection(belay.id, tail, endKrab),
     };
 }
 
@@ -1428,7 +1503,15 @@ function belayRedirected(
 function wrapSling(
     item: WrapSling,
     target: Vector3 | null,
-): { pieces: Piece[]; clip: Vector3; along: Vector3; gate: Vector3 } {
+): {
+    pieces: Piece[];
+    clip: Vector3;
+    along: Vector3;
+    gate: Vector3;
+    krab: CarabinerFeatures;
+    tape: TapeFeatures;
+    slingPull: Vector3;
+} {
     const up = vec3(0, 1, 0);
     const { around } = item;
     // What it wraps: its middle where the sling goes round, the way it runs, and its section.
@@ -1495,7 +1578,7 @@ function wrapSling(
                           .add(depth.scale((i * j * section.h) / 2)),
                   ),
               );
-    const sling = basketedSling(
+    const { pieces: sling, tape } = basketedSlingWith(
         "climbing",
         centre,
         wrapped,
@@ -1510,6 +1593,9 @@ function wrapSling(
         clip: krab.far,
         along: target ? target.sub(krab.far).unit() : up.neg(),
         gate: krab.gate,
+        krab: krab.features,
+        tape,
+        slingPull: pullDir.neg(),
     };
 }
 
@@ -1680,13 +1766,26 @@ export function layoutRig(
     rig: Rig,
     only?: Set<string>,
     { knotCylinders = false, face }: { knotCylinders?: boolean; face?: Vector3 } = {},
-): { pieces: Piece[]; labels: RigLabel[] } {
+): { pieces: Piece[]; labels: RigLabel[]; connections: Connection[] } {
     const pieces: Piece[] = [];
     const labels: RigLabel[] = [];
+    const connections: Connection[] = [];
     const clips = new Map<
         string,
-        { clip: Vector3; along: Vector3; gate: Vector3; group?: Group }
+        { clip: Vector3; along: Vector3; gate: Vector3; group?: Group; krab: CarabinerFeatures }
     >();
+    /** The connection between a sling and its carabiner. */
+    const onSling = (
+        id: string,
+        s: { krab: CarabinerFeatures; tape: TapeFeatures; slingPull: Vector3 },
+    ): Connection => ({
+        kind: "carabiner-on-sling",
+        id: `${id}: its carabiner`,
+        arrangement: "anchor",
+        carabiner: s.krab,
+        sling: s.tape,
+        pull: s.slingPull,
+    });
     // Where each fixed line's end carabiner takes a rope round it, for belays redirected through it.
     const redirects = new Map<string, Vector3>();
     const heightOf = (id?: string) =>
@@ -1704,15 +1803,16 @@ export function layoutRig(
             (i): i is Rope | Belay => (i.kind === "rope" || i.kind === "belay") && i.from === id,
         );
     for (const item of rig.items) {
-        const [drawn, written] = [pieces.length, labels.length];
+        const [drawn, written, connected] = [pieces.length, labels.length, connections.length];
         layOut(item);
         // Everything's laid out, as one item can depend on another, but only those asked for are kept.
         if (only && !only.has(item.id)) {
             pieces.length = drawn;
             labels.length = written;
+            connections.length = connected;
         }
     }
-    return { pieces, labels };
+    return { pieces, labels, connections };
 
     /** Where a person stands (the middle of their disc, on their deck). */
     function personAt(id: string): Vector3 | undefined {
@@ -1787,6 +1887,7 @@ export function layoutRig(
                 rope?.kind === "rope" && rope.knot === "F8OB",
             );
             pieces.push(...s.pieces);
+            connections.push(onSling(item.id, s));
             clips.set(item.id, s);
         } else if (item.kind === "bucket") {
             if (underBelay(item)) return;
@@ -1809,6 +1910,7 @@ export function layoutRig(
             const via = belay?.redirect && redirects.get(belay.redirect.via);
             const s = wrapSling(item, via ?? null);
             pieces.push(...s.pieces);
+            connections.push(onSling(item.id, s));
             clips.set(item.id, s);
         } else if (item.kind === "person") {
             const centre = personCentre(item);
@@ -1832,6 +1934,7 @@ export function layoutRig(
                 labels: RigLabel[];
                 back: Vector3;
                 under?: Vector3;
+                connections: Connection[];
             } | null =
                 item.redirect && through
                     ? belayRedirected(
@@ -1849,6 +1952,7 @@ export function layoutRig(
             if (!belay) return;
             pieces.push(...belay.pieces);
             labels.push(...belay.labels);
+            connections.push(...belay.connections);
             // A bucket for its spare standing on the deck under its prusiks.
             const below = rig.items.find(
                 (i): i is Bucket =>
@@ -1903,10 +2007,12 @@ export function layoutRig(
                 knotCylinders,
                 face,
                 from.group,
+                from.krab,
             );
             if (rope.through) redirects.set(item.id, rope.through);
             pieces.push(...rope.pieces);
             labels.push(...rope.labels);
+            connections.push(...rope.connections);
             const bucket = item.spare && buckets.get(item.spare);
             if (bucket)
                 pieces.push(

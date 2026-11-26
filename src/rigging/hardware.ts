@@ -167,10 +167,23 @@ export function bolt(
  * from its spine, over the top bend to the gate's nose, down the gate to its hinge, and round the bottom bend back to
  * the spine. What it hangs from sits at `top` and what hangs from it at `bottom`, square below; `gate` is the gate's
  * line from its nose to its hinge, `sleeve` the stretch of it the locking sleeve covers, and `knurl` its gripped
- * middle. The D has a narrow top bend and a wide bottom one beside its straight spine, which loads sit against; the
- * oval is the same round both ends, loads sitting in the middle of each.
+ * middle. The D is wide at the top and narrow at the bottom, beside its straight spine, which loads sit against; the
+ * oval is the same round both ends, loads sitting in the middle of each. `stretches` names its parts by the traced
+ * points they run between (counting on round past the last to the first): its top and bottom bends, its gate, its spine.
  */
-const CARABINER_SHAPES = {
+const CARABINER_SHAPES: Record<
+    "d" | "oval",
+    {
+        loop: Flat[];
+        top: Flat;
+        bottom: Flat;
+        width: number;
+        gate: Flat[];
+        sleeve: [number, number];
+        knurl: [number, number];
+        stretches: Record<CarabinerStretch, [number, number]>;
+    }
+> = {
     d: {
         loop: [
             [405, 420],
@@ -207,6 +220,7 @@ const CARABINER_SHAPES = {
         ] as Flat[],
         sleeve: [195, 385],
         knurl: [255, 335],
+        stretches: { top: [4, 9], bottom: [17, 24], gate: [13, 17], spine: [0, 4] },
     },
     oval: {
         loop: [
@@ -241,8 +255,32 @@ const CARABINER_SHAPES = {
         ] as Flat[],
         sleeve: [195, 392],
         knurl: [268, 365],
+        stretches: { top: [2, 8], bottom: [13, 19], gate: [9, 12], spine: [20, 22] },
     },
 };
+
+/**
+ * A carabiner's named stretches: its top bend, its bottom bend, its gate and its spine. On the D, the top is its wide end
+ * (a tight corner beside the spine, sloping across to the gate's nose) and the bottom its narrow end (one round bend);
+ * on the oval, the two ends are alike.
+ */
+export type CarabinerStretch = "top" | "bottom" | "gate" | "spine";
+
+/**
+ * What a carabiner's connections are checked against: its bar's centreline (`loop`, closed, its last point its first),
+ * the bar's radius, where the loads sit at its top and bottom ends, and its named stretches, each as the range of
+ * `loop`'s indices it covers (`from` to `to`, counting on round past the end to the start).
+ */
+export type CarabinerFeatures = {
+    loop: Vector3[];
+    r: number;
+    top: Vector3;
+    bottom: Vector3;
+    stretches: Record<CarabinerStretch, { from: number; to: number }>;
+};
+
+/** How many points the carabiner's loop has between each pair of its traced points. */
+const CARABINER_STEPS = 6;
 
 /** A closed smooth loop through `pts` (Catmull–Rom), `n` points between each pair. */
 function closedLoop(pts: Flat[], n: number): Flat[] {
@@ -274,7 +312,12 @@ function closedLoop(pts: Flat[], n: number): Flat[] {
  * and the two are in line along the pull; `centred`, it hangs as it's drawn but from the middle of its bottom bend, as on
  * a knot's loop with nothing on its other end.
  */
-export function carabiner(
+export function carabiner(...args: Parameters<typeof carabinerWith>): Piece[] {
+    return carabinerWith(...args).pieces;
+}
+
+/** A carabiner as `carabiner` draws it, with its features for checking its connections. */
+export function carabinerWith(
     top: Vector3,
     down: Vector3,
     across: Vector3,
@@ -297,11 +340,11 @@ export function carabiner(
         settled?: boolean;
         centred?: boolean;
     } = {},
-): Piece[] {
+): { pieces: Piece[]; features: CarabinerFeatures } {
     const d = down.unit();
     const a = across.unit();
     const S = CARABINER_SHAPES[shape];
-    const loop = closedLoop(S.loop, 6);
+    const loop = closedLoop(S.loop, CARABINER_STEPS);
     // Metres per pixel across: `width` across, by default in proportion to the photo.
     const span = S.bottom[1] - S.top[1];
     let ku = (width ?? (length * S.width) / span) / S.width;
@@ -400,11 +443,29 @@ export function carabiner(
         const [[x0, y0], [x1, y1]] = S.gate;
         return at(turn([x0 + ((x1 - x0) * (y - y0)) / (y1 - y0), y]));
     };
-    return [
-        body,
-        ...part(gate(S.sleeve[0]), gate(S.sleeve[1]), r * 1.55, sleeve, r),
-        ...part(gate(S.knurl[0]), gate(S.knurl[1]), r * 1.75, sleeve, r),
-    ];
+    const stretch = ([from, to]: [number, number]) => ({
+        from: from * CARABINER_STEPS,
+        to: to * CARABINER_STEPS,
+    });
+    return {
+        pieces: [
+            body,
+            ...part(gate(S.sleeve[0]), gate(S.sleeve[1]), r * 1.55, sleeve, r),
+            ...part(gate(S.knurl[0]), gate(S.knurl[1]), r * 1.75, sleeve, r),
+        ],
+        features: {
+            loop: body.points,
+            r,
+            top: at([hangX, topY]),
+            bottom: at([hangX, bottomY]),
+            stretches: {
+                top: stretch(S.stretches.top),
+                bottom: stretch(S.stretches.bottom),
+                gate: stretch(S.stretches.gate),
+                spine: stretch(S.stretches.spine),
+            },
+        },
+    };
 }
 
 /**

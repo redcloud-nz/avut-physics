@@ -24,12 +24,13 @@ Everything is in SI units and plain functions or immutable classes. Physics coor
 
 ## Curves
 
-| File          | What's in it                                                                                                                                                                              |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bezier.ts`   | `Cubic`, a cubic Bézier in 2D: points and derivatives along it, splitting, length, curvature, boxes, and where two cross.                                                                 |
-| `hobby.ts`    | Hobby's smooth curves through points (as in METAFONT): the directions and control points for a row of points.                                                                             |
-| `curve3.ts`   | Curves in 3D as runs of points: a cubic Bézier (`cubicPoints`), a Catmull–Rom path through points (`catmullRom`), and a run of points thinned out where it's nearly straight (`thinned`). |
-| `svg-path.ts` | SVG path data: numbers, points and polylines written for it (`svgNumber`, `svgPoint`, `svgPoints`, `polylinePath`), and paths (M, L, H, V, C, A) read back as points (`pathPoints`).      |
+| File           | What's in it                                                                                                                                                                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bezier.ts`    | `Cubic`, a cubic Bézier in 2D: points and derivatives along it, splitting, length, curvature, boxes, and where two cross.                                                                                                                                           |
+| `hobby.ts`     | Hobby's smooth curves through points (as in METAFONT): the directions and control points for a row of points.                                                                                                                                                       |
+| `curve3.ts`    | Curves in 3D as runs of points: a cubic Bézier (`cubicPoints`), a Catmull–Rom path through points (`catmullRom`), and a run of points thinned out where it's nearly straight (`thinned`).                                                                           |
+| `polyline3.ts` | Runs of points in 3D against each other: the nearest points between two segments (`segmentsNearest`) or two runs (`nearestBetween`, `nearestOnRun`), the way a closed loop faces (`loopNormal`), and where a run passes through a flat loop's inside (`piercings`). |
+| `svg-path.ts`  | SVG path data: numbers, points and polylines written for it (`svgNumber`, `svgPoint`, `svgPoints`, `polylinePath`), and paths (M, L, H, V, C, A) read back as points (`pathPoints`).                                                                                |
 
 ## Ropes in 3D
 

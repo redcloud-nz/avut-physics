@@ -222,7 +222,18 @@ export function tapeRun(
  * them and to `along`, which the top leg is on. The loop crosses itself round the crown, where it changes layer. It's
  * in the sling's own colour unless given `color`, and a climbing sling's stitching is drawn unless it's not `stitched`.
  */
-export function basketedSling(
+export function basketedSling(...args: Parameters<typeof basketedSlingWith>): Strand[] {
+    return basketedSlingWith(...args).pieces;
+}
+
+/**
+ * What a sling's connections are checked against: its tape's middle line (closed, its last point its first) and how
+ * thick the tape is at each of its points.
+ */
+export type TapeFeatures = { points: Vector3[]; thickness: number[] };
+
+/** A basketed sling as `basketedSling` draws it, with its tape's features for checking its connections. */
+export function basketedSlingWith(
     kind: keyof typeof SLINGS,
     log: Vector3,
     around: number | Vector3[],
@@ -231,7 +242,7 @@ export function basketedSling(
     up: Vector3,
     along: Vector3,
     { color = SLINGS[kind].color, stitched = true }: { color?: string; stitched?: boolean } = {},
-): Strand[] {
+): { pieces: Strand[]; tape: TapeFeatures } {
     const { width, thickness, r, bunched } = SLINGS[kind];
     // Worked out square to the log, then sheared along it as far as the bar rises along it, so the loop hugs the log
     // on a slant.
@@ -367,14 +378,17 @@ export function basketedSling(
     // Round an outline (finer than round a log) in shorter strands, so none reaching from a leg over the top of what
     // it wraps sorts below it in the flat views.
     const tape = tapeRun(points, profile, z, color, r, typeof around === "number" ? 12 : 4);
-    return [
-        ...tape,
-        ...(kind === "round"
-            ? stripes(points, profile, z)
-            : stitched
-              ? stitching(points, profile, z)
-              : []),
-    ];
+    return {
+        pieces: [
+            ...tape,
+            ...(kind === "round"
+                ? stripes(points, profile, z)
+                : stitched
+                  ? stitching(points, profile, z)
+                  : []),
+        ],
+        tape: { points, thickness: profile.map((q) => q.thickness) },
+    };
 }
 
 /**

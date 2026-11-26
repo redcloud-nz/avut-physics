@@ -1,6 +1,7 @@
 import { knot3dFile } from "@/knot-editor-3d/knot-file";
 import { convexHull } from "@/lib/hull";
 import { clamp } from "@/lib/math";
+import { nearestOnRun } from "@/lib/polyline3";
 import { arcLengths } from "@/lib/rope-3d/rope";
 import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
@@ -382,6 +383,18 @@ export function carabinerKnot(
     const bar = bend.sub(gate.scale(end * Math.sin(spine))).add(down.scale(end * Math.cos(spine)));
     const axis = gate.scale(Math.cos(spine)).add(down.scale(Math.sin(spine)));
     return { knot: figure8(bar, axis, CARABINER_R, toward, r), bar };
+}
+
+/**
+ * A knot's rope kept clear of a curved bar (a carabiner's, its centreline `bar`): each point nearer the bar's middle than
+ * `gap` (the bar's radius and the rope's) pushed straight out from it until it just touches. A figure 8 is shaped round
+ * a straight bar, so round a carabiner's tight bend its bight would otherwise sink into it.
+ */
+export function clearOf(rope: Vector3[], bar: readonly Vector3[], gap: number): Vector3[] {
+    return rope.map((p) => {
+        const { at, distance } = nearestOnRun(p, bar);
+        return distance < gap && distance > 0 ? at.add(p.sub(at).scale(gap / distance)) : p;
+    });
 }
 
 /** The points of `route` past the reach of `knot`, tied into the bar at `bar`. */
