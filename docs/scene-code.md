@@ -12,17 +12,15 @@ The engine every scene shares is in `src/scene/`: the pieces, the 3D view (`Scen
 flat views' camera and gestures, the callout layout and detail. The hardware, rope, knots and slings are in
 `src/rigging/`.
 
-The flying fox is in parts: `site.ts` (the ground, sizes and fixed positions, which is all the physics in `run.ts`
-reads), `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `rig/`, a file for each part of the rig
+The flying fox is in parts: `site.ts` (the ground, sizes and fixed positions) and `chain-weight.ts` (the chain
+weight's size and how much of it hangs), which are all the physics in `run.ts` reads, `colors.ts`, `labels.ts`, `targets.ts`, `ground.ts`, and the model in `rig/`, a file for each part of the rig
 (`tower.ts`, `tree.ts`, `shear-leg.ts`, `log-anchor.ts` with the lizards and Tirfor, `hawsers.ts`, `trolleys.ts`,
-`brake.ts`) and `shared.ts` for the builders several use. `fox.ts` puts them together.
+`brake.ts`, `chain-weight.ts`) and `shared.ts` for the builders several use. `fox.ts` puts them together.
 
 ## Structure
 
 - **The flying fox's own rigging builders** (in `src/flying-fox/rig/`) could join `src/rigging/` once they take their colours and the
   ground as arguments: `guy` and `picket`, `rigPulley`, `squareLashing`, `chokedSling`, `madeOff`, `swagedEye`.
-- **`chain-weight.ts` mixes the physics** (`chainWeightHanging`, which `run.ts` reads) with the drawing of the chain
-  heap.
 - Keep the assembly editor in mind (`docs/knot-editor-3d.md`, "The assembly editor"): builders that return named
   frames, and placements kept apart from the pieces drawn.
 

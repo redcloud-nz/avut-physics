@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { vec3 } from "@/lib/vector3";
 import { chain, CHAIN_10, stepsAlong } from "@/rigging/hardware";
 
-import { CHAIN_WEIGHT, chainWeight, chainWeightHanging, chainWeightMass } from "./chain-weight";
+import { CHAIN_WEIGHT, chainWeightHanging, chainWeightMass } from "./chain-weight";
+import { chainWeight } from "./rig/chain-weight";
 
 describe("chain", () => {
     it("lays a whole number of links exactly along a path that long", () => {

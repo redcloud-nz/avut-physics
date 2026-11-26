@@ -1,10 +1,4 @@
-import {
-    CHAIN_WEIGHT,
-    chainWeight,
-    chainWeightHanging,
-    chainWeightMass,
-    chainWeightPieces,
-} from "@/flying-fox/chain-weight";
+import { CHAIN_WEIGHT, chainWeightHanging, chainWeightMass } from "@/flying-fox/chain-weight";
 import {
     C,
     PULLEY_COLORS,
@@ -13,6 +7,7 @@ import {
     TROLLEY_COLORS,
 } from "@/flying-fox/colors";
 import { foxPieces } from "@/flying-fox/fox";
+import { chainWeight, chainWeightPieces } from "@/flying-fox/rig/chain-weight";
 import { ANCHOR_SHACKLE } from "@/flying-fox/rig/log-anchor";
 import { rigPulley } from "@/flying-fox/rig/shared";
 import { SADDLE, shearLegGuyLoops, SLING_Z } from "@/flying-fox/rig/shear-leg";

@@ -1,10 +1,6 @@
-import {
-    CHAIN_WEIGHT,
-    chainWeight,
-    chainWeightPieces,
-    type ChainWeight,
-} from "@/flying-fox/chain-weight";
+import { CHAIN_WEIGHT } from "@/flying-fox/chain-weight";
 import { C, STOP_BLOCK_COLORS, STOP_BLOCK_EYE } from "@/flying-fox/colors";
+import { chainWeight, chainWeightPieces, type ChainWeight } from "@/flying-fox/rig/chain-weight";
 import {
     BLOCKS_X,
     BRAKE,
