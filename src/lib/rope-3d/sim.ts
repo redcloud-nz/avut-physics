@@ -1,11 +1,11 @@
 import { vec3, type Vector3 } from "@/lib/vector3";
 
-import type { RopeSetup } from "./rope";
+import type { Loop, RopeSetup } from "./rope";
 
 /**
  * A rope settling by position-based dynamics: its points kept their spacing along it (it doesn't stretch), bent no
  * tighter than its least bend, straightened a little each step (its stiffness), kept a diameter off itself wherever two
- * points further apart along it than a tight bend can bring them come close, and kept off the bars. Points held
+ * points further apart along it than a tight bend can bring them come close, and kept off the bars and closed bars. Points held
  * (`fixed`) don't move, and everything else is kept off them. Pieces marked `shrinking` get a little shorter each step,
  * drawing the rope up.
  *
@@ -37,6 +37,8 @@ export class RopeSim {
     private steps = 0;
     /** How close each pair that started closer than a diameter may come (keyed i * n + j). */
     private readonly allowed = new Map<number, number>();
+    /** The closed bars, each with its pieces filed by the cells of a grid they're near, to find them quickly. */
+    private readonly loops: LoopGrid[];
 
     constructor(points: readonly Vector3[], setup: RopeSetup, fixed?: readonly boolean[]) {
         this.setup = setup;
@@ -49,6 +51,7 @@ export class RopeSim {
             points[i].distanceTo(points[i + 1]),
         );
         this.fixed = Uint8Array.from({ length: n }, (_, i) => (fixed?.[i] ? 1 : 0));
+        this.loops = (setup.loops ?? []).map((loop) => loopGrid(loop, setup.diameter));
         this.findPairs();
         const d = setup.diameter;
         for (let p = 0; p < this.pairs.length; p += 2) {
@@ -225,6 +228,48 @@ export class RopeSim {
                     }
                 }
             }
+            // Not through a closed bar: each point pushed out from the nearest piece of it near enough to touch.
+            for (const loop of this.loops) {
+                const want = loop.r + d / 2;
+                const P = loop.points;
+                for (let i = 0; i < n; i++) {
+                    if (fixed[i]) continue;
+                    const near = loop.cells.get(loop.key(x[i], y[i], z[i]));
+                    if (!near) continue;
+                    let [best, bx, by, bz] = [Infinity, 0, 0, 0];
+                    for (const k of near) {
+                        const [a, b] = [P[k], P[k + 1]];
+                        const [ux, uy, uz] = [b.x - a.x, b.y - a.y, b.z - a.z];
+                        const uu = ux * ux + uy * uy + uz * uz;
+                        const t =
+                            uu > 0
+                                ? Math.min(
+                                      1,
+                                      Math.max(
+                                          0,
+                                          ((x[i] - a.x) * ux +
+                                              (y[i] - a.y) * uy +
+                                              (z[i] - a.z) * uz) /
+                                              uu,
+                                      ),
+                                  )
+                                : 0;
+                        const [rx, ry, rz] = [
+                            x[i] - (a.x + ux * t),
+                            y[i] - (a.y + uy * t),
+                            z[i] - (a.z + uz * t),
+                        ];
+                        const len = Math.hypot(rx, ry, rz);
+                        if (len < best) [best, bx, by, bz] = [len, rx, ry, rz];
+                    }
+                    if (best < want && best > 0) {
+                        const c = (want - best) / best;
+                        x[i] += bx * c;
+                        y[i] += by * c;
+                        z[i] += bz * c;
+                    }
+                }
+            }
             // Its length: each piece its own length, both ways along so neither end leads.
             const free = this.free;
             for (let i = 0; i < n - 1; i++) if (!free?.[i]) this.apart(i, i + 1, rest[i]);
@@ -233,52 +278,37 @@ export class RopeSim {
     }
 }
 
-/** The options `tightenKnot` takes: the rope's diameter, the bar it's round and how it's drawn up. */
-export type TightenOptions = {
-    /** The rope's diameter (metres). */
-    diameter: number;
-    /** A bar it's tied round, running along z through `at`, `r` in radius (metres). */
-    bar?: { at: Vector3; r: number };
-    /** How far each end is pulled each step (metres), along `pull`'s direction: one for each end. */
-    pull?: [Vector3, Vector3];
-    /** How much shorter the rope gets each step (a fraction of its length), drawing the knot up evenly. */
-    shrink?: number;
-    /** Which pieces shrink (each between a point and the next), if not all of them. */
-    shrinking?: boolean[];
-    /** How many steps at most, and how many passes over the constraints each step. */
-    steps?: number;
-    iterations?: number;
-    /** The tightest bend, in diameters to the centreline. */
-    minBend?: number;
-    /** How much each step straightens the rope, 0 to 1: its stiffness. */
-    stiffness?: number;
-    /** Points held where they are: only the rest move, kept off these as off everything else. */
-    fixed?: boolean[];
-    /** Checked every so often: true once it's tight enough. */
-    stop?: (points: Vector3[]) => boolean;
+/** A closed bar's pieces filed by grid cell: each in every cell within reach of a rope touching it. */
+type LoopGrid = {
+    points: Loop["points"];
+    r: number;
+    cells: Map<string, number[]>;
+    key: (x: number, y: number, z: number) => string;
 };
 
-/**
- * A knot pulled tight from a loose start (a drawing lifted into 3D), as the flying fox's first figure 8 was: its ends
- * pulled or its pieces shrunk, until `stop` says it's tight enough or the steps run out.
- */
-export function tightenKnot(start: Vector3[], options: TightenOptions): Vector3[] {
-    const { diameter: d, steps = 4000, minBend = 0.5, stiffness = 0.02, stop } = options;
-    const bars = options.bar
-        ? [{ at: options.bar.at, along: vec3(0, 0, 1), r: options.bar.r }]
-        : [];
-    const sim = new RopeSim(
-        start,
-        { diameter: d, minBend: minBend * d, stiffness, bars },
-        options.fixed,
-    );
-    sim.shrink = options.shrink ?? 0;
-    if (options.shrinking) sim.shrinking = Uint8Array.from(options.shrinking, (s) => (s ? 1 : 0));
-    sim.pull = options.pull ?? null;
-    sim.iterations = options.iterations ?? 12;
-    for (let s = 0; s < steps; s++) {
-        sim.step();
-        if (stop && s > 0 && s % 25 === 0 && stop(sim.points())) break;
+function loopGrid(loop: Loop, diameter: number): LoopGrid {
+    const reach = loop.r + diameter / 2;
+    const cell = 2 * reach;
+    const c = (v: number) => Math.floor(v / cell);
+    const key = (x: number, y: number, z: number) => `${c(x)},${c(y)},${c(z)}`;
+    const cells = new Map<string, number[]>();
+    const P = loop.points;
+    for (let k = 0; k < P.length - 1; k++) {
+        const [a, b] = [P[k], P[k + 1]];
+        const lo = [Math.min(a.x, b.x), Math.min(a.y, b.y), Math.min(a.z, b.z)].map((v) =>
+            c(v - reach),
+        );
+        const hi = [Math.max(a.x, b.x), Math.max(a.y, b.y), Math.max(a.z, b.z)].map((v) =>
+            c(v + reach),
+        );
+        for (let i = lo[0]; i <= hi[0]; i++)
+            for (let j = lo[1]; j <= hi[1]; j++)
+                for (let l = lo[2]; l <= hi[2]; l++) {
+                    const id = `${i},${j},${l}`;
+                    const list = cells.get(id);
+                    if (list) list.push(k);
+                    else cells.set(id, [k]);
+                }
     }
-    return sim.points();
+    return { points: P, r: loop.r, cells, key };
 }

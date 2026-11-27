@@ -1,4 +1,4 @@
-import { knot3dFile } from "@/knot-editor-3d/knot-file";
+import { knot3dFile, knotRope } from "@/knot-editor-3d/knot-file";
 import { convexHull } from "@/lib/hull";
 import { clamp } from "@/lib/math";
 import { nearestOnRun } from "@/lib/polyline3";
@@ -45,7 +45,7 @@ function halveTail(points: readonly Vector3[]): Vector3[] {
 }
 
 /** The figure 8 on a bight's rope as drawn, its tail halved. */
-const FIGURE_8_ROPE = halveTail(FIGURE_8.rope.points);
+const FIGURE_8_ROPE = halveTail(knotRope(FIGURE_8).points);
 
 /** How much of each of a big loop's legs is kept as tied (metres, at the knot file's size) before it opens out. */
 const BIG_LOOP_KEEP = 0.03;
@@ -56,12 +56,14 @@ const BIG_LOOP_KEEP = 0.03;
  */
 const FIGURE_8_BIG_LOOP = knot3dFile("figure-8-big-loop.json", FIGURE_8_BIG_LOOP_JSON);
 
-const FIGURE_8_BIG_LOOP_ROPE = halveTail(FIGURE_8_BIG_LOOP.rope.points);
+const FIGURE_8_BIG_LOOP_POINTS = knotRope(FIGURE_8_BIG_LOOP);
+
+const FIGURE_8_BIG_LOOP_ROPE = halveTail(FIGURE_8_BIG_LOOP_POINTS.points);
 
 /** Where its loop leaves the knot and comes back to it. */
 const BIG_LOOP_ENDS = loopEnds(
     FIGURE_8_BIG_LOOP_ROPE,
-    FIGURE_8_BIG_LOOP.rope.seg,
+    FIGURE_8_BIG_LOOP_POINTS.seg,
     FIGURE_8_BIG_LOOP.knot,
     BIG_LOOP_KEEP,
 );
@@ -70,7 +72,7 @@ const BIG_LOOP_ENDS = loopEnds(
 const FIGURE_8_SINGLE = knot3dFile("figure-8-single.json", FIGURE_8_SINGLE_JSON);
 
 /** The single figure 8's rope as drawn, from its standing end, its tail halved. */
-const FIGURE_8_SINGLE_ROPE = halveTail(FIGURE_8_SINGLE.rope.points);
+const FIGURE_8_SINGLE_ROPE = halveTail(knotRope(FIGURE_8_SINGLE).points);
 
 /**
  * A figure 8 stopper tied in a rope's end: the rope arriving at `at` heading along `dir`, and on through the knot to
@@ -128,6 +130,7 @@ export function figure8(
 ): Figure8 {
     const { props, diameter } = loop === undefined ? FIGURE_8 : FIGURE_8_BIG_LOOP;
     const at = props[0];
+    if (at?.kind !== "bar") throw new Error("The figure 8's file has no bar first.");
     const scale = ropeR / (diameter / 2);
     // The knot's own axes turned onto the bar's: its bar along z, and back up its standing part along y. A big loop
     // lies in the plane of the pull, square to it, its bar's axis taken square to the pull.

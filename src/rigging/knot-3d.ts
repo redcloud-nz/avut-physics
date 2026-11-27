@@ -11,7 +11,7 @@ import { line } from "./rope";
  * and, where two cross, which is on top. Lifted, each rope keeps its place in the drawing's plane and rises towards the
  * viewer where it's on top, or sinks where it's underneath, so at a crossing the two are a rope's thickness apart
  * (each half the two ropes' diameters added, from the plane), easing back to the plane over `EASE` diameters either
- * side. Where it passes in front of or behind a prop (a bar, a carabiner's end) it's clear of it the same way, by the
+ * side. Crossings close together each keep their full lift. Where it passes in front of or behind a prop (a bar, a carabiner's end) it's clear of it the same way, by the
  * prop's radius and its own. A dressed knot's strands lie nearly flat beside each other, so it's close to how one sits.
  */
 
@@ -50,18 +50,23 @@ export function liftKnot(picture: Picture): Rope3D[] {
     picture.strands.forEach((strand, i) => {
         if (strand.kind !== "rope") return;
         const g = geometry.strands[i];
-        // A blend of the lifts near each point: each weighed by how near its crossing is (1 at it, easing to 0), and
-        // averaged where they overlap, so two crossings close together don't stack.
+        // A blend of the lifts near each point, each weighed by how near its crossing is, so that at each crossing it's
+        // lifted (or sunk) the whole way and two crossings close together neither stack nor cancel: weighed by the
+        // inverse square of the distance, it passes through every crossing's own lift, and the nearest crossing's ease
+        // (1 at it, to 0 a few diameters off) brings it back to the drawing's plane between them.
         const depth = (s: number) => {
-            let [sum, weight] = [0, 0];
+            let [sum, weight, near] = [0, 0, 0];
             for (const l of lifts[i]) {
                 const u = Math.abs(s - l.s) / l.ease;
                 if (u >= 1) continue;
-                const w = Math.cos((Math.PI / 2) * u) ** 2;
+                if (u < 1e-9) return l.by;
+                const ease = Math.cos((Math.PI / 2) * u) ** 2;
+                const w = ease / (u * u);
                 sum += w * l.by;
                 weight += w;
+                near = Math.max(near, ease);
             }
-            return sum / Math.max(1, weight);
+            return weight > 0 ? (near * sum) / weight : 0;
         };
         const step = strand.diameter / 4;
         const n = Math.max(2, Math.ceil(g.length / step));

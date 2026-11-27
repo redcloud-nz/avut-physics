@@ -4,6 +4,10 @@
 (`src/rigging/knots/figure-8.json`), and it's drawn on the flying fox's trolleys, tying the dropper into the rider's
 carabiner. Its other uses (the rethreaded 8s, the joining rope's) still stand in as turns round a bar. What changed from the design below as it was built is under Built.
 
+**Rework planned (2026-11-27):** pins and segments as in the 2D editor, the carabiner as its closed loop, new knots
+from any drawing file, and tightening painted and run in stages. See "Rework: pins and staged tightening" at the end;
+where it differs from what's above, it wins.
+
 An editor for shaping knots in 3D by hand, a few segments at a time, and tightening them, saved to files. It's for
 the flying fox's figure 8s first: their 3D shape comes from tightening the Rescue Knots drawing, which leaves strands
 twisted in places, and fixing a twist means moving rope about half way round the knot while watching what happens.
@@ -260,3 +264,160 @@ pieces drawn, make this easier later.
   34–50. Both are set in the panel.
 - **Not built:** dragging a segment boundary's marker (boundaries slide from the panel), the photos beside the view,
   and knots of two ropes (New from a knot drawing takes a drawing's first rope and its bars only).
+
+## Rework: pins and staged tightening
+
+Planned 2026-11-27, from tying the munter hitch and two half hitches in the editor and in code. What went wrong:
+
+- **Smoothing made the rope lumpy, and moving a segment made a mess.** The rope is a run of points the simulation
+  moves, so every edit reshapes it point by point, and nothing keeps it a smooth curve.
+- **The carabiner is a straight bar** (the bar across its bottom end). Tightening the munter drew the rope off its end.
+- **Tightening runs all at once**, too fast to watch, and the whole munter drawn up together passes rope through rope
+  or jams so tight the half hitches disappear. Tightened in code, it only worked in stages: the munter first, a
+  little, holding the bight; then the hitches; the standing end held straight throughout.
+- **"Tightening the knot" can't be worked out from the page.** It builds its held and knot lists one run in play at a
+  time, doesn't show which segments are in them, and its button is somewhere else.
+- **Only registered knots can be started from.** A drawing saved in the 2D editor has to be added to `KNOTS` first.
+- **Its segments aren't the drawing's.** They're cut every 20 mm, so "hold the bight" has to be found again by number.
+
+### The rope: pins and segments
+
+- **As the 2D editor's:** a rope is a run of pins, and a segment is one cubic Bézier between two pins. A pin has a
+  position in 3D and may have a direction; where it has none, its direction comes from its neighbours, as the 2D
+  editor's Hobby directions do. A segment has a tension at each end (1 by default), and can be locked to a length.
+  The rope is smooth by construction, so there's no Smooth.
+- **Its diameter, least bend and stiffness** are the file's, as now. The simulation (tightening, Settle) works on
+  points sampled from the curves about a quarter of a diameter apart, and the result is fitted back to pins (below).
+- **From a drawing,** every pin and segment carries over with its number, so segment 19 in the 3D editor is segment
+  19 in the drawing. Heights come from `liftKnot`. Where one Bézier between a segment's pins can't give the heights
+  the lift gives it (a segment crossing over one strand and under another), pins are added at its crossings, and the
+  pieces keep the drawn number with a letter (19a, 19b). Segments are chosen, painted and named by these numbers.
+- **Doubled strands:** the 2D editor's linked pins (a pin held beside another, a gap apart, on one side) carry over
+  later, to keep a figure 8's doubled strands paired instead of twisting round each other.
+
+### Editing
+
+- **Click a pin** to pick it. It has X, Y and Z arrows to drag, and nudges from the panel and keys as now (1 mm, 5 mm
+  with shift). The two segments either side follow; locked segments keep their length, as in the 2D editor.
+- **A pin's direction** is set by dragging its handle, or cleared to come from its neighbours. **A segment's
+  tensions** are set in the panel.
+- **Add a pin** in a segment (the pieces keep its number with a letter), or **remove one** (its two segments join).
+- **Edits don't push rope out of the way.** A drag moves the curve where you put it, and the page warns about what's
+  wrong instead (as the 2D editor does):
+  - rope pressed into rope, or into the carabiner, more than a tolerance, marked where it is;
+  - a bend tighter than the least bend;
+  - a drag that took rope through rope or through the carabiner (watched frame to frame, as tightening is);
+  - while the knot still lies near the drawing's plane, crossings that aren't the drawing's.
+- **Settle** runs the simulation a short while with nothing shortened, to push overlaps apart, and fits the result
+  back to pins.
+
+### The carabiner
+
+- **A carabiner prop** is the closed loop of its rod's middle line, as `middleLoop` in `src/knots/carabiner.tsx`
+  draws it, in the drawing's plane, with the rod's radius. The rope can't slide off it as off a bar. Straight bars
+  stay for knots tied round a bar.
+- The rope's times through the carabiner, counted each way, are watched in every edit: with the ends held they can
+  only change by going through the rod.
+
+### New from a drawing file
+
+File gains "New from a drawing file", which opens any file the 2D editor saves (its first rope, its bars and
+carabiners), as well as the list of registered knots.
+
+### Tightening in stages
+
+- **Tighten mode** replaces "Tightening the knot" and tightening in play. In it, you paint segments in the 3D view with
+  brushes, each its own colour, with a key in the panel:
+  - **Shorten:** draws up, a little each step.
+  - **Hold:** stays where it is.
+  - **Hold straight:** stays on the line it lies along now, its far end held, and can slide along that line into the
+    knot, as a loaded standing end does.
+  - **Slides** (the eraser): moves freely.
+- **The rope's two end segments are held** to start with, so the knot doesn't draw them in.
+- **Run it:** Step (a few simulation steps), Run, and Stop, with "until it's this much shorter" (a percentage of the
+  painted rope's length when the run started) and a live readout of how much shorter it is. It also stops when the
+  painted rope stops getting shorter (jammed).
+- **It's watched as it runs,** and stops the step before rope passes through rope or through the carabiner, saying
+  where. Crossings seen from the drawing's side aren't checked while it tightens: a tightened knot's strands come to
+  lie over each other without anything passing through.
+- **Stages:** each run is a stage, listed in the panel with its painting and how far it went (the munter to 15%, then
+  the hitches to 30%), and is one step to undo. The list is saved with the knot, so a good sequence can be run again
+  from the untightened knot.
+- **Afterwards the rope is fitted back to pins.** A pin is a point of the rope itself, so it goes where its point of
+  rope ended up; each segment's Bézier is fitted to the shape its rope settled into (ends at its pins, directions from
+  the settled rope, tensions by least squares). The panel says how far the fit strays from the settled rope, and marks
+  segments that stray more than a quarter of a diameter, where adding a pin would help.
+
+### Files
+
+A new version of the file, with an upgrade from the old: the old version's points become pins at its segment
+boundaries, each segment fitted as above.
+
+```json
+{
+  "format": "avut-knot-3d",
+  "version": 2,
+  "name": "Munter hitch and two half hitches",
+  "from": "munter-and-two-half-hitches",
+  "diameter": 0.011,
+  "minBend": 0.011,
+  "stiffness": 0.05,
+  "props": [{ "id": 1, "kind": "carabiner", "loop": [[0.01, -0.04, 0]], "r": 0.0055 }],
+  "rope": {
+    "pins": [
+      { "id": 1, "at": [0, -0.2, 0] },
+      { "id": 2, "at": [0.01, -0.06, 0.004], "along": [0, 1, 0] }
+    ],
+    "segments": [{ "id": 19, "name": "19", "tension": [1, 1] }]
+  },
+  "stages": [
+    { "shorten": ["20", "21", "22"], "hold": ["77", "67"], "straight": ["19"], "until": 0.15 }
+  ]
+}
+```
+
+`from` names the drawing, by its file name when it isn't a registered knot. `held` and `knot` go, replaced by
+`stages`.
+
+### Order of work
+
+1. Pins and segments in 3D: the curves (directions where a pin has none, tensions, locked lengths), sampling them for
+   the simulation, and fitting a settled rope back to pins; tests (a fitted curve matches what it's fitted to, segment
+   numbers survive).
+2. The file's new version and the upgrade from the old; the trial figure 8 and the munter hitch opened through it.
+3. The carabiner prop, and New from a drawing file, with the drawing's pins and numbers and pins added at crossings.
+4. Editing: picking and dragging pins, directions, tensions, adding and removing pins, the warnings, Settle.
+5. Tighten mode: the brushes, Step, Run and Stop, the watch, stages and their list.
+6. Tie the munter and two half hitches with it, and save it to `src/rigging/knots/`.
+
+### Still open
+
+- **Directions in 3D** where a pin has none: Hobby's method is for curves in a plane. Something like it in 3D (the
+  direction from the neighbours, with Hobby's handle lengths from the angles turned) needs trying on the drawings.
+- **How long a run of steps** Step is, and how fast Run goes, to be watchable on the munter.
+
+### Built (2026-11-27)
+
+- **Where things are:** the rope of pins and segments is `src/lib/rope-3d/pinned.ts` (3D Hobby directions, sampling,
+  fitting back, splitting a segment, removing a pin), a stage is `stage.ts` (`StageRun`), the watch for passing
+  through is `watch.ts`, and the warnings `checks.ts`. The old point-by-point engine (`operations.ts`, `curve.ts`:
+  moves through the simulation, Smooth, sliding boundaries) is gone, and so is `src/rigging/knot-tighten.ts`, the
+  scripted staged tightening, with its trial munter file.
+- **Directions in 3D:** each pin's plane is the one its two chords lie in, the planes' normals kept facing the same way
+  along the run, and Hobby's equations solved on the angles in them. A run lying in one plane gives exactly the 2D
+  editor's directions (tested), so a drawing comes in as drawn.
+- **From a drawing:** a pin at each crossing and pass more than half a diameter from its segment's ends; every drawing
+  in `src/knots/files` keeps its crossings (tested). The crossing check counted a crossing at a point where two
+  pieces meet as no crossing; it now counts it once.
+- **Fitting back:** a pin's direction is the way the rope runs across its point; a held segment isn't fitted again but
+  kept as it was, its pins holding the ways they ran, so held rope comes through a stage exactly. Elsewhere a segment
+  that strays more than a twentieth of a diameter gets a pin at its middle, down to runs of three points.
+- **Old files** (version 1) are fitted at a tenth of a millimetre: the committed knots come out within 0.13–0.45 mm
+  of their old points (the rest is the old points' own corners), with 44 to 134 pins. Pages read a file's rope with
+  `knotRope`, sampled a quarter of a diameter apart.
+- **Stages** name their segments by id, not name, in the file. A stage that's kept is listed; the painting itself
+  lives in the editor, not the file, until a stage is kept. Pieces a kept stage split a segment into are painted as it
+  was.
+- **Settle** runs 150 steps with only the end segments held. **Step** runs 25.
+- **Not built yet:** running the saved stages again from the untightened knot; dragging a pin's direction (it's held
+  or freed, and turned 5° at a time about X, Y or Z, from the panel); locked segment lengths; linked pins.

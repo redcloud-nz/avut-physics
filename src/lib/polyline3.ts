@@ -81,12 +81,13 @@ export function loopNormal(loop: readonly Vector3[]): Vector3 {
 
 /**
  * Where the run `path` passes through the inside of the closed loop `loop`, which lies flat (in a plane): the points
- * it crosses the loop's plane at inside the loop, and the segments of `path` they're on.
+ * it crosses the loop's plane at inside the loop, the segments of `path` they're on, and which way it goes through
+ * (1 the way the loop faces, by `loopNormal`, -1 the other).
  */
 export function piercings(
     loop: readonly Vector3[],
     path: readonly Vector3[],
-): { at: Vector3; index: number }[] {
+): { at: Vector3; index: number; way: 1 | -1 }[] {
     const n = loopNormal(loop).unit();
     const origin = loop[0];
     // Axes in the loop's plane.
@@ -106,14 +107,14 @@ export function piercings(
         return odd;
     };
     const side = (p: Vector3) => p.sub(origin).dot(n);
-    const out: { at: Vector3; index: number }[] = [];
+    const out: { at: Vector3; index: number; way: 1 | -1 }[] = [];
     for (let i = 0; i < path.length - 1; i++) {
         const [h0, h1] = [side(path[i]), side(path[i + 1])];
         // On its plane counts as below it, so a point on the plane is crossed at once, not twice.
         if (h0 > 0 === h1 > 0) continue;
         const at = path[i].lerp(path[i + 1], h0 / (h0 - h1));
         const d = at.sub(origin);
-        if (inside(d.dot(e1), d.dot(e2))) out.push({ at, index: i });
+        if (inside(d.dot(e1), d.dot(e2))) out.push({ at, index: i, way: h1 > h0 ? 1 : -1 });
     }
     return out;
 }

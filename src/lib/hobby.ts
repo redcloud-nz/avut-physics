@@ -33,7 +33,7 @@ const turn = (a: Vector2, b: Vector2) => Math.atan2(a.cross(b), a.dot(b));
  * Hobby's velocity function f(θ, φ): how far along the chord (as a fraction of its length, at tension 1) the
  * control point leaving at angle θ to the chord sits, when the curve arrives at angle φ to it.
  */
-function velocity(theta: number, phi: number): number {
+export function hobbyVelocity(theta: number, phi: number): number {
     const [st, ct, sp, cp] = [Math.sin(theta), Math.cos(theta), Math.sin(phi), Math.cos(phi)];
     const num = 2 + Math.SQRT2 * (st - sp / 16) * (sp - st / 16) * (ct - cp);
     const den = 3 * (1 + 0.5 * (Math.sqrt(5) - 1) * ct + 0.5 * (3 - Math.sqrt(5)) * cp);
@@ -57,8 +57,8 @@ export function hobbyControls(
     const theta = turn(chord, leaving);
     const phi = turn(arriving, chord);
     return [
-        from.add(leaving.scale((d * velocity(theta, phi)) / tensions[0])),
-        to.sub(arriving.scale((d * velocity(phi, theta)) / tensions[1])),
+        from.add(leaving.scale((d * hobbyVelocity(theta, phi)) / tensions[0])),
+        to.sub(arriving.scale((d * hobbyVelocity(phi, theta)) / tensions[1])),
     ];
 }
 
@@ -78,7 +78,10 @@ export function hobbyTensions(
     const [out, back] = [c1.sub(from), to.sub(c2)];
     const theta = turn(chord, out.safeUnit(chord.unit()));
     const phi = turn(back.safeUnit(chord.unit()), chord);
-    return [(d * velocity(theta, phi)) / out.len(), (d * velocity(phi, theta)) / back.len()];
+    return [
+        (d * hobbyVelocity(theta, phi)) / out.len(),
+        (d * hobbyVelocity(phi, theta)) / back.len(),
+    ];
 }
 
 /**

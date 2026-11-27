@@ -24,22 +24,24 @@ Everything is in SI units and plain functions or immutable classes. Physics coor
 
 ## Curves
 
-| File           | What's in it                                                                                                                                                                                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bezier.ts`    | `Cubic`, a cubic Bézier in 2D: points and derivatives along it, splitting, length, curvature, boxes, and where two cross.                                                                                                                                           |
-| `hobby.ts`     | Hobby's smooth curves through points (as in METAFONT): the directions and control points for a row of points.                                                                                                                                                       |
-| `curve3.ts`    | Curves in 3D as runs of points: a cubic Bézier (`cubicPoints`), a Catmull–Rom path through points (`catmullRom`), and a run of points thinned out where it's nearly straight (`thinned`).                                                                           |
-| `polyline3.ts` | Runs of points in 3D against each other: the nearest points between two segments (`segmentsNearest`) or two runs (`nearestBetween`, `nearestOnRun`), the way a closed loop faces (`loopNormal`), and where a run passes through a flat loop's inside (`piercings`). |
-| `svg-path.ts`  | SVG path data: numbers, points and polylines written for it (`svgNumber`, `svgPoint`, `svgPoints`, `polylinePath`), and paths (M, L, H, V, C, A) read back as points (`pathPoints`).                                                                                |
+| File           | What's in it                                                                                                                                                                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bezier.ts`    | `Cubic`, a cubic Bézier in 2D: points and derivatives along it, splitting, length, curvature, boxes, and where two cross.                                                                                                                                                          |
+| `hobby.ts`     | Hobby's smooth curves through points (as in METAFONT): the directions and control points for a row of points.                                                                                                                                                                      |
+| `curve3.ts`    | Curves in 3D as runs of points: a cubic Bézier (`cubicPoints`), a Catmull–Rom path through points (`catmullRom`), and a run of points thinned out where it's nearly straight (`thinned`).                                                                                          |
+| `polyline3.ts` | Runs of points in 3D against each other: the nearest points between two segments (`segmentsNearest`) or two runs (`nearestBetween`, `nearestOnRun`), the way a closed loop faces (`loopNormal`), and where a run passes through a flat loop's inside, and which way (`piercings`). |
+| `svg-path.ts`  | SVG path data: numbers, points and polylines written for it (`svgNumber`, `svgPoint`, `svgPoints`, `polylinePath`), and paths (M, L, H, V, C, A) read back as points (`pathPoints`).                                                                                               |
 
 ## Ropes in 3D
 
-| File                    | What's in it                                                                                                                                                                                         |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rope-3d/rope.ts`       | A rope as points in numbered segments (`Rope3`): arc lengths, the point a distance along (`pointAt`), spacing, segments, and respacing. Its `arcLengths` and `pointAt` work on any run of 3D points. |
-| `rope-3d/sim.ts`        | Settling a rope by position-based dynamics: no stretch, a least bend, stiffness, not passing through itself or the bars.                                                                             |
-| `rope-3d/curve.ts`      | A smooth curve through locked ends (cubic Hermite pieces), for moving a handle along.                                                                                                                |
-| `rope-3d/operations.ts` | The 3D knot editor's edits as steppers: moving a handle, tightening, smoothing.                                                                                                                      |
+| File                | What's in it                                                                                                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rope-3d/rope.ts`   | A rope's setup (diameter, least bend, stiffness, straight bars and closed ones), and points' arc lengths and the point a distance along (`pointAt`), for any run of 3D points.                  |
+| `rope-3d/pinned.ts` | A rope as pins and segments, one cubic Bézier each (`PinnedRope`): Hobby's directions worked in 3D, sampling it as points, fitting points back to pins, splitting a segment and removing a pin. |
+| `rope-3d/sim.ts`    | Settling a rope by position-based dynamics: no stretch, a least bend, stiffness, not passing through itself, the bars or closed bars (a carabiner's rod).                                       |
+| `rope-3d/stage.ts`  | A stage of tightening (`StageRun`): segments painted to shorten, hold or hold straight, stepped and watched, fitted back to pins.                                                               |
+| `rope-3d/watch.ts`  | Watching a moving rope for passing through itself (`PassWatch`) or a closed bar (`timesThrough`).                                                                                               |
+| `rope-3d/checks.ts` | What's wrong with a rope as it lies (`ropeProblems`): rope into rope or a bar, bends too tight.                                                                                                 |
 
 ## Numerical methods
 

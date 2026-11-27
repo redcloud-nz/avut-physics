@@ -9,7 +9,6 @@ import { format as prettierFormat } from "prettier/standalone";
 import { PRETTIER_OPTIONS } from "@/knot-editor/knot-file";
 import type { JsonObject } from "@/knot-editor/versions";
 import { roundTo } from "@/lib/math";
-import { countsOf } from "@/lib/rope-3d/rope";
 import type { Vector3 } from "@/lib/vector3";
 
 import { FORMAT, type Knot3dFile } from "./knot-file";
@@ -18,6 +17,8 @@ import { CURRENT_VERSION } from "./versions";
 /** A length rounded for the file: to a hundredth of a millimetre. */
 const metres = (n: number) => roundTo(n, 5);
 const point = (p: Vector3, round = metres) => [round(p.x), round(p.y), round(p.z)];
+/** A direction rounded for the file. */
+const direction = (n: number) => roundTo(n, 5);
 
 /** The file as text, laid out as Prettier lays out the repo's JSON, so a saved file needs no formatting. */
 export async function writeKnot3d(file: Knot3dFile): Promise<string> {
@@ -29,19 +30,42 @@ export async function writeKnot3d(file: Knot3dFile): Promise<string> {
         diameter: metres(file.diameter),
         minBend: metres(file.minBend),
         stiffness: roundTo(file.stiffness, 4),
-        props: file.props.map((p) => ({
-            id: p.id,
-            kind: p.kind,
-            at: point(p.at),
-            along: point(p.along, (n) => roundTo(n, 6)),
-            r: metres(p.r),
-        })),
+        props: file.props.map(
+            (p): JsonObject =>
+                p.kind === "bar"
+                    ? {
+                          id: p.id,
+                          kind: p.kind,
+                          at: point(p.at),
+                          along: point(p.along, direction),
+                          r: metres(p.r),
+                      }
+                    : { id: p.id, kind: p.kind, loop: p.loop.map((q) => point(q)), r: metres(p.r) },
+        ),
         rope: {
-            points: file.rope.points.map((p) => point(p)),
-            segments: countsOf(file.rope.seg),
+            pins: file.rope.pins.map((p) => ({
+                id: p.id,
+                at: point(p.at),
+                ...(p.along && { along: point(p.along, direction) }),
+            })),
+            segments: file.rope.segments.map((s) => ({
+                id: s.id,
+                name: s.name,
+                tension: s.tension.map((t) => roundTo(t, 4)),
+            })),
         },
-        held: file.held,
+        ...(file.crossings && {
+            crossings: file.crossings.map((c) => [c.crossing, c.over ? "over" : "under"]),
+        }),
         knot: file.knot,
+        stages: file.stages.map((s) => ({
+            shorten: s.shorten,
+            hold: s.hold,
+            straight: s.straight,
+            ...(s.until !== undefined && { until: roundTo(s.until, 4) }),
+            reached: roundTo(s.reached, 4),
+            ended: s.ended,
+        })),
     };
     return prettierFormat(JSON.stringify(json), {
         parser: "json",

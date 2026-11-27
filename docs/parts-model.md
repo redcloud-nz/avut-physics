@@ -6,7 +6,9 @@ stop drifting from how gear really fits together. Talked through in November 202
 Built so far: the first two interactions, checked on the abseil tower (`src/rigging/interactions.ts`, its tests in
 `src/abseil-tower/interactions.test.ts`): a carabiner on a sling and a figure 8's loop on a carabiner. The carabiner and
 the basketed sling give their features (`carabinerWith`, `basketedSlingWith`), and `layoutRig` lists the tower's
-connections. The rest is still to do.
+connections. A knot drawing can be lifted into 3D and tightened round its carabiner's real shape, watched for the rope
+passing through itself or the carabiner (`src/rigging/knot-tighten.ts`, `src/rigging/knot-crossings.ts`); the munter
+hitch and two half hitches is the first, in the parts viewer. The rest is still to do.
 
 ## Why
 
@@ -92,6 +94,45 @@ bottom its narrow end.
 - **Anchor** (sling, carabiner, figure 8 on a bight): the sling on the narrow end, the knot on the wide end, the two
   pulling opposite ways along the carabiner.
 - **Rope's end** (figure 8 on a bight, carabiner): the knot on the narrow end, nothing on the other.
+
+## Knots: a core and its exits
+
+A knot isn't one rigid shape. It's a fixed core, as tightened in the 3D knot editor, and the rope leaving it, whose
+shape depends on where it's going.
+
+- **Core**: the part that keeps its shape: a figure 8's body, a munter hitch's turns round the bar.
+- **Exit stretches**: where each strand leaves the core. A strand doesn't leave at a fixed point: it runs along the
+  core's surface and peels off where its tangent points where it's going, as rope leaves a pulley or a log (as
+  `basketedSling` works out where tape leaves a log). So an exit is a stretch of the core's curve, and where the strand
+  leaves slides along it as the direction it's going changes. Fitted with a circular arc, the point is a tangent to a
+  circle, worked out exactly.
+- **What each exit allows**:
+  - _Locked_: it carries straight on in a set direction, as a munter's standing end goes in line with the carabiner.
+    That's the pull check the interactions already make.
+  - _Free_: it carries on from its exit with no corner, then curves however the scene needs (into a coil, a bucket,
+    over a rail), bending no tighter than a rope can and passing through nothing.
+
+The knot files already number their rope's segments and list which are the knot's, which is how `loopEnds` finds a
+loop. Each exit stretch would be marked the same way, as a range of segments, ideally shown in the knot editor.
+
+### A figure 8 on a bight's loop angle
+
+The loop's angle on the bar is one of the knot's movements. For a given angle the bight sits round the bar as its
+interaction says, the knot's body turns about the bar to that angle, and each of the loop's two strands leaves its
+exit stretch where its tangent points at its side of the bight. The loop's rope stays the same length (unless the knot
+slips), which fixes how far the body sits from the bar, so the angle is the only free choice.
+
+It can be checked: each strand leaves with no corner, the loop's length matches the knot's own, both strands touch the
+bar, and the angle stays within the range where the strands still leave from their exit stretches. Past that range a
+real figure 8 would have to deform, which is a sign it's being asked to do something it can't.
+
+### A munter hitch
+
+A munter hitch only holds while its running end (the brake strand) is held, so on its own it has no proper exit: the
+strand goes to a belayer's hand. Tied off with half hitches it holds by itself, so the core is the munter and its half
+hitches together. The standing end is locked in line with the carabiner, and the running end leaves free from the last
+half hitch, to a coil or a bucket. (In the tower it's still a labelled cylinder, with `drape` hanging a sagging curve
+from its end into the bucket.)
 
 ## Checking: first, and as tests
 

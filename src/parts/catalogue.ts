@@ -30,8 +30,11 @@ import {
     TREE,
     TROLLEY_X,
 } from "@/flying-fox/site";
-import { knot3dFile } from "@/knot-editor-3d/knot-file";
+import { knot3dFile, knotRope } from "@/knot-editor-3d/knot-file";
+import { parseKnotFile } from "@/knot-editor/knot-file";
 import { KNOTS } from "@/knots";
+import { middleLoop } from "@/knots/carabiner";
+import MUNTER_2HH_DRAWING from "@/knots/files/munter-and-two-half-hitches.json";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import {
     baseClamp,
@@ -56,9 +59,10 @@ import {
     wrap,
     zipTrolley,
 } from "@/rigging/hardware";
-import { axes, knotPieces, numberedRope } from "@/rigging/knot-3d";
+import { axes, knotPieces, liftKnot, numberedRope } from "@/rigging/knot-3d";
 import { figure8, tiedTo } from "@/rigging/knots";
 import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
+import MUNTER_2HH_JSON from "@/rigging/knots/munter-and-two-half-hitches.json";
 import MUNTER_HITCH_JSON from "@/rigging/knots/munter-hitch.json";
 import { line } from "@/rigging/rope";
 import { sling } from "@/rigging/slings";
@@ -164,7 +168,7 @@ export const PARTS: Part[] = [
         about: "Trial: the figure 8 on a bight tightened in 3D round a 5 mm bar (src/rigging/knots/figure-8.json, edited in /knot-editor-3d), its rope numbered in segments from the standing end, with X, Y and Z arrows.",
         ...(() => {
             const file = knot3dFile("figure-8.json", FIGURE_8_JSON);
-            const { points, seg } = file.rope;
+            const { points, seg } = knotRope(file);
             const rope = () =>
                 numberedRope(points, file.diameter / 2, seg, [
                     "var(--knot-orange)",
@@ -176,16 +180,18 @@ export const PARTS: Part[] = [
                 pieces: () => [
                     ...rope().pieces,
                     ...arrows().pieces,
-                    ...file.props.map((bar) => ({
-                        kind: "rod" as const,
-                        a: bar.at.sub(bar.along.scale(0.04)),
-                        b: bar.at.add(bar.along.scale(0.04)),
-                        r: bar.r,
-                        material: "steel" as const,
-                        color: STEEL,
-                        capA: true,
-                        capB: true,
-                    })),
+                    ...file.props
+                        .filter((p) => p.kind === "bar")
+                        .map((bar) => ({
+                            kind: "rod" as const,
+                            a: bar.at.sub(bar.along.scale(0.04)),
+                            b: bar.at.add(bar.along.scale(0.04)),
+                            r: bar.r,
+                            material: "steel" as const,
+                            color: STEEL,
+                            capA: true,
+                            capB: true,
+                        })),
                 ],
                 labels: () => [...rope().labels, ...arrows().labels],
             };
@@ -218,6 +224,71 @@ export const PARTS: Part[] = [
             pieces: (toward) => munterOnCarabiner(toward),
             minWidth: FLAT_HAIRLINE,
             thinEdges: true,
+        },
+    },
+    {
+        slug: "munter-two-half-hitches",
+        name: "Munter hitch and two half hitches",
+        group: "Knots",
+        about: "The munter hitch tied off with two half hitches, tightened in stages in /knot-editor-3d from its knot drawing round the drawing's HMS carabiner (src/rigging/knots/munter-and-two-half-hitches.json).",
+        pieces: () => {
+            const file = knot3dFile("munter-and-two-half-hitches.json", MUNTER_2HH_JSON);
+            return [
+                ...line(knotRope(file).points, file.diameter / 2, rigColor("blue"), "rope", {
+                    a: true,
+                    b: true,
+                }),
+                ...file.props.map((p) =>
+                    p.kind === "carabiner"
+                        ? {
+                              kind: "strand" as const,
+                              points: p.loop,
+                              r: p.r,
+                              material: "steel" as const,
+                              color: STEEL,
+                              capA: false,
+                              capB: false,
+                          }
+                        : {
+                              kind: "rod" as const,
+                              a: p.at.sub(p.along.scale(0.04)),
+                              b: p.at.add(p.along.scale(0.04)),
+                              r: p.r,
+                              material: "steel" as const,
+                              color: STEEL,
+                              capA: true,
+                              capB: true,
+                          },
+                ),
+            ];
+        },
+    },
+    {
+        slug: "munter-two-half-hitches-drawn",
+        name: "Munter hitch and two half hitches, as drawn",
+        group: "Knots",
+        about: "The munter hitch tied off with two half hitches as drawn in the knot editor (src/knots/files/munter-and-two-half-hitches.json), lifted into 3D before it's tightened: each strand in the drawing's place, rising a rope's thickness where it's on top at a crossing and sinking where it's underneath, round the drawing's HMS carabiner.",
+        pieces: () => {
+            const read = parseKnotFile(JSON.stringify(MUNTER_2HH_DRAWING));
+            if (read.kind === "error") throw new Error(read.reason);
+            const [rope] = liftKnot(read.file.knot);
+            const prop = MUNTER_2HH_DRAWING.knot.props[0];
+            const loop = middleLoop(prop).map((q) => vec3(q.x / 1000, -q.y / 1000, 0));
+            return [
+                ...line(rope.points, rope.diameter / 2, rigColor("blue"), "rope", {
+                    a: true,
+                    b: true,
+                }),
+                {
+                    kind: "strand" as const,
+                    points: loop,
+                    r: prop.r / 1000,
+                    material: "steel" as const,
+                    color: STEEL,
+                    capA: false,
+                    capB: false,
+                },
+            ];
         },
     },
     {
@@ -850,7 +921,7 @@ function munterOnCarabiner(face?: Vector3): Piece[] {
             .add(y.scale(p.y + rise * p.x))
             .add(z.scale(p.z));
     const file = knot3dFile("munter-hitch.json", MUNTER_HITCH_JSON);
-    const points = file.rope.points.map(at);
+    const points = knotRope(file).points.map(at);
     const r = file.diameter / 2;
     const color = rigColor("blue");
     if (!face) return [body, ...sleeve, ...line(points, r, color, "rope", { a: true, b: true })];

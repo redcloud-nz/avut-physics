@@ -1,70 +1,58 @@
 import { describe, expect, it } from "vitest";
 
-import { segmentsOf } from "@/lib/rope-3d/rope";
 import { vec3 } from "@/lib/vector3";
 
 import type { Knot3dFile } from "./knot-file";
-import { choose, initialState, keyDirection, reduce } from "./state";
+import { initialState, keyDirection, reduce, segmentsBetween } from "./state";
 
-const points = Array.from({ length: 81 }, (_, i) => vec3(i * 0.0025, 0, 0));
 const FILE: Knot3dFile = {
     name: "Test",
     diameter: 0.011,
     minBend: 0.011,
     stiffness: 0.05,
     props: [],
-    rope: { points, seg: segmentsOf(points, 0.02) },
-    held: [],
+    rope: {
+        pins: [0, 1, 2, 3].map((i) => ({ id: i + 1, at: vec3(i * 0.02, 0, 0) })),
+        segments: [10, 11, 12].map((id, k) => ({ id, name: String(k + 1), tension: [1, 1] })),
+    },
     knot: [],
+    stages: [],
 };
 
-describe("choosing segments in play", () => {
-    it("makes a clicked segment the handle, on its own if it wasn't in play", () => {
-        expect(choose(null, 4, "handle", null)).toEqual({ from: 4, to: 4, handle: 4 });
-        const play = { from: 3, to: 6, handle: 4 };
-        expect(choose(play, 5, "handle", 4)).toEqual({ from: 3, to: 6, handle: 5 });
-        expect(choose(play, 8, "handle", 4)).toEqual({ from: 8, to: 8, handle: 8 });
-    });
-
-    it("toggles segments in and out, filling gaps and keeping a run", () => {
-        const play = { from: 3, to: 6, handle: 4 };
-        expect(choose(play, 9, "toggle", 4)).toEqual({ from: 3, to: 9, handle: 4 });
-        expect(choose(play, 3, "toggle", 4)).toEqual({ from: 4, to: 6, handle: 4 });
-        expect(choose(play, 6, "toggle", 4)).toEqual({ from: 3, to: 5, handle: 4 });
-        expect(choose(play, 5, "toggle", 4)).toEqual({ from: 3, to: 4, handle: 4 });
-        expect(choose({ from: 3, to: 3, handle: 3 }, 3, "toggle", 3)).toBeNull();
-    });
-
-    it("puts in a range from the last chosen", () => {
-        expect(choose({ from: 3, to: 3, handle: 3 }, 7, "range", 3)).toEqual({
-            from: 3,
-            to: 7,
-            handle: 3,
-        });
-    });
-});
-
 describe("the editor's state", () => {
-    it("undoes and redoes edits, keeping what's in play", () => {
+    it("starts with the rope's end segments held", () => {
+        const state = initialState(FILE, "test.json");
+        expect([...state.painting]).toEqual([
+            [10, "hold"],
+            [12, "hold"],
+        ]);
+    });
+
+    it("undoes and redoes edits, keeping what's picked while the file has it", () => {
         let state = initialState(FILE, "test.json");
-        state = reduce(state, { type: "choose", seg: 3, mode: "handle" });
+        state = reduce(state, { type: "pick", picked: { kind: "pin", id: 3 } });
         const moved = { ...FILE, stiffness: 0.1 };
         state = reduce(state, { type: "edit", file: moved });
         expect(state.saved).toBe(false);
         state = reduce(state, { type: "undo" });
         expect(state.file).toBe(FILE);
-        expect(state.play).toEqual({ from: 3, to: 3, handle: 3 });
+        expect(state.picked).toEqual({ kind: "pin", id: 3 });
         state = reduce(state, { type: "redo" });
         expect(state.file).toBe(moved);
+        const fewer = { ...FILE, rope: { ...FILE.rope, pins: FILE.rope.pins.slice(0, 2) } };
+        expect(reduce(state, { type: "edit", file: fewer }).picked).toBeNull();
     });
 
-    it("notes where the handle was when it was chosen", () => {
-        const state = reduce(initialState(FILE, "test.json"), {
-            type: "choose",
-            seg: 2,
-            mode: "handle",
+    it("paints segments, and a run between two", () => {
+        let state = initialState(FILE, "test.json");
+        state = reduce(state, {
+            type: "paint",
+            ids: segmentsBetween(FILE.rope, 12, 10),
+            role: "shorten",
         });
-        expect(state.origin!.x).toBeCloseTo(0.03, 2);
+        expect(state.painting.get(11)).toBe("shorten");
+        state = reduce(state, { type: "paint", ids: [11], role: null });
+        expect(state.painting.has(11)).toBe(false);
     });
 });
 

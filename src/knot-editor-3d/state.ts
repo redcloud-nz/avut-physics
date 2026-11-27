@@ -1,15 +1,20 @@
 import { rad } from "@/lib/math";
-import type { Play } from "@/lib/rope-3d/operations";
-import { segmentCount, segmentMiddle } from "@/lib/rope-3d/rope";
+import type { PinnedRope } from "@/lib/rope-3d/pinned";
+import type { Role } from "@/lib/rope-3d/stage";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import type { Knot3dFile } from "./knot-file";
 
 /**
- * The 3D knot editor's state: the file and its undo history, and the rope in play. Every edit (a whole drag, a whole
- * tightening) is one step to undo. What's in play isn't undone: it's what you're working on, not part of the file, and
- * it's in segment numbers, which every edit keeps.
+ * The 3D knot editor's state: the file and its undo history, what's picked (a pin or a segment, by id, so it survives
+ * edits that add or take away pins), and how the segments are painted for tightening. Every edit (a drag, a nudge, a
+ * stage kept) is one step to undo. What's picked and painted isn't undone: it's what you're working on, not the file.
  */
+export type Picked = { kind: "pin" | "segment"; id: number } | null;
+
+/** Shaping the rope by its pins, or painting segments and tightening. */
+export type Mode = "shape" | "tighten";
+
 export type EditorState = {
     file: Knot3dFile;
     fileName: string;
@@ -17,31 +22,35 @@ export type EditorState = {
     saved: boolean;
     past: Knot3dFile[];
     future: Knot3dFile[];
-    play: Play | null;
-    /** Where the handle was when it was chosen, for its offset since. */
-    origin: Vector3 | null;
-    /** The segment last chosen, for choosing a range from it. */
-    last: number | null;
+    picked: Picked;
+    mode: Mode;
+    /** Each painted segment's role, by id; the rest slide. */
+    painting: ReadonlyMap<number, Role>;
+    /** The segment last painted, for painting a run from it. */
+    lastPainted: number | null;
 };
-
-/**
- * How a segment's chosen: `handle` (a click) makes it the handle, putting it in play on its own if it isn't already;
- * `toggle` (⌘- or Ctrl-click, or a click while choosing) puts it in play or takes it out; `range` (with Shift too)
- * puts in every segment between it and the last one chosen.
- */
-export type ChooseMode = "handle" | "toggle" | "range";
 
 export type Action =
     | { type: "load"; file: Knot3dFile; fileName: string; saved: boolean }
     | { type: "edit"; file: Knot3dFile }
     | { type: "undo" }
     | { type: "redo" }
-    | { type: "choose"; seg: number; mode: ChooseMode }
-    | { type: "choose-none" }
+    | { type: "pick"; picked: Picked }
+    | { type: "mode"; mode: Mode }
+    /** Segments (by id) painted with a role, or `null` to slide. */
+    | { type: "paint"; ids: number[]; role: Role | null }
     | { type: "saved"; fileName: string };
 
 /** The most edits kept to undo. */
 const HISTORY = 100;
+
+/** A rope's painting to start with: its two end segments held, so tightening doesn't draw them in. */
+export function startPainting(rope: PinnedRope): Map<number, Role> {
+    const out = new Map<number, Role>();
+    out.set(rope.segments[0].id, "hold");
+    out.set(rope.segments.at(-1)!.id, "hold");
+    return out;
+}
 
 export function initialState(file: Knot3dFile, fileName: string): EditorState {
     return {
@@ -50,41 +59,26 @@ export function initialState(file: Knot3dFile, fileName: string): EditorState {
         saved: true,
         past: [],
         future: [],
-        play: null,
-        origin: null,
-        last: null,
+        picked: null,
+        mode: "shape",
+        painting: startPainting(file.rope),
+        lastPainted: null,
     };
 }
 
-/** The rope in play after choosing segment `seg` (`last` the one chosen before), or null for none. */
-export function choose(
-    play: Play | null,
-    seg: number,
-    mode: ChooseMode,
-    last: number | null,
-): Play | null {
-    if (!play) return { from: seg, to: seg, handle: seg };
-    const inPlay = seg >= play.from && seg <= play.to;
-    if (mode === "handle")
-        return inPlay ? { ...play, handle: seg } : { from: seg, to: seg, handle: seg };
-    if (mode === "range") {
-        const from = Math.min(play.from, seg, last ?? seg);
-        const to = Math.max(play.to, seg, last ?? seg);
-        return { ...play, from, to };
-    }
-    // Toggling: one not in play joins, filling any gap; one in play leaves, with whatever's beyond it from the handle.
-    if (!inPlay) return { ...play, from: Math.min(play.from, seg), to: Math.max(play.to, seg) };
-    if (play.from === play.to) return null;
-    if (seg === play.from)
-        return { ...play, from: seg + 1, handle: Math.max(play.handle, seg + 1) };
-    if (seg === play.to) return { ...play, to: seg - 1, handle: Math.min(play.handle, seg - 1) };
-    if (seg < play.handle) return { ...play, from: seg + 1 };
-    return { ...play, to: seg - 1, handle: Math.min(play.handle, seg - 1) };
+/** `picked` if the file's rope still has it, otherwise nothing. */
+function still(picked: Picked, file: Knot3dFile): Picked {
+    if (!picked) return null;
+    const list = picked.kind === "pin" ? file.rope.pins : file.rope.segments;
+    return list.some((x) => x.id === picked.id) ? picked : null;
 }
 
-/** `play` if it still fits the file's rope, otherwise none. */
-function fitted(play: Play | null, file: Knot3dFile): Play | null {
-    return play && play.to <= segmentCount(file.rope) ? play : null;
+/** The segments (by id) from `from` to `to` along the rope, both included, in either order. */
+export function segmentsBetween(rope: PinnedRope, from: number, to: number): number[] {
+    const ids = rope.segments.map((s) => s.id);
+    const [a, b] = [ids.indexOf(from), ids.indexOf(to)];
+    if (a < 0 || b < 0) return [to];
+    return ids.slice(Math.min(a, b), Math.max(a, b) + 1);
 }
 
 export function reduce(state: EditorState, action: Action): EditorState {
@@ -98,7 +92,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
                 saved: false,
                 past: [...state.past, state.file].slice(-HISTORY),
                 future: [],
-                play: fitted(state.play, action.file),
+                picked: still(state.picked, action.file),
             };
         case "undo": {
             const before = state.past.at(-1);
@@ -109,7 +103,7 @@ export function reduce(state: EditorState, action: Action): EditorState {
                 saved: false,
                 past: state.past.slice(0, -1),
                 future: [state.file, ...state.future],
-                play: fitted(state.play, before),
+                picked: still(state.picked, before),
             };
         }
         case "redo": {
@@ -121,34 +115,29 @@ export function reduce(state: EditorState, action: Action): EditorState {
                 saved: false,
                 past: [...state.past, state.file],
                 future: rest,
-                play: fitted(state.play, next),
+                picked: still(state.picked, next),
             };
         }
-        case "choose": {
-            const play = choose(state.play, action.seg, action.mode, state.last);
-            const handleMoved = play?.handle !== state.play?.handle;
-            return {
-                ...state,
-                play,
-                last: action.seg,
-                origin: !play
-                    ? null
-                    : handleMoved
-                      ? segmentMiddle(state.file.rope, play.handle)
-                      : state.origin,
-            };
+        case "pick":
+            return { ...state, picked: action.picked };
+        case "mode":
+            return { ...state, mode: action.mode };
+        case "paint": {
+            const painting = new Map(state.painting);
+            for (const id of action.ids)
+                if (action.role) painting.set(id, action.role);
+                else painting.delete(id);
+            return { ...state, painting, lastPainted: action.ids.at(-1) ?? state.lastPainted };
         }
-        case "choose-none":
-            return { ...state, play: null, origin: null, last: null };
         case "saved":
             return { ...state, saved: true, fileName: action.fileName };
     }
 }
 
 /**
- * Which way a W/A/S/D/R/F key moves the handle, with the view looking from compass bearing `azimuth` (degrees): W away
- * from the eye, S towards it, A and D to its left and right, each along whichever of X and Z is nearest that way, so
- * the move lies along an axis as the arrows' do; R up and F down.
+ * Which way a W/A/S/D/R/F key moves a pin, with the view looking from compass bearing `azimuth` (degrees): W away from
+ * the eye, S towards it, A and D to its left and right, each along whichever of X and Z is nearest that way, so the
+ * move lies along an axis as the arrows' do; R up and F down.
  */
 export function keyDirection(code: string, azimuth: number): Vector3 | null {
     if (code === "KeyR") return vec3(0, 1, 0);

@@ -1,7 +1,7 @@
 /**
- * The 3D knot file: one tightened knot, as the 3D knot editor opens and saves it, and as pages import it. Lengths are
- * in metres. A file names its format and version; an older one is upgraded as it's read (`versions.ts`), a newer one
- * refused, and every file is checked against the types below, with the reason given where it doesn't read.
+ * The 3D knot file: one knot, as the 3D knot editor opens and saves it, and as pages import it. Lengths are in metres.
+ * A file names its format and version; an older one is upgraded as it's read (`versions.ts`), a newer one refused, and
+ * every file is checked against the types below, with the reason given where it doesn't read.
  */
 import {
     below,
@@ -17,7 +17,15 @@ import {
     readString,
 } from "@/knot-editor/read-json";
 import type { JsonObject, JsonValue } from "@/knot-editor/versions";
-import { countsOf, segFromCounts, type Rope3, type RopeSetup } from "@/lib/rope-3d/rope";
+import {
+    nameParts,
+    sampleRope,
+    type Pin3,
+    type PinnedRope,
+    type Segment3,
+} from "@/lib/rope-3d/pinned";
+import type { RopeSetup } from "@/lib/rope-3d/rope";
+import type { StageEnd } from "@/lib/rope-3d/stage";
 import { vec3, type Vector3 } from "@/lib/vector3";
 
 import { CURRENT_VERSION, UPGRADES, type Upgrade } from "./versions";
@@ -26,31 +34,67 @@ export const FORMAT = "avut-knot-3d";
 
 /** A straight bar the knot's tied round: its axis through `at` along `along` (a unit vector), `r` in radius. */
 export type BarProp = { id: number; kind: "bar"; at: Vector3; along: Vector3; r: number };
+/** A carabiner the knot's tied round: its rod's middle line, closed (the last point back at the first), `r` in radius. */
+export type CarabinerProp = { id: number; kind: "carabiner"; loop: Vector3[]; r: number };
+export type Prop3 = BarProp | CarabinerProp;
+
+/** A crossing of the drawing the knot was made from, met along its rope: which (from 1, as first met), and on top or not. */
+export type DrawnCrossing = { crossing: number; over: boolean };
+
+/**
+ * A stage of tightening, as it was run: the segments (by id) it shortened, held and held straight (the rest slid),
+ * how far it was to go (a fraction shorter) and how far it went, and how it ended.
+ */
+export type Stage = {
+    shorten: number[];
+    hold: number[];
+    straight: number[];
+    until?: number;
+    reached: number;
+    ended: StageEnd;
+};
 
 export type Knot3dFile = {
     name: string;
-    /** The knot drawing it was started from (a slug in `src/knots/`), for reference only. */
+    /** The knot drawing it was started from (a slug in `src/knots/`, or a drawing file's name), for reference only. */
     from?: string;
     diameter: number;
     /** The tightest the rope bends: the radius of its centreline round the bend. */
     minBend: number;
     /** How much the rope straightens each step as it settles, 0 to 1. */
     stiffness: number;
-    props: BarProp[];
-    rope: Rope3;
-    /** The segments that stay put when the whole knot's tightened: its ends and the top of the loop. */
-    held: number[];
-    /** The knot's own segments, which shorten together when it's tightened. */
+    props: Prop3[];
+    rope: PinnedRope;
+    /** The drawing's crossings in order along the rope, to check the rope against while it lies near the drawing. */
+    crossings?: DrawnCrossing[];
+    /** The knot's own segments (by segment number), for pages that route the strands in and out of it. */
     knot: number[];
+    /** The stages it's been tightened in, in order. */
+    stages: Stage[];
 };
 
-/** What the rope's engine needs to know of a file: the rope's make and the bars. */
+/** What the rope's engine needs to know of a file: the rope's make, the bars and the carabiners. */
 export const setupOf = (file: Knot3dFile): RopeSetup => ({
     diameter: file.diameter,
     minBend: file.minBend,
     stiffness: file.stiffness,
-    bars: file.props,
+    bars: file.props.filter((p) => p.kind === "bar"),
+    loops: file.props
+        .filter((p) => p.kind === "carabiner")
+        .map((p) => ({ points: p.loop, r: p.r })),
 });
+
+/** A segment's number, from its name ("19b" is 19). */
+export const segmentNumber = (s: Segment3) => Number(nameParts(s.name).number) || 0;
+
+/**
+ * A file's rope as pages draw it: points about a quarter of a diameter apart, with each point's segment number (from
+ * its name).
+ */
+export function knotRope(file: Knot3dFile): { points: Vector3[]; seg: number[] } {
+    const { points, seg } = sampleRope(file.rope, file.diameter / 4);
+    return { points, seg: seg.map((k) => segmentNumber(file.rope.segments[k])) };
+}
 
 export type ReadResult =
     | { kind: "read"; file: Knot3dFile; upgradedFrom?: number }
@@ -126,21 +170,32 @@ const FIELDS = [
     "stiffness",
     "props",
     "rope",
-    "held",
+    "crossings",
     "knot",
+    "stages",
 ] as const;
 
 function readFile(json: JsonObject): Knot3dFile {
     onlyFields(json, "", FIELDS);
-    const props = readList(json.props ?? [], "props").map((p, i) => readBar(p, below("props", i)));
-    const ids = new Set<number>();
-    props.forEach((p, i) => {
-        if (ids.has(p.id))
-            throw new FileError(below(below("props", i), "id"), `${p.id} is used twice`);
-        ids.add(p.id);
-    });
+    const props = readList(json.props ?? [], "props").map((p, i) => readProp(p, below("props", i)));
     const rope = readRope(json.rope, "rope");
-    const count = countsOf(rope.seg).length;
+    const ids = new Set<number>();
+    const unique = (id: number, at: string) => {
+        if (ids.has(id)) throw new FileError(at, `${id} is used twice`);
+        ids.add(id);
+    };
+    props.forEach((p, i) => unique(p.id, below(below("props", i), "id")));
+    const ropeIds = new Set<number>();
+    rope.pins.forEach((p, i) => {
+        const at = below(below("rope", "pins"), i);
+        if (ropeIds.has(p.id)) throw new FileError(below(at, "id"), `${p.id} is used twice`);
+        ropeIds.add(p.id);
+    });
+    rope.segments.forEach((s, i) => {
+        const at = below(below("rope", "segments"), i);
+        if (ropeIds.has(s.id)) throw new FileError(below(at, "id"), `${s.id} is used twice`);
+        ropeIds.add(s.id);
+    });
     return {
         name: readString(json.name, "name"),
         ...(json.from !== undefined && { from: readString(json.from, "from") }),
@@ -149,8 +204,15 @@ function readFile(json: JsonObject): Knot3dFile {
         stiffness: readFraction(json.stiffness, "stiffness"),
         props,
         rope,
-        held: readSegments(json.held ?? [], "held", count),
-        knot: readSegments(json.knot ?? [], "knot", count),
+        ...(json.crossings !== undefined && {
+            crossings: readList(json.crossings, "crossings").map((c, i) =>
+                readCrossing(c, below("crossings", i)),
+            ),
+        }),
+        knot: readList(json.knot ?? [], "knot").map((k, i) => readCount(k, below("knot", i), 0)),
+        stages: readList(json.stages ?? [], "stages").map((s, i) =>
+            readStage(s, below("stages", i)),
+        ),
     };
 }
 
@@ -169,49 +231,108 @@ function readPoint(value: JsonValue | undefined, at: string): Vector3 {
     return vec3(x, y, z);
 }
 
-function readBar(value: JsonValue, at: string): BarProp {
+function readDirection(value: JsonValue | undefined, at: string): Vector3 {
+    const v = readPoint(value, at);
+    if (v.len() < 1e-9) throw new FileError(at, "should have a direction, but is [0, 0, 0]");
+    return v.unit();
+}
+
+function readProp(value: JsonValue, at: string): Prop3 {
     const json = readObject(value, at);
-    onlyFields(json, at, ["id", "kind", "at", "along", "r"]);
-    readChoice(json.kind, below(at, "kind"), ["bar"]);
-    const along = readPoint(json.along, below(at, "along"));
-    if (along.len() < 1e-9)
-        throw new FileError(below(at, "along"), "should have a direction, but is [0, 0, 0]");
+    const kind = readChoice(json.kind, below(at, "kind"), ["bar", "carabiner"]);
+    if (kind === "bar") {
+        onlyFields(json, at, ["id", "kind", "at", "along", "r"]);
+        return {
+            id: readId(json.id, below(at, "id")),
+            kind: "bar",
+            at: readPoint(json.at, below(at, "at")),
+            along: readDirection(json.along, below(at, "along")),
+            r: readPositive(json.r, below(at, "r")),
+        };
+    }
+    onlyFields(json, at, ["id", "kind", "loop", "r"]);
+    const loop = readList(json.loop, below(at, "loop")).map((p, i) =>
+        readPoint(p, below(below(at, "loop"), i)),
+    );
+    if (loop.length < 4) throw new FileError(below(at, "loop"), "should have at least 4 points");
     return {
         id: readId(json.id, below(at, "id")),
-        kind: "bar",
-        at: readPoint(json.at, below(at, "at")),
-        along: along.unit(),
+        kind: "carabiner",
+        loop,
         r: readPositive(json.r, below(at, "r")),
     };
 }
 
-function readRope(value: JsonValue | undefined, at: string): Rope3 {
+function readPin(value: JsonValue, at: string): Pin3 {
     const json = readObject(value, at);
-    onlyFields(json, at, ["points", "segments"]);
-    const points = readList(json.points, below(at, "points")).map((p, i) =>
-        readPoint(p, below(below(at, "points"), i)),
-    );
-    if (points.length < 2)
-        throw new FileError(below(at, "points"), `should have at least 2 points`);
-    const counts = readList(json.segments, below(at, "segments")).map((c, i) =>
-        readCount(c, below(below(at, "segments"), i), 1),
-    );
-    const total = counts.reduce((a, b) => a + b, 0);
-    if (total !== points.length)
-        throw new FileError(
-            below(at, "segments"),
-            `should share out the rope's ${points.length} points, but adds up to ${total}`,
-        );
-    return { points, seg: segFromCounts(counts) };
+    onlyFields(json, at, ["id", "at", "along"]);
+    return {
+        id: readId(json.id, below(at, "id")),
+        at: readPoint(json.at, below(at, "at")),
+        ...(json.along !== undefined && { along: readDirection(json.along, below(at, "along")) }),
+    };
 }
 
-/** A list of segment numbers, each one of the rope's and none twice, in order. */
-function readSegments(value: JsonValue, at: string, count: number): number[] {
-    const list = readList(value, at).map((v, i) => readCount(v, below(at, i), 1));
-    list.forEach((k, i) => {
-        if (k > count)
-            throw new FileError(below(at, i), `is segment ${k}, but the rope has ${count}`);
-        if (list.indexOf(k) !== i) throw new FileError(below(at, i), `${k} is listed twice`);
-    });
-    return [...list].sort((a, b) => a - b);
+function readSegment(value: JsonValue, at: string): Segment3 {
+    const json = readObject(value, at);
+    onlyFields(json, at, ["id", "name", "tension"]);
+    const tension = readList(json.tension, below(at, "tension")).map((t, i) =>
+        readPositive(t, below(below(at, "tension"), i)),
+    );
+    if (tension.length !== 2)
+        throw new FileError(
+            below(at, "tension"),
+            `should be two numbers, but has ${tension.length}`,
+        );
+    return {
+        id: readId(json.id, below(at, "id")),
+        name: readString(json.name, below(at, "name")),
+        tension: [tension[0], tension[1]],
+    };
+}
+
+function readRope(value: JsonValue | undefined, at: string): PinnedRope {
+    const json = readObject(value, at);
+    onlyFields(json, at, ["pins", "segments"]);
+    const pins = readList(json.pins, below(at, "pins")).map((p, i) =>
+        readPin(p, below(below(at, "pins"), i)),
+    );
+    if (pins.length < 2) throw new FileError(below(at, "pins"), "should have at least 2 pins");
+    const segments = readList(json.segments, below(at, "segments")).map((s, i) =>
+        readSegment(s, below(below(at, "segments"), i)),
+    );
+    if (segments.length !== pins.length - 1)
+        throw new FileError(
+            below(at, "segments"),
+            `should be one between each two pins (${pins.length - 1}), but has ${segments.length}`,
+        );
+    return { pins, segments };
+}
+
+function readCrossing(value: JsonValue, at: string): DrawnCrossing {
+    const list = readList(value, at);
+    if (list.length !== 2)
+        throw new FileError(at, `should be [crossing, "over" or "under"], but has ${list.length}`);
+    return {
+        crossing: readCount(list[0], below(at, 0), 1),
+        over: readChoice(list[1], below(at, 1), ["over", "under"]) === "over",
+    };
+}
+
+/** A stage as it was run. Its segments may since have been joined into others, so their ids aren't checked. */
+function readStage(value: JsonValue, at: string): Stage {
+    const json = readObject(value, at);
+    onlyFields(json, at, ["shorten", "hold", "straight", "until", "reached", "ended"]);
+    const ids = (key: string) =>
+        readList(json[key] ?? [], below(at, key)).map((v, i) =>
+            readId(v, below(below(at, key), i)),
+        );
+    return {
+        shorten: ids("shorten"),
+        hold: ids("hold"),
+        straight: ids("straight"),
+        ...(json.until !== undefined && { until: readFraction(json.until, below(at, "until")) }),
+        reached: readNumber(json.reached, below(at, "reached")),
+        ended: readChoice(json.ended, below(at, "ended"), ["jammed", "far enough", "stopped"]),
+    };
 }

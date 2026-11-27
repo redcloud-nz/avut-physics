@@ -6,16 +6,19 @@ import * as THREE from "three";
 import { GizmoHelper } from "@react-three/drei";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 
-import type { LockedEnd } from "@/lib/rope-3d/curve";
-import type { Play } from "@/lib/rope-3d/operations";
-import type { Rope3 } from "@/lib/rope-3d/rope";
+import type { Problem } from "@/lib/rope-3d/checks";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import { T, textTexture, tubeGeometry, useSceneColors, type Colors } from "@/scene/scene-gl";
 
-import type { ChooseMode } from "./state";
-
 /** The rope's colours, by turns along it, so each segment shows against the next. */
 export const SEGMENT_COLORS = ["var(--knot-orange)", "var(--knot-purple)"] as const;
+
+/** What each role in tightening is painted. */
+export const ROLE_COLORS = {
+    shorten: "var(--knot-red)",
+    hold: "var(--knot-blue)",
+    straight: "var(--knot-green)",
+} as const;
 
 /** The three axes, as the arrows show them: X across, Y up, Z towards the front. */
 export const AXES = [
@@ -24,110 +27,124 @@ export const AXES = [
     { name: "Z", dir: vec3(0, 0, 1), color: "var(--knot-blue)" },
 ] as const;
 
-/** A segment's colour: by turns, dimmed out of play while some rope's in play, lighter for the handle. */
-export function segmentColor(
-    colors: Colors,
-    seg: number,
-    play: Play | null,
-    background: THREE.Color,
-) {
-    const base = colors.read(SEGMENT_COLORS[(seg - 1) % 2]).clone();
-    if (!play) return base;
-    if (seg < play.from || seg > play.to) return base.lerp(background, 0.3);
-    return seg === play.handle ? base.lerp(new THREE.Color(1, 1, 1), 0.35) : base;
-}
-
-/** Each segment's run of points, on to the next one's first point so there's no gap between them. */
-function runs(rope: Rope3): { seg: number; points: Vector3[] }[] {
-    const out: { seg: number; points: Vector3[] }[] = [];
-    let from = 0;
-    for (let i = 1; i <= rope.points.length; i++) {
-        if (i < rope.points.length && rope.seg[i] === rope.seg[from]) continue;
-        out.push({
-            seg: rope.seg[from],
-            points: rope.points.slice(from, Math.min(i + 1, rope.points.length)),
-        });
-        from = i;
-    }
-    return out;
-}
+export type PinMark = { at: Vector3; held: boolean; picked: boolean };
 
 export type RopeViewProps = {
-    rope: Rope3;
+    /** The rope as points, with each pin's place among them: segment k runs from `pinAt[k]` to `pinAt[k + 1]`. */
+    points: readonly Vector3[];
+    pinAt: readonly number[];
     diameter: number;
-    play: Play | null;
-    /** Where the handle is, while there's one. */
+    /** Each segment's colour (CSS), by its place along the rope. */
+    colorOf: (k: number) => string;
+    /** The pins to show and click, or none (while tightening). */
+    pins: PinMark[] | null;
+    /** Where the picked pin's arrows are, while one's picked. */
     handle: Vector3 | null;
-    /** The locked ends of the rope in play. */
-    locked: [LockedEnd, LockedEnd] | null;
-    /** Whether a plain click puts segments in play or takes them out, rather than choosing the handle. */
-    choosing: boolean;
-    onChoose: (seg: number, mode: ChooseMode) => void;
-    /** A drag of one of the handle's arrows: where the handle's wanted, as the pointer moves. */
+    /** Places to mark as wrong. */
+    marks: readonly Problem[];
+    onSegment: (k: number, shift: boolean) => void;
+    onPin: (k: number) => void;
+    /** A drag of one of the handle's arrows: where the pin's wanted, as the pointer moves. */
     onDragStart: () => void;
     onDrag: (goal: Vector3) => void;
     onDragEnd: () => void;
 };
 
 /**
- * The rope being edited, drawn inside a `SceneGL`: its segments, each one clickable, the handle's arrows to drag it
- * along X, Y and Z, the locked ends of the rope in play, and the axes in a corner.
+ * The rope being edited, drawn inside a `SceneGL`: its segments, each one clickable, its pins (drawn over the rope, so
+ * those inside the knot show), the picked pin's arrows to drag it along X, Y and Z, marks where something's wrong, and
+ * the axes in a corner.
  */
 export function RopeView(props: RopeViewProps) {
-    const { rope, diameter, play, handle, locked } = props;
+    const { points, pinAt, diameter, pins, handle, marks } = props;
     const colors = useSceneColors();
-    const background = useMemo(() => colors.read("var(--surface)"), [colors]);
     const [hover, setHover] = useState<number | null>(null);
     // A press on the handle's arrows: the click it ends in isn't a choice of segment.
     const pressed = useRef(false);
 
     const geometries = useMemo(
         () =>
-            runs(rope).map((run) => ({
-                seg: run.seg,
-                geometry: tubeGeometry(run.points.map(T), diameter / 2, 12),
-            })),
-        [rope, diameter],
+            pinAt
+                .slice(0, -1)
+                .map((from, k) =>
+                    tubeGeometry(points.slice(from, pinAt[k + 1] + 1).map(T), diameter / 2, 12),
+                ),
+        [points, pinAt, diameter],
     );
-    useEffect(() => () => geometries.forEach((g) => g.geometry?.dispose()), [geometries]);
+    useEffect(() => () => geometries.forEach((g) => g?.dispose()), [geometries]);
 
-    const click = (seg: number) => (e: ThreeEvent<MouseEvent>) => {
-        // A drag that turned the view, or a press on the arrows, isn't a click on the rope.
-        if (e.delta > 4 || pressed.current) return;
+    const clicked = (e: ThreeEvent<MouseEvent>) => {
+        // A drag that turned the view, or a press on the arrows, isn't a click.
+        if (e.delta > 4 || pressed.current) return false;
         e.stopPropagation();
-        const n = e.nativeEvent;
-        const mode: ChooseMode = n.shiftKey
-            ? "range"
-            : props.choosing || n.ctrlKey || n.metaKey
-              ? "toggle"
-              : "handle";
-        props.onChoose(seg, mode);
+        return true;
     };
+    const white = new THREE.Color(1, 1, 1);
 
     return (
         <>
-            {geometries.map(({ seg, geometry }) =>
+            {geometries.map((geometry, k) =>
                 geometry ? (
                     <mesh
-                        key={seg}
+                        key={k}
                         geometry={geometry}
-                        onClick={click(seg)}
+                        onClick={(e) => {
+                            if (!clicked(e)) return;
+                            // Pins are drawn over the rope but lie inside it: one under the pointer is what's meant.
+                            const pin = e.intersections.find(
+                                (i) => i.object.userData.pin !== undefined,
+                            );
+                            if (pin) props.onPin(pin.object.userData.pin as number);
+                            else props.onSegment(k, e.nativeEvent.shiftKey);
+                        }}
                         onPointerOver={(e) => {
                             e.stopPropagation();
-                            setHover(seg);
+                            setHover(k);
                         }}
-                        onPointerOut={() => setHover((h) => (h === seg ? null : h))}
+                        onPointerOut={() => setHover((h) => (h === k ? null : h))}
                     >
                         <meshLambertMaterial
-                            color={segmentColor(colors, seg, play, background)
+                            color={colors
+                                .read(props.colorOf(k))
                                 .clone()
-                                .lerp(new THREE.Color(1, 1, 1), hover === seg ? 0.2 : 0)}
+                                .lerp(white, hover === k ? 0.25 : 0)}
                         />
                     </mesh>
                 ) : null,
             )}
-            {locked?.map((end, i) => (
-                <LockedMark key={i} end={end} diameter={diameter} colors={colors} />
+            {pins?.map((pin, k) => (
+                <mesh
+                    key={k}
+                    position={T(pin.at)}
+                    renderOrder={5}
+                    userData={{ pin: k }}
+                    onClick={(e) => clicked(e) && props.onPin(k)}
+                >
+                    <sphereGeometry args={[diameter * (pin.picked ? 0.3 : 0.2), 12, 8]} />
+                    <meshBasicMaterial
+                        color={colors.read(
+                            pin.picked
+                                ? "var(--highlight)"
+                                : pin.held
+                                  ? "var(--knot-yellow)"
+                                  : "var(--ink-bright)",
+                        )}
+                        depthTest={false}
+                        transparent
+                        opacity={0.85}
+                    />
+                </mesh>
+            ))}
+            {marks.map((m, i) => (
+                <mesh key={i} position={T(m.at)} renderOrder={4}>
+                    <sphereGeometry args={[diameter * 0.75, 16, 12]} />
+                    <meshBasicMaterial
+                        color={colors.read("var(--warning)")}
+                        depthTest={false}
+                        transparent
+                        opacity={0.3}
+                    />
+                </mesh>
             ))}
             {handle && (
                 <HandleArrows
@@ -142,32 +159,6 @@ export function RopeView(props: RopeViewProps) {
             )}
             <CornerAxes colors={colors} />
         </>
-    );
-}
-
-/** A ring round the rope where the rope in play joins the fixed rope: it holds its place and direction there. */
-function LockedMark({
-    end,
-    diameter,
-    colors,
-}: {
-    end: LockedEnd;
-    diameter: number;
-    colors: Colors;
-}) {
-    const quaternion = useMemo(
-        () =>
-            new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                T(end.dir).normalize(),
-            ),
-        [end],
-    );
-    return (
-        <mesh position={T(end.at)} quaternion={quaternion} renderOrder={1}>
-            <torusGeometry args={[diameter * 0.6, diameter * 0.04, 6, 32]} />
-            <meshBasicMaterial color={colors.read("var(--ink-bright)")} transparent opacity={0.7} />
-        </mesh>
     );
 }
 

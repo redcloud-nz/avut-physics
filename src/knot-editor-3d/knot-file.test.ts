@@ -36,8 +36,10 @@ describe("3D knot files", () => {
 
     it("reads the flying fox's figure 8", () => {
         const file = knot3dFile("figure-8.json", FIGURE_8);
-        expect(file.rope.points.length).toBe(file.rope.seg.length);
-        expect(file.held).toContain(1);
+        expect(file.rope.segments).toHaveLength(file.rope.pins.length - 1);
+        // Its segments keep their numbers, pieces of one lettered.
+        expect(file.rope.segments[0].name).toMatch(/^1[a-z]*$/);
+        expect(file.knot).toContain(7);
     });
 
     it("refuses what isn't a 3D knot file, or is newer than it reads", () => {
@@ -53,13 +55,16 @@ describe("3D knot files", () => {
     });
 
     it("says where a file doesn't read", () => {
+        type Rope = { pins: unknown[]; segments: { tension: number[] }[] };
         const cases: [(j: Record<string, unknown>) => void, string][] = [
-            [(j) => ((j.rope as { segments: number[] }).segments = [3, 3, 2]), "rope.segments"],
-            [(j) => (j.held = [1, 4]), "held[1]"],
-            [(j) => (j.knot = [2, 2]), "knot[1]"],
+            [(j) => (j.rope as Rope).pins.pop(), "rope.segments"],
+            [(j) => ((j.rope as Rope).segments[0].tension = [1]), "rope.segments[0].tension"],
+            [(j) => (j.stages = [{ shorten: [], reached: 0.1, ended: "done" }]), "stages[0].ended"],
+            [(j) => (j.crossings = [[1, "above"]]), "crossings[0][1]"],
             [(j) => (j.stiffness = 2), "stiffness"],
             [(j) => (j.extra = 1), "unknown field"],
             [(j) => ((j.props as { along: number[] }[])[0].along = [0, 0, 0]), "props[0].along"],
+            [(j) => ((j.props as { loop: number[][] }[])[1].loop = [[0, 0, 0]]), "props[1].loop"],
         ];
         for (const [change, where] of cases)
             expect(parseKnot3d(changed(change))).toMatchObject({

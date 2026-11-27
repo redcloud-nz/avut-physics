@@ -151,6 +151,17 @@ function curves(c: Carabiner): Cubic[] {
     });
 }
 
+/**
+ * The rod's whole middle line with its gate closed, as points close together: from the hinge round the narrow end, down
+ * the spine, round the wide end to the nose's foot, and along the gate back to the hinge (the last point the first).
+ */
+export function middleLoop(c: Carabiner): Vector2[] {
+    const body = curves(c).flatMap((k, j) => k.points(SAMPLES).slice(j > 0 ? 1 : 0));
+    const [foot, hinge] = [body[body.length - 1], body[0]];
+    const gate = Array.from({ length: SAMPLES }, (_, i) => foot.lerp(hinge, (i + 1) / SAMPLES));
+    return [...body, ...gate];
+}
+
 /** The wide end's middle line, from the spine round the bottom to the nose, as points close together. */
 export function wideEnd(c: Carabiner): Vector2[] {
     const all = curves(c);
