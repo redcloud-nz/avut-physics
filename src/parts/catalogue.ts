@@ -259,6 +259,13 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "tower-daisy-chain",
+        name: "Daisy chain from its sling's carabiner",
+        group: "Abseil tower",
+        about: "The east edge person's safety line in NZRT11 (safety-1), cut out of the tower as its 3D view lays it out: a daisy chain from its green sling's carabiner under the overhead beam to a carabiner at the person's harness, made as a chain: closed loops of 13 mm Dyneema tape (pale with dark blue edges, the last loop's edges orange), each sewn shut with a bar tack and threaded through the next, turned a quarter round from it, their bends only just touching pulled straight. Its first loop goes round the sling carabiner's bottom bar and its last round the harness carabiner.",
+        pieces: () => towerDaisyChain(),
+    },
+    {
         slug: "tower-munter",
         name: "Munter hitch on a carabiner",
         group: "Abseil tower",
@@ -923,6 +930,14 @@ function towerKnot(end: boolean, face?: Vector3): Piece[] {
     const reach = vec3(0.3, 0.3, 0.3);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
     return moved(within([...(end ? towerPieces() : []), ...pieces], box), label.at.neg());
+}
+
+/** NZRT11's east edge person's daisy chain and its sling, cut out of the tower and moved so its middle is at the origin. */
+function towerDaisyChain(): Piece[] {
+    const rig = RIGS.find((r) => r.slug === "nzrt11")!;
+    const { pieces, labels } = layoutRig(rig, new Set(["sling-11", "safety-1"]));
+    const label = labels.find((l) => l.text === "DC")!;
+    return moved(pieces, label.at.neg());
 }
 
 /** NZRT11's first rope's munter and two half hitches on its sling's carabiner, cut out of the tower. */

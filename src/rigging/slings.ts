@@ -521,3 +521,118 @@ export function chokedSling(
     push(pts[0], sizes[0].across!, sizes[0]);
     return [...tapeRun(pts, sizes, w, color, r), ...stripes(pts, sizes, w)];
 }
+
+/**
+ * A daisy chain made as a chain: closed loops of flat Dyneema tape, each sewn shut with a bar tack and threaded
+ * through the next, each turned a quarter round from the one before as a metal chain's links are. Pulled out straight,
+ * the loops' bends only just touch. Pale tape with coloured edges, the last loop's edges in their own colour. Sizes (m): 13 mm
+ * tape, loops about 100 mm long.
+ */
+export const DAISY = {
+    width: 0.013,
+    thickness: 0.0015,
+    /** A loop's length, from the middle of the tape at one end to the other's. */
+    link: 0.1,
+    /** How much room a loop leaves round the tape threaded through it, each side. */
+    room: 0.0005,
+    /** A loop's bar tack: how long along the tape it is, and how much of its width it crosses. */
+    tack: { long: 0.012, across: 0.7 },
+    /** How many points round each end of a loop, and how far apart the points along its legs are. */
+    bend: 12,
+    step: 0.01,
+};
+
+/** A daisy chain's colours: its tape, its edges, its last loop's edges and its bar tacks. */
+export type DaisyColors = { tape: string; edge: string; tab: string; tack: string };
+
+/**
+ * A daisy chain from the bar at `from` to the bar at `to` (both bars `barR` thick): its first loop round the first
+ * bar, its tape's width lying `across` (squared to the line between them; the way the first bar runs), and its last
+ * round the second. As many loops as fit, stretched a little to reach. Gives its pieces and the way the last loop's
+ * tape lies, which the second bar should run.
+ */
+export function daisyChain(
+    from: Vector3,
+    to: Vector3,
+    across: Vector3,
+    barR: number,
+    colors: DaisyColors,
+): { pieces: Strand[]; lastAcross: Vector3 } {
+    const { width: W, thickness: t } = DAISY;
+    const a = to.sub(from).unit();
+    const u0 = across.sub(a.scale(across.dot(a))).unit();
+    const v0 = a.cross(u0);
+    // A loop's half-width (to its tape's middle): just room inside for the next loop's tape to pass through flat.
+    const R = W / 2 + DAISY.room + t / 2;
+    const inner = R - t / 2;
+    // How far two linked loops' ends overlap when pulled tight: each tape's edges, where the other's bend has curved
+    // back furthest, touch.
+    const overlap = 2 * (R - Math.sqrt(inner * inner - (W * W) / 4));
+    // Each end loop goes round its bar, its tape's middle that far past the bar's middle.
+    const past = barR + t / 2;
+    const reach = to.distanceTo(from) + 2 * past;
+    const count = Math.max(1, Math.round((reach - overlap) / (DAISY.link - overlap)));
+    const link = (reach + (count - 1) * overlap) / count;
+    const pieces: Strand[] = [];
+    let width = u0;
+    for (let i = 0; i < count; i++) {
+        // Each loop's tape lies across its own plane: the first's along the bar, the next's square to it.
+        width = i % 2 === 0 ? u0 : v0;
+        const side = i % 2 === 0 ? v0 : u0;
+        const centre = from.add(a.scale(-past + link / 2 + i * (link - overlap)));
+        const half = link / 2 - R;
+        // Round the loop: up one leg, round the far end, down the other leg and round the near end.
+        const legSteps = Math.max(1, Math.ceil((2 * half) / DAISY.step));
+        const leg = (sign: 1 | -1) =>
+            Array.from({ length: legSteps }, (_, k) =>
+                centre
+                    .add(side.scale(sign * R))
+                    .add(a.scale(sign * (-half + (2 * half * k) / legSteps))),
+            );
+        const end = (sign: 1 | -1) =>
+            Array.from({ length: DAISY.bend }, (_, k) => {
+                const phi = (Math.PI * k) / DAISY.bend;
+                return centre
+                    .add(a.scale(sign * (half + R * Math.sin(phi))))
+                    .add(side.scale(sign * R * Math.cos(phi)));
+            });
+        const round = [...leg(1), ...end(1), ...leg(-1), ...end(-1)];
+        const points = [...round, round[0]];
+        const last = i === count - 1;
+        const profile = points.map(() => ({ width: W, thickness: t, across: width }));
+        const closed = (strands: Strand[]) =>
+            strands.map((s, k) => ({
+                ...s,
+                capA: k === 0 ? false : s.capA,
+                capB: k === strands.length - 1 ? false : s.capB,
+            }));
+        pieces.push(...closed(tapeRun(points, profile, width, colors.tape, W / 2)));
+        // Its edges, a little proud of the tape on both faces.
+        const edge = 0.0025;
+        for (const s of [-1, 1])
+            pieces.push(
+                ...closed(
+                    tapeRun(
+                        points.map((q) => q.add(width.scale((s * (W - edge)) / 2))),
+                        points.map(() => ({ width: edge, thickness: t + 0.0006, across: width })),
+                        width,
+                        last ? colors.tab : colors.edge,
+                        edge / 2,
+                    ),
+                ).map((p) => ({ ...p, fine: edge })),
+            );
+        // Its bar tack, across the middle of one leg where it's sewn shut.
+        const tackAt = centre.add(side.scale(R));
+        const tackHalf = (DAISY.tack.across * W) / 2;
+        pieces.push(
+            ...tapeRun(
+                [tackAt.sub(width.scale(tackHalf)), tackAt.add(width.scale(tackHalf))],
+                [0, 1].map(() => ({ width: DAISY.tack.long, thickness: t + 0.001, across: a })),
+                a,
+                colors.tack,
+                DAISY.tack.long / 2,
+            ).map((p) => ({ ...p, fine: DAISY.tack.long })),
+        );
+    }
+    return { pieces, lastAcross: width };
+}

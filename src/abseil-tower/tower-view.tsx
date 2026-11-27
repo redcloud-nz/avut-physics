@@ -300,6 +300,7 @@ export default function TowerView({ slug }: { slug: string }) {
                         toSvg={toSvg}
                         ppm={ppm}
                         middle={toSvg(vec3(SIDE / 2, 0, SIDE / 2)).x}
+                        lookingDown={plan}
                     />
                 )}
             </g>

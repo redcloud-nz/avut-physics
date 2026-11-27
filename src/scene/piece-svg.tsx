@@ -289,12 +289,23 @@ const CALLOUT = { font: 11, gap: 14, line: 14 };
  * out to the side of the tower its knot is on (`middle` is where the tower's middle is drawn, so panning never moves a
  * label across), unless its knot says otherwise, and moves down past any already written there.
  */
+/** A label written beside its knot, to its right or left, with its leader to the label's near end. */
+const beside = (label: RigLabel, at: Vector2, x: number, y: number, right: boolean) => ({
+    label,
+    at,
+    x,
+    y,
+    anchor: right ? ("start" as const) : ("end" as const),
+    lead: { x: right ? x - 2 : x + 2, y },
+});
+
 export function Callouts({
     labels,
     toSvg,
     ppm,
     middle,
     avoid,
+    lookingDown = false,
 }: {
     labels: RigLabel[];
     toSvg: (p: Vector3) => Vector2;
@@ -302,6 +313,8 @@ export function Callouts({
     middle: number;
     /** What's drawn, for the labels to keep off too, searching round their knots for a clear place. */
     avoid?: ObstacleGrid;
+    /** Looking down: a label that says which (`plan`) is written above or below its knot, centred on it. */
+    lookingDown?: boolean;
 }) {
     const placed: Box[] = [];
     const overlaps = (b: Box) =>
@@ -314,6 +327,29 @@ export function Callouts({
             const width = label.text.length * MONO_WIDTH * CALLOUT.font + 4;
             // Clear of the knot's side as it's drawn, however close the view.
             const gap = CALLOUT.gap + (label.on ? label.on.r * ppm : 0);
+            if (lookingDown && label.plan) {
+                // Straight above or below its knot, moving further out past any already written there.
+                const out = label.plan === "above" ? -1 : 1;
+                const half = CALLOUT.font / 2 + 1;
+                const box = (y: number): Box => ({
+                    x0: at.x - width / 2,
+                    x1: at.x + width / 2,
+                    y0: y - half,
+                    y1: y + half,
+                });
+                let y = at.y + out * (gap + CALLOUT.font / 2);
+                for (let tries = 0; tries < 40 && overlaps(box(y)); tries++)
+                    y += (out * CALLOUT.line) / 2;
+                placed.push(box(y));
+                return {
+                    label,
+                    at,
+                    x: at.x,
+                    y,
+                    anchor: "middle" as const,
+                    lead: { x: at.x, y: y - out * half },
+                };
+            }
             const x = right ? at.x + gap : at.x - gap;
             const box = (y: number): Box => ({
                 x0: right ? x - 2 : x - width,
@@ -324,27 +360,27 @@ export function Callouts({
             if (avoid) {
                 const spot = placeLabel(at, width, CALLOUT.font, right, gap, placed, avoid);
                 placed.push(spot.box);
-                return { label, at, x: spot.x, y: spot.y, right: spot.right };
+                return beside(label, at, spot.x, spot.y, spot.right);
             }
             let y = at.y;
             for (let tries = 0; tries < 40 && overlaps(box(y)); tries++) y += CALLOUT.line / 2;
             placed.push(box(y));
-            return { label, at, x, y, right };
+            return beside(label, at, x, y, right);
         });
     return (
         <g>
-            {items.map(({ at, x, y, right }, i) => (
+            {items.map(({ at, lead }, i) => (
                 <line
                     key={`l${i}`}
                     x1={at.x}
                     y1={at.y}
-                    x2={right ? x - 2 : x + 2}
-                    y2={y}
+                    x2={lead.x}
+                    y2={lead.y}
                     stroke="var(--ink-muted)"
                     strokeWidth={1}
                 />
             ))}
-            {items.map(({ label, x, y, right }, i) => (
+            {items.map(({ label, x, y, anchor }, i) => (
                 <text
                     key={`t${i}`}
                     x={x}
@@ -353,7 +389,7 @@ export function Callouts({
                     fontSize={CALLOUT.font}
                     fontFamily={MONO}
                     fontWeight={600}
-                    textAnchor={right ? "start" : "end"}
+                    textAnchor={anchor}
                     dominantBaseline="central"
                     paintOrder="stroke"
                     stroke="var(--halo)"

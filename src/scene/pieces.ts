@@ -291,4 +291,6 @@ export type RigLabel = {
     shell?: Piece["shell"];
     /** Which side of it an elevation writes it, if not the side of the drawing it's on. */
     side?: "left" | "right";
+    /** Which side of it a view looking down writes it, above (north) or below, if not beside it. */
+    plan?: "above" | "below";
 };

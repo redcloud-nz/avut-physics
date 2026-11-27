@@ -351,6 +351,8 @@ html {
   /* The round slings (pastel purple). */
   --fox-sling: #2552c9;
   --fox-sling-stitch: #8db4f2;
+  /* A daisy chain's bar tacks, grey stitching across its pale tape. */
+  --daisy-tack: #6b7280;
   --fox-round-sling: #12876b;
   --fox-round-sling-6t: #f4c2cf;
   --fox-round-sling-stripe: #1d2b25;

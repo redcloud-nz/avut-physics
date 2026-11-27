@@ -17,7 +17,7 @@ import {
     stopper,
     tiedPrusik,
 } from "@/rigging/knots";
-import { basketedSlingWith, SLINGS, type TapeFeatures } from "@/rigging/slings";
+import { basketedSlingWith, daisyChain, SLINGS, type TapeFeatures } from "@/rigging/slings";
 import {
     type Face,
     type Group,
@@ -501,15 +501,7 @@ export const RIGS: Rig[] = [
                 role: "Edge",
                 place: { east: 3.95, north: 2.25, level: 4 },
             },
-            // West side, against the railing in the middle.
-            {
-                kind: "person",
-                id: "person-5",
-                role: "Edge",
-                place: { east: 0.35, north: 2.25, level: 4 },
-            },
-            // The edge people's safety lines: a 3 m sling each in the beam's middle space, a little apart, and a
-            // daisy chain to them.
+            // The east edge person's safety line: a 3 m sling in the beam's middle space and a daisy chain to them.
             {
                 kind: "sling",
                 id: "sling-11",
@@ -518,22 +510,12 @@ export const RIGS: Rig[] = [
                 color: "green",
                 configuration: "basket",
             },
-            { kind: "safety", id: "safety-1", from: "sling-11", person: "person-4", dc: "yellow" },
             {
-                kind: "sling",
-                id: "sling-12",
-                at: 2.3,
-                length: 3,
-                color: "green",
-                configuration: "basket",
-            },
-            { kind: "safety", id: "safety-2", from: "sling-12", person: "person-5", dc: "yellow" },
-            // Just east of the middle, clear of the beam.
-            {
-                kind: "person",
-                id: "person-6",
-                role: "Supervisor",
-                place: { east: 2.8, north: 2.25, level: 4 },
+                kind: "safety",
+                id: "safety-1",
+                from: "sling-11",
+                person: "person-4",
+                dc: "dark-blue",
             },
             // SE: at the east railing, under its pair of ropes (the dark blue abseil and white belay).
             {
@@ -929,7 +911,14 @@ const PULL: Record<Rope["route"], Vector2> = {
  * carabiner and on every rope's end that finishes in a carabiner, a figure 8 stopper on every other rope's end, a
  * munter and two half hitches, and a belay's load-release hitch.
  */
-export const KNOT_LABELS = { bight: "F8OB", stopper: "F8", munter: "M+2HH", lrh: "LRH" };
+export const KNOT_LABELS = {
+    bight: "F8OB",
+    stopper: "F8",
+    munter: "M+2HH",
+    lrh: "LRH",
+    tbp: "TBP",
+    dc: "DC",
+};
 /** A munter and two half hitches' label, and the cylinder it's drawn as in 3D with knot labels on, in the rope's colour. */
 const HITCH = { text: KNOT_LABELS.munter, r: 0.055, length: 0.25 };
 const DOWN = vec3(0, -1, 0);
@@ -1363,8 +1352,8 @@ function toGround(
 
 /** A load-release hitch's label, and the cylinder it's drawn as in 3D with knot labels on: longer and thinner than a rope's hitch. */
 const LRH = { text: KNOT_LABELS.lrh, r: 0.035, length: 0.35 };
-/** A daisy chain, drawn as a cylinder as thick as the load-release hitch, as long as it takes to reach its person. */
-const DC = { text: "DC", r: LRH.r };
+/** A daisy chain's label. */
+const DC = { text: KNOT_LABELS.dc };
 /** How high above the deck a person's harness is, where their daisy chain clips in. */
 const HARNESS_H = 1.0;
 
@@ -1391,7 +1380,7 @@ const LRH_TURN = (10 * Math.PI) / 180;
  * Their pulley's plates are red.
  */
 const TBP = {
-    text: "TBP",
+    text: KNOT_LABELS.tbp,
     /** How far along the rope from the pulley's shoulders the prusiks reach, the second's end where the rope goes on. */
     length: 0.26,
     plates: "red" as RigColor,
@@ -2527,6 +2516,11 @@ export function layoutRig(
     for (const item of rig.items) {
         const [drawn, written, connected] = [pieces.length, labels.length, connections.length];
         layOut(item);
+        // Looking down, a line's labels go on the far side of it from the line it's paired with.
+        const above = aboveItsPair(item);
+        if (above !== undefined)
+            for (let i = written; i < labels.length; i++)
+                labels[i] = { ...labels[i], plan: above ? "above" : "below" };
         // Everything's laid out, as one item can depend on another, but only those asked for are kept.
         if (only && !only.has(item.id)) {
             pieces.length = drawn;
@@ -2536,6 +2530,36 @@ export function layoutRig(
     }
     return { pieces, labels, connections };
 
+    /**
+     * Whether a line's labels go above it looking down (north) or below: a belay and the abseil rope it's beside are a
+     * pair, as are two lines over the same side from slings close together along the beam, and the one further north
+     * of a pair has its labels above. A line on its own has them above. Nothing else is a line.
+     */
+    function aboveItsPair(item: RigItem): boolean | undefined {
+        if (item.kind === "safety") return true;
+        if (item.kind !== "rope" && item.kind !== "belay") return undefined;
+        const lines = rig.items.filter(
+            (i): i is Rope | Belay => i.kind === "rope" || i.kind === "belay",
+        );
+        const at = (line: Rope | Belay) => slings.find((s) => s.id === line.from)?.at;
+        const east = (line: Rope | Belay) => !line.route?.startsWith("west");
+        const z = at(item);
+        if (z === undefined) return true;
+        const paired =
+            lines.find(
+                (l) =>
+                    (item.kind === "belay" && l.id === item.beside) ||
+                    (l.kind === "belay" && l.beside === item.id),
+            ) ??
+            lines
+                .filter((l) => l !== item && east(l) === east(item) && at(l) !== undefined)
+                .map((l) => ({ l, d: Math.abs(at(l)! - z) }))
+                .filter(({ d }) => d < 0.4)
+                .sort((a, b) => a.d - b.d)[0]?.l;
+        const theirs = paired && at(paired);
+        return theirs === undefined || z >= theirs;
+    }
+
     /** Where a person stands (the middle of their disc, on their deck). */
     function personAt(id: string): Vector3 | undefined {
         const p = rig.items.find((i): i is Person => i.kind === "person" && i.id === id);
@@ -2544,35 +2568,47 @@ export function layoutRig(
 
     function layOut(item: RigItem) {
         if (item.kind === "safety") {
-            // The daisy chain from the sling's carabiner straight to the person, as long as it takes: its carabiner
-            // clips in at their harness, over the middle of where they stand.
+            // The daisy chain from the sling's carabiner straight to the person: its first loop round the
+            // carabiner's bottom bar, and its last round a carabiner that clips in at their harness, over the middle
+            // of where they stand.
             const from = clips.get(item.from);
             const harness = personAt(item.person)?.add(vec3(0, HARNESS_H, 0));
             if (!from || !harness) return;
             const along = harness.sub(from.clip).unit();
             const end = harness.sub(along.scale(KRAB_L));
-            const color = rigColor(item.dc);
-            const start = from.clip.sub(along.scale(0.02));
-            pieces.push({
-                kind: "rod",
-                a: start,
-                b: end,
-                r: DC.r,
-                material: "rope",
-                color,
-                capA: true,
-                capB: true,
+            // The first loop's tape lies along the sling carabiner's bar, and the harness carabiner lies the way the
+            // last loop's tape does.
+            const { loop } = from.krab;
+            const i = loop.reduce(
+                (best, q, j) =>
+                    q.distanceTo(from.clip) < loop[best].distanceTo(from.clip) ? j : best,
+                0,
+            );
+            const bar = loop[Math.min(loop.length - 1, i + 1)].sub(loop[Math.max(0, i - 1)]);
+            const across = bar.sub(along.scale(bar.dot(along))).unit();
+            const chain = daisyChain(from.clip, end, across, CARABINER_R, {
+                tape: rigColor("white"),
+                edge: rigColor(item.dc),
+                tab: rigColor("orange"),
+                tack: "var(--daisy-tack)",
             });
-            // Its carabiner, lying along it, flat in the upright plane it's in.
-            const across = vec3(-along.y, along.x, 0).unit();
-            pieces.push(...carabiner(end.sub(along.scale(0.01)), along, across, face).pieces);
-            labels.push({
-                at: start.lerp(end, 0.5),
-                text: DC.text,
-                on: { along, length: start.distanceTo(end), r: DC.r },
-                light: DARK_COLORS.includes(item.dc),
-                font: CYLINDER_FONT,
-            });
+            pieces.push(...chain.pieces, ...carabiner(end, along, chain.lastAcross, face).pieces);
+            const around = knotCylinders
+                ? enclosing(
+                      partsOf(chain.pieces).filter((q) =>
+                          clearOfLoops(q.at, [loop], CARABINER_R + q.r + 0.003),
+                      ),
+                      along,
+                      DC.text,
+                  )
+                : undefined;
+            if (around)
+                pieces.push(...banded(around.a, around.b, around.r, [rigColor(item.dc)], 1));
+            labels.push(
+                around
+                    ? onCylinder(around, DC.text, DARK_COLORS.includes(item.dc))
+                    : knotLabel([from.clip, end], DC.text),
+            );
             return;
         }
         if (item.kind === "sling") {
@@ -2826,13 +2862,7 @@ export function legend(rig: Rig): {
     if (belays.length) knots.push({ text: LRH.text, name: "Load-release hitch" });
     if (belays.length) knots.push({ text: TBP.text, name: "Tandem belay prusiks + pulley" });
     const safety = rig.items.filter((i): i is SafetyLine => i.kind === "safety");
-    if (safety.length)
-        cylinders.push({
-            text: DC.text,
-            name: "Daisy chain",
-            colors: [rigColor(safety[0].dc)],
-            light: DARK_COLORS.includes(safety[0].dc),
-        });
+    if (safety.length) knots.push({ text: DC.text, name: "Daisy chain" });
     // A line for each length of sling and of rope, with every colour that length comes in.
     const byLength = (
         items: { length: number; color: RigColor }[],
