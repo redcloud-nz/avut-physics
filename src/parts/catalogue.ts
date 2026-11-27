@@ -248,7 +248,7 @@ export const PARTS: Part[] = [
         slug: "tower-tbp",
         name: "Tandem belay prusiks and their pulley",
         group: "Abseil tower",
-        about: "The first belay in NZRT11 (belay-1, the white rope) where it hangs from its load release hitch's second carabiner, cut out of the tower as its 3D view lays it out: the carabiner turned 10° in its own plane from hanging square about the figure 8's loop, centred in its narrow end, and a single prusik minding pulley (red plates) hanging straight down the pull from the middle of its wide end, the bar passing through the middle of the pulley's eyes; the rope from the abseiler past the plates' shoulders, where the tandem belay prusiks sit, one below the other (as tied in /knot-editor-3d, src/rigging/knots/prusik.json: 8 mm cord, three wraps each side of a bridge, each loop up through the carabiner on the spine side of the pulley, hanging loose round its bar, the upper's shorter and inside the lower's; the tower's stand-in cylinder for them is left out; with X, Y and Z arrows, X along the rope), round the sheave and off it towards where its spare lands in its coil on the deck.",
+        about: "The first belay in NZRT11 (belay-1, the white rope) where it hangs from its load release hitch's second carabiner, cut out of the tower as its 3D view lays it out: the carabiner turned 10° in its own plane from hanging square about the figure 8's loop, centred in its narrow end, and a single prusik minding pulley (red plates) hanging straight down the pull from the middle of its wide end, the bar passing through the middle of the pulley's eyes; the rope from the abseiler past the plates' shoulders, where the tandem belay prusiks sit, one below the other (as tied in /knot-editor-3d, src/rigging/knots/prusik.json: 8 mm cord, three wraps each side of a bridge, each loop up through the carabiner on the spine side of the pulley, hanging loose round its bar, the upper's shorter and inside the lower's; with X, Y and Z arrows, X along the rope), round the sheave and off it towards where its spare lands in its coil on the deck.",
         pieces: () => towerTbp().pieces,
         labels: () => towerTbp().labels,
         flat: {
@@ -942,9 +942,7 @@ function towerLrh(face?: Vector3): Piece[] {
     const label = labels.find((l) => l.text === "LRH")!;
     const reach = vec3(0.35, 0.35, 0.35);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
-    // Without the tandem belay prusiks' stand-in cylinder (the rope's own rods), so the rope shows through them.
-    const shown = pieces.filter((p) => !(p.kind === "rod" && p.material === "rope"));
-    return moved(within(shown, box), label.at.neg());
+    return moved(within(pieces, box), label.at.neg());
 }
 
 /**
@@ -962,13 +960,11 @@ function towerTbp(face?: Vector3): {
     const label = labels.find((l) => l.text === "TBP")!;
     const reach = vec3(0.3, 0.3, 0.3);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
-    // Without the tandem belay prusiks' stand-in cylinder (the rope's own rods), so the rope shows through them.
-    const shown = pieces.filter((p) => !(p.kind === "rod" && p.material === "rope"));
     const to = label.at.neg();
     // X, Y and Z arrows beside it, for saying which way to move things: X along the rope towards the abseiler (the
     // last stretch of the rope's run round the sheave and through the prusiks), Y square to it as near straight up as
     // it goes, Z across.
-    const run = shown.find(
+    const run = pieces.find(
         (p) => p.kind === "strand" && p.color === rigColor("white") && p.points.length > 10,
     );
     const ropeX =
@@ -976,7 +972,7 @@ function towerTbp(face?: Vector3): {
     const ropeY = vec3(0, 1, 0).sub(ropeX.scale(ropeX.y)).unit();
     const arrows = axes(vec3(0.04, 0.06, 0.1), 0.04, [ropeX, ropeY, ropeX.cross(ropeY)]);
     return {
-        pieces: [...moved(within(shown, box), to), ...arrows.pieces],
+        pieces: [...moved(within(pieces, box), to), ...arrows.pieces],
         labels: arrows.labels,
         ropeX,
         ropeY,

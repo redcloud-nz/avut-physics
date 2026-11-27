@@ -19,7 +19,7 @@ Everything is in SI units and plain functions or immutable classes. Physics coor
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `segment.ts`  | `Segment`, a straight piece between two points (a stretcher, a ladder, a piece of a polyline from `Segment.along`): its length, direction and middle, the point a fraction along, nearest points, distances, crossings, gaps and intersections. |
 | `polyline.ts` | The `Polyline` type (a `readonly Vector2[]`), its arc lengths and its length.                                                                                                                                                                   |
-| `hull.ts`     | `convexHull` of points in the plane (Andrew's monotone chain).                                                                                                                                                                                  |
+| `hull.ts`     | `convexHull` of points in the plane (Andrew's monotone chain), and the `smallestCircle` round them.                                                                                                                                             |
 | `wall.ts`     | The wall the lowers share: its face at x = 0, its anchor, and the rope's path over its edge.                                                                                                                                                    |
 
 ## Curves

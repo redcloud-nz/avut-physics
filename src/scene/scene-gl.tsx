@@ -753,8 +753,9 @@ function KnotLabel({ label, colors }: { label: RigLabel; colors: Colors }) {
     // The letters' height that fits on the cylinder (as in the SVG views: 70% of its thickness, the text 72% of its
     // length).
     const font =
+        label.font ??
         (label.size ?? 1) *
-        Math.min(0.7 * 2 * on.r, (0.72 * on.length) / (label.text.length * 0.6));
+            Math.min(0.7 * 2 * on.r, (0.72 * on.length) / (label.text.length * 0.6));
     useFrame(() => {
         const m = mesh.current;
         if (!m) return;

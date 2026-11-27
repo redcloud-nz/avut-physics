@@ -1,3 +1,4 @@
+import { convexHull, smallestCircle } from "@/lib/hull";
 import { clamp } from "@/lib/math";
 import { vec2, type Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
@@ -164,6 +165,16 @@ export type Belay = {
      * Without one, it drapes straight into the bucket.
      */
     coil?: OnDeck;
+    /**
+     * Its load-release hitch's second carabiner turned half round about the pull, its spine on the other side, so the
+     * prusiks' loops (always tied the same way round the rope) reach its bar on the spine side of the pulley.
+     */
+    flip?: boolean;
+    /**
+     * How far its prusiks are turned about the rope (radians, right-handed about the rope towards the abseiler), from
+     * their legs heading level across it, so their loops line up with its carabiner as the others' do.
+     */
+    prusikTurn?: number;
 };
 
 /**
@@ -354,6 +365,7 @@ export const RIGS: Rig[] = [
                 beside: "rope-2",
                 spare: "bucket-4",
                 coil: { east: 2.95, north: 3.5 },
+                flip: true,
             },
             // The other end of the same red rope, over the west side, sharing its bucket.
             {
@@ -416,6 +428,8 @@ export const RIGS: Rig[] = [
                 redirect: { via: "rope-5", drop: 1 },
                 spare: "bucket-5",
                 coil: { east: 1.45, north: 1.25 },
+                flip: true,
+                prusikTurn: Math.PI / 2,
             },
             { kind: "bucket", id: "bucket-5", color: "yellow", place: { underBelay: "belay-4" } },
             // The photographer's two lines, so they can work over the east edge, each on its own green sling and tied
@@ -944,8 +958,6 @@ export function lengths(points: Vector3[], n = 4): Vector3[][] {
         out.push(points.slice(Math.max(0, i - 1), Math.min(points.length, i + n + 2)));
     return out;
 }
-/** A figure 8's radius drawn as a cylinder, slimmer than the munter's. */
-const KNOT_CYLINDER_R = 0.045;
 /** How far a figure 8 stopper reaches down from where the rope goes into it. */
 const STOPPER_DROP = -Math.min(...stopper(vec3(0, 0, 0), DOWN, ROPE_R).map((p) => p.y));
 
@@ -1031,64 +1043,46 @@ function endKnot(
     const at = end.add(lateral).add(shift);
     const text = bar ? KNOT_LABELS.bight : KNOT_LABELS.stopper;
     const into = rope[0];
-    if (cylinders) {
-        const foot = vec3(into.x, Math.min(...rope.map((p) => p.y)), into.z);
-        return { ...knotCylinder(into, foot, color, text, shell), into, at, hang };
-    }
     // Face on, it draws over its carabiner, which hangs from `at` along `hang`.
     const group = n && { at: at.add(hang.scale(KRAB_L / 2)), over: true, order: 4 };
+    // With knots as labelled cylinders, still drawn as it's tied, a cylinder round it: a figure 8's short of the
+    // carabiner its loop goes round, which hangs from `at`.
+    const around = cylinders
+        ? enclosing(
+              rope
+                  .filter((q) => !bar || q.sub(at).dot(hang) < -(CARABINER_R + ROPE_R + 0.003))
+                  .map((q) => ({ at: q, r: ROPE_R })),
+              hang,
+              text,
+          )
+        : undefined;
     return {
-        pieces: knotRope(rope, rigColor(color)).map((p) => ({
-            ...p,
-            shell,
-            ...(group && { group }),
-        })),
+        pieces: [
+            ...knotRope(rope, rigColor(color)).map((p) => ({
+                ...p,
+                shell,
+                ...(group && { group }),
+            })),
+            ...(around
+                ? banded(around.a, around.b, around.r, [rigColor(color)], 1).map((p) => ({
+                      ...p,
+                      shell,
+                  }))
+                : []),
+        ],
         into,
         // Laid out with a carabiner on it, it's called out from past the carabiner's far end, clear of both.
-        label:
-            laid && bar
-                ? { ...knotLabel(rope, text, shell), at: at.add(hang.scale(KRAB_L + 0.01)) }
-                : knotLabel(rope, text, shell),
+        label: around
+            ? onCylinder(around, text, DARK_COLORS.includes(color), { shell })
+            : laid && bar
+              ? { ...knotLabel(rope, text, shell), at: at.add(hang.scale(KRAB_L + 0.01)) }
+              : knotLabel(rope, text, shell),
         at,
         hang,
         knot: knot ? rope : undefined,
     };
 }
 
-/** A knot drawn as a labelled cylinder in its rope's colour from `a` to `b`, as the hitches are. */
-function knotCylinder(
-    a: Vector3,
-    b: Vector3,
-    color: RigColor,
-    text: string,
-    shell?: Piece["shell"],
-    side?: RigLabel["side"],
-): { pieces: Piece[]; label: RigLabel } {
-    const r = KNOT_CYLINDER_R;
-    return {
-        pieces: [
-            {
-                kind: "rod",
-                a,
-                b,
-                r,
-                material: "rope",
-                color: rigColor(color),
-                capA: true,
-                capB: true,
-                shell,
-            },
-        ],
-        label: {
-            at: a.lerp(b, 0.5),
-            text,
-            on: { along: b.sub(a).unit(), length: a.distanceTo(b), r },
-            light: DARK_COLORS.includes(color),
-            shell,
-            side,
-        },
-    };
-}
 /** How far apart along the beam ropes sharing one carabiner sit. */
 const SHARED_GAP = 0.1;
 
@@ -1168,7 +1162,8 @@ function ropeOverSide(
         clipped && carabiner(tail.at, tail.hang, across, face, "near", end === "below-outrigger");
     const color = rigColor(rope.color);
     // Tied to its sling's carabiner round its wide end with a figure 8 on a bight, lying towards the rail, or a munter
-    // and two half hitches; with knots as cylinders, the munter's is along the pull from a little back over the end.
+    // and two half hitches; with knots as cylinders, the munter's is still drawn as tied, a labelled cylinder round it
+    // (and without its carabiner drawn as tied, along the pull from a little back over the end).
     let tied: {
         pieces: Piece[];
         from: Vector3[];
@@ -1195,27 +1190,32 @@ function ropeOverSide(
                 pull: rail.sub(clip).unit(),
             });
         const group = krabGroup && { ...krabGroup, over: true, order: 4 };
-        tied = cylinders
-            ? {
-                  ...knotCylinder(
-                      clip.sub(along.scale(0.02)),
-                      knot.end,
-                      rope.color,
-                      KNOT_LABELS.bight,
-                      undefined,
-                      rope.labelSide,
-                  ),
-                  from: [knot.end],
-              }
-            : {
-                  pieces: knotRope([...knot.rope].reverse(), color).map((p) => ({
-                      ...p,
-                      ...(group && { group }),
-                  })),
-                  from: [knot.end],
-                  label: knotLabel(knot.rope, KNOT_LABELS.bight, undefined, rope.labelSide),
-              };
-    } else if (!cylinders && krab) {
+        // With knots as labelled cylinders, still drawn as it's tied, a cylinder round it short of the carabiner.
+        const around = cylinders
+            ? enclosing(
+                  knot.rope
+                      .filter((q) => !krab || clearOfLoops(q, [krab.loop], krab.r + ROPE_R + 0.003))
+                      .map((q) => ({ at: q, r: ROPE_R })),
+                  knot.end.sub(clip).unit(),
+                  KNOT_LABELS.bight,
+              )
+            : undefined;
+        tied = {
+            pieces: [
+                ...knotRope([...knot.rope].reverse(), color).map((p) => ({
+                    ...p,
+                    ...(group && { group }),
+                })),
+                ...(around ? banded(around.a, around.b, around.r, [color], 1) : []),
+            ],
+            from: [knot.end],
+            label: around
+                ? onCylinder(around, KNOT_LABELS.bight, DARK_COLORS.includes(rope.color), {
+                      side: rope.labelSide,
+                  })
+                : knotLabel(knot.rope, KNOT_LABELS.bight, undefined, rope.labelSide),
+        };
+    } else if (krab) {
         // Face on in a flat view, as its carabiner is.
         const knot = munterTwoHalfHitches(krab);
         // Each length over the carabiner where it's on the eye's side of it, and under it where it's behind.
@@ -1227,18 +1227,35 @@ function ropeOverSide(
                       .sub(krabGroup.at)
                       .dot(face)
                 : 1;
+        // With knots as labelled cylinders, still drawn as it's tied, a cylinder round it short of the carabiner.
+        const around = cylinders
+            ? enclosing(
+                  knot.rope
+                      .filter((q) => clearOfLoops(q, [krab.loop], krab.r + ROPE_R + 0.003))
+                      .map((q) => ({ at: q, r: ROPE_R })),
+                  along,
+                  HITCH.text,
+              )
+            : undefined;
         tied = {
-            pieces: knotRope(knot.rope, color).map((p) => ({
-                ...p,
-                ...(krabGroup && {
-                    group:
-                        side(p) >= 0
-                            ? { ...krabGroup, over: true, order: 4 }
-                            : { ...krabGroup, order: 0 },
-                }),
-            })),
+            pieces: [
+                ...knotRope(knot.rope, color).map((p) => ({
+                    ...p,
+                    ...(krabGroup && {
+                        group:
+                            side(p) >= 0
+                                ? { ...krabGroup, over: true, order: 4 }
+                                : { ...krabGroup, order: 0 },
+                    }),
+                })),
+                ...(around ? banded(around.a, around.b, around.r, [color], 1) : []),
+            ],
             from: [knot.end],
-            label: knotLabel(knot.rope, HITCH.text, undefined, rope.labelSide),
+            label: around
+                ? onCylinder(around, HITCH.text, DARK_COLORS.includes(rope.color), {
+                      side: rope.labelSide,
+                  })
+                : knotLabel(knot.rope, HITCH.text, undefined, rope.labelSide),
             tail: { at: knot.rope.at(-1)!, heading: knot.rope.at(-1)!.sub(knot.rope.at(-2)!) },
         };
     } else {
@@ -1375,9 +1392,8 @@ const LRH_TURN = (10 * Math.PI) / 180;
  */
 const TBP = {
     text: "TBP",
-    r: 0.016,
+    /** How far along the rope from the pulley's shoulders the prusiks reach, the second's end where the rope goes on. */
     length: 0.26,
-    bands: 2,
     plates: "red" as RigColor,
     /** Their cord's radius: 8 mm cord. */
     cordR: 0.004,
@@ -1512,20 +1528,6 @@ function slackened(
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
 const BELAY_DROP = 0.35;
 
-/** A cylinder from `a` to `b` in `bands` bands of alternating colours, rounded only at its ends. */
-function banded(a: Vector3, b: Vector3, r: number, colors: string[], bands: number): Piece[] {
-    return Array.from({ length: bands }, (_, i) => ({
-        kind: "rod",
-        a: a.lerp(b, i / bands),
-        b: a.lerp(b, (i + 1) / bands),
-        r,
-        material: "rope",
-        color: colors[i % colors.length],
-        capA: i === 0,
-        capB: i === bands - 1,
-    }));
-}
-
 /** A belay's load-release hitch drawn as a labelled cylinder along the pull from `clip`, a carabiner on its end. */
 function lrhCylinder(
     belay: Belay,
@@ -1589,21 +1591,27 @@ function tiedLrh(
     bar: Vector3;
     hangs: Vector3;
     onBar: (offset: number) => { at: Vector3; along: Vector3 };
+    /** Its cord and the cord's radius, and its second carabiner's centreline. */
+    cord: Vector3[];
+    cordR: number;
+    loop: Vector3[];
 } {
     const color = rigColor(belay.lrh);
     const { cord, r, lower } = loadReleaseHitch(krab);
     // Hanging square, not settled: its narrow end's middle where the figure 8's loop holds it (where the settled one's
     // was), along the way it was tied.
-    const settled = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
+    // Turned half round about the pull if it's flipped.
+    const across = belay.flip ? lower.across.neg() : lower.across;
+    const settled = ctCarabiner(lower.top, lower.down, across, "var(--tower-steel)", KRAB_L, {
         settled: true,
     });
-    const square = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
+    const square = ctCarabiner(lower.top, lower.down, across, "var(--tower-steel)", KRAB_L, {
         centred: true,
     });
     const shift = settled.features.bottom.sub(square.features.bottom);
     const pivot = settled.features.bottom;
     const axis = lower.down.unit();
-    const n = lower.down.cross(lower.across).unit();
+    const n = lower.down.cross(across).unit();
     const shifted = square.features.loop.map((q) => q.add(shift));
     // Where the line straight down the pull from the figure 8's loop crosses its wide end.
     const offLine = (q: Vector3) => {
@@ -1651,7 +1659,17 @@ function tiedLrh(
         return { at: loop[j], along: loop[j + 1].sub(loop[j - 1]).unit() };
     };
     if (!face || !krabGroup)
-        return { pieces: [...second.pieces, ...lengthsOf], label, far, bar, hangs, onBar };
+        return {
+            pieces: [...second.pieces, ...lengthsOf],
+            label,
+            far,
+            bar,
+            hangs,
+            onBar,
+            cord,
+            cordR: r,
+            loop,
+        };
     const group = { at: middle(second.features.loop) };
     const [body, ...sleeve] = second.pieces;
     const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
@@ -1682,6 +1700,157 @@ function tiedLrh(
         bar,
         hangs,
         onBar,
+        cord,
+        cordR: r,
+        loop,
+    };
+}
+
+/** A cylinder from `a` to `b` in `bands` bands of alternating colours, rounded only at its ends. */
+function banded(a: Vector3, b: Vector3, r: number, colors: string[], bands: number): Piece[] {
+    return Array.from({ length: bands }, (_, i) => ({
+        kind: "rod",
+        a: a.lerp(b, i / bands),
+        b: a.lerp(b, (i + 1) / bands),
+        r,
+        material: "rope",
+        color: colors[i % colors.length],
+        capA: i === 0,
+        capB: i === bands - 1,
+    }));
+}
+
+/**
+ * How tall a knot cylinder's label is written (metres), on every cylinder alike: as the load-release hitch's was when
+ * it was sized to fit its cylinder.
+ */
+const CYLINDER_FONT = 0.05;
+/** The thinnest and shortest a cylinder can be to take its label at that height (as `KnotLabel` fits text to them). */
+const cylinderAtLeast = (text: string) => ({
+    r: CYLINDER_FONT / (0.7 * 2),
+    length: (CYLINDER_FONT * text.length * 0.6) / 0.72,
+});
+
+/** Whether `q` is further than `d` from every point of each of `loops` (a carabiner's centreline), checking only near. */
+function clearOfLoops(q: Vector3, loops: readonly (readonly Vector3[])[], d: number): boolean {
+    return loops.every((loop) => {
+        const box = loopBoxes.get(loop) ?? boxOf(loop);
+        loopBoxes.set(loop, box);
+        if (
+            q.x < box.lo.x - d ||
+            q.y < box.lo.y - d ||
+            q.z < box.lo.z - d ||
+            q.x > box.hi.x + d ||
+            q.y > box.hi.y + d ||
+            q.z > box.hi.z + d
+        )
+            return true;
+        return loop.every((k) => k.distanceTo(q) > d);
+    });
+}
+const loopBoxes = new WeakMap<readonly Vector3[], { lo: Vector3; hi: Vector3 }>();
+const boxOf = (points: readonly Vector3[]) => ({
+    lo: vec3(
+        Math.min(...points.map((p) => p.x)),
+        Math.min(...points.map((p) => p.y)),
+        Math.min(...points.map((p) => p.z)),
+    ),
+    hi: vec3(
+        Math.max(...points.map((p) => p.x)),
+        Math.max(...points.map((p) => p.y)),
+        Math.max(...points.map((p) => p.z)),
+    ),
+});
+
+/** Pieces as points round them, for fitting a cylinder round them: a rod by rings round its ends. */
+function partsOf(pieces: readonly Piece[]): { at: Vector3; r: number }[] {
+    return pieces.flatMap((p) => {
+        if (p.kind === "strand") return p.points.map((q) => ({ at: q, r: p.r }));
+        if (p.kind === "face") return p.points.map((q) => ({ at: q, r: 0 }));
+        const axis = p.b.sub(p.a).unit();
+        const e1 = (Math.abs(axis.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0)).cross(axis).unit();
+        const e2 = axis.cross(e1);
+        return [p.a, p.b].flatMap((end) =>
+            Array.from({ length: 12 }, (_, i) => {
+                const t = (i / 12) * 2 * Math.PI;
+                return {
+                    at: end.add(e1.scale(p.r * Math.cos(t)).add(e2.scale(p.r * Math.sin(t)))),
+                    r: 0,
+                };
+            }),
+        );
+    });
+}
+
+/**
+ * The smallest cylinder that takes in every one of `parts` (each a point and how thick it is round it) and still has
+ * room for `text` on it at `CYLINDER_FONT`: tried along `along` and tilted from it up to 25° (coarsely every way, then
+ * finely round the best), its axis through the middle of the smallest circle round them square to it, and kept the one
+ * with the least in it.
+ */
+function enclosing(
+    parts: { at: Vector3; r: number }[],
+    along: Vector3,
+    text: string,
+): { a: Vector3; b: Vector3; r: number } | undefined {
+    if (!parts.length) return undefined;
+    const least = cylinderAtLeast(text);
+    const thickest = Math.max(...parts.map((p) => p.r));
+    // Every third point is plenty: a cord's points are only a few millimetres apart.
+    const some = parts.filter((_, i) => i % 3 === 0 || i === parts.length - 1);
+    const u0 = along.unit();
+    const side0 = (Math.abs(u0.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0)).cross(u0).unit();
+    const tilted = (tilt: number, turn: number) =>
+        u0.turned(side0.turned(u0, turn), (tilt * Math.PI) / 180);
+    let best:
+        | { a: Vector3; b: Vector3; r: number; volume: number; tilt: number; turn: number }
+        | undefined;
+    const tryWay = (tilt: number, turn: number) => {
+        const u = tilted(tilt, turn);
+        const e1 = (Math.abs(u.y) < 0.9 ? vec3(0, 1, 0) : vec3(1, 0, 0)).cross(u).unit();
+        const e2 = u.cross(e1);
+        const circle = smallestCircle(
+            convexHull(some.map((p) => vec2(p.at.dot(e1), p.at.dot(e2)))),
+        );
+        const r = Math.max(circle.r + thickest, least.r);
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (const p of some) {
+            const t = p.at.dot(u);
+            lo = Math.min(lo, t - p.r);
+            hi = Math.max(hi, t + p.r);
+        }
+        if (hi - lo < least.length)
+            [lo, hi] = [(lo + hi - least.length) / 2, (lo + hi + least.length) / 2];
+        const volume = r * r * (hi - lo);
+        if (best && volume >= best.volume) return;
+        const centre = e1.scale(circle.centre.x).add(e2.scale(circle.centre.y));
+        best = { a: centre.add(u.scale(lo)), b: centre.add(u.scale(hi)), r, volume, tilt, turn };
+    };
+    // Coarsely every way up to 25° off, then finely round the best of those.
+    tryWay(0, 0);
+    for (const tilt of [10, 20]) for (let k = 0; k < 8; k++) tryWay(tilt, (k / 8) * 2 * Math.PI);
+    const { tilt, turn } = best!;
+    for (const dt of [-5, 0, 5])
+        for (const dk of [-1, 0, 1])
+            if (tilt + dt >= 0 && tilt + dt <= 25) tryWay(tilt + dt, turn + (dk * Math.PI) / 8);
+    return best && { a: best.a, b: best.b, r: best.r };
+}
+
+/** A label written on a knot's cylinder, at `CYLINDER_FONT`. */
+function onCylinder(
+    c: { a: Vector3; b: Vector3; r: number },
+    text: string,
+    light: boolean,
+    extra: Partial<RigLabel> = {},
+): RigLabel {
+    return {
+        at: c.a.lerp(c.b, 0.5),
+        text,
+        on: { along: c.b.sub(c.a).unit(), length: c.a.distanceTo(c.b), r: c.r },
+        light,
+        font: CYLINDER_FONT,
+        ...extra,
     };
 }
 
@@ -1700,20 +1869,78 @@ function belayHitches(
     face?: Vector3,
     krab?: CarabinerFeatures,
     krabGroup?: Group,
-): {
+): BelayHitches {
+    const tied = belayHitchesAsTied(belay, clip, along, cylinders, face, krab, krabGroup);
+    if (!face) return tied;
+    // In an elevation, laid into the view as the parts viewer's flat view sees it from above, square to the rope: its
+    // level up (as the prusiks' frame has it) towards the eye and the rope running straight down the page, turned
+    // about where it hangs (`clip`). Looking down, it's seen that way already.
+    if (Math.abs(face.unit().y) > 0.9) return tied;
+    const x = along.unit();
+    const y = vec3(0, 1, 0).sub(x.scale(x.y)).unit();
+    const eye = face.unit();
+    const down = vec3(0, -1, 0).sub(eye.scale(-eye.y)).unit();
+    // Two turns: the rope onto straight down the page, then about it, its level up onto the eye.
+    const first = x.cross(down);
+    const one = first.len() > 1e-12 ? { axis: first.unit(), angle: x.angleTo(down) } : undefined;
+    const y1 = one ? y.turned(one.axis, one.angle) : y;
+    const two = { axis: down, angle: Math.atan2(y1.cross(eye).dot(down), y1.dot(eye)) };
+    const turn = (v: Vector3) => {
+        const v1 = one ? v.turned(one.axis, one.angle) : v;
+        return v1.turned(two.axis, two.angle);
+    };
+    const unturn = (v: Vector3) => {
+        const v1 = v.turned(two.axis, -two.angle);
+        return one ? v1.turned(one.axis, -one.angle) : v1;
+    };
+    const point = (q: Vector3) => turn(q.sub(clip)).add(clip);
+    const pose = (pieces: Piece[]): Piece[] => {
+        const once = one
+            ? posed(moved(pieces, clip.neg()), { at: vec3(0, 0, 0), ...one })
+            : moved(pieces, clip.neg());
+        return posed(once, { at: clip, ...two }).map((p) =>
+            // Groups sort by their middles, which turning the pieces leaves be; the sling's carabiner's stays.
+            p.group && p.group.at !== krabGroup?.at
+                ? { ...p, group: { ...p.group, at: point(p.group.at) } }
+                : p,
+        );
+    };
+    return {
+        pieces: pose(tied.pieces),
+        labels: tied.labels.map((l) => ({ ...l, at: point(l.at) })),
+        tbpA: point(tied.tbpA),
+        tbpB: point(tied.tbpB),
+        spare: (toward) => {
+            const { pieces, from } = tied.spare(unturn(toward.sub(clip)).add(clip));
+            return { pieces: pose(pieces), from: point(from) };
+        },
+        sheave: point(tied.sheave),
+    };
+}
+
+type BelayHitches = {
     pieces: Piece[];
     labels: RigLabel[];
     tbpA: Vector3;
     tbpB: Vector3;
     spare: (toward: Vector3) => { pieces: Piece[]; from: Vector3 };
     sheave: Vector3;
-} {
+};
+
+/** A belay's hitches (`belayHitches`) as they're tied, before a flat view turns them to be seen from above. */
+function belayHitchesAsTied(
+    belay: Belay,
+    clip: Vector3,
+    along: Vector3,
+    cylinders: boolean,
+    face?: Vector3,
+    krab?: CarabinerFeatures,
+    krabGroup?: Group,
+): BelayHitches {
     const color = rigColor(belay.color);
     const across = vec3(-along.y, along.x, 0).unit();
-    const lrh =
-        !cylinders && krab
-            ? tiedLrh(belay, krab, face, krabGroup)
-            : lrhCylinder(belay, clip, along, across, face);
+    const tied = krab ? tiedLrh(belay, krab, face, krabGroup) : undefined;
+    const lrh = tied ?? lrhCylinder(belay, clip, along, across, face);
     // The pulley hangs from the carabiner's end, the rope round it: from the abseiler through the prusiks, which sit
     // against its plates' shoulders, round the sheave and off it towards the spare.
     const pulley = prusikMindingPulley({
@@ -1765,80 +1992,104 @@ function belayHitches(
             from,
         };
     };
+    // The prusiks round the rope, one below the other, as tied in /knot-editor-3d: each one's legs heading
+    // level across the rope, to the right looking down it from the pulley, and its loop on up through the
+    // carabiner on the spine side of the pulley, each round the bar at its own place: the upper's nearer the
+    // pulley, shorter and inside the lower's; the lower's further round, with a little more slack.
+    const prusiks = tbpColors.map((c, i) => {
+        const level = vec3(0, 1, 0)
+            .sub(along.scale(along.y))
+            .unit()
+            .turned(along.unit(), belay.prusikTurn ?? 0);
+        const middle = tbpA.add(along.scale(0.045 + i * TBP.apart));
+        const { hitch, loop: tied } = tiedPrusik(middle, along, level);
+        // Where the loop went round the bar as tied, from the lower's hitch, placed from this one's.
+        const tiedOn = lrh.onBar(TBP.tiedAt);
+        const was = {
+            at: tiedOn.at.add(along.scale((i - 1) * TBP.apart)),
+            along: tiedOn.along,
+        };
+        // The upper's wrap round the bar, beside the pulley, lies parallel to its side plates; the lower's sits next
+        // to it, further round, canted outwards away from it.
+        const on = lrh.onBar(i === 0 ? TBP.upperAt : TBP.lowerAt);
+        const cant = lrh.bar.cross(lrh.hangs).unit();
+        const square = i === 0 ? lrh.bar : lrh.bar.turned(cant, TBP.cant);
+        const loop = rehungLoop(tied, was, on, square, TBP.clear);
+        // Their legs eased apart across the rope (Z, square to it and its level Y), so they clear each other
+        // between the hitches and the bar; the lower's with more slack, and bowed on down the rope.
+        const z = along.cross(level).unit();
+        const eased =
+            i === 0
+                ? slackened(loop, middle, along, 0, z.scale(-TBP.nudge))
+                : slackened(
+                      loop,
+                      middle,
+                      along,
+                      TBP.slack,
+                      along.scale(TBP.sag).add(z.scale(TBP.nudge)),
+                  );
+        // The upper's lower leg (further below the rope, Y) eased on towards +Z beside the pulley's axle, so
+        // it sits more under its upper leg there: most level with the axle, fading out along the rope.
+        const tip = eased.reduce(
+            (b, q, k) => (q.distanceTo(middle) > eased[b].distanceTo(middle) ? k : b),
+            0,
+        );
+        const besideAxle = (q: Vector3) =>
+            Math.exp(-((q.sub(pulley.centre).dot(along) / TBP.tuckReach) ** 2));
+        const lowness = (from: number, to: number) => {
+            let sum = 0;
+            let weight = 0;
+            for (let k = from; k < to; k++) {
+                const w = besideAxle(eased[k]);
+                sum += eased[k].sub(middle).dot(level) * w;
+                weight += w;
+            }
+            return sum / Math.max(weight, 1e-12);
+        };
+        const firstLower = lowness(0, tip) < lowness(tip, eased.length);
+        const tucked =
+            i === 0
+                ? eased.map((q, k) =>
+                      k < tip === firstLower ? q.add(z.scale(TBP.tuck * besideAxle(q))) : q,
+                  )
+                : eased;
+        return strand([...hitch, ...tucked], TBP.cordR, "rope", c, false, false);
+    });
+    // With knots as labelled cylinders, each hitch is still drawn as it's tied, a cylinder in its colours round it
+    // and labelled on it: the load-release hitch's round its cord, the prusiks' round them and the pulley, each along
+    // the pull and stopping short of the carabiners.
+    const krabLoops = [krab?.loop, tied?.loop].filter((l): l is Vector3[] => !!l);
+    const clear = (q: Vector3, r: number) => clearOfLoops(q, krabLoops, CARABINER_R + r + 0.003);
+    const lrhAround =
+        cylinders && tied
+            ? enclosing(
+                  tied.cord.filter((q) => clear(q, 0)).map((q) => ({ at: q, r: tied.cordR })),
+                  along,
+                  LRH.text,
+              )
+            : undefined;
+    const tbpAround = cylinders
+        ? enclosing(
+              partsOf([...prusiks, ...pulley.pieces]).filter((q) => clear(q.at, q.r)),
+              along,
+              TBP.text,
+          )
+        : undefined;
     return {
         pieces: [
             ...lrh.pieces,
             ...pulley.pieces,
-            ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
-            // The prusiks round the rope, one below the other, as tied in /knot-editor-3d: each one's legs heading
-            // level across the rope, to the right looking down it from the pulley, and its loop on up through the
-            // carabiner on the spine side of the pulley, each round the bar at its own place: the upper's nearer the
-            // pulley, shorter and inside the lower's; the lower's further round, with a little more slack.
-            ...tbpColors.map((c, i) => {
-                const level = vec3(0, 1, 0).sub(along.scale(along.y)).unit();
-                const middle = tbpA.add(along.scale(0.045 + i * TBP.apart));
-                const { hitch, loop: tied } = tiedPrusik(middle, along, level);
-                // Where the loop went round the bar as tied, from the lower's hitch, placed from this one's.
-                const tiedOn = lrh.onBar(TBP.tiedAt);
-                const was = {
-                    at: tiedOn.at.add(along.scale((i - 1) * TBP.apart)),
-                    along: tiedOn.along,
-                };
-                // The upper's wrap round the bar, beside the pulley, lies parallel to its side plates; the lower's sits next
-                // to it, further round, canted outwards away from it.
-                const on = lrh.onBar(i === 0 ? TBP.upperAt : TBP.lowerAt);
-                const cant = lrh.bar.cross(lrh.hangs).unit();
-                const square = i === 0 ? lrh.bar : lrh.bar.turned(cant, TBP.cant);
-                const loop = rehungLoop(tied, was, on, square, TBP.clear);
-                // Their legs eased apart across the rope (Z, square to it and its level Y), so they clear each other
-                // between the hitches and the bar; the lower's with more slack, and bowed on down the rope.
-                const z = along.cross(level).unit();
-                const eased =
-                    i === 0
-                        ? slackened(loop, middle, along, 0, z.scale(-TBP.nudge))
-                        : slackened(
-                              loop,
-                              middle,
-                              along,
-                              TBP.slack,
-                              along.scale(TBP.sag).add(z.scale(TBP.nudge)),
-                          );
-                // The upper's lower leg (further below the rope, Y) eased on towards +Z beside the pulley's axle, so
-                // it sits more under its upper leg there: most level with the axle, fading out along the rope.
-                const tip = eased.reduce(
-                    (b, q, k) => (q.distanceTo(middle) > eased[b].distanceTo(middle) ? k : b),
-                    0,
-                );
-                const besideAxle = (q: Vector3) =>
-                    Math.exp(-((q.sub(pulley.centre).dot(along) / TBP.tuckReach) ** 2));
-                const lowness = (from: number, to: number) => {
-                    let sum = 0;
-                    let weight = 0;
-                    for (let k = from; k < to; k++) {
-                        const w = besideAxle(eased[k]);
-                        sum += eased[k].sub(middle).dot(level) * w;
-                        weight += w;
-                    }
-                    return sum / Math.max(weight, 1e-12);
-                };
-                const firstLower = lowness(0, tip) < lowness(tip, eased.length);
-                const tucked =
-                    i === 0
-                        ? eased.map((q, k) =>
-                              k < tip === firstLower ? q.add(z.scale(TBP.tuck * besideAxle(q))) : q,
-                          )
-                        : eased;
-                return strand([...hitch, ...tucked], TBP.cordR, "rope", c, false, false);
-            }),
+            ...prusiks,
+            ...(lrhAround
+                ? banded(lrhAround.a, lrhAround.b, lrhAround.r, [rigColor(belay.lrh)], 1)
+                : []),
+            ...(tbpAround ? banded(tbpAround.a, tbpAround.b, tbpAround.r, tbpColors, 2) : []),
         ],
         labels: [
-            lrh.label,
-            {
-                at: tbpA.lerp(tbpB, 0.5),
-                text: TBP.text,
-                on: { along, length: TBP.length, r: TBP.r },
-                light: true,
-            },
+            lrhAround && !lrh.label.on
+                ? onCylinder(lrhAround, LRH.text, DARK_COLORS.includes(belay.lrh))
+                : lrh.label,
+            tbpAround ? onCylinder(tbpAround, TBP.text, true) : knotLabel([tbpA, tbpB], TBP.text),
         ],
         tbpA,
         tbpB,
@@ -2320,6 +2571,7 @@ export function layoutRig(
                 text: DC.text,
                 on: { along, length: start.distanceTo(end), r: DC.r },
                 light: DARK_COLORS.includes(item.dc),
+                font: CYLINDER_FONT,
             });
             return;
         }
@@ -2572,13 +2824,7 @@ export function legend(rig: Rig): {
     );
     if (stopped.length) knots.push({ text: KNOT_LABELS.stopper, name: "Figure 8 stopper" });
     if (belays.length) knots.push({ text: LRH.text, name: "Load-release hitch" });
-    if (belays.length)
-        cylinders.push({
-            text: TBP.text,
-            name: "Tandem belay prusiks + pulley",
-            colors: belays[0].tbp.map(rigColor),
-            light: true,
-        });
+    if (belays.length) knots.push({ text: TBP.text, name: "Tandem belay prusiks + pulley" });
     const safety = rig.items.filter((i): i is SafetyLine => i.kind === "safety");
     if (safety.length)
         cylinders.push({

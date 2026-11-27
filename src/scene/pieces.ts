@@ -285,6 +285,8 @@ export type RigLabel = {
     light?: boolean;
     /** How big it's written in 3D, as a fraction of the most that fits on what it's on (all of it unless given). */
     size?: number;
+    /** How tall its letters are written in 3D (metres), in place of fitting them to what it's on. */
+    font?: number;
     /** Where it is in the tower's shell, as what it's written on is, so it sorts with it. */
     shell?: Piece["shell"];
     /** Which side of it an elevation writes it, if not the side of the drawing it's on. */
