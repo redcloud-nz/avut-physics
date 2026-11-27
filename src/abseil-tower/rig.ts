@@ -8,7 +8,14 @@ import {
     type CarabinerFeatures,
 } from "@/rigging/hardware";
 import type { Connection } from "@/rigging/interactions";
-import { clearOf, figure8, loadReleaseHitch, munterTwoHalfHitches, stopper } from "@/rigging/knots";
+import {
+    clearOf,
+    figure8,
+    loadReleaseHitch,
+    munterTwoHalfHitches,
+    stopper,
+    tiedPrusik,
+} from "@/rigging/knots";
 import { basketedSlingWith, SLINGS, type TapeFeatures } from "@/rigging/slings";
 import {
     type Face,
@@ -1371,9 +1378,132 @@ const TBP = {
     r: 0.016,
     length: 0.26,
     bands: 2,
-    cordR: 0.0035,
     plates: "red" as RigColor,
+    /** Their cord's radius: 8 mm cord. */
+    cordR: 0.004,
+    /** How far apart along the rope the two prusiks' middles are. */
+    apart: 0.07,
+    /**
+     * Where the prusiks' loops go round the carabiner's bar, round it from the middle of the pulley towards the spine:
+     * as tied in the knot file (from the lower's hitch), the upper's (just clear of the pulley's plate), and the
+     * lower's (far enough on to clear the upper's).
+     */
+    tiedAt: 0.0265,
+    upperAt: 0.0175,
+    lowerAt: 0.0255,
+    /** How much further out from the rope the lower prusik's loop bulges than as tied, to give the upper's room. */
+    slack: 0.009,
+    /** How much further down the rope (towards the abseiler) the lower prusik's loop bows than as tied. */
+    sag: 0.01,
+    /** How much further out from the carabiner's bar the loops go round it than as tied. */
+    clear: 0.0025,
+    /** How far the lower prusik's wrap round the bar is canted outwards, away from the upper's (radians). */
+    cant: (10 * Math.PI) / 180,
 };
+
+/** Arc lengths along `points` from the first, at each. */
+function arcLengths(points: readonly Vector3[]): number[] {
+    const out = [0];
+    for (let k = 1; k < points.length; k++)
+        out.push(out[k - 1] + points[k].distanceTo(points[k - 1]));
+    return out;
+}
+
+/** The index of the point of `points` nearest `to`. */
+function nearestIndex(points: readonly Vector3[], to: Vector3): number {
+    return points.reduce((b, q, k) => (q.distanceTo(to) < points[b].distanceTo(to) ? k : b), 0);
+}
+
+/**
+ * A prusik's loop as tied (`tied`, leg end to leg end), going round a carabiner's bar at `was`, hung instead round it at
+ * `to` from the same hitch. Where it goes round the bar it's carried there, turned as the bar turns between the two, so
+ * it wraps the bar the same; between there and the hitch it's turned and stretched or shrunk about where it leaves the
+ * hitch, to reach; and at its legs' ends it's as tied, so it leaves the hitch as tied. Given `square`, the wrap is
+ * turned on about the bar's middle to lie square to it (parallel to a pulley's side plates, `square` their normal).
+ * It's eased `clear` further out from the bar all round. Then it's smoothed, except round the bar and at the legs' ends.
+ */
+function rehungLoop(
+    tied: readonly Vector3[],
+    was: { at: Vector3; along: Vector3 },
+    to: { at: Vector3; along: Vector3 },
+    square?: Vector3,
+    clear = 0,
+): Vector3[] {
+    const turn = (v: Vector3, from: Vector3, onto: Vector3) => {
+        const axis = from.cross(onto);
+        return axis.len() > 1e-12 ? v.turned(axis.unit(), from.angleTo(onto)) : v;
+    };
+    const carried = (q: Vector3) => to.at.add(turn(q.sub(was.at), was.along, to.along));
+    const tip = nearestIndex(tied, was.at);
+    const lengths = arcLengths(tied);
+    const total = lengths.at(-1)!;
+    const inWrap = (k: number) => Math.abs(lengths[k] - lengths[tip]) < 0.1 * total;
+    // The wrap's plane, by Newell's sum over its points as carried, turned to be square to `square`.
+    const wrap = tied.filter((_, k) => inWrap(k)).map(carried);
+    const centre = wrap.reduce((t, q) => t.add(q), vec3(0, 0, 0)).scale(1 / wrap.length);
+    let normal = vec3(0, 0, 0);
+    for (let k = 1; k < wrap.length; k++)
+        normal = normal.add(wrap[k - 1].sub(centre).cross(wrap[k].sub(centre)));
+    const onto = square && (normal.dot(square) < 0 ? square.neg() : square);
+    // Then eased out from the bar's middle by `clear`, to clear it.
+    const wrapped = (q: Vector3) => {
+        const v = onto ? turn(carried(q).sub(to.at), normal, onto) : carried(q).sub(to.at);
+        const out = v.sub(to.along.scale(v.dot(to.along)));
+        return to.at.add(v).add(out.unit().scale(clear));
+    };
+    const base = tied[0].lerp(tied.at(-1)!, 0.5);
+    const reach = tied[tip].sub(base);
+    const reached = wrapped(tied[tip]).sub(base);
+    const scaled = (q: Vector3) =>
+        base.add(turn(q.sub(base), reach, reached).scale(reached.len() / reach.len()));
+    const ease = (t: number) => {
+        const u = Math.min(1, Math.max(0, t));
+        return u * u * (3 - 2 * u);
+    };
+    const fromEnds = tied.map((_, k) =>
+        ease(Math.min(lengths[k], total - lengths[k]) / (0.35 * total)),
+    );
+    const nearTip = tied.map((_, k) =>
+        ease(1 - Math.abs(lengths[k] - lengths[tip]) / (0.2 * total)),
+    );
+    let loop = tied.map((q, k) => q.lerp(scaled(q).lerp(wrapped(q), nearTip[k]), fromEnds[k]));
+    // Smoothed by repeatedly easing each point towards its neighbours' middle, held round the bar and at the ends.
+    const free = tied.map((_, k) => fromEnds[k] * (1 - nearTip[k]));
+    for (let pass = 0; pass < 200; pass++)
+        loop = loop.map((q, k) =>
+            k === 0 || k === loop.length - 1
+                ? q
+                : q.lerp(loop[k - 1].lerp(loop[k + 1], 0.5), 0.5 * free[k]),
+        );
+    return loop;
+}
+
+/**
+ * A prusik's loop (`loop`, leg end to leg end, round a bar furthest along it) with `slack` more in it: each leg pushed
+ * out from the rope (through `middle`, along `along`), and `sag` on down it, most halfway between the hitch and the
+ * bar, not at all at either.
+ */
+function slackened(
+    loop: readonly Vector3[],
+    middle: Vector3,
+    along: Vector3,
+    slack: number,
+    sag: number,
+): Vector3[] {
+    const arc = arcLengths(loop);
+    const total = arc.at(-1)!;
+    const tip = loop.reduce(
+        (b, q, k) => (q.distanceTo(middle) > loop[b].distanceTo(middle) ? k : b),
+        0,
+    );
+    return loop.map((q, k) => {
+        const s = k <= tip ? arc[k] / arc[tip] : (total - arc[k]) / (total - arc[tip]);
+        const off = q.sub(middle);
+        const out = off.sub(along.scale(off.dot(along)));
+        const bump = Math.sin(Math.PI * s) ** 2;
+        return q.add(out.unit().scale(slack * bump)).add(along.scale(sag * bump));
+    });
+}
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
 const BELAY_DROP = 0.35;
 
@@ -1398,7 +1528,14 @@ function lrhCylinder(
     along: Vector3,
     across: Vector3,
     face?: Vector3,
-): { pieces: Piece[]; label: RigLabel; far: Vector3; bar: Vector3; hangs: Vector3 } {
+): {
+    pieces: Piece[];
+    label: RigLabel;
+    far: Vector3;
+    bar: Vector3;
+    hangs: Vector3;
+    onBar: (offset: number) => { at: Vector3; along: Vector3 };
+} {
     const tied = clip.sub(along.scale(0.02));
     const lrhEnd = clip.add(along.scale(LRH.length));
     const krab = carabiner(lrhEnd.sub(along.scale(0.015)), along, across, face);
@@ -1424,6 +1561,7 @@ function lrhCylinder(
         far: krab.far,
         bar: across,
         hangs: along,
+        onBar: (offset) => ({ at: krab.far.add(across.scale(offset)), along: across }),
     };
 }
 
@@ -1439,7 +1577,14 @@ function tiedLrh(
     krab: CarabinerFeatures,
     face?: Vector3,
     krabGroup?: Group,
-): { pieces: Piece[]; label: RigLabel; far: Vector3; bar: Vector3; hangs: Vector3 } {
+): {
+    pieces: Piece[];
+    label: RigLabel;
+    far: Vector3;
+    bar: Vector3;
+    hangs: Vector3;
+    onBar: (offset: number) => { at: Vector3; along: Vector3 };
+} {
     const color = rigColor(belay.lrh);
     const { cord, r, lower } = loadReleaseHitch(krab);
     // Hanging square, not settled: its narrow end's middle where the figure 8's loop holds it (where the settled one's
@@ -1494,8 +1639,14 @@ function tiedLrh(
     const slope = loop[k + 1].sub(loop[k - 1]);
     const bar = slope.sub(axis.scale(slope.dot(axis))).unit();
     const hangs = axis.neg();
+    // Where along its bar, `offset` round it from where the pulley hangs towards the spine.
+    const onBar = (offset: number) => {
+        let j = k;
+        for (let gone = 0; gone < offset && j > 1; j--) gone += loop[j].distanceTo(loop[j - 1]);
+        return { at: loop[j], along: loop[j + 1].sub(loop[j - 1]).unit() };
+    };
     if (!face || !krabGroup)
-        return { pieces: [...second.pieces, ...lengthsOf], label, far, bar, hangs };
+        return { pieces: [...second.pieces, ...lengthsOf], label, far, bar, hangs, onBar };
     const group = { at: middle(second.features.loop) };
     const [body, ...sleeve] = second.pieces;
     const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
@@ -1525,6 +1676,7 @@ function tiedLrh(
         far,
         bar,
         hangs,
+        onBar,
     };
 }
 
@@ -1533,7 +1685,7 @@ function tiedLrh(
  * from that on the rope. With the sling's carabiner (`krab`, hanging square) and knots drawn as they're tied, the
  * load-release hitch is the one tied in /knot-editor-3d, moved and turned with that carabiner, its second carabiner
  * where it was tied; otherwise it's a labelled cylinder. Gives their pieces and labels, the prusiks' two ends (the rope
- * goes on from the second), and where the rope comes from behind them, for its spare.
+ * goes on from the second), and the rope from its spare round the pulley's sheave, given which way the spare lies.
  */
 function belayHitches(
     belay: Belay,
@@ -1543,7 +1695,14 @@ function belayHitches(
     face?: Vector3,
     krab?: CarabinerFeatures,
     krabGroup?: Group,
-): { pieces: Piece[]; labels: RigLabel[]; tbpA: Vector3; tbpB: Vector3; back: Vector3 } {
+): {
+    pieces: Piece[];
+    labels: RigLabel[];
+    tbpA: Vector3;
+    tbpB: Vector3;
+    spare: (toward: Vector3) => { pieces: Piece[]; from: Vector3 };
+    sheave: Vector3;
+} {
     const color = rigColor(belay.color);
     const across = vec3(-along.y, along.x, 0).unit();
     const lrh =
@@ -1551,7 +1710,7 @@ function belayHitches(
             ? tiedLrh(belay, krab, face, krabGroup)
             : lrhCylinder(belay, clip, along, across, face);
     // The pulley hangs from the carabiner's end, the rope round it: from the abseiler through the prusiks, which sit
-    // against its plates' shoulders, round the sheave and back out along the pull below them to the spare.
+    // against its plates' shoulders, round the sheave and off it towards the spare.
     const pulley = prusikMindingPulley({
         hang: lrh.far,
         bar: lrh.bar,
@@ -1566,36 +1725,78 @@ function belayHitches(
         },
     });
     const flip = pulley.side.y < 0;
-    const [upper, lower] = flip ? [pulley.b, pulley.a] : [pulley.a, pulley.b];
+    const upper = flip ? pulley.b : pulley.a;
     const sideUp = flip ? pulley.side.neg() : pulley.side;
-    const d = pulley.along;
+    const toEye = pulley.along.neg();
     const R = upper.distanceTo(pulley.centre);
-    // Both parts leave the sheave along the pull, which may be a little out of the pulley's plane.
+    // The part to the abseiler leaves the sheave along the pull, which may be a little out of the pulley's plane.
     const tbpA = upper.add(along.scale(pulley.shoulder + 0.004));
     const tbpB = tbpA.add(along.scale(TBP.length));
-    const back = lower.add(along.scale(pulley.shoulder + 0.03));
-    const round = Array.from({ length: 13 }, (_, i) => {
-        const t = (Math.PI * i) / 12;
-        return pulley.centre.sub(sideUp.scale(R * Math.cos(t))).sub(d.scale(R * Math.sin(t)));
-    });
     const tbpColors = belay.tbp.map(rigColor);
-    // Their loops back to the carabiner, either side of the pulley's plates.
-    const loops = tbpColors.map((c, i) =>
-        strand(
-            [lrh.far.add(lrh.bar.scale(0.02 * (i ? 1 : -1))), tbpA.add(along.scale(0.02))],
-            TBP.cordR,
-            "rope",
-            c,
-        ),
-    );
+    /**
+     * The rope from the spare round the sheave and on through the prusiks: from the abseiler's side it goes round the
+     * sheave's side nearest the eye and leaves it on a tangent towards `toward`, a little way. Gives its pieces and
+     * where it's got to, from where the spare goes on.
+     */
+    const spare = (toward: Vector3): { pieces: Piece[]; from: Vector3 } => {
+        // In the pulley's plane, round from the abseiler's side (angle 0) over the eye's side to where it leaves.
+        const rel = toward.sub(pulley.centre);
+        const [u, v] = [rel.dot(sideUp), rel.dot(toEye)];
+        const dist = Math.max(Math.hypot(u, v), R * 1.001);
+        let leave = Math.atan2(v, u) - Math.acos(R / dist);
+        while (leave <= Math.PI / 2) leave += 2 * Math.PI;
+        while (leave > (5 * Math.PI) / 2) leave -= 2 * Math.PI;
+        const steps = Math.max(2, Math.ceil(leave / (Math.PI / 12)));
+        const round = Array.from({ length: steps + 1 }, (_, i) => {
+            const t = (leave * i) / steps;
+            return pulley.centre
+                .add(sideUp.scale(R * Math.cos(t)))
+                .add(toEye.scale(R * Math.sin(t)));
+        });
+        const off = round[round.length - 1];
+        const from = off.add(toward.sub(off).unit().scale(0.05));
+        return {
+            pieces: [strand([from, ...round.reverse(), tbpB], ROPE_R, "rope", color)],
+            from,
+        };
+    };
     return {
         pieces: [
             ...lrh.pieces,
             ...pulley.pieces,
-            ...loops,
             ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
-            // The rope from the spare round the sheave and on through the prusiks.
-            strand([back, ...round, tbpB], ROPE_R, "rope", color),
+            // The prusiks round the rope, one below the other, as tied in /knot-editor-3d: each one's legs heading
+            // level across the rope, to the right looking down it from the pulley, and its loop on up through the
+            // carabiner on the spine side of the pulley, each round the bar at its own place: the upper's nearer the
+            // pulley, shorter and inside the lower's; the lower's further round, with a little more slack.
+            ...tbpColors.map((c, i) => {
+                const level = vec3(0, 1, 0).sub(along.scale(along.y)).unit();
+                const middle = tbpA.add(along.scale(0.045 + i * TBP.apart));
+                const { hitch, loop: tied } = tiedPrusik(middle, along, level);
+                // Where the loop went round the bar as tied, from the lower's hitch, placed from this one's.
+                const tiedOn = lrh.onBar(TBP.tiedAt);
+                const was = {
+                    at: tiedOn.at.add(along.scale((i - 1) * TBP.apart)),
+                    along: tiedOn.along,
+                };
+                // The upper's wrap round the bar, beside the pulley, lies parallel to its side plates; the lower's sits next
+                // to it, further round, canted outwards away from it.
+                const on = lrh.onBar(i === 0 ? TBP.upperAt : TBP.lowerAt);
+                const cant = lrh.bar.cross(lrh.hangs).unit();
+                const square = i === 0 ? lrh.bar : lrh.bar.turned(cant, TBP.cant);
+                const loop = rehungLoop(tied, was, on, square, TBP.clear);
+                return strand(
+                    [
+                        ...hitch,
+                        ...(i === 0 ? loop : slackened(loop, middle, along, TBP.slack, TBP.sag)),
+                    ],
+                    TBP.cordR,
+                    "rope",
+                    c,
+                    false,
+                    false,
+                );
+            }),
         ],
         labels: [
             lrh.label,
@@ -1608,7 +1809,8 @@ function belayHitches(
         ],
         tbpA,
         tbpB,
-        back,
+        spare,
+        sheave: pulley.centre,
     };
 }
 
@@ -1625,10 +1827,16 @@ function belayOverSide(
     face?: Vector3,
     krab?: CarabinerFeatures,
     krabGroup?: Group,
-): { pieces: Piece[]; labels: RigLabel[]; back: Vector3; connections: Connection[] } {
+): {
+    pieces: Piece[];
+    labels: RigLabel[];
+    spare: (toward: Vector3) => { pieces: Piece[]; from: Vector3 };
+    sheave: Vector3;
+    connections: Connection[];
+} {
     const color = rigColor(belay.color);
     const hitches = belayHitches(belay, clip, along, cylinders, face, krab, krabGroup);
-    const { tbpB, back } = hitches;
+    const { tbpB } = hitches;
     // Where the line on from the prusiks meets the rail, which is further along the beam if it's angled.
     const railZ = tbpB.z + ((PULL[route].x - tbpB.x) * along.z) / along.x;
     const rail = vec3(PULL[route].x, PULL[route].y, railZ);
@@ -1652,7 +1860,8 @@ function belayOverSide(
             ...endKrab.pieces.map((p) => ({ ...p, shell })),
         ],
         labels: [...hitches.labels, tail.label],
-        back,
+        spare: hitches.spare,
+        sheave: hitches.sheave,
         connections: endConnection(belay.id, tail, endKrab),
     };
 }
@@ -1675,7 +1884,8 @@ function belayRedirected(
 ): {
     pieces: Piece[];
     labels: RigLabel[];
-    back: Vector3;
+    spare: (toward: Vector3) => { pieces: Piece[]; from: Vector3 };
+    sheave: Vector3;
     under: Vector3;
     connections: Connection[];
 } {
@@ -1702,7 +1912,8 @@ function belayRedirected(
             ...endKrab.pieces.map((p) => ({ ...p, shell: outside })),
         ],
         labels: [...hitches.labels, tail.label],
-        back: hitches.back,
+        spare: hitches.spare,
+        sheave: hitches.sheave,
         under: hitches.tbpA.lerp(tbpB, 0.5),
         connections: endConnection(belay.id, tail, endKrab),
     };
@@ -2161,7 +2372,8 @@ export function layoutRig(
             const belay: {
                 pieces: Piece[];
                 labels: RigLabel[];
-                back: Vector3;
+                spare: (toward: Vector3) => { pieces: Piece[]; from: Vector3 };
+                sheave: Vector3;
                 under?: Vector3;
                 connections: Connection[];
             } | null =
@@ -2219,17 +2431,30 @@ export function layoutRig(
                 );
             }
             const bucket = item.spare && buckets.get(item.spare);
+            // The rope leaves the pulley towards where it lands on the deck in its coil, or towards its bucket.
+            const coil = item.coil && bucket && vec3(item.coil.east, bucket.y, item.coil.north);
+            const toward = coil
+                ? coil.add(
+                      vec3(belay.sheave.x - coil.x, 0, belay.sheave.z - coil.z)
+                          .unit()
+                          .scale(COIL.outer),
+                  )
+                : bucket
+                  ? bucket.add(vec3(0, heightOf(item.spare) ?? BUCKET_H, 0))
+                  : belay.sheave.add(vec3(0, -1, 0));
+            const spare = belay.spare(toward);
+            pieces.push(...spare.pieces);
             if (bucket)
                 pieces.push(
-                    ...(item.coil
+                    ...(coil
                         ? coiledDrape(
-                              belay.back,
-                              vec3(item.coil.east, bucket.y, item.coil.north),
+                              spare.from,
+                              coil,
                               bucket,
                               rigColor(item.color),
                               heightOf(item.spare),
                           )
-                        : drape(belay.back, bucket, rigColor(item.color), heightOf(item.spare))),
+                        : drape(spare.from, bucket, rigColor(item.color), heightOf(item.spare))),
                 );
         } else {
             const from = clips.get(item.from);

@@ -248,11 +248,12 @@ export const PARTS: Part[] = [
         slug: "tower-tbp",
         name: "Tandem belay prusiks and their pulley",
         group: "Abseil tower",
-        about: "The first belay in NZRT11 (belay-1, the white rope) where it hangs from its load release hitch's second carabiner, cut out of the tower as its 3D view lays it out: the carabiner turned 10° in its own plane from hanging square about the figure 8's loop, centred in its narrow end, and a single prusik minding pulley (red plates) hanging straight down the pull from the middle of its wide end, the bar passing through the middle of the pulley's eyes; the rope from the abseiler past the plates' shoulders, where the tandem belay prusiks sit (their loops drawn, the tower's stand-in cylinder for them left out), round the sheave and back out to its spare on the deck.",
-        pieces: () => towerTbp(),
+        about: "The first belay in NZRT11 (belay-1, the white rope) where it hangs from its load release hitch's second carabiner, cut out of the tower as its 3D view lays it out: the carabiner turned 10° in its own plane from hanging square about the figure 8's loop, centred in its narrow end, and a single prusik minding pulley (red plates) hanging straight down the pull from the middle of its wide end, the bar passing through the middle of the pulley's eyes; the rope from the abseiler past the plates' shoulders, where the tandem belay prusiks sit, one below the other (as tied in /knot-editor-3d, src/rigging/knots/prusik.json: 8 mm cord, three wraps each side of a bridge, each loop up through the carabiner on the spine side of the pulley, hanging loose round its bar, the upper's shorter and inside the lower's; the tower's stand-in cylinder for them is left out; with X, Y and Z arrows, X along the rope), round the sheave and off it towards where its spare lands in its coil on the deck.",
+        pieces: () => towerTbp().pieces,
+        labels: () => towerTbp().labels,
         flat: {
             main: { azimuth: 90, elevation: 90 },
-            pieces: (toward) => towerTbp(toward),
+            pieces: (toward) => towerTbp(toward).pieces,
             minWidth: FLAT_HAIRLINE,
             thinEdges: true,
         },
@@ -946,8 +947,11 @@ function towerLrh(face?: Vector3): Piece[] {
     return moved(within(shown, box), label.at.neg());
 }
 
-/** The first belay's tandem belay prusiks and pulley as `towerLrh` cuts them out, round their label. */
-function towerTbp(face?: Vector3): Piece[] {
+/**
+ * The first belay's tandem belay prusiks and pulley as `towerLrh` cuts them out, round their label, with X, Y and Z
+ * arrows in the rope's frame so changes to them can be talked through.
+ */
+function towerTbp(face?: Vector3): { pieces: Piece[]; labels: RigLabel[] } {
     const rig = RIGS.find((r) => r.slug === "nzrt11")!;
     const { pieces, labels } = layoutRig(rig, new Set(["sling-5", "belay-1"]), { face });
     const label = labels.find((l) => l.text === "TBP")!;
@@ -955,7 +959,21 @@ function towerTbp(face?: Vector3): Piece[] {
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
     // Without the tandem belay prusiks' stand-in cylinder (the rope's own rods), so the rope shows through them.
     const shown = pieces.filter((p) => !(p.kind === "rod" && p.material === "rope"));
-    return moved(within(shown, box), label.at.neg());
+    const to = label.at.neg();
+    // X, Y and Z arrows beside it, for saying which way to move things: X along the rope towards the abseiler (the
+    // last stretch of the rope's run round the sheave and through the prusiks), Y square to it as near straight up as
+    // it goes, Z across.
+    const run = shown.find(
+        (p) => p.kind === "strand" && p.color === rigColor("white") && p.points.length > 10,
+    );
+    const ropeX =
+        run?.kind === "strand" ? run.points.at(-1)!.sub(run.points.at(-2)!).unit() : vec3(1, 0, 0);
+    const ropeY = vec3(0, 1, 0).sub(ropeX.scale(ropeX.y)).unit();
+    const arrows = axes(vec3(0.04, 0.06, 0.1), 0.04, [ropeX, ropeY, ropeX.cross(ropeY)]);
+    return {
+        pieces: [...moved(within(shown, box), to), ...arrows.pieces],
+        labels: arrows.labels,
+    };
 }
 
 /**

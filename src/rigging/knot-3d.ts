@@ -142,15 +142,22 @@ export function numberedRope(
     return { pieces, labels };
 }
 
-/** X, Y and Z arrows from `at`, `length` long, each labelled, for saying which way to move something. */
-export function axes(at: Vector3, length: number): { pieces: Piece[]; labels: RigLabel[] } {
+/**
+ * X, Y and Z arrows from `at`, `length` long, each labelled, for saying which way to move something: along the scene's
+ * own axes, or along `dirs` (three unit directions) if given.
+ */
+export function axes(
+    at: Vector3,
+    length: number,
+    dirs: [Vector3, Vector3, Vector3] = [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)],
+): { pieces: Piece[]; labels: RigLabel[] } {
     const r = length / 14;
     const pieces: Piece[] = [];
     const labels: RigLabel[] = [];
     const each: [string, Vector3, string][] = [
-        ["X", vec3(1, 0, 0), "var(--knot-red)"],
-        ["Y", vec3(0, 1, 0), "var(--knot-green)"],
-        ["Z", vec3(0, 0, 1), "var(--knot-blue)"],
+        ["X", dirs[0], "var(--knot-red)"],
+        ["Y", dirs[1], "var(--knot-green)"],
+        ["Z", dirs[2], "var(--knot-blue)"],
     ];
     for (const [text, dir, color] of each) {
         const tip = at.add(dir.scale(length));

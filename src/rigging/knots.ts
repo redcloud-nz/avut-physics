@@ -13,6 +13,7 @@ import FIGURE_8_SINGLE_JSON from "./knots/figure-8-single.json";
 import FIGURE_8_JSON from "./knots/figure-8.json";
 import LOAD_RELEASE_HITCH_JSON from "./knots/load-release-hitch.json";
 import MUNTER_2HH_JSON from "./knots/munter-and-two-half-hitches.json";
+import PRUSIK_JSON from "./knots/prusik.json";
 import { line } from "./rope";
 
 /**
@@ -503,4 +504,34 @@ export function loadReleaseHitch(krab: { loop: readonly Vector3[] }): {
             across: way(LRH_LOWER.across),
         },
     };
+}
+
+/**
+ * The tandem belay's prusik as tied by hand in /knot-editor-3d (`knots/prusik.json`): 8 mm cord, three wraps each side
+ * of its bridge, its legs and loop up to the carabiner, closed (the rope ends where it starts, at its first leg's end).
+ * It's in its rope's frame: the rope along x through the origin (the hitch's middle) towards the abseiler, y up square
+ * to it, z across, the way its legs head.
+ */
+const PRUSIK = knot3dFile("prusik.json", PRUSIK_JSON);
+
+/** The last of the prusik file's segments in the hitch round the rope: the rest are its loop. */
+const PRUSIK_HITCH_LAST = 23;
+
+/**
+ * The prusik as tied, placed: its middle at `at` on the rope, the rope running `along`, `up` square to it, and its legs
+ * heading `along` × `up`. Gives the hitch round the rope (from its first leg's end round to its second's) and the loop
+ * as tied, on from the second leg's end back to the first's.
+ */
+export function tiedPrusik(
+    at: Vector3,
+    along: Vector3,
+    up: Vector3,
+): { hitch: Vector3[]; loop: Vector3[]; r: number } {
+    const x = along.unit();
+    const y = up.sub(x.scale(up.dot(x))).unit();
+    const z = x.cross(y);
+    const { points, seg } = knotRope(PRUSIK);
+    const placed = points.map((p) => at.add(x.scale(p.x)).add(y.scale(p.y)).add(z.scale(p.z)));
+    const split = seg.findIndex((n) => n > PRUSIK_HITCH_LAST);
+    return { hitch: placed.slice(0, split), loop: placed.slice(split), r: PRUSIK.diameter / 2 };
 }
