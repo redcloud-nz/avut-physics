@@ -7,7 +7,7 @@ import {
     type CarabinerFeatures,
 } from "@/rigging/hardware";
 import type { Connection } from "@/rigging/interactions";
-import { clearOf, figure8, munterTwoHalfHitches, stopper } from "@/rigging/knots";
+import { clearOf, figure8, loadReleaseHitch, munterTwoHalfHitches, stopper } from "@/rigging/knots";
 import { basketedSlingWith, SLINGS, type TapeFeatures } from "@/rigging/slings";
 import {
     type Face,
@@ -901,13 +901,14 @@ const PULL: Record<Rope["route"], Vector2> = {
     "west-face": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
 };
 
-/** A munter and two half hitches' label, and the cylinder it's drawn as in 3D with knot labels on, in the rope's colour. */
-const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
 /**
- * The figure 8s' labels (the knots themselves are drawn): a figure 8 on a bight where a rope's tied to its sling's
- * carabiner and on every rope's end that finishes in a carabiner, and a figure 8 stopper on every other rope's end.
+ * The drawn knots' labels, which knot labels turn on and off: a figure 8 on a bight where a rope's tied to its sling's
+ * carabiner and on every rope's end that finishes in a carabiner, a figure 8 stopper on every other rope's end, a
+ * munter and two half hitches, and a belay's load-release hitch.
  */
-export const KNOT_LABELS = { bight: "F8OB", stopper: "F8" };
+export const KNOT_LABELS = { bight: "F8OB", stopper: "F8", munter: "M+2HH", lrh: "LRH" };
+/** A munter and two half hitches' label, and the cylinder it's drawn as in 3D with knot labels on, in the rope's colour. */
+const HITCH = { text: KNOT_LABELS.munter, r: 0.055, length: 0.25 };
 const DOWN = vec3(0, -1, 0);
 /**
  * The way an end carabiner's narrow bar runs, hanging off a side whose outside is `out`: turned half way out from the
@@ -1208,9 +1209,25 @@ function ropeOverSide(
     } else if (!cylinders && krab) {
         // Face on in a flat view, as its carabiner is.
         const knot = munterTwoHalfHitches(krab);
-        const group = krabGroup && { ...krabGroup, over: true, order: 4 };
+        // Each length over the carabiner where it's on the eye's side of it, and under it where it's behind.
+        const side = (p: Piece) =>
+            face && krabGroup && p.kind === "strand"
+                ? p.points
+                      .reduce((t, q) => t.add(q), vec3(0, 0, 0))
+                      .scale(1 / p.points.length)
+                      .sub(krabGroup.at)
+                      .dot(face)
+                : 1;
         tied = {
-            pieces: knotRope(knot.rope, color).map((p) => ({ ...p, ...(group && { group }) })),
+            pieces: knotRope(knot.rope, color).map((p) => ({
+                ...p,
+                ...(krabGroup && {
+                    group:
+                        side(p) >= 0
+                            ? { ...krabGroup, over: true, order: 4 }
+                            : { ...krabGroup, order: 0 },
+                }),
+            })),
             from: [knot.end],
             label: knotLabel(knot.rope, HITCH.text, undefined, rope.labelSide),
             tail: { at: knot.rope.at(-1)!, heading: knot.rope.at(-1)!.sub(knot.rope.at(-2)!) },
@@ -1318,8 +1335,8 @@ function toGround(
     ];
 }
 
-/** A load-release hitch, as it's drawn: a cylinder of cord, longer and thinner than a rope's hitch. */
-const LRH = { text: "LRH", r: 0.035, length: 0.35 };
+/** A load-release hitch's label, and the cylinder it's drawn as in 3D with knot labels on: longer and thinner than a rope's hitch. */
+const LRH = { text: KNOT_LABELS.lrh, r: 0.035, length: 0.35 };
 /** A daisy chain, drawn as a cylinder as thick as the load-release hitch, as long as it takes to reach its person. */
 const DC = { text: "DC", r: LRH.r };
 /** How high above the deck a person's harness is, where their daisy chain clips in. */
@@ -1359,34 +1376,120 @@ function banded(a: Vector3, b: Vector3, r: number, colors: string[], bands: numb
     }));
 }
 
+/** A belay's load-release hitch drawn as a labelled cylinder along the pull from `clip`, a carabiner on its end. */
+function lrhCylinder(
+    belay: Belay,
+    clip: Vector3,
+    along: Vector3,
+    across: Vector3,
+    face?: Vector3,
+): { pieces: Piece[]; label: RigLabel; far: Vector3 } {
+    const tied = clip.sub(along.scale(0.02));
+    const lrhEnd = clip.add(along.scale(LRH.length));
+    const krab = carabiner(lrhEnd.sub(along.scale(0.015)), along, across, face);
+    return {
+        pieces: [
+            {
+                kind: "rod",
+                a: tied,
+                b: lrhEnd,
+                r: LRH.r,
+                material: "rope",
+                color: rigColor(belay.lrh),
+                capA: true,
+                capB: true,
+            },
+            ...krab.pieces,
+        ],
+        label: {
+            at: tied.lerp(lrhEnd, 0.5),
+            text: LRH.text,
+            on: { along, length: lrhEnd.distanceTo(tied), r: LRH.r },
+        },
+        far: krab.far,
+    };
+}
+
+/**
+ * A belay's load-release hitch as it's tied, on the sling's carabiner (`krab`, hanging square): its cord and its second
+ * carabiner, settled below. In a flat view, laid face on with the sling's carabiner, each carabiner draws as a group
+ * (its body, its sleeve over that), and each short length of cord over the carabiner it's nearest where it's on the
+ * eye's side of it, under it where it's behind. Gives its pieces, its label beside it, and the second carabiner's narrow
+ * end, where the prusiks hang.
+ */
+function tiedLrh(
+    belay: Belay,
+    krab: CarabinerFeatures,
+    face?: Vector3,
+    krabGroup?: Group,
+): { pieces: Piece[]; label: RigLabel; far: Vector3 } {
+    const color = rigColor(belay.lrh);
+    const { cord, r, lower } = loadReleaseHitch(krab);
+    const second = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
+        settled: true,
+    });
+    const middle = (pts: readonly Vector3[]) =>
+        pts.reduce((t, q) => t.add(q), vec3(0, 0, 0)).scale(1 / pts.length);
+    const lengthsOf = lengths(cord).map((points, i, all) =>
+        strand(points, r, "rope", color, i === 0, i === all.length - 1),
+    );
+    const label = knotLabel(cord, LRH.text);
+    if (!face || !krabGroup)
+        return { pieces: [...second.pieces, ...lengthsOf], label, far: second.features.top };
+    const group = { at: middle(second.features.loop) };
+    const [body, ...sleeve] = second.pieces;
+    const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
+    const groups = [krabGroup, group];
+    return {
+        pieces: [
+            { ...body, group: { ...group, order: 1 } },
+            ...sleeve.map((p) => ({
+                ...p,
+                group: { ...group, over: true, order: p.kind === "rod" && p.r > sleeveR ? 3 : 2 },
+            })),
+            ...lengthsOf.map((p) => {
+                const at = p.kind === "strand" ? middle(p.points) : vec3(0, 0, 0);
+                const near = groups.reduce((m, g) =>
+                    g.at.distanceTo(at) < m.at.distanceTo(at) ? g : m,
+                );
+                return {
+                    ...p,
+                    group:
+                        at.sub(near.at).dot(face) >= 0
+                            ? { ...near, over: true, order: 4 }
+                            : { ...near, order: 0 },
+                };
+            }),
+        ],
+        label,
+        far: second.features.top,
+    };
+}
+
 /**
  * A belay's hitches from `clip`: the load-release hitch along the pull, a carabiner on its end, and the tandem prusiks
- * from that on the rope. Gives their pieces and labels, the prusiks' two ends (the rope goes on from the second), and
- * where the rope comes from behind them, for its spare.
+ * from that on the rope. With the sling's carabiner (`krab`, hanging square) and knots drawn as they're tied, the
+ * load-release hitch is the one tied in /knot-editor-3d, moved and turned with that carabiner, its second carabiner
+ * where it was tied; otherwise it's a labelled cylinder. Gives their pieces and labels, the prusiks' two ends (the rope
+ * goes on from the second), and where the rope comes from behind them, for its spare.
  */
 function belayHitches(
     belay: Belay,
     clip: Vector3,
     along: Vector3,
+    cylinders: boolean,
     face?: Vector3,
+    krab?: CarabinerFeatures,
+    krabGroup?: Group,
 ): { pieces: Piece[]; labels: RigLabel[]; tbpA: Vector3; tbpB: Vector3; back: Vector3 } {
     const color = rigColor(belay.color);
     const across = vec3(-along.y, along.x, 0).unit();
-    const tied = clip.sub(along.scale(0.02));
-    const lrhEnd = clip.add(along.scale(LRH.length));
-    const lrh: Piece = {
-        kind: "rod",
-        a: tied,
-        b: lrhEnd,
-        r: LRH.r,
-        material: "rope",
-        color: rigColor(belay.lrh),
-        capA: true,
-        capB: true,
-    };
-    const krab = carabiner(lrhEnd.sub(along.scale(0.015)), along, across, face);
+    const lrh =
+        !cylinders && krab
+            ? tiedLrh(belay, krab, face, krabGroup)
+            : lrhCylinder(belay, clip, along, across, face);
     // The rope runs just under the carabiner's end, the prusiks gripping it beyond, their loops back to the carabiner.
-    const onRope = krab.far.add(along.scale(0.04)).sub(across.scale(0.03));
+    const onRope = lrh.far.add(along.scale(0.04)).sub(across.scale(0.03));
     const [tbpA, tbpB] = [
         onRope.add(along.scale(0.04)),
         onRope.add(along.scale(0.04 + TBP.length)),
@@ -1394,7 +1497,7 @@ function belayHitches(
     const tbpColors = belay.tbp.map(rigColor);
     const loops = tbpColors.map((c, i) =>
         strand(
-            [krab.far.add(across.scale(0.008 * (i ? 1 : -1))), tbpA.add(along.scale(0.02))],
+            [lrh.far.add(across.scale(0.008 * (i ? 1 : -1))), tbpA.add(along.scale(0.02))],
             TBP.cordR,
             "rope",
             c,
@@ -1403,19 +1506,14 @@ function belayHitches(
     const back = onRope.sub(along.scale(0.04));
     return {
         pieces: [
-            lrh,
-            ...krab.pieces,
+            ...lrh.pieces,
             ...loops,
             ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
             // The rope goes into the prusiks at one end and out at the other, hidden inside them.
             strand([back, tbpA], ROPE_R, "rope", color),
         ],
         labels: [
-            {
-                at: tied.lerp(lrhEnd, 0.5),
-                text: LRH.text,
-                on: { along, length: lrhEnd.distanceTo(tied), r: LRH.r },
-            },
+            lrh.label,
             {
                 at: tbpA.lerp(tbpB, 0.5),
                 text: TBP.text,
@@ -1440,9 +1538,11 @@ function belayOverSide(
     along: Vector3,
     cylinders: boolean,
     face?: Vector3,
+    krab?: CarabinerFeatures,
+    krabGroup?: Group,
 ): { pieces: Piece[]; labels: RigLabel[]; back: Vector3; connections: Connection[] } {
     const color = rigColor(belay.color);
-    const hitches = belayHitches(belay, clip, along, face);
+    const hitches = belayHitches(belay, clip, along, cylinders, face, krab, krabGroup);
     const { tbpB, back } = hitches;
     // Where the line on from the prusiks meets the rail, which is further along the beam if it's angled.
     const railZ = tbpB.z + ((PULL[route].x - tbpB.x) * along.z) / along.x;
@@ -1485,6 +1585,8 @@ function belayRedirected(
     drop: number,
     cylinders: boolean,
     face?: Vector3,
+    krab?: CarabinerFeatures,
+    krabGroup?: Group,
 ): {
     pieces: Piece[];
     labels: RigLabel[];
@@ -1493,7 +1595,7 @@ function belayRedirected(
     connections: Connection[];
 } {
     const color = rigColor(belay.color);
-    const hitches = belayHitches(belay, clip, along, face);
+    const hitches = belayHitches(belay, clip, along, cylinders, face, krab, krabGroup);
     const { tbpB } = hitches;
     // Where it leaves the tower, a little past the west railing.
     const leave = tbpB.lerp(through, (tbpB.x - (WEST_EDGE.rail.x - 0.1)) / (tbpB.x - through.x));
@@ -1924,8 +2026,9 @@ export function layoutRig(
                 rigColor(item.color),
                 slant,
                 face,
-                rope?.kind === "rope",
-                rope?.kind === "rope" && rope.knot !== "F8OB",
+                rope?.kind === "rope" && rope.knot === "F8OB",
+                // A munter's and a load-release hitch's carabiner hangs square, as they were tied.
+                (rope?.kind === "rope" && rope.knot !== "F8OB") || rope?.kind === "belay",
             );
             pieces.push(...s.pieces);
             connections.push(onSling(item.id, s));
@@ -1986,9 +2089,20 @@ export function layoutRig(
                           item.redirect.drop,
                           knotCylinders,
                           face,
+                          from.krab,
+                          from.group,
                       )
                     : item.route
-                      ? belayOverSide(item, item.route, from.clip, from.along, knotCylinders, face)
+                      ? belayOverSide(
+                            item,
+                            item.route,
+                            from.clip,
+                            from.along,
+                            knotCylinders,
+                            face,
+                            from.krab,
+                            from.group,
+                        )
                       : null;
             if (!belay) return;
             pieces.push(...belay.pieces);
@@ -2114,21 +2228,14 @@ export function legend(rig: Rig): {
         (r) => r.end === undefined || (typeof r.end === "object" && !r.end.carabiner),
     );
     if (stopped.length) knots.push({ text: KNOT_LABELS.stopper, name: "Figure 8 stopper" });
+    if (belays.length) knots.push({ text: LRH.text, name: "Load-release hitch" });
     if (belays.length)
-        cylinders.push(
-            {
-                text: LRH.text,
-                name: "Load-release hitch",
-                colors: [rigColor(belays[0].lrh)],
-                light: DARK_COLORS.includes(belays[0].lrh),
-            },
-            {
-                text: TBP.text,
-                name: "Tandem belay prusiks + pulley",
-                colors: belays[0].tbp.map(rigColor),
-                light: true,
-            },
-        );
+        cylinders.push({
+            text: TBP.text,
+            name: "Tandem belay prusiks + pulley",
+            colors: belays[0].tbp.map(rigColor),
+            light: true,
+        });
     const safety = rig.items.filter((i): i is SafetyLine => i.kind === "safety");
     if (safety.length)
         cylinders.push({

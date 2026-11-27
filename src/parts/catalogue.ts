@@ -61,7 +61,12 @@ import {
     zipTrolley,
 } from "@/rigging/hardware";
 import { axes, knotPieces, liftKnot, numberedRope } from "@/rigging/knot-3d";
-import { figure8, munterTwoHalfHitches, tiedTo } from "@/rigging/knots";
+import {
+    figure8,
+    munterTwoHalfHitches,
+    loadReleaseHitch as tiedLoadReleaseHitch,
+    tiedTo,
+} from "@/rigging/knots";
 import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
 import MUNTER_HITCH_JSON from "@/rigging/knots/munter-hitch.json";
 import { line } from "@/rigging/rope";
@@ -227,6 +232,19 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "tower-lrh",
+        name: "Load release hitch on its sling's carabiner",
+        group: "Abseil tower",
+        about: "The first belay in NZRT11 (belay-1, the white rope) from its sling's carabiner under the overhead beam, cut out of the tower as its 3D view lays it out: the load release hitch as finished in /knot-editor-3d (src/rigging/knots/load-release-hitch.json), moved and turned with the carabiner hanging square, its second carabiner below, and the tandem belay prusiks from that.",
+        pieces: () => towerLrh(),
+        flat: {
+            main: { azimuth: 90, elevation: 90 },
+            pieces: (toward) => towerLrh(toward),
+            minWidth: FLAT_HAIRLINE,
+            thinEdges: true,
+        },
+    },
+    {
         slug: "tower-munter",
         name: "Munter hitch on a carabiner",
         group: "Abseil tower",
@@ -255,6 +273,13 @@ export const PARTS: Part[] = [
                 }),
             ];
         },
+    },
+    {
+        slug: "load-release-hitch",
+        name: "Load release hitch",
+        group: "Knots",
+        about: "The load release hitch between two CT D carabiners, both with their narrow ends towards the anchor above, the upper one hanging square and the lower one settled: 5 mm green cord, doubled from its middle with a figure 8 on a bight round the lower carabiner, rises as a pair to a munter hitch round the upper carabiner, then comes down and wraps round the rising pair almost to the figure 8. Started from the drawn hitch, wrapped and finished by hand in /knot-editor-3d (src/rigging/knots/load-release-hitch.json).",
+        pieces: () => loadReleaseHitch(),
     },
     {
         slug: "munter-two-half-hitches-drawn",
@@ -856,6 +881,21 @@ export const PARTS: Part[] = [
 ];
 
 /**
+ * The load release hitch: two CT D carabiners, narrow ends up towards the anchor, the upper one hanging square from the
+ * origin as it was tied (`loadReleaseHitch` in the knots), the lower one settled below it, and the 5 mm cord between.
+ */
+function loadReleaseHitch(): Piece[] {
+    const upper = carabinerWith(ORIGIN, UP, ALONG.neg(), STEEL, 0.11);
+    const { cord, r, lower } = tiedLoadReleaseHitch(upper.features);
+    return [
+        ...upper.pieces,
+        ...carabinerWith(lower.top, lower.down, lower.across, STEEL, 0.11, { settled: true })
+            .pieces,
+        ...line(cord, r, rigColor("green"), "rope", { a: true, b: true }),
+    ];
+}
+
+/**
  * The abseil tower's photographer's rope (rope-6) and its sling, cut out round one of its figure 8s on a bight and
  * moved to the origin: the one tied to the sling's carabiner, or (`end`) the one on the rope's end, with the boarding
  * it hangs against. Laid `face` on to the eye for a flat view, as the tower's flat views lay them.
@@ -881,6 +921,16 @@ function towerMunter(face?: Vector3): Piece[] {
     return moved(within(pieces, box), label.at.neg());
 }
 
+/** NZRT11's first belay's load release hitch on its sling's carabiner, cut out of the tower. */
+function towerLrh(face?: Vector3): Piece[] {
+    const rig = RIGS.find((r) => r.slug === "nzrt11")!;
+    const { pieces, labels } = layoutRig(rig, new Set(["sling-5", "belay-1"]), { face });
+    const label = labels.find((l) => l.text === "LRH")!;
+    const reach = vec3(0.35, 0.35, 0.35);
+    const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
+    return moved(within(pieces, box), label.at.neg());
+}
+
 /**
  * Where a munter hitch sits on a carabiner's wide end: the straight run of its bar from the corner by the spine towards
  * the gate (from `from` to `to` metres across it), which it follows, centred `gate` (metres) on from its middle towards
@@ -897,6 +947,40 @@ const MUNTER_BAR = { from: 0.003, to: 0.03, gate: 0.006 };
  * sorting in front of and behind its bar.
  */
 function munterOnCarabiner(face?: Vector3): Piece[] {
+    const L = 0.11;
+    const { body, sleeve, points, r, y } = munterPlaced(face);
+    const color = rigColor("blue");
+    if (!face) return [body, ...sleeve, ...line(points, r, color, "rope", { a: true, b: true })];
+    // Face on: the rope in short lengths (each reaching a point into the next, so no seam shows), sorting by depth
+    // among the carabiner's pieces, which keep their order.
+    const group = { at: ORIGIN.add(y.scale(L / 2)) };
+    const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
+    const lengths: Piece[] = [];
+    for (let i = 0; i < points.length - 1; i += 4)
+        lengths.push({
+            kind: "strand",
+            points: points.slice(Math.max(0, i - 1), Math.min(points.length, i + 6)),
+            r,
+            material: "rope",
+            color,
+            capA: i === 0,
+            capB: i + 4 >= points.length - 1,
+        });
+    return [
+        { ...body, group: { ...group, order: 1 } },
+        ...sleeve.map((p) => ({
+            ...p,
+            group: { ...group, order: p.kind === "rod" && p.r > sleeveR ? 3 : 2 },
+        })),
+        ...lengths,
+    ];
+}
+
+/**
+ * The munter hitch on the carabiner as `munterOnCarabiner` draws it: the carabiner's body and sleeve, the rope's points
+ * and radius, and the drawing's axes (x across, y up the carabiner, z out of the drawing).
+ */
+function munterPlaced(face?: Vector3) {
     const L = 0.11;
     const n = face?.unit() ?? ACROSS;
     const seen = DOWN.sub(n.scale(DOWN.dot(n)));
@@ -925,32 +1009,7 @@ function munterOnCarabiner(face?: Vector3): Piece[] {
             .add(z.scale(p.z));
     const file = knot3dFile("munter-hitch.json", MUNTER_HITCH_JSON);
     const points = knotRope(file).points.map(at);
-    const r = file.diameter / 2;
-    const color = rigColor("blue");
-    if (!face) return [body, ...sleeve, ...line(points, r, color, "rope", { a: true, b: true })];
-    // Face on: the rope in short lengths (each reaching a point into the next, so no seam shows), sorting by depth
-    // among the carabiner's pieces, which keep their order.
-    const group = { at: ORIGIN.add(y.scale(L / 2)) };
-    const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
-    const lengths: Piece[] = [];
-    for (let i = 0; i < points.length - 1; i += 4)
-        lengths.push({
-            kind: "strand",
-            points: points.slice(Math.max(0, i - 1), Math.min(points.length, i + 6)),
-            r,
-            material: "rope",
-            color,
-            capA: i === 0,
-            capB: i + 4 >= points.length - 1,
-        });
-    return [
-        { ...body, group: { ...group, order: 1 } },
-        ...sleeve.map((p) => ({
-            ...p,
-            group: { ...group, order: p.kind === "rod" && p.r > sleeveR ? 3 : 2 },
-        })),
-        ...lengths,
-    ];
+    return { body, sleeve, points, r: file.diameter / 2, x, y, z };
 }
 
 /** The tower's figure 8 on a carabiner as its overhead view draws it. */

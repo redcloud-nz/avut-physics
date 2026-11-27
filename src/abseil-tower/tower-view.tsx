@@ -170,7 +170,7 @@ export default function TowerView({ slug }: { slug: string }) {
     const rig = RIGS.find((r) => r.slug === slug) ?? RIGS[0];
     // The figure 8s are drawn as they're tied, so their labels can be turned off. In 3D, where labels are written on
     // cylinders, the knots are drawn as labelled cylinders while their labels are on.
-    const [showKnotLabels, setShowKnotLabels] = useState(true);
+    const [showKnotLabels, setShowKnotLabels] = useState(false);
     const knotCylinders = mode === "3d" && showKnotLabels;
     const cam = useMemo(() => new OrbitCamera(rad(azimuth), rad(elevation)), [azimuth, elevation]);
     // In the flat views the carabiners and knots are laid face on to the eye, so each shows its shape.

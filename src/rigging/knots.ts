@@ -7,10 +7,11 @@ import { Vector2 } from "@/lib/vector2";
 import { vec3, type Vector3 } from "@/lib/vector3";
 import type { Piece } from "@/scene/pieces";
 
-import { CARABINER_R, CARABINER_WIDTH } from "./hardware";
+import { CARABINER_R, CARABINER_WIDTH, carabinerWith } from "./hardware";
 import FIGURE_8_BIG_LOOP_JSON from "./knots/figure-8-big-loop.json";
 import FIGURE_8_SINGLE_JSON from "./knots/figure-8-single.json";
 import FIGURE_8_JSON from "./knots/figure-8.json";
+import LOAD_RELEASE_HITCH_JSON from "./knots/load-release-hitch.json";
 import MUNTER_2HH_JSON from "./knots/munter-and-two-half-hitches.json";
 import { line } from "./rope";
 
@@ -432,6 +433,22 @@ function loopFrame(loop: readonly Vector3[]) {
 }
 
 /**
+ * How a knot tied on a CT D carabiner (its rod's middle line `tied`, as `carabinerWith` gives it) is moved and turned to
+ * sit the same on another (`krab`): where each point goes, and which way each direction turns.
+ */
+function onCarabiner(tied: readonly Vector3[], krab: readonly Vector3[]) {
+    if (tied.length !== krab.length)
+        throw new Error("The knot was tied on another carabiner than this one.");
+    const [from, to] = [loopFrame(tied), loopFrame(krab)];
+    const way = (d: Vector3) =>
+        to.u
+            .scale(d.dot(from.u))
+            .add(to.v.scale(d.dot(from.v)))
+            .add(to.w.scale(d.dot(from.w)));
+    return { point: (p: Vector3) => to.o.add(way(p.sub(from.o))), way };
+}
+
+/**
  * The munter and two half hitches on a CT D carabiner (its rod's middle line `loop`, as `carabinerWith` gives it),
  * wherever it hangs: the knot as tied, moved and turned with the carabiner from where it was tied, so it sits on it as
  * it was made. The rope runs from where its standing part leaves the knot to its tail's end, and that first point.
@@ -442,15 +459,48 @@ export function munterTwoHalfHitches(krab: { loop: readonly Vector3[] }): {
 } {
     const tied = MUNTER_2HH.props.find((p) => p.kind === "carabiner");
     if (!tied) throw new Error("The munter's file has no carabiner.");
-    if (tied.loop.length !== krab.loop.length)
-        throw new Error("The munter was tied on another carabiner than this one.");
-    const [from, to] = [loopFrame(tied.loop), loopFrame(krab.loop)];
-    const rope = MUNTER_ROPE.map((p) => {
-        const d = p.sub(from.o);
-        return to.o
-            .add(to.u.scale(d.dot(from.u)))
-            .add(to.v.scale(d.dot(from.v)))
-            .add(to.w.scale(d.dot(from.w)));
-    });
+    const { point } = onCarabiner(tied.loop, krab.loop);
+    const rope = MUNTER_ROPE.map(point);
     return { rope, end: rope[0] };
+}
+
+/**
+ * The load release hitch, tied in /knot-editor-3d between two CT D carabiners and finished by hand: the upper one
+ * hanging square, up the y axis from its broad end at the origin, its gate towards −x (as `carabinerWith(origin, up,
+ * −x)` draws it), the 5 mm cord's munter round that broad end; the lower one settled below, drawn the same way up, the
+ * cord's figure 8 on a bight round its broad end, its narrow end down for the load.
+ */
+const LOAD_RELEASE_HITCH = knot3dFile("load-release-hitch.json", LOAD_RELEASE_HITCH_JSON);
+
+/** The load release hitch's lower carabiner as the file has it: where `carabinerWith` starts it, and its two ways. */
+const LRH_LOWER = (() => {
+    const lower = LOAD_RELEASE_HITCH.props.filter((p) => p.kind === "carabiner")[1];
+    if (!lower) throw new Error("The load release hitch's file hasn't two carabiners.");
+    const across = vec3(-1, 0, 0);
+    const drawn = carabinerWith(vec3(0, 0, 0), UP, across, "", 0.11, { settled: true });
+    return { top: lower.loop[0].sub(drawn.features.loop[0]), down: UP, across };
+})();
+
+/**
+ * The load release hitch hung from a CT D carabiner hanging square (its rod's middle line `loop`), moved and turned
+ * with it from where it was tied: its cord (from one end round to the other), how thick it is, and its lower carabiner,
+ * to draw with `carabinerWith(top, down, across, colour, 0.11, { settled: true })`.
+ */
+export function loadReleaseHitch(krab: { loop: readonly Vector3[] }): {
+    cord: Vector3[];
+    r: number;
+    lower: { top: Vector3; down: Vector3; across: Vector3 };
+} {
+    const upper = LOAD_RELEASE_HITCH.props.find((p) => p.kind === "carabiner");
+    if (!upper) throw new Error("The load release hitch's file has no carabiner.");
+    const { point, way } = onCarabiner(upper.loop, krab.loop);
+    return {
+        cord: knotRope(LOAD_RELEASE_HITCH).points.map(point),
+        r: LOAD_RELEASE_HITCH.diameter / 2,
+        lower: {
+            top: point(LRH_LOWER.top),
+            down: way(LRH_LOWER.down),
+            across: way(LRH_LOWER.across),
+        },
+    };
 }
