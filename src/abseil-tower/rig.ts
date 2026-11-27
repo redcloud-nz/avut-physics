@@ -938,7 +938,7 @@ const knotRope = (rope: Vector3[], color: string): Piece[] =>
  * of what it passes over and behind what it passes under. Each reaches a step into the next and the last, so they join
  * on a straight stretch both cover, and no seam shows across a bend whichever's drawn over the other.
  */
-function lengths(points: Vector3[], n = 4): Vector3[][] {
+export function lengths(points: Vector3[], n = 4): Vector3[][] {
     const out: Vector3[][] = [];
     for (let i = 0; i < points.length - 1; i += n)
         out.push(points.slice(Math.max(0, i - 1), Math.min(points.length, i + n + 2)));
@@ -1395,6 +1395,11 @@ const TBP = {
     slack: 0.009,
     /** How much further down the rope (towards the abseiler) the lower prusik's loop bows than as tied. */
     sag: 0.01,
+    /** How far the loops' legs are eased apart across the rope (the upper's to -Z, the lower's to +Z) at their middles. */
+    nudge: 0.006,
+    /** How far the upper prusik's lower leg is eased on to +Z beside the pulley's axle, and how far along the rope that reaches. */
+    tuck: 0.004,
+    tuckReach: 0.02,
     /** How much further out from the carabiner's bar the loops go round it than as tied. */
     clear: 0.0025,
     /** How far the lower prusik's wrap round the bar is canted outwards, away from the upper's (radians). */
@@ -1480,7 +1485,7 @@ function rehungLoop(
 
 /**
  * A prusik's loop (`loop`, leg end to leg end, round a bar furthest along it) with `slack` more in it: each leg pushed
- * out from the rope (through `middle`, along `along`), and `sag` on down it, most halfway between the hitch and the
+ * out from the rope (through `middle`, along `along`), and moved by `push` too, most halfway between the hitch and the
  * bar, not at all at either.
  */
 function slackened(
@@ -1488,7 +1493,7 @@ function slackened(
     middle: Vector3,
     along: Vector3,
     slack: number,
-    sag: number,
+    push: Vector3,
 ): Vector3[] {
     const arc = arcLengths(loop);
     const total = arc.at(-1)!;
@@ -1501,7 +1506,7 @@ function slackened(
         const off = q.sub(middle);
         const out = off.sub(along.scale(off.dot(along)));
         const bump = Math.sin(Math.PI * s) ** 2;
-        return q.add(out.unit().scale(slack * bump)).add(along.scale(sag * bump));
+        return q.add(out.unit().scale(slack * bump)).add(push.scale(bump));
     });
 }
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
@@ -1785,17 +1790,45 @@ function belayHitches(
                 const cant = lrh.bar.cross(lrh.hangs).unit();
                 const square = i === 0 ? lrh.bar : lrh.bar.turned(cant, TBP.cant);
                 const loop = rehungLoop(tied, was, on, square, TBP.clear);
-                return strand(
-                    [
-                        ...hitch,
-                        ...(i === 0 ? loop : slackened(loop, middle, along, TBP.slack, TBP.sag)),
-                    ],
-                    TBP.cordR,
-                    "rope",
-                    c,
-                    false,
-                    false,
+                // Their legs eased apart across the rope (Z, square to it and its level Y), so they clear each other
+                // between the hitches and the bar; the lower's with more slack, and bowed on down the rope.
+                const z = along.cross(level).unit();
+                const eased =
+                    i === 0
+                        ? slackened(loop, middle, along, 0, z.scale(-TBP.nudge))
+                        : slackened(
+                              loop,
+                              middle,
+                              along,
+                              TBP.slack,
+                              along.scale(TBP.sag).add(z.scale(TBP.nudge)),
+                          );
+                // The upper's lower leg (further below the rope, Y) eased on towards +Z beside the pulley's axle, so
+                // it sits more under its upper leg there: most level with the axle, fading out along the rope.
+                const tip = eased.reduce(
+                    (b, q, k) => (q.distanceTo(middle) > eased[b].distanceTo(middle) ? k : b),
+                    0,
                 );
+                const besideAxle = (q: Vector3) =>
+                    Math.exp(-((q.sub(pulley.centre).dot(along) / TBP.tuckReach) ** 2));
+                const lowness = (from: number, to: number) => {
+                    let sum = 0;
+                    let weight = 0;
+                    for (let k = from; k < to; k++) {
+                        const w = besideAxle(eased[k]);
+                        sum += eased[k].sub(middle).dot(level) * w;
+                        weight += w;
+                    }
+                    return sum / Math.max(weight, 1e-12);
+                };
+                const firstLower = lowness(0, tip) < lowness(tip, eased.length);
+                const tucked =
+                    i === 0
+                        ? eased.map((q, k) =>
+                              k < tip === firstLower ? q.add(z.scale(TBP.tuck * besideAxle(q))) : q,
+                          )
+                        : eased;
+                return strand([...hitch, ...tucked], TBP.cordR, "rope", c, false, false);
             }),
         ],
         labels: [

@@ -1,4 +1,4 @@
-import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, rigColor, RIGS } from "@/abseil-tower/rig";
+import { FLAT_HAIRLINE, KNOT_LABELS, layoutRig, lengths, rigColor, RIGS } from "@/abseil-tower/rig";
 import { towerPieces } from "@/abseil-tower/tower";
 import { CHAIN_WEIGHT, chainWeightHanging, chainWeightMass } from "@/flying-fox/chain-weight";
 import {
@@ -73,7 +73,7 @@ import { line } from "@/rigging/rope";
 import { sling } from "@/rigging/slings";
 import type { RigLabel } from "@/scene/pieces";
 import { timber, type Piece } from "@/scene/pieces";
-import { moved } from "@/scene/transforms";
+import { moved, posed } from "@/scene/transforms";
 
 /**
  * The parts the visualisations build from pieces, each on its own so it can be looked at and refined: the shared
@@ -253,7 +253,7 @@ export const PARTS: Part[] = [
         labels: () => towerTbp().labels,
         flat: {
             main: { azimuth: 90, elevation: 90 },
-            pieces: (toward) => towerTbp(toward).pieces,
+            pieces: () => towerTbpFlat(),
             minWidth: FLAT_HAIRLINE,
             thinEdges: true,
         },
@@ -951,7 +951,12 @@ function towerLrh(face?: Vector3): Piece[] {
  * The first belay's tandem belay prusiks and pulley as `towerLrh` cuts them out, round their label, with X, Y and Z
  * arrows in the rope's frame so changes to them can be talked through.
  */
-function towerTbp(face?: Vector3): { pieces: Piece[]; labels: RigLabel[] } {
+function towerTbp(face?: Vector3): {
+    pieces: Piece[];
+    labels: RigLabel[];
+    ropeX: Vector3;
+    ropeY: Vector3;
+} {
     const rig = RIGS.find((r) => r.slug === "nzrt11")!;
     const { pieces, labels } = layoutRig(rig, new Set(["sling-5", "belay-1"]), { face });
     const label = labels.find((l) => l.text === "TBP")!;
@@ -973,7 +978,45 @@ function towerTbp(face?: Vector3): { pieces: Piece[]; labels: RigLabel[] } {
     return {
         pieces: [...moved(within(shown, box), to), ...arrows.pieces],
         labels: arrows.labels,
+        ropeX,
+        ropeY,
     };
+}
+
+/**
+ * The tandem belay prusiks' flat view: looking straight down the rope's Y arrow, the part turned so its rope's frame is
+ * the scene's (X along x, Y up, Z along z) and seen from above. The carabiner (with the load-release hitch, which sorts
+ * with it) is drawn under everything else; the rope and the prusiks' cords in short lengths, each sorting by its own
+ * depth, so the rope goes under the pulley where it's below the sheave and each turn of a prusik shows in front of the
+ * rope or behind it.
+ */
+function towerTbpFlat(): Piece[] {
+    const { ropeX, ropeY } = towerTbp();
+    const up = vec3(0, 1, 0);
+    const tilt = ropeY.cross(up);
+    const level = { at: vec3(0, 0, 0), axis: tilt.unit(), angle: ropeY.angleTo(up) };
+    const x = tilt.len() > 1e-12 ? ropeX.turned(level.axis, level.angle) : ropeX;
+    const pieces = towerTbp(ropeY).pieces;
+    const levelled = tilt.len() > 1e-12 ? posed(pieces, level) : pieces;
+    const turned = posed(levelled, {
+        at: vec3(0, 0, 0),
+        axis: up,
+        angle: Math.atan2(x.cross(vec3(1, 0, 0)).dot(up), x.dot(vec3(1, 0, 0))),
+    });
+    // Groups keep their middles where the tower has them (moving and turning pieces leaves those be), metres up on it:
+    // dropped well below everything here, keeping their order among themselves.
+    const under = vec3(0, 100, 0);
+    return turned.flatMap((p): Piece[] => {
+        if (p.group) return [{ ...p, group: { ...p.group, at: p.group.at.sub(under) } }];
+        if (p.kind === "strand" && p.material === "rope")
+            return lengths(p.points).map((points, i, all) => ({
+                ...p,
+                points,
+                capA: i === 0 && p.capA,
+                capB: i === all.length - 1 && p.capB,
+            }));
+        return [p];
+    });
 }
 
 /**
