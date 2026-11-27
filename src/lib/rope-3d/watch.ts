@@ -32,27 +32,46 @@ export class PassWatch {
         const n = p.length;
         const near = 2 * d;
         const seen = new Set<number>();
-        for (let i = 0; i < n - 1; i++)
-            for (let j = i + 2; j < n - 1; j++) {
-                if (along[j] - along[i] < Math.PI * d) continue;
-                if (p[i].distanceTo(p[j]) > near + 2 * p[i].distanceTo(p[i + 1])) continue;
-                const { s, t } = segmentsNearest(p[i], p[i + 1], p[j], p[j + 1]);
-                if (s <= 0 || s >= 1 || t <= 0 || t >= 1) continue;
-                const w = p[j].lerp(p[j + 1], t).sub(p[i].lerp(p[i + 1], s));
-                const gap = w.len();
-                const side = Math.sign(
-                    p[i + 1]
-                        .sub(p[i])
-                        .cross(p[j + 1].sub(p[j]))
-                        .dot(w),
-                );
-                const key = i * n + j;
-                seen.add(key);
-                const was = this.sides.get(key);
-                this.sides.set(key, side);
-                if (was !== undefined && side !== 0 && was !== side && gap < d / 2)
-                    return `the rope went through itself, ${(along[i] * 1000).toFixed(0)} mm and ${(along[j] * 1000).toFixed(0)} mm along it`;
-            }
+        // Pieces filed by the grid cell their start is in, cells as wide as a piece and the reach together, so a
+        // piece's neighbours are in its own cell and those next to it.
+        let longest = 0;
+        for (let i = 0; i < n - 1; i++) longest = Math.max(longest, p[i].distanceTo(p[i + 1]));
+        const cell = near + 2 * longest;
+        const at = (q: Vector3) => [q.x, q.y, q.z].map((v) => Math.floor(v / cell));
+        const grid = new Map<string, number[]>();
+        for (let i = 0; i < n - 1; i++) {
+            const k = at(p[i]).join(",");
+            const list = grid.get(k);
+            if (list) list.push(i);
+            else grid.set(k, [i]);
+        }
+        for (let i = 0; i < n - 1; i++) {
+            const [cx, cy, cz] = at(p[i]);
+            for (let a = -1; a <= 1; a++)
+                for (let b = -1; b <= 1; b++)
+                    for (let c = -1; c <= 1; c++)
+                        for (const j of grid.get(`${cx + a},${cy + b},${cz + c}`) ?? []) {
+                            if (j < i + 2 || along[j] - along[i] < Math.PI * d) continue;
+                            if (p[i].distanceTo(p[j]) > near + 2 * p[i].distanceTo(p[i + 1]))
+                                continue;
+                            const { s, t } = segmentsNearest(p[i], p[i + 1], p[j], p[j + 1]);
+                            if (s <= 0 || s >= 1 || t <= 0 || t >= 1) continue;
+                            const w = p[j].lerp(p[j + 1], t).sub(p[i].lerp(p[i + 1], s));
+                            const gap = w.len();
+                            const side = Math.sign(
+                                p[i + 1]
+                                    .sub(p[i])
+                                    .cross(p[j + 1].sub(p[j]))
+                                    .dot(w),
+                            );
+                            const key = i * n + j;
+                            seen.add(key);
+                            const was = this.sides.get(key);
+                            this.sides.set(key, side);
+                            if (was !== undefined && side !== 0 && was !== side && gap < d / 2)
+                                return `the rope went through itself, ${(along[i] * 1000).toFixed(0)} mm and ${(along[j] * 1000).toFixed(0)} mm along it`;
+                        }
+        }
         for (const key of this.sides.keys()) if (!seen.has(key)) this.sides.delete(key);
         return null;
     }

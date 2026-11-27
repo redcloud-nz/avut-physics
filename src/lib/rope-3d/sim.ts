@@ -282,16 +282,19 @@ export class RopeSim {
 type LoopGrid = {
     points: Loop["points"];
     r: number;
-    cells: Map<string, number[]>;
-    key: (x: number, y: number, z: number) => string;
+    cells: Map<number, number[]>;
+    key: (x: number, y: number, z: number) => number;
 };
 
 function loopGrid(loop: Loop, diameter: number): LoopGrid {
     const reach = loop.r + diameter / 2;
     const cell = 2 * reach;
     const c = (v: number) => Math.floor(v / cell);
-    const key = (x: number, y: number, z: number) => `${c(x)},${c(y)},${c(z)}`;
-    const cells = new Map<string, number[]>();
+    // Cells numbered as findPairs numbers them: each index offset to be positive, packed into one number.
+    const id = (i: number, j: number, l: number) =>
+        (i + 1024) * 4194304 + (j + 1024) * 2048 + (l + 1024);
+    const key = (x: number, y: number, z: number) => id(c(x), c(y), c(z));
+    const cells = new Map<number, number[]>();
     const P = loop.points;
     for (let k = 0; k < P.length - 1; k++) {
         const [a, b] = [P[k], P[k + 1]];
@@ -304,10 +307,10 @@ function loopGrid(loop: Loop, diameter: number): LoopGrid {
         for (let i = lo[0]; i <= hi[0]; i++)
             for (let j = lo[1]; j <= hi[1]; j++)
                 for (let l = lo[2]; l <= hi[2]; l++) {
-                    const id = `${i},${j},${l}`;
-                    const list = cells.get(id);
+                    const at = id(i, j, l);
+                    const list = cells.get(at);
                     if (list) list.push(k);
-                    else cells.set(id, [k]);
+                    else cells.set(at, [k]);
                 }
     }
     return { points: P, r: loop.r, cells, key };

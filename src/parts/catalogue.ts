@@ -42,6 +42,7 @@ import {
     bolt,
     carabiner,
     CARABINER_R,
+    carabinerWith,
     chain,
     CHAIN_10,
     chainLink,
@@ -60,9 +61,8 @@ import {
     zipTrolley,
 } from "@/rigging/hardware";
 import { axes, knotPieces, liftKnot, numberedRope } from "@/rigging/knot-3d";
-import { figure8, tiedTo } from "@/rigging/knots";
+import { figure8, munterTwoHalfHitches, tiedTo } from "@/rigging/knots";
 import FIGURE_8_JSON from "@/rigging/knots/figure-8.json";
-import MUNTER_2HH_JSON from "@/rigging/knots/munter-and-two-half-hitches.json";
 import MUNTER_HITCH_JSON from "@/rigging/knots/munter-hitch.json";
 import { line } from "@/rigging/rope";
 import { sling } from "@/rigging/slings";
@@ -214,6 +214,19 @@ export const PARTS: Part[] = [
         flat: towerKnotFlat(true),
     },
     {
+        slug: "tower-m2hh",
+        name: "Munter and two half hitches on its sling's carabiner",
+        group: "Abseil tower",
+        about: "The first rope in NZRT11 (rope-1) tied to its red sling's carabiner under the overhead beam with a munter and two half hitches, cut out of the tower as its 3D view lays it out: the knot as finished in /knot-editor-3d on the D hanging square (src/rigging/knots/munter-and-two-half-hitches.json), moved and turned with the carabiner.",
+        pieces: () => towerMunter(),
+        flat: {
+            main: { azimuth: 90, elevation: 90 },
+            pieces: (toward) => towerMunter(toward),
+            minWidth: FLAT_HAIRLINE,
+            thinEdges: true,
+        },
+    },
+    {
         slug: "tower-munter",
         name: "Munter hitch on a carabiner",
         group: "Abseil tower",
@@ -230,36 +243,16 @@ export const PARTS: Part[] = [
         slug: "munter-two-half-hitches",
         name: "Munter hitch and two half hitches",
         group: "Knots",
-        about: "The munter hitch tied off with two half hitches, tightened in stages in /knot-editor-3d from its knot drawing round the drawing's HMS carabiner (src/rigging/knots/munter-and-two-half-hitches.json).",
+        about: "The munter hitch tied off with two half hitches on the tower's D carabiner, hanging square, its spine upright: drawn in the knot editor, tightened in stages in /knot-editor-3d round the drawing's HMS carabiner, moved onto the D and finished by hand there (src/rigging/knots/munter-and-two-half-hitches.json). Its standing part carries on down the pull.",
         pieces: () => {
-            const file = knot3dFile("munter-and-two-half-hitches.json", MUNTER_2HH_JSON);
+            const { pieces, features } = carabinerWith(ORIGIN, UP, ALONG, STEEL, 0.11);
+            const { rope, end } = munterTwoHalfHitches(features);
             return [
-                ...line(knotRope(file).points, file.diameter / 2, rigColor("blue"), "rope", {
+                ...pieces,
+                ...line([end.add(DOWN.scale(0.15)), ...rope], 0.0055, rigColor("blue"), "rope", {
                     a: true,
                     b: true,
                 }),
-                ...file.props.map((p) =>
-                    p.kind === "carabiner"
-                        ? {
-                              kind: "strand" as const,
-                              points: p.loop,
-                              r: p.r,
-                              material: "steel" as const,
-                              color: STEEL,
-                              capA: false,
-                              capB: false,
-                          }
-                        : {
-                              kind: "rod" as const,
-                              a: p.at.sub(p.along.scale(0.04)),
-                              b: p.at.add(p.along.scale(0.04)),
-                              r: p.r,
-                              material: "steel" as const,
-                              color: STEEL,
-                              capA: true,
-                              capB: true,
-                          },
-                ),
             ];
         },
     },
@@ -876,6 +869,16 @@ function towerKnot(end: boolean, face?: Vector3): Piece[] {
     const reach = vec3(0.3, 0.3, 0.3);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
     return moved(within([...(end ? towerPieces() : []), ...pieces], box), label.at.neg());
+}
+
+/** NZRT11's first rope's munter and two half hitches on its sling's carabiner, cut out of the tower. */
+function towerMunter(face?: Vector3): Piece[] {
+    const rig = RIGS.find((r) => r.slug === "nzrt11")!;
+    const { pieces, labels } = layoutRig(rig, new Set(["sling-1", "rope-1"]), { face });
+    const label = labels.find((l) => l.text === "M+2HH")!;
+    const reach = vec3(0.3, 0.3, 0.3);
+    const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
+    return moved(within(pieces, box), label.at.neg());
 }
 
 /**

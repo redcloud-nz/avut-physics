@@ -7,7 +7,7 @@ import {
     type CarabinerFeatures,
 } from "@/rigging/hardware";
 import type { Connection } from "@/rigging/interactions";
-import { clearOf, figure8, stopper } from "@/rigging/knots";
+import { clearOf, figure8, munterTwoHalfHitches, stopper } from "@/rigging/knots";
 import { basketedSlingWith, SLINGS, type TapeFeatures } from "@/rigging/slings";
 import {
     type Face,
@@ -632,8 +632,9 @@ const run = (
  * A basket sling at `z`, of `length` laid flat, pulled towards `target` (a point in the beam's cross-section: x across,
  * y up), or straight down without one. A `slant` angles the pull along the beam: that far along it for each metre out
  * across. It's a climbing sling as on the flying fox, doubled round the back of both logs, each leg's bight round the
- * top bar of its carabiner, which lies along the pull, flat in the plane of the pull and the beam. Gives its pieces,
- * where the carabiner's bottom bar is for what clips to it, and the pull's direction.
+ * top bar of its carabiner, which lies along the pull, flat in the plane of the pull and the beam. In 3D the carabiner
+ * hangs settled between its loads, or `square` (as a munter's does), its spine along the pull. Gives its pieces, where
+ * the carabiner's bottom bar is for what clips to it, and the pull's direction.
  */
 function basketSling(
     z: number,
@@ -643,6 +644,7 @@ function basketSling(
     slant = 0,
     face?: Vector3,
     knotted = false,
+    square = false,
 ): {
     pieces: Piece[];
     clip: Vector3;
@@ -674,6 +676,7 @@ function basketSling(
         beam.sub(along.scale(beam.dot(along))).unit(),
         face,
         knotted ? "far" : undefined,
+        face === undefined && !square,
     );
     const section = stackedLogs(lower, upper, OVERHEAD.r).map((p) => vec3(p.x, p.y, z));
     const up = beam.cross(vec3(pull.x, pull.y, 0));
@@ -898,7 +901,7 @@ const PULL: Record<Rope["route"], Vector2> = {
     "west-face": vec2(WEST_EDGE.rail.x, WEST_EDGE.rail.y + ROPE_R),
 };
 
-/** How a rope's tied to a carabiner (a munter and two half hitches), drawn as a short cylinder in the rope's colour. */
+/** A munter and two half hitches' label, and the cylinder it's drawn as in 3D with knot labels on, in the rope's colour. */
 const HITCH = { text: "M+2HH", r: 0.055, length: 0.25 };
 /**
  * The figure 8s' labels (the knots themselves are drawn): a figure 8 on a bight where a rope's tied to its sling's
@@ -1134,7 +1137,14 @@ function ropeOverSide(
     face?: Vector3,
     krabGroup?: Group,
     krab?: CarabinerFeatures,
-): { pieces: Piece[]; labels: RigLabel[]; through?: Vector3; connections: Connection[] } {
+): {
+    pieces: Piece[];
+    labels: RigLabel[];
+    through?: Vector3;
+    connections: Connection[];
+    /** Where the knot's tail ends, when it's drawn, and the way it's heading: the rest of the rope runs on from there. */
+    tail?: { at: Vector3; heading: Vector3 };
+} {
     const { route, end } = rope;
     const last = beyondRail(route, clip.z, end).at(-1)!;
     const out = route === "east-face" ? EAST : EAST.neg();
@@ -1147,9 +1157,14 @@ function ropeOverSide(
     const endKrab =
         clipped && carabiner(tail.at, tail.hang, across, face, "near", end === "below-outrigger");
     const color = rigColor(rope.color);
-    // Tied to its sling's carabiner with a figure 8 on a bight round its wide end, lying towards the rail; or with a
-    // munter and two half hitches, drawn as a cylinder along the pull from a little back over the carabiner's end.
-    let tied: { pieces: Piece[]; from: Vector3[]; label: RigLabel };
+    // Tied to its sling's carabiner round its wide end with a figure 8 on a bight, lying towards the rail, or a munter
+    // and two half hitches; with knots as cylinders, the munter's is along the pull from a little back over the end.
+    let tied: {
+        pieces: Piece[];
+        from: Vector3[];
+        label: RigLabel;
+        tail?: { at: Vector3; heading: Vector3 };
+    };
     const connections = endConnection(rope.id, tail, endKrab);
     if (rope.knot === "F8OB") {
         const rail = vec3(PULL[route].x, PULL[route].y, clip.z);
@@ -1190,6 +1205,16 @@ function ropeOverSide(
                   from: [knot.end],
                   label: knotLabel(knot.rope, KNOT_LABELS.bight, undefined, rope.labelSide),
               };
+    } else if (!cylinders && krab) {
+        // Face on in a flat view, as its carabiner is.
+        const knot = munterTwoHalfHitches(krab);
+        const group = krabGroup && { ...krabGroup, over: true, order: 4 };
+        tied = {
+            pieces: knotRope(knot.rope, color).map((p) => ({ ...p, ...(group && { group }) })),
+            from: [knot.end],
+            label: knotLabel(knot.rope, HITCH.text, undefined, rope.labelSide),
+            tail: { at: knot.rope.at(-1)!, heading: knot.rope.at(-1)!.sub(knot.rope.at(-2)!) },
+        };
     } else {
         const hitch = clip.add(along.scale(HITCH.length));
         const start = clip.sub(along.scale(0.02));
@@ -1230,6 +1255,7 @@ function ropeOverSide(
                 ? endKrab.far.add(vec3(0, ROPE_R + CARABINER_R, 0))
                 : undefined,
         connections,
+        tail: tied.tail,
     };
 }
 
@@ -1745,12 +1771,26 @@ function coiledDrape(
 }
 
 /** Spare rope draping from `from` (the hitch) into the bucket at `base`, sagging a little, and down onto its coil. */
-function drape(from: Vector3, base: Vector3, color: string, height = BUCKET_H): Piece[] {
+function drape(
+    from: Vector3,
+    base: Vector3,
+    color: string,
+    height = BUCKET_H,
+    leaving?: Vector3,
+): Piece[] {
     const into = base.add(vec3(0, height, 0));
     const sag = 0.25;
+    // Leaving `from` the way it's heading, when it's given: a curve that sets off that way, then sags into the bucket.
+    const lead = leaving && from.add(leaving.unit().scale(0.15));
     const points = Array.from({ length: 13 }, (_, i) => {
         const t = i / 12;
-        return from.lerp(into, t).add(vec3(0, -sag * 4 * t * (1 - t), 0));
+        const line = lead
+            ? from
+                  .scale((1 - t) ** 2)
+                  .add(lead.scale(2 * t * (1 - t)))
+                  .add(into.scale(t * t))
+            : from.lerp(into, t);
+        return line.add(vec3(0, -sag * 4 * t * (1 - t) * (lead ? t : 1), 0));
     });
     points.push(base.add(vec3(0.12, height - 0.12, 0)));
     return run(points, [4, 8, 12], ROPE_R, "rope", color);
@@ -1884,7 +1924,8 @@ export function layoutRig(
                 rigColor(item.color),
                 slant,
                 face,
-                rope?.kind === "rope" && rope.knot === "F8OB",
+                rope?.kind === "rope",
+                rope?.kind === "rope" && rope.knot !== "F8OB",
             );
             pieces.push(...s.pieces);
             connections.push(onSling(item.id, s));
@@ -2016,7 +2057,13 @@ export function layoutRig(
             const bucket = item.spare && buckets.get(item.spare);
             if (bucket)
                 pieces.push(
-                    ...drape(from.clip, bucket, rigColor(item.color), heightOf(item.spare)),
+                    ...drape(
+                        rope.tail?.at ?? from.clip,
+                        bucket,
+                        rigColor(item.color),
+                        heightOf(item.spare),
+                        rope.tail?.heading,
+                    ),
                 );
         }
     }
@@ -2058,15 +2105,9 @@ export function legend(rig: Rig): {
         ),
         ...belays,
     ];
-    if (munter.length)
-        cylinders.push({
-            text: HITCH.text,
-            name: "Munter and two half-hitches",
-            colors: [rigColor(munter[0].color)],
-            light: DARK_COLORS.includes(munter[0].color),
-        });
     // The knots that are drawn, and their labels.
     const knots: LegendKnot[] = [];
+    if (munter.length) knots.push({ text: HITCH.text, name: "Munter and two half-hitches" });
     if (f8.length) knots.push({ text: KNOT_LABELS.bight, name: "Figure 8 on a bight" });
     // Stoppers: every rope whose end has nothing clipped to it.
     const stopped = ropes.filter(

@@ -1,4 +1,4 @@
-import { knot3dFile, knotRope } from "@/knot-editor-3d/knot-file";
+import { knot3dFile, knotRope, segmentNumber } from "@/knot-editor-3d/knot-file";
 import { convexHull } from "@/lib/hull";
 import { clamp } from "@/lib/math";
 import { nearestOnRun } from "@/lib/polyline3";
@@ -11,11 +11,12 @@ import { CARABINER_R, CARABINER_WIDTH } from "./hardware";
 import FIGURE_8_BIG_LOOP_JSON from "./knots/figure-8-big-loop.json";
 import FIGURE_8_SINGLE_JSON from "./knots/figure-8-single.json";
 import FIGURE_8_JSON from "./knots/figure-8.json";
+import MUNTER_2HH_JSON from "./knots/munter-and-two-half-hitches.json";
 import { line } from "./rope";
 
 /**
  * Knots in 3D: figure 8s on a bight (tightened by hand in the 3D knot editor and saved in `knots/`), big loops round
- * bars, stoppers, and a rope's knot on a carabiner.
+ * bars, stoppers, a rope's knot on a carabiner, and a munter and two half hitches on a D carabiner.
  */
 
 const UP = vec3(0, 1, 0);
@@ -405,4 +406,51 @@ export function beyond(knot: Figure8, bar: Vector3, route: Vector3[]): Vector3[]
     const pull = knot.end.sub(bar).unit();
     const i = route.findIndex((p) => p.sub(bar).dot(pull) > knot.reach + 0.01);
     return i < 0 ? route.slice(-1) : route.slice(i);
+}
+
+/**
+ * The munter and two half hitches, tied in /knot-editor-3d on the CT D carabiner hanging square (`carabinerWith` from
+ * the origin up, its gate along +x), the rope's standing part running down from it.
+ */
+const MUNTER_2HH = knot3dFile("munter-and-two-half-hitches.json", MUNTER_2HH_JSON);
+
+/** The munter's rope from where its standing part leaves the knot (15 mm below the lowest of the rest) to its tail. */
+const MUNTER_ROPE = (() => {
+    const { points, seg } = knotRope(MUNTER_2HH);
+    const standing = segmentNumber(MUNTER_2HH.rope.segments[0]);
+    const low = Math.min(...points.filter((_, i) => seg[i] !== standing).map((p) => p.y)) - 0.015;
+    return points.slice(Math.max(0, points.findIndex((p) => p.y >= low) - 1));
+})();
+
+/** A frame on a closed loop from three of its points: where the first is, and three square directions. */
+function loopFrame(loop: readonly Vector3[]) {
+    const n = loop.length - 1;
+    const [o, p, q] = [loop[0], loop[Math.floor(n / 3)], loop[Math.floor((2 * n) / 3)]];
+    const u = p.sub(o).unit();
+    const w = u.cross(q.sub(o)).unit();
+    return { o, u, v: w.cross(u), w };
+}
+
+/**
+ * The munter and two half hitches on a CT D carabiner (its rod's middle line `loop`, as `carabinerWith` gives it),
+ * wherever it hangs: the knot as tied, moved and turned with the carabiner from where it was tied, so it sits on it as
+ * it was made. The rope runs from where its standing part leaves the knot to its tail's end, and that first point.
+ */
+export function munterTwoHalfHitches(krab: { loop: readonly Vector3[] }): {
+    rope: Vector3[];
+    end: Vector3;
+} {
+    const tied = MUNTER_2HH.props.find((p) => p.kind === "carabiner");
+    if (!tied) throw new Error("The munter's file has no carabiner.");
+    if (tied.loop.length !== krab.loop.length)
+        throw new Error("The munter was tied on another carabiner than this one.");
+    const [from, to] = [loopFrame(tied.loop), loopFrame(krab.loop)];
+    const rope = MUNTER_ROPE.map((p) => {
+        const d = p.sub(from.o);
+        return to.o
+            .add(to.u.scale(d.dot(from.u)))
+            .add(to.v.scale(d.dot(from.v)))
+            .add(to.w.scale(d.dot(from.w)));
+    });
+    return { rope, end: rope[0] };
 }
