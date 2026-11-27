@@ -245,6 +245,19 @@ export const PARTS: Part[] = [
         },
     },
     {
+        slug: "tower-tbp",
+        name: "Tandem belay prusiks and their pulley",
+        group: "Abseil tower",
+        about: "The first belay in NZRT11 (belay-1, the white rope) where it hangs from its load release hitch's second carabiner, cut out of the tower as its 3D view lays it out: the carabiner turned 10° in its own plane from hanging square about the figure 8's loop, centred in its narrow end, and a single prusik minding pulley (red plates) hanging straight down the pull from the middle of its wide end, the bar passing through the middle of the pulley's eyes; the rope from the abseiler past the plates' shoulders, where the tandem belay prusiks sit (their loops drawn, the tower's stand-in cylinder for them left out), round the sheave and back out to its spare on the deck.",
+        pieces: () => towerTbp(),
+        flat: {
+            main: { azimuth: 90, elevation: 90 },
+            pieces: (toward) => towerTbp(toward),
+            minWidth: FLAT_HAIRLINE,
+            thinEdges: true,
+        },
+    },
+    {
         slug: "tower-munter",
         name: "Munter hitch on a carabiner",
         group: "Abseil tower",
@@ -928,7 +941,21 @@ function towerLrh(face?: Vector3): Piece[] {
     const label = labels.find((l) => l.text === "LRH")!;
     const reach = vec3(0.35, 0.35, 0.35);
     const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
-    return moved(within(pieces, box), label.at.neg());
+    // Without the tandem belay prusiks' stand-in cylinder (the rope's own rods), so the rope shows through them.
+    const shown = pieces.filter((p) => !(p.kind === "rod" && p.material === "rope"));
+    return moved(within(shown, box), label.at.neg());
+}
+
+/** The first belay's tandem belay prusiks and pulley as `towerLrh` cuts them out, round their label. */
+function towerTbp(face?: Vector3): Piece[] {
+    const rig = RIGS.find((r) => r.slug === "nzrt11")!;
+    const { pieces, labels } = layoutRig(rig, new Set(["sling-5", "belay-1"]), { face });
+    const label = labels.find((l) => l.text === "TBP")!;
+    const reach = vec3(0.3, 0.3, 0.3);
+    const box = { lo: label.at.sub(reach), hi: label.at.add(reach) };
+    // Without the tandem belay prusiks' stand-in cylinder (the rope's own rods), so the rope shows through them.
+    const shown = pieces.filter((p) => !(p.kind === "rod" && p.material === "rope"));
+    return moved(within(shown, box), label.at.neg());
 }
 
 /**

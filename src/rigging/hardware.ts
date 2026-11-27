@@ -692,6 +692,109 @@ export function pulley({
 }
 
 /**
+ * A prusik minding pulley's sizes (metres), in proportion to the pulley systems' drawings: its sheave's groove and rim,
+ * the plates' margin round it, its eye's hole and how far that is from the axle, the bottom corners' radius, the plates'
+ * thickness and how far apart their middles are, and the sheave's width.
+ */
+const PMP = {
+    groove: 0.019,
+    rim: 0.0256,
+    margin: 0.0056,
+    eye: 0.0104,
+    eyeAt: 0.0416,
+    corner: 0.0032,
+    plate: 0.004,
+    apart: 0.022,
+    width: 0.014,
+};
+
+/**
+ * A single prusik minding pulley hanging by its eye from a carabiner's bar (the bar's middle at `hang`, running along
+ * `bar`, `barR` thick), pulled towards `along`. Its side plates are as the pulley systems' pages draw them: narrowing
+ * from round the sheave to round the eye above the axle, square with rounded corners below it, so a prusik on the rope
+ * comes up against their shoulders rather than being drawn into the sheave. The rope runs round the sheave's side
+ * nearest the eye, both its parts leaving along the pull, one each side `side` apart. `centred`, the bar sits in the
+ * middle of its eyes rather than resting in their tops, so a bar crossing them at a slant clears them. Gives its pieces, the sheave's
+ * middle, the pull square to the axle, where the rope's two parts leave the sheave (`a` on `side`'s side), and how far along the pull from the
+ * sheave's middle its plates' shoulders reach.
+ */
+export function prusikMindingPulley({
+    hang,
+    bar,
+    along,
+    barR,
+    ropeR,
+    colors,
+    centred = false,
+}: {
+    hang: Vector3;
+    bar: Vector3;
+    along: Vector3;
+    barR: number;
+    ropeR: number;
+    colors: { plates: string; sheave: string; steel: string };
+    centred?: boolean;
+}): {
+    pieces: Piece[];
+    centre: Vector3;
+    along: Vector3;
+    side: Vector3;
+    a: Vector3;
+    b: Vector3;
+    shoulder: number;
+} {
+    const n = bar.unit();
+    const d = along.sub(n.scale(along.dot(n))).unit();
+    const side = n.cross(d).unit();
+    // The bar rests in the top of the eye's hole, or `centred` in it.
+    const eyeCentre = hang.add(d.scale(centred ? 0 : PMP.eye - barR));
+    const centre = eyeCentre.add(d.scale(PMP.eyeAt));
+    const m = PMP.rim + PMP.margin;
+    const e = PMP.eye + PMP.margin;
+    const E = PMP.eyeAt;
+    const c = PMP.corner;
+    // u across (`side`), v towards the eye. The straight edges touch both circles at the same angle.
+    const phi = Math.asin((m - e) / E);
+    const arc = (cu: number, cv: number, r: number, from: number, to: number, k: number): Flat[] =>
+        Array.from({ length: k + 1 }, (_, i) => {
+            const t = from + ((to - from) * i) / k;
+            return [cu + r * Math.cos(t), cv + r * Math.sin(t)];
+        });
+    const outline: Flat[] = [
+        ...arc(0, 0, m, 0, phi, 3),
+        ...arc(0, E, e, phi, Math.PI - phi, 12),
+        ...arc(0, 0, m, Math.PI - phi, Math.PI, 3),
+        ...arc(-m + c, -m + c, c, Math.PI, 1.5 * Math.PI, 3),
+        ...arc(m - c, -m + c, c, 1.5 * Math.PI, 2 * Math.PI, 3),
+    ];
+    const f: Frame = { o: centre, u: side, v: d.neg(), n };
+    const hole = circle([0, E], PMP.eye, 14);
+    const pieces: Piece[] = [];
+    for (const s of [-1, 1])
+        pieces.push(
+            ...plate(
+                { ...f, o: centre.add(n.scale((s * PMP.apart) / 2)) },
+                outline,
+                [hole],
+                PMP.plate,
+                colors.plates,
+            ),
+        );
+    pieces.push(...sheave(centre, n, PMP.groove, PMP.rim, PMP.width, colors.sheave));
+    pieces.push(...bolt(centre, n, PMP.apart + PMP.plate, 0.004, colors.steel));
+    const R = PMP.groove + ropeR;
+    return {
+        pieces,
+        centre,
+        along: d,
+        side,
+        a: centre.add(side.scale(R)),
+        b: centre.sub(side.scale(R)),
+        shoulder: m,
+    };
+}
+
+/**
  * The ISC Zip Speed (RP075) trolley's measurements (metres), taken off a side-on photo scaled to its data sheet's 206 mm
  * by 111 mm plates: along the wire (u, its bumper end towards +u) and up from it (v), the wire at the origin, for 50 mm
  * wheels on 11 mm wire. A lobe at the −u end carries the tow hole, and the pin at the +u end holds the bumper.

@@ -4,6 +4,7 @@ import { vec3, type Vector3 } from "@/lib/vector3";
 import {
     CARABINER_R,
     carabinerWith as ctCarabiner,
+    prusikMindingPulley,
     type CarabinerFeatures,
 } from "@/rigging/hardware";
 import type { Connection } from "@/rigging/interactions";
@@ -17,6 +18,7 @@ import {
     type RigLabel,
     type Strand,
 } from "@/scene/pieces";
+import { moved, posed } from "@/scene/transforms";
 
 import { basket, stackedLogs } from "./basket";
 import {
@@ -1357,8 +1359,21 @@ function personCentre(person: Person): Vector3 {
             : [place.east, place.north];
     return vec3(x, LEVELS[place.level] + 0.01, z);
 }
-/** Tandem belay prusiks, drawn as one cylinder round the rope: its upper half one cord's colour, its lower the other's. */
-const TBP = { text: "TBP", r: 0.04, length: 0.26, bands: 2, cordR: 0.0035 };
+/** How far the LRH's second carabiner is turned in its own plane, squaring the bar its pulley hangs from (radians). */
+const LRH_TURN = (10 * Math.PI) / 180;
+
+/**
+ * Tandem belay prusiks, drawn as one cylinder round the rope: its upper half one cord's colour, its lower the other's.
+ * Their pulley's plates are red.
+ */
+const TBP = {
+    text: "TBP",
+    r: 0.016,
+    length: 0.26,
+    bands: 2,
+    cordR: 0.0035,
+    plates: "red" as RigColor,
+};
 /** How far down past the top rail's outer corner a belay rope hangs, waiting for its abseiler, a carabiner on its end. */
 const BELAY_DROP = 0.35;
 
@@ -1383,7 +1398,7 @@ function lrhCylinder(
     along: Vector3,
     across: Vector3,
     face?: Vector3,
-): { pieces: Piece[]; label: RigLabel; far: Vector3 } {
+): { pieces: Piece[]; label: RigLabel; far: Vector3; bar: Vector3; hangs: Vector3 } {
     const tied = clip.sub(along.scale(0.02));
     const lrhEnd = clip.add(along.scale(LRH.length));
     const krab = carabiner(lrhEnd.sub(along.scale(0.015)), along, across, face);
@@ -1407,6 +1422,8 @@ function lrhCylinder(
             on: { along, length: lrhEnd.distanceTo(tied), r: LRH.r },
         },
         far: krab.far,
+        bar: across,
+        hangs: along,
     };
 }
 
@@ -1422,20 +1439,63 @@ function tiedLrh(
     krab: CarabinerFeatures,
     face?: Vector3,
     krabGroup?: Group,
-): { pieces: Piece[]; label: RigLabel; far: Vector3 } {
+): { pieces: Piece[]; label: RigLabel; far: Vector3; bar: Vector3; hangs: Vector3 } {
     const color = rigColor(belay.lrh);
     const { cord, r, lower } = loadReleaseHitch(krab);
-    const second = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
+    // Hanging square, not settled: its narrow end's middle where the figure 8's loop holds it (where the settled one's
+    // was), along the way it was tied.
+    const settled = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
         settled: true,
     });
+    const square = ctCarabiner(lower.top, lower.down, lower.across, "var(--tower-steel)", KRAB_L, {
+        centred: true,
+    });
+    const shift = settled.features.bottom.sub(square.features.bottom);
+    const pivot = settled.features.bottom;
+    const axis = lower.down.unit();
+    const n = lower.down.cross(lower.across).unit();
+    const shifted = square.features.loop.map((q) => q.add(shift));
+    // Where the line straight down the pull from the figure 8's loop crosses its wide end.
+    const offLine = (q: Vector3) => {
+        const v = q.sub(pivot);
+        return v.sub(axis.scale(v.dot(axis))).len();
+    };
+    const { from, to } = square.features.stretches.top;
+    const crossing = (loop: Vector3[]) => {
+        let k = from;
+        for (let i = from; i <= to; i++) if (offLine(loop[i]) < offLine(loop[k])) k = i;
+        return k;
+    };
+    // Turned a little in its own plane about the loop, the way that brings the bar there squarer to the pull.
+    const k0 = crossing(shifted);
+    const slope0 = shifted[k0 + 1].sub(shifted[k0 - 1]);
+    const turn = Math.sign(n.dot(axis.cross(slope0)) * axis.dot(slope0)) * LRH_TURN;
+    const turnPoint = (q: Vector3) => q.sub(pivot).turned(n, turn).add(pivot);
+    const second = {
+        pieces: posed(moved(moved(square.pieces, shift), pivot.neg()), {
+            at: pivot,
+            axis: n,
+            angle: turn,
+        }),
+        features: { ...square.features, loop: shifted.map(turnPoint) },
+    };
     const middle = (pts: readonly Vector3[]) =>
         pts.reduce((t, q) => t.add(q), vec3(0, 0, 0)).scale(1 / pts.length);
     const lengthsOf = lengths(cord).map((points, i, all) =>
         strand(points, r, "rope", color, i === 0, i === all.length - 1),
     );
     const label = knotLabel(cord, LRH.text);
+    // The pulley hangs centred in its wide end, straight down the pull from the figure 8's loop, square to the pull:
+    // its axle straight across, though the bar slopes a little there, which its eyes, centred on it, are wide enough
+    // to take.
+    const loop = second.features.loop;
+    const k = crossing(loop);
+    const far = loop[k];
+    const slope = loop[k + 1].sub(loop[k - 1]);
+    const bar = slope.sub(axis.scale(slope.dot(axis))).unit();
+    const hangs = axis.neg();
     if (!face || !krabGroup)
-        return { pieces: [...second.pieces, ...lengthsOf], label, far: second.features.top };
+        return { pieces: [...second.pieces, ...lengthsOf], label, far, bar, hangs };
     const group = { at: middle(second.features.loop) };
     const [body, ...sleeve] = second.pieces;
     const sleeveR = Math.min(...sleeve.map((p) => (p.kind === "rod" ? p.r : Infinity)));
@@ -1462,7 +1522,9 @@ function tiedLrh(
             }),
         ],
         label,
-        far: second.features.top,
+        far,
+        bar,
+        hangs,
     };
 }
 
@@ -1488,29 +1550,52 @@ function belayHitches(
         !cylinders && krab
             ? tiedLrh(belay, krab, face, krabGroup)
             : lrhCylinder(belay, clip, along, across, face);
-    // The rope runs just under the carabiner's end, the prusiks gripping it beyond, their loops back to the carabiner.
-    const onRope = lrh.far.add(along.scale(0.04)).sub(across.scale(0.03));
-    const [tbpA, tbpB] = [
-        onRope.add(along.scale(0.04)),
-        onRope.add(along.scale(0.04 + TBP.length)),
-    ];
+    // The pulley hangs from the carabiner's end, the rope round it: from the abseiler through the prusiks, which sit
+    // against its plates' shoulders, round the sheave and back out along the pull below them to the spare.
+    const pulley = prusikMindingPulley({
+        hang: lrh.far,
+        bar: lrh.bar,
+        along: lrh.hangs,
+        barR: CARABINER_R,
+        centred: true,
+        ropeR: ROPE_R,
+        colors: {
+            plates: rigColor(TBP.plates),
+            sheave: "var(--tower-steel)",
+            steel: "var(--tower-steel)",
+        },
+    });
+    const flip = pulley.side.y < 0;
+    const [upper, lower] = flip ? [pulley.b, pulley.a] : [pulley.a, pulley.b];
+    const sideUp = flip ? pulley.side.neg() : pulley.side;
+    const d = pulley.along;
+    const R = upper.distanceTo(pulley.centre);
+    // Both parts leave the sheave along the pull, which may be a little out of the pulley's plane.
+    const tbpA = upper.add(along.scale(pulley.shoulder + 0.004));
+    const tbpB = tbpA.add(along.scale(TBP.length));
+    const back = lower.add(along.scale(pulley.shoulder + 0.03));
+    const round = Array.from({ length: 13 }, (_, i) => {
+        const t = (Math.PI * i) / 12;
+        return pulley.centre.sub(sideUp.scale(R * Math.cos(t))).sub(d.scale(R * Math.sin(t)));
+    });
     const tbpColors = belay.tbp.map(rigColor);
+    // Their loops back to the carabiner, either side of the pulley's plates.
     const loops = tbpColors.map((c, i) =>
         strand(
-            [lrh.far.add(across.scale(0.008 * (i ? 1 : -1))), tbpA.add(along.scale(0.02))],
+            [lrh.far.add(lrh.bar.scale(0.02 * (i ? 1 : -1))), tbpA.add(along.scale(0.02))],
             TBP.cordR,
             "rope",
             c,
         ),
     );
-    const back = onRope.sub(along.scale(0.04));
     return {
         pieces: [
             ...lrh.pieces,
+            ...pulley.pieces,
             ...loops,
             ...banded(tbpA, tbpB, TBP.r, tbpColors, TBP.bands),
-            // The rope goes into the prusiks at one end and out at the other, hidden inside them.
-            strand([back, tbpA], ROPE_R, "rope", color),
+            // The rope from the spare round the sheave and on through the prusiks.
+            strand([back, ...round, tbpB], ROPE_R, "rope", color),
         ],
         labels: [
             lrh.label,
